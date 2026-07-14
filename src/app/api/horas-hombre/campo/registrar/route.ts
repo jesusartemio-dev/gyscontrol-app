@@ -178,8 +178,13 @@ export async function POST(request: NextRequest) {
         }
       })
 
-      // Crear las tareas con sus miembros
+      // Crear las tareas con sus miembros (dedupe por usuarioId dentro de cada tarea:
+      // el índice único (registroCampoTareaId, usuarioId) haría fallar la creación
+      // si el payload trajera al mismo usuario repetido en la misma tarea)
       for (const tarea of tareas) {
+        const miembrosUnicos = Array.from(
+          new Map(tarea.miembros.map(m => [m.usuarioId, m])).values()
+        )
         await tx.registroHorasCampoTarea.create({
           data: {
             registroCampoId: registro.id,
@@ -187,7 +192,7 @@ export async function POST(request: NextRequest) {
             nombreTareaExtra: tarea.nombreTareaExtra || null,
             descripcion: tarea.descripcion || null,
             miembros: {
-              create: tarea.miembros.map(m => ({
+              create: miembrosUnicos.map(m => ({
                 usuarioId: m.usuarioId,
                 horas: m.horas,
                 observaciones: m.observaciones || null

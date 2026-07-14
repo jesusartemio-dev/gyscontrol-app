@@ -101,8 +101,11 @@ export async function GET(request: NextRequest) {
 
     // Formatear respuesta con totales
     const registrosConTotales = registros.map(r => {
-      // Calcular totales desde las tareas
-      const cantidadTareas = r.tareas.length
+      // Calcular totales desde las tareas. cantidadMiembros/totalHoras sobre TODAS
+      // las tareas (incluida la placeholder de asistencia); cantidadTareas y `tareas`
+      // visibles la excluyen.
+      const tareasVisibles = r.tareas.filter(t => !t.esAutoAsistencia)
+      const cantidadTareas = tareasVisibles.length
       const todosLosMiembros = r.tareas.flatMap(t => t.miembros)
       const miembrosUnicos = new Set(todosLosMiembros.map(m => m.usuarioId))
       const totalHoras = todosLosMiembros.reduce((sum, m) => sum + m.horas, 0)
@@ -123,7 +126,7 @@ export async function GET(request: NextRequest) {
         cantidadTareas,
         cantidadMiembros: miembrosUnicos.size,
         totalHoras,
-        tareas: r.tareas.map(t => ({
+        tareas: tareasVisibles.map(t => ({
           id: t.id,
           proyectoTareaId: t.proyectoTareaId,
           nombreTareaExtra: t.nombreTareaExtra,

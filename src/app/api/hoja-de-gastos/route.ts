@@ -2,27 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-
-async function generarNumero(): Promise<string> {
-  const now = new Date()
-  const yy = String(now.getFullYear()).slice(-2)
-  const mm = String(now.getMonth() + 1).padStart(2, '0')
-  const dd = String(now.getDate()).padStart(2, '0')
-  const prefix = `REQ-${yy}${mm}${dd}`
-
-  const ultimo = await prisma.hojaDeGastos.findFirst({
-    where: { numero: { startsWith: prefix } },
-    orderBy: { numero: 'desc' },
-  })
-
-  let correlativo = 1
-  if (ultimo) {
-    const parts = ultimo.numero.split('-')
-    correlativo = parseInt(parts[parts.length - 1]) + 1
-  }
-
-  return `${prefix}-${String(correlativo).padStart(3, '0')}`
-}
+import { generarNumeroHoja as generarNumero } from '@/lib/utils/generarNumeroHoja'
 
 const includeRelations = {
   proyecto: { select: { id: true, codigo: true, nombre: true } },

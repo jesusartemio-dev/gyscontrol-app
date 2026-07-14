@@ -473,6 +473,7 @@ export default function Sidebar() {
         { href: '/configuracion/tipos-bloqueo', label: 'Tipos de Bloqueo', icon: ShieldAlert },
         // 💰 Centros de costo
         { href: '/configuracion/centros-costo', label: 'Centros de Costo', icon: CreditCard },
+        { href: '/configuracion/tarifas-campo', label: 'Tarifas de Campo', icon: DollarSign },
         // 👁️ Vistas del catálogo
         { href: '/configuracion/catalogo-columnas', label: 'Vistas Catálogo', icon: Wrench },
         // 📅 Ausencias

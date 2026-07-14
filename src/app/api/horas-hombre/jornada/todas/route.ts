@@ -120,7 +120,12 @@ export async function GET(request: NextRequest) {
     })
 
     const jornadasConEstadisticas = jornadas.map(j => {
-      const cantidadTareas = j.tareas.length
+      // cantidadMiembros/totalHoras se calculan sobre TODAS las tareas (incluida la
+      // placeholder "Asistencia (auto)"), para que el headcount refleje a quienes
+      // marcaron ingreso aunque aún no tengan horas cargadas en una tarea real.
+      // cantidadTareas y el array `tareas` visible excluyen la placeholder.
+      const tareasVisibles = j.tareas.filter(t => !t.esAutoAsistencia)
+      const cantidadTareas = tareasVisibles.length
       const cantidadMiembros = new Set(
         j.tareas.flatMap(t => t.miembros.map(m => m.usuarioId))
       ).size
@@ -149,7 +154,7 @@ export async function GET(request: NextRequest) {
         cantidadTareas,
         cantidadMiembros,
         totalHoras,
-        tareas: j.tareas.map(t => ({
+        tareas: tareasVisibles.map(t => ({
           id: t.id,
           proyectoTareaId: t.proyectoTareaId,
           proyectoTarea: t.proyectoTarea,

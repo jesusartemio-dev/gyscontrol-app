@@ -7,6 +7,7 @@ import {
   calcularFechaEsperada,
   determinarModoRemoto,
   obtenerSedeRemotaActiva,
+  registrarMiembroJornadaCampo,
   upsertDispositivo,
 } from '@/lib/services/asistencia'
 import { formatearTardanza } from '@/lib/utils/formatTardanza'
@@ -373,6 +374,25 @@ export async function POST(req: Request) {
       banderas,
     },
   })
+
+  // Enriquecimiento best-effort: registrar al usuario como miembro (horas=0) de la jornada de
+  // campo para que el headcount esté disponible en tiempo real. No debe bloquear el check-in.
+  if (body.tipo === 'ingreso' && jornadaAsistenciaId) {
+    try {
+      const jornada = await prisma.jornadaAsistencia.findUnique({
+        where: { id: jornadaAsistenciaId },
+        select: { registroHorasCampoId: true },
+      })
+      if (jornada?.registroHorasCampoId) {
+        const registroHorasCampoId = jornada.registroHorasCampoId
+        await prisma.$transaction((tx) =>
+          registrarMiembroJornadaCampo(tx, registroHorasCampoId, userId),
+        )
+      }
+    } catch (error) {
+      console.error('No se pudo auto-registrar miembro de jornada de campo:', error)
+    }
+  }
 
   const horaLima = fechaHora.toLocaleTimeString('es-PE', {
     hour: '2-digit',

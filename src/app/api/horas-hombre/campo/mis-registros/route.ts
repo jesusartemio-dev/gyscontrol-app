@@ -63,8 +63,9 @@ export async function GET(request: NextRequest) {
 
     // Formatear respuesta
     const registrosFormateados = registros.map(r => {
-      // Calcular totales desde las tareas
-      const cantidadTareas = r.tareas.length
+      // Calcular totales desde las tareas. cantidadMiembros/totalHoras sobre TODAS
+      // las tareas (incluida la placeholder de asistencia); cantidadTareas la excluye.
+      const cantidadTareas = r.tareas.filter(t => !t.esAutoAsistencia).length
       const miembrosUnicos = new Set(
         r.tareas.flatMap(t => t.miembros.map(m => m.usuarioId))
       )

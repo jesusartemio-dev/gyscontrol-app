@@ -430,6 +430,7 @@ export default function MobileSidebar() {
         { href: '/configuracion/calendario-laboral', label: 'Calendarios Laborales', icon: Calendar },
         { href: '/configuracion/tipos-bloqueo', label: 'Tipos de Bloqueo', icon: ShieldAlert },
         { href: '/configuracion/centros-costo', label: 'Centros de Costo', icon: CreditCard },
+        { href: '/configuracion/tarifas-campo', label: 'Tarifas de Campo', icon: DollarSign },
         { href: '/configuracion/catalogo-columnas', label: 'Vistas Catálogo', icon: Wrench },
         { href: '/configuracion/tipos-ausencia', label: 'Tipos de Ausencia', icon: CalendarOff },
         { href: '/admin/uso-ia', label: 'Uso IA', icon: Sparkles },

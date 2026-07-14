@@ -9,9 +9,10 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Plus, Search, X, Loader2, CreditCard, ChevronRight, Edit, Trash2, Package } from 'lucide-react'
+import { Plus, Search, X, Loader2, CreditCard, ChevronRight, Edit, Trash2, Package, CalendarClock } from 'lucide-react'
 import { toast } from 'sonner'
 import { getHojasDeGastos, deleteHojaDeGastos } from '@/lib/services/hojaDeGastos'
+import { RequerimientoDelDiaModal } from '@/components/gastos/RequerimientoDelDiaModal'
 import type { HojaDeGastos } from '@/types'
 
 const ESTADOS = [
@@ -74,6 +75,7 @@ export default function MisRequerimientosPage() {
   const [filterCategoria, setFilterCategoria] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<HojaDeGastos | null>(null)
+  const [modalDiaOpen, setModalDiaOpen] = useState(false)
 
   useEffect(() => { loadData() }, [])
 
@@ -131,10 +133,16 @@ export default function MisRequerimientosPage() {
             {hojas.length} requerimientos de dinero
           </p>
         </div>
-        <Button onClick={() => router.push('/gastos/mis-requerimientos/nuevo')} className="bg-amber-600 hover:bg-amber-700">
-          <Plus className="h-4 w-4 mr-1" />
-          Nuevo Requerimiento
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setModalDiaOpen(true)}>
+            <CalendarClock className="h-4 w-4 mr-1" />
+            Requerimiento del día
+          </Button>
+          <Button onClick={() => router.push('/gastos/mis-requerimientos/nuevo')} className="bg-amber-600 hover:bg-amber-700">
+            <Plus className="h-4 w-4 mr-1" />
+            Nuevo Requerimiento
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -293,6 +301,12 @@ export default function MisRequerimientosPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <RequerimientoDelDiaModal
+        open={modalDiaOpen}
+        onOpenChange={setModalDiaOpen}
+        onCreated={loadData}
+      />
     </div>
   )
 }

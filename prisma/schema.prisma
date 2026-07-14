@@ -180,44 +180,45 @@ model CatalogoGasto {
 }
 
 model Cliente {
-  id                                String                 @id
-  codigo                            String                 @unique
-  numeroSecuencia                   Int?                   @default(1)
-  ventaEquipoNumeroSecuencia        Int                    @default(0)
-  nombre                   String
+  id                         String                 @id
+  codigo                     String                 @unique
+  numeroSecuencia            Int?                   @default(1)
+  ventaEquipoNumeroSecuencia Int                    @default(0)
+  nombre                     String
   /// Nombre corto para celdas angostas de documentos (ej. tabla de contactos
   /// del Word de la Matriz de Comunicaciones) — la razón social completa
   /// suele partir la celda en varias líneas. Fallback a `nombre` si vacío.
-  nombreCorto              String?
-  ruc                      String?
-  direccion                String?
-  telefono                 String?
-  correo                   String?
-  createdAt                DateTime               @default(now())
-  updatedAt                DateTime
-  calificacion             Int?                   @default(3)
-  estadoRelacion           String                 @default("prospecto")
-  frecuenciaCompra         String?
-  linkedin                 String?
-  potencialAnual           Float?
-  sector                   String?
-  sitioWeb                 String?
-  tamanoEmpresa            String?
-  ultimoProyecto           DateTime?
-  calificacionSatisfaccion Int?                   @default(3)
-  frecuenciaCompraMeses    Int?
-  logoUrl                  String?
-  cotizacion               Cotizacion[]
-  proyecto                 Proyecto[]
-  ventasEquipo             VentaEquipo[]
-  ubicaciones              Ubicacion[]
-  crmContactoCliente       CrmContactoCliente[]
-  crmHistorialProyecto     CrmHistorialProyecto[]
-  crmOportunidad           CrmOportunidad[]
-  cuentasPorCobrar         CuentaPorCobrar[]
-  tarifasRecursos          TarifaClienteRecurso[]
-  descuentosHH             ConfigDescuentoHH[]
-  valorizacionesHH         ValorizacionHH[]
+  nombreCorto                String?
+  ruc                        String?
+  direccion                  String?
+  telefono                   String?
+  correo                     String?
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime
+  calificacion               Int?                   @default(3)
+  estadoRelacion             String                 @default("prospecto")
+  frecuenciaCompra           String?
+  linkedin                   String?
+  potencialAnual             Float?
+  sector                     String?
+  sitioWeb                   String?
+  tamanoEmpresa              String?
+  ultimoProyecto             DateTime?
+  calificacionSatisfaccion   Int?                   @default(3)
+  frecuenciaCompraMeses      Int?
+  logoUrl                    String?
+  cotizacion                 Cotizacion[]
+  proyecto                   Proyecto[]
+  ventasEquipo               VentaEquipo[]
+  ubicaciones                Ubicacion[]
+  crmContactoCliente         CrmContactoCliente[]
+  crmHistorialProyecto       CrmHistorialProyecto[]
+  crmOportunidad             CrmOportunidad[]
+  cuentasPorCobrar           CuentaPorCobrar[]
+  tarifasRecursos            TarifaClienteRecurso[]
+  descuentosHH               ConfigDescuentoHH[]
+  valorizacionesHH           ValorizacionHH[]
+  tarifasCampoPersonal       TarifaCampoPersonal[]
 
   @@map("cliente")
 }
@@ -237,6 +238,27 @@ model TarifaClienteRecurso {
 
   @@unique([clienteId, recursoId, modalidad])
   @@map("tarifa_cliente_recurso")
+}
+
+// Costo de almuerzo y movilidad (ida y vuelta) por persona, configurable por cliente,
+// usado para prellenar el "Requerimiento del día" desde una jornada de campo en curso.
+model TarifaCampoPersonal {
+  id             String   @id @default(cuid())
+  clienteId      String
+  userId         String
+  costoAlmuerzo  Float    @default(0)
+  costoMovilidad Float    @default(0)
+  activo         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  usuario User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clienteId, userId])
+  @@index([clienteId])
+  @@index([userId])
+  @@map("tarifa_campo_personal")
 }
 
 model ConfigDescuentoHH {
@@ -1035,154 +1057,154 @@ model PlantillaServicioItem {
 }
 
 model Proveedor {
-  id                  String                @id
-  nombre              String
-  ruc                 String?
-  direccion           String?
-  telefono            String?
-  correo              String?
-  contactoNombre      String?
-  contactoTelefono    String?
-  contactoCorreo      String?
-  banco               String?
-  numeroCuenta        String?
-  cci                 String?
-  tipoCuenta          String?
+  id                          String                @id
+  nombre                      String
+  ruc                         String?
+  direccion                   String?
+  telefono                    String?
+  correo                      String?
+  contactoNombre              String?
+  contactoTelefono            String?
+  contactoCorreo              String?
+  banco                       String?
+  numeroCuenta                String?
+  cci                         String?
+  tipoCuenta                  String?
   // % de detracción que SUNAT define para los servicios de este proveedor (4, 10, 12...).
   // Sirve de sugerencia automática al crear una CxP — el usuario puede sobrescribirlo.
   detraccionPorcentajeDefault Float?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  cotizacionProveedor CotizacionProveedor[]
-  listaEquipoItem     ListaEquipoItem[]
-  ordenesCompra       OrdenCompra[]
-  cuentasPorPagar     CuentaPorPagar[]
-  pedidoEquipoItems   PedidoEquipoItem[]
+  createdAt                   DateTime              @default(now())
+  updatedAt                   DateTime              @updatedAt
+  cotizacionProveedor         CotizacionProveedor[]
+  listaEquipoItem             ListaEquipoItem[]
+  ordenesCompra               OrdenCompra[]
+  cuentasPorPagar             CuentaPorPagar[]
+  pedidoEquipoItems           PedidoEquipoItem[]
 
   @@map("proveedor")
 }
 
 model Proyecto {
-  id                         String                      @id
-  clienteId                  String?
-  comercialId                String?
-  gestorId                   String
-  esInterno                  Boolean                     @default(false)
-  centroCostoId              String?
-  supervisorId               String?
-  liderId                    String?
-  cotizacionId               String?
-  nombre                     String
-  descripcion                String?
-  totalEquiposInterno        Float                       @default(0)
-  totalServiciosInterno      Float                       @default(0)
-  totalGastosInterno         Float                       @default(0)
-  totalInterno               Float                       @default(0)
-  totalCliente               Float                       @default(0)
-  descuento                  Float                       @default(0)
-  grandTotal                 Float                       @default(0)
-  codigo                     String
-  estado                     ProyectoEstado              @default(creado)
-  fechaInicio                DateTime
-  fechaFin                   DateTime?
-  totalRealEquipos           Float                       @default(0)
-  totalRealServicios         Float                       @default(0)
-  totalRealGastos            Float                       @default(0)
-  totalReal                  Float                       @default(0)
-  moneda                     String?                     @default("USD")
-  tipoCambio                 Float?
-  diasGarantia               Int                         @default(365)
-  adelantoPorcentaje         Float                       @default(0)
-  adelantoMonto              Float                       @default(0)
-  adelantoAmortizado         Float                       @default(0)
+  id                             String                               @id
+  clienteId                      String?
+  comercialId                    String?
+  gestorId                       String
+  esInterno                      Boolean                              @default(false)
+  centroCostoId                  String?
+  supervisorId                   String?
+  liderId                        String?
+  cotizacionId                   String?
+  nombre                         String
+  descripcion                    String?
+  totalEquiposInterno            Float                                @default(0)
+  totalServiciosInterno          Float                                @default(0)
+  totalGastosInterno             Float                                @default(0)
+  totalInterno                   Float                                @default(0)
+  totalCliente                   Float                                @default(0)
+  descuento                      Float                                @default(0)
+  grandTotal                     Float                                @default(0)
+  codigo                         String
+  estado                         ProyectoEstado                       @default(creado)
+  fechaInicio                    DateTime
+  fechaFin                       DateTime?
+  totalRealEquipos               Float                                @default(0)
+  totalRealServicios             Float                                @default(0)
+  totalRealGastos                Float                                @default(0)
+  totalReal                      Float                                @default(0)
+  moneda                         String?                              @default("USD")
+  tipoCambio                     Float?
+  diasGarantia                   Int                                  @default(365)
+  adelantoPorcentaje             Float                                @default(0)
+  adelantoMonto                  Float                                @default(0)
+  adelantoAmortizado             Float                                @default(0)
   // Contrato
-  numeroContrato             String?
-  fechaFirmaContrato         DateTime?
-  fechaInicioContrato        DateTime?
-  fechaFinContrato           DateTime?
-  fondoGarantiaPct           Float                       @default(0)
-  descuentoComercialPct      Float                       @default(0)
-  igvPct                     Float                       @default(18)
-  ordenCompraCliente         String?
+  numeroContrato                 String?
+  fechaFirmaContrato             DateTime?
+  fechaInicioContrato            DateTime?
+  fechaFinContrato               DateTime?
+  fondoGarantiaPct               Float                                @default(0)
+  descuentoComercialPct          Float                                @default(0)
+  igvPct                         Float                                @default(18)
+  ordenCompraCliente             String?
   /// Atributos de identificación documental — reutilizados por TODOS los documentos
   /// templeteados del proyecto (matriz, dossier, informes, protocolos), no solo la Matriz
   /// de Comunicaciones. `etapa` es texto libre a propósito (no enum): el estándar Nexa
   /// sugiere FEL1/FEL2/FEL3/E&C pero otros clientes necesitan valores arbitrarios.
-  sede                       String?
-  etapa                      String?
-  codigoPEP                  String?
-  areaSeccion                String?
+  sede                           String?
+  etapa                          String?
+  codigoPEP                      String?
+  areaSeccion                    String?
   /// @deprecated — usar Valorizacion.condicionPago. Estos campos son legacy huérfanos sin uso operacional. Mantener solo por retrocompatibilidad.
-  condicionPago              String?
+  condicionPago                  String?
   /// @deprecated — usar Valorizacion.diasCredito.
-  diasCredito                Int?
-  createdAt                  DateTime                    @default(now())
-  updatedAt                  DateTime
-  deletedAt                  DateTime?
-  colorPlanificacion         String?
-  progresoGeneral            Int                         @default(0)
-  cotizacionProveedor        CotizacionProveedor[]
-  entregaItem                EntregaItem[]
-  eventoTrazabilidad         EventoTrazabilidad[]
-  listaEquipo                ListaEquipo[]
-  pedidoEquipo               PedidoEquipo[]
-  pedidoEquipoItemsOverride  PedidoEquipoItem[]          @relation("PedidoItemProyectoOverride")
-  cliente                    Cliente?                    @relation(fields: [clienteId], references: [id])
-  comercial                  User?                       @relation("ProyectoComercial", fields: [comercialId], references: [id])
-  centroCosto                CentroCosto?                @relation(fields: [centroCostoId], references: [id])
-  cotizacion                 Cotizacion?                 @relation(fields: [cotizacionId], references: [id])
-  gestor                     User                        @relation("ProyectoGestor", fields: [gestorId], references: [id])
-  supervisor                 User?                       @relation("ProyectoSupervisor", fields: [supervisorId], references: [id])
-  lider                      User?                       @relation("ProyectoLider", fields: [liderId], references: [id])
-  personalProyecto           PersonalProyecto[]
-  proyectoEquipoCotizado     ProyectoEquipoCotizado[]
-  proyectoGastoCotizado      ProyectoGastoCotizado[]
-  proyectoServicioCotizado   ProyectoServicioCotizado[]
-  registroHoras              RegistroHoras[]
-  valorizacion               Valorizacion[]
-  crmHistorialProyecto       CrmHistorialProyecto[]
-  crmOportunidad             CrmOportunidad[]
-  proyectoCronograma         ProyectoCronograma[]
-  proyectoEdt                ProyectoEdt[]
-  proyectoFase               ProyectoFase[]
-  registrosCampo             RegistroHorasCampo[]
-  jornadasAsistencia         JornadaAsistencia[]
-  proyectoCondicion          ProyectoCondicion[]
-  proyectoExclusion          ProyectoExclusion[]
+  diasCredito                    Int?
+  createdAt                      DateTime                             @default(now())
+  updatedAt                      DateTime
+  deletedAt                      DateTime?
+  colorPlanificacion             String?
+  progresoGeneral                Int                                  @default(0)
+  cotizacionProveedor            CotizacionProveedor[]
+  entregaItem                    EntregaItem[]
+  eventoTrazabilidad             EventoTrazabilidad[]
+  listaEquipo                    ListaEquipo[]
+  pedidoEquipo                   PedidoEquipo[]
+  pedidoEquipoItemsOverride      PedidoEquipoItem[]                   @relation("PedidoItemProyectoOverride")
+  cliente                        Cliente?                             @relation(fields: [clienteId], references: [id])
+  comercial                      User?                                @relation("ProyectoComercial", fields: [comercialId], references: [id])
+  centroCosto                    CentroCosto?                         @relation(fields: [centroCostoId], references: [id])
+  cotizacion                     Cotizacion?                          @relation(fields: [cotizacionId], references: [id])
+  gestor                         User                                 @relation("ProyectoGestor", fields: [gestorId], references: [id])
+  supervisor                     User?                                @relation("ProyectoSupervisor", fields: [supervisorId], references: [id])
+  lider                          User?                                @relation("ProyectoLider", fields: [liderId], references: [id])
+  personalProyecto               PersonalProyecto[]
+  proyectoEquipoCotizado         ProyectoEquipoCotizado[]
+  proyectoGastoCotizado          ProyectoGastoCotizado[]
+  proyectoServicioCotizado       ProyectoServicioCotizado[]
+  registroHoras                  RegistroHoras[]
+  valorizacion                   Valorizacion[]
+  crmHistorialProyecto           CrmHistorialProyecto[]
+  crmOportunidad                 CrmOportunidad[]
+  proyectoCronograma             ProyectoCronograma[]
+  proyectoEdt                    ProyectoEdt[]
+  proyectoFase                   ProyectoFase[]
+  registrosCampo                 RegistroHorasCampo[]
+  jornadasAsistencia             JornadaAsistencia[]
+  proyectoCondicion              ProyectoCondicion[]
+  proyectoExclusion              ProyectoExclusion[]
   // Documentos financieros imputados al proyecto
-  hojasDeGastos              HojaDeGastos[]
-  gastoLineas                GastoLinea[]                @relation("GastoLineaProyecto")
-  ordenesCompra              OrdenCompra[]
-  cuentasPorCobrar           CuentaPorCobrar[]
-  cuentasPorPagar            CuentaPorPagar[]
-  requerimientoMaterialItems RequerimientoMaterialItem[]
-  lineasHH                   LineaHH[]
-  cartasFianza               CartaFianza[]
-  solicitudesRecurso         SolicitudRecurso[]
-  prestamosHerramienta       PrestamoHerramienta[]
-  solicitudesHerramienta     SolicitudHerramienta[]
-  devolucionesMaterial       DevolucionMaterial[]
-  entregasEpp                EntregaEPP[]
-  reportesSemanalesSeguridad ReporteSemanalSeguridad[]
-  reportesSemanalesAvance    ReporteSemanalAvance[]      @relation("ReportesAvanceProyecto")
-  avanceSnapshots            ProyectoAvanceSnapshot[]    @relation("AvanceSnapshotsProyecto")
-  avancesTarea               ProyectoTareaAvance[]
-  hitos                      ProyectoHito[]              @relation("HitosProyecto")
-  orgNodos                   ProyectoOrgNodo[]
-  contactosCliente           ProyectoContactoCliente[]
-  matrizComunicacion         MatrizComunicacion?
-  documentosMeta             DocumentoProyectoMeta[]
-  tdrAnalisis                ProyectoTdrAnalisis?
-  cotizacionDocumento        ProyectoCotizacionDocumento?
-  planTrabajo                PlanTrabajo?
-  iperc                      Iperc?
-  mpp                        Mpp?
-  pets                       Pets?
-  planificacionesDia         PlanificacionDia[]
-  cronogramaIATareaDecision  CronogramaIATareaDecision[]
+  hojasDeGastos                  HojaDeGastos[]
+  gastoLineas                    GastoLinea[]                         @relation("GastoLineaProyecto")
+  ordenesCompra                  OrdenCompra[]
+  cuentasPorCobrar               CuentaPorCobrar[]
+  cuentasPorPagar                CuentaPorPagar[]
+  requerimientoMaterialItems     RequerimientoMaterialItem[]
+  lineasHH                       LineaHH[]
+  cartasFianza                   CartaFianza[]
+  solicitudesRecurso             SolicitudRecurso[]
+  prestamosHerramienta           PrestamoHerramienta[]
+  solicitudesHerramienta         SolicitudHerramienta[]
+  devolucionesMaterial           DevolucionMaterial[]
+  entregasEpp                    EntregaEPP[]
+  reportesSemanalesSeguridad     ReporteSemanalSeguridad[]
+  reportesSemanalesAvance        ReporteSemanalAvance[]               @relation("ReportesAvanceProyecto")
+  avanceSnapshots                ProyectoAvanceSnapshot[]             @relation("AvanceSnapshotsProyecto")
+  avancesTarea                   ProyectoTareaAvance[]
+  hitos                          ProyectoHito[]                       @relation("HitosProyecto")
+  orgNodos                       ProyectoOrgNodo[]
+  contactosCliente               ProyectoContactoCliente[]
+  matrizComunicacion             MatrizComunicacion?
+  documentosMeta                 DocumentoProyectoMeta[]
+  tdrAnalisis                    ProyectoTdrAnalisis?
+  cotizacionDocumento            ProyectoCotizacionDocumento?
+  planTrabajo                    PlanTrabajo?
+  iperc                          Iperc?
+  mpp                            Mpp?
+  pets                           Pets?
+  planificacionesDia             PlanificacionDia[]
+  cronogramaIATareaDecision      CronogramaIATareaDecision[]
   cronogramaIASugerenciaAceptada CronogramaIASugerenciaAceptada[]
-  cronogramaEdtCorreccion    ProyectoCronogramaEdtCorreccion[]
-  tareaResponsableAsignacion ProyectoTareaResponsableAsignacion[]
+  cronogramaEdtCorreccion        ProyectoCronogramaEdtCorreccion[]
+  tareaResponsableAsignacion     ProyectoTareaResponsableAsignacion[]
 
   @@index([clienteId, estado, createdAt(sort: Desc)], map: "idx_proyecto_cliente_estado_fecha")
   @@index([comercialId, estado, fechaInicio], map: "idx_proyecto_comercial_estado_inicio")
@@ -1529,15 +1551,16 @@ model RegistroHorasCampo {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  proyecto           Proyecto                  @relation(fields: [proyectoId], references: [id])
-  proyectoEdt        ProyectoEdt?              @relation(fields: [proyectoEdtId], references: [id])
-  supervisor         User                      @relation("RegistrosCampoSupervisor", fields: [supervisorId], references: [id])
-  creadoPor          User?                     @relation("RegistrosCampoCreador", fields: [creadoPorId], references: [id])
-  aprobadoPor        User?                     @relation("RegistrosCampoAprobador", fields: [aprobadoPorId], references: [id])
-  tareas             RegistroHorasCampoTarea[]
-  evidenciaSeguridad EvidenciaSeguridad?
-  evidenciaAvance    EvidenciaAvance?          @relation("JornadaEvidenciaAvance")
-  jornadaAsistencia  JornadaAsistencia?        @relation("JornadaAsistenciaRegistro")
+  proyecto            Proyecto                  @relation(fields: [proyectoId], references: [id])
+  proyectoEdt         ProyectoEdt?              @relation(fields: [proyectoEdtId], references: [id])
+  supervisor          User                      @relation("RegistrosCampoSupervisor", fields: [supervisorId], references: [id])
+  creadoPor           User?                     @relation("RegistrosCampoCreador", fields: [creadoPorId], references: [id])
+  aprobadoPor         User?                     @relation("RegistrosCampoAprobador", fields: [aprobadoPorId], references: [id])
+  tareas              RegistroHorasCampoTarea[]
+  evidenciaSeguridad  EvidenciaSeguridad?
+  evidenciaAvance     EvidenciaAvance?          @relation("JornadaEvidenciaAvance")
+  jornadaAsistencia   JornadaAsistencia?        @relation("JornadaAsistenciaRegistro")
+  hojasDeGastosOrigen HojaDeGastos[]            @relation("HojaDeGastosOrigenRegistroCampo")
 
   @@index([proyectoId, estado, fechaTrabajo])
   @@index([supervisorId, estado])
@@ -1657,22 +1680,22 @@ enum EstadoEvidenciaAvance {
 
 // Registro de actividad de avance técnico asociado a una evidencia de jornada.
 model RegistroAvance {
-  id                         String             @id @default(cuid())
-  evidenciaAvanceId          String
-  autorId                    String
-  tipo                       TipoRegistroAvance
-  descripcion                String
-  disciplina                 String?
-  proyectoTareaId            String?
-  registroHorasCampoTareaId  String?
-  porcentajeAvance           Int?
-  observaciones              String?
-  createdAt                  DateTime           @default(now())
-  updatedAt                  DateTime           @updatedAt
+  id                        String             @id @default(cuid())
+  evidenciaAvanceId         String
+  autorId                   String
+  tipo                      TipoRegistroAvance
+  descripcion               String
+  disciplina                String?
+  proyectoTareaId           String?
+  registroHorasCampoTareaId String?
+  porcentajeAvance          Int?
+  observaciones             String?
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
 
-  evidencia               EvidenciaAvance         @relation(fields: [evidenciaAvanceId], references: [id], onDelete: Cascade)
-  autor                   User                    @relation("RegistrosAvanceAutor", fields: [autorId], references: [id])
-  proyectoTarea           ProyectoTarea?          @relation(fields: [proyectoTareaId], references: [id])
+  evidencia               EvidenciaAvance          @relation(fields: [evidenciaAvanceId], references: [id], onDelete: Cascade)
+  autor                   User                     @relation("RegistrosAvanceAutor", fields: [autorId], references: [id])
+  proyectoTarea           ProyectoTarea?           @relation(fields: [proyectoTareaId], references: [id])
   registroHorasCampoTarea RegistroHorasCampoTarea? @relation(fields: [registroHorasCampoTareaId], references: [id], onDelete: SetNull)
   fotos                   RegistroAvanceFoto[]
 
@@ -1718,30 +1741,31 @@ model RegistroAvanceFoto {
 // e impedimentos. Lo redacta el autor, se envía a revisión y se aprueba/rechaza.
 // ===========================================================================
 model ReporteSemanalAvance {
-  id          String              @id @default(cuid())
-  proyectoId  String
-  autorId     String
-  semanaIso   String              // "2026-W05"
-  numero      Int?
-  fechaInicio DateTime
-  fechaFin    DateTime
-  fechaCorte  DateTime
-  estado      EstadoReporteAvance @default(borrador)
+  id               String              @id @default(cuid())
+  proyectoId       String
+  autorId          String
+  semanaIso        String // "2026-W05"
+  numero           Int?
+  fechaInicio      DateTime
+  fechaFin         DateTime
+  fechaCorte       DateTime
+  estado           EstadoReporteAvance @default(borrador)
   alcanceTexto     String?
   resumenEjecutivo String?
   comentariosHitos Json?
   variaciones      Json?
   impedimentos     Json?
-  aprobadorId   String?
-  notasRevision String?
-  enviadoAt   DateTime?
-  aprobadoAt  DateTime?
-  rechazadoAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  proyecto  Proyecto @relation("ReportesAvanceProyecto", fields: [proyectoId], references: [id])
-  autor     User     @relation("ReportesAvanceAutor", fields: [autorId], references: [id])
-  aprobador User?    @relation("ReportesAvanceAprobador", fields: [aprobadorId], references: [id])
+  aprobadorId      String?
+  notasRevision    String?
+  enviadoAt        DateTime?
+  aprobadoAt       DateTime?
+  rechazadoAt      DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  proyecto         Proyecto            @relation("ReportesAvanceProyecto", fields: [proyectoId], references: [id])
+  autor            User                @relation("ReportesAvanceAutor", fields: [autorId], references: [id])
+  aprobador        User?               @relation("ReportesAvanceAprobador", fields: [aprobadorId], references: [id])
+
   @@unique([proyectoId, semanaIso])
   @@index([estado, semanaIso(sort: Desc)])
   @@map("reporte_semanal_avance")
@@ -1750,19 +1774,19 @@ model ReporteSemanalAvance {
 // Snapshot semanal del % de avance del cronograma de EJECUCIÓN (para la Curva S de avance
 // real). Se toma manualmente por semana; re-tomar la misma semana sobreescribe (upsert).
 model ProyectoAvanceSnapshot {
-  id                   String   @id @default(cuid())
+  id                   String                        @id @default(cuid())
   proyectoId           String
   proyectoCronogramaId String? // cronograma de ejecución fotografiado (SetNull si se borra)
   semanaIso            String // "2026-W05"
   fechaCorte           DateTime
   tomadoPorId          String?
   progresoGeneral      Float // % global ponderado por horas (criterio de progresoService)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  proyecto           Proyecto                      @relation("AvanceSnapshotsProyecto", fields: [proyectoId], references: [id], onDelete: Cascade)
-  proyectoCronograma ProyectoCronograma?           @relation(fields: [proyectoCronogramaId], references: [id], onDelete: SetNull)
-  tomadoPor          User?                         @relation("AvanceSnapshotsTomadoPor", fields: [tomadoPorId], references: [id], onDelete: SetNull)
-  tareas             ProyectoAvanceSnapshotTarea[]
+  createdAt            DateTime                      @default(now())
+  updatedAt            DateTime                      @updatedAt
+  proyecto             Proyecto                      @relation("AvanceSnapshotsProyecto", fields: [proyectoId], references: [id], onDelete: Cascade)
+  proyectoCronograma   ProyectoCronograma?           @relation(fields: [proyectoCronogramaId], references: [id], onDelete: SetNull)
+  tomadoPor            User?                         @relation("AvanceSnapshotsTomadoPor", fields: [tomadoPorId], references: [id], onDelete: SetNull)
+  tareas               ProyectoAvanceSnapshotTarea[]
 
   @@unique([proyectoId, semanaIso])
   @@index([proyectoId, semanaIso])
@@ -1772,16 +1796,16 @@ model ProyectoAvanceSnapshot {
 // Foto del % de una tarea del cronograma en el momento del snapshot (denormalizado para
 // sobrevivir cambios/borrados del cronograma).
 model ProyectoAvanceSnapshotTarea {
-  id                 String   @id @default(cuid())
+  id                 String                 @id @default(cuid())
   snapshotId         String
   proyectoTareaId    String?
   nombreTarea        String
   proyectoFaseNombre String?
-  horasEstimadas     Decimal  @default(0) @db.Decimal(10, 2)
+  horasEstimadas     Decimal                @default(0) @db.Decimal(10, 2)
   porcentaje         Int
-  createdAt          DateTime @default(now())
-  snapshot      ProyectoAvanceSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
-  proyectoTarea ProyectoTarea?         @relation("AvanceSnapshotTareaProyectoTarea", fields: [proyectoTareaId], references: [id], onDelete: SetNull)
+  createdAt          DateTime               @default(now())
+  snapshot           ProyectoAvanceSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  proyectoTarea      ProyectoTarea?         @relation("AvanceSnapshotTareaProyectoTarea", fields: [proyectoTareaId], references: [id], onDelete: SetNull)
 
   @@index([snapshotId])
   @@map("proyecto_avance_snapshot_tarea")
@@ -1796,20 +1820,21 @@ enum EstadoReporteAvance {
 
 // Hito del proyecto (contractual o intermedio) con fechas Plan/Pronóstico/Real.
 model ProyectoHito {
-  id String @id @default(cuid())
-  proyectoId String
-  tipo TipoHito @default(intermedio)
-  nombre String
-  orden Int @default(0)
-  fechaPlan DateTime?
+  id              String        @id @default(cuid())
+  proyectoId      String
+  tipo            TipoHito      @default(intermedio)
+  nombre          String
+  orden           Int           @default(0)
+  fechaPlan       DateTime?
   fechaPronostico DateTime?
-  fechaReal DateTime?
-  comentario String?
-  proyectoFaseId String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  proyecto Proyecto @relation("HitosProyecto", fields: [proyectoId], references: [id], onDelete: Cascade)
-  proyectoFase ProyectoFase? @relation("HitosFase", fields: [proyectoFaseId], references: [id])
+  fechaReal       DateTime?
+  comentario      String?
+  proyectoFaseId  String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  proyecto        Proyecto      @relation("HitosProyecto", fields: [proyectoId], references: [id], onDelete: Cascade)
+  proyectoFase    ProyectoFase? @relation("HitosFase", fields: [proyectoFaseId], references: [id])
+
   @@index([proyectoId, tipo, orden])
   @@map("proyecto_hito")
 }
@@ -1825,7 +1850,7 @@ model ReporteSemanalSeguridad {
   id          String                 @id @default(cuid())
   proyectoId  String
   ingenieroId String
-  semanaIso   String                 // e.g. "2026-W19"
+  semanaIso   String // e.g. "2026-W19"
   fechaInicio DateTime
   fechaFin    DateTime
   estado      EstadoReporteSeguridad @default(borrador)
@@ -1834,12 +1859,12 @@ model ReporteSemanalSeguridad {
   resumenEjecutivo String?
 
   // KPI override (null = usar valor calculado en vivo)
-  horasHombre          Float?
-  diasSinAccidentes    Int?
-  incidentesCount      Int?
-  accidentesCount      Int?
-  horasCapacitacion    Float?
-  personasCapacitadas  Int?
+  horasHombre         Float?
+  diasSinAccidentes   Int?
+  incidentesCount     Int?
+  accidentesCount     Int?
+  horasCapacitacion   Float?
+  personasCapacitadas Int?
 
   // Reporte COVID 19 (todos opcionales — si todos null, se omite del PPT)
   totalPersonas    Int?
@@ -1861,9 +1886,9 @@ model ReporteSemanalSeguridad {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  proyecto   Proyecto @relation(fields: [proyectoId], references: [id])
-  ingeniero  User     @relation("ReportesSeguridadIngeniero", fields: [ingenieroId], references: [id])
-  aprobador  User?    @relation("ReportesSeguridadAprobador", fields: [aprobadorId], references: [id])
+  proyecto  Proyecto @relation(fields: [proyectoId], references: [id])
+  ingeniero User     @relation("ReportesSeguridadIngeniero", fields: [ingenieroId], references: [id])
+  aprobador User?    @relation("ReportesSeguridadAprobador", fields: [aprobadorId], references: [id])
 
   @@unique([proyectoId, semanaIso])
   @@index([proyectoId, semanaIso])
@@ -1889,6 +1914,13 @@ model RegistroHorasCampoTarea {
   descripcion       String?
   porcentajeInicial Int?
   porcentajeFinal   Int?
+  // Tarea placeholder auto-generada cuando alguien marca asistencia (check-in) en la jornada,
+  // para contabilizar personas presentes con horas=0 antes de que se carguen horas reales.
+  // Se excluye de cantidadTareas y de los listados de tareas visibles en UI.
+  // Nota: solo puede existir una fila con esAutoAsistencia=true por registroCampoId,
+  // garantizado por un índice único parcial creado a mano en la migración SQL
+  // (Prisma no soporta índices únicos parciales vía @@unique).
+  esAutoAsistencia  Boolean  @default(false)
   createdAt         DateTime @default(now())
 
   registroCampo   RegistroHorasCampo          @relation(fields: [registroCampoId], references: [id], onDelete: Cascade)
@@ -1915,6 +1947,7 @@ model RegistroHorasCampoMiembro {
   usuario            User                    @relation(fields: [usuarioId], references: [id])
   registroHoras      RegistroHoras?          @relation(fields: [registroHorasId], references: [id])
 
+  @@unique([registroCampoTareaId, usuarioId])
   @@index([registroCampoTareaId])
   @@index([usuarioId])
   @@map("registro_horas_campo_miembro")
@@ -1955,12 +1988,12 @@ model UnidadServicio {
 }
 
 model User {
-  id                                       String                      @id @default(cuid())
+  id                                       String                               @id @default(cuid())
   name                                     String?
-  email                                    String                      @unique
+  email                                    String                               @unique
   emailVerified                            DateTime?
   password                                 String?
-  role                                     Role                        @default(colaborador)
+  role                                     Role                                 @default(colaborador)
   image                                    String?
   lastLoginAt                              DateTime?
   lastActivityAt                           DateTime?
@@ -1974,10 +2007,10 @@ model User {
   listaEquipoItem                          ListaEquipoItem[]
   pedidoEquipo                             PedidoEquipo[]
   pedidoEquipoItem                         PedidoEquipoItem[]
-  proyectosComoComercial                   Proyecto[]                  @relation("ProyectoComercial")
-  proyectosComoGestor                      Proyecto[]                  @relation("ProyectoGestor")
-  proyectosComoSupervisor                  Proyecto[]                  @relation("ProyectoSupervisor")
-  proyectosComoLider                       Proyecto[]                  @relation("ProyectoLider")
+  proyectosComoComercial                   Proyecto[]                           @relation("ProyectoComercial")
+  proyectosComoGestor                      Proyecto[]                           @relation("ProyectoGestor")
+  proyectosComoSupervisor                  Proyecto[]                           @relation("ProyectoSupervisor")
+  proyectosComoLider                       Proyecto[]                           @relation("ProyectoLider")
   personalProyecto                         PersonalProyecto[]
   proyectoEquipoCotizado                   ProyectoEquipoCotizado[]
   proyectoServicioCotizado                 ProyectoServicioCotizado[]
@@ -1991,97 +2024,98 @@ model User {
   cotizacionVersion                        CotizacionVersion[]
   crmActividad                             CrmActividad[]
   crmMetricaComercial                      CrmMetricaComercial[]
-  crmOportunidadComercial                  CrmOportunidad[]            @relation("CrmOportunidadComercial")
-  crmOportunidadResponsable                CrmOportunidad[]            @relation("CrmOportunidadResponsable")
+  crmOportunidadComercial                  CrmOportunidad[]                     @relation("CrmOportunidadComercial")
+  crmOportunidadResponsable                CrmOportunidad[]                     @relation("CrmOportunidadResponsable")
   metricaComercial                         MetricaComercial[]
   notificaciones                           Notificacion[]
   proyectoActividad                        ProyectoActividad[]
   proyectoEdt                              ProyectoEdt[]
   proyectoSubtarea                         ProyectoSubtarea[]
-  tareasAsignadas                          ProyectoTarea[]             @relation("TareaResponsable")
-  tareasCreadas                            ProyectoTarea[]             @relation("TareaCreadaPor")
+  tareasAsignadas                          ProyectoTarea[]                      @relation("TareaResponsable")
+  tareasCreadas                            ProyectoTarea[]                      @relation("TareaCreadaPor")
   registrosProgreso                        RegistroProgreso[]
   subtareas                                Subtarea[]
   tareas                                   Tarea[]
   userPermissions                          UserPermission[]
   empleado                                 Empleado?
-  departamentosResponsable                 Departamento[]              @relation("DepartamentoResponsable")
+  departamentosResponsable                 Departamento[]                       @relation("DepartamentoResponsable")
   configuracionGeneral                     ConfiguracionGeneral[]
   // Registro de horas en campo
-  registrosCampoSupervisor                 RegistroHorasCampo[]        @relation("RegistrosCampoSupervisor")
-  registrosCampoCreador                    RegistroHorasCampo[]        @relation("RegistrosCampoCreador")
-  registrosCampoAprobador                  RegistroHorasCampo[]        @relation("RegistrosCampoAprobador")
+  registrosCampoSupervisor                 RegistroHorasCampo[]                 @relation("RegistrosCampoSupervisor")
+  registrosCampoCreador                    RegistroHorasCampo[]                 @relation("RegistrosCampoCreador")
+  registrosCampoAprobador                  RegistroHorasCampo[]                 @relation("RegistrosCampoAprobador")
   miembrosCuadrilla                        RegistroHorasCampoMiembro[]
+  tarifasCampoPersonal                     TarifaCampoPersonal[]
   // Trazabilidad
-  listaEquipoItemsVerificados              ListaEquipoItem[]           @relation("ListaEquipoItemVerificador")
-  pedidoEquipoItemsComentados              PedidoEquipoItem[]          @relation("PedidoEquipoItemComentarioLogistica")
+  listaEquipoItemsVerificados              ListaEquipoItem[]                    @relation("ListaEquipoItemVerificador")
+  pedidoEquipoItemsComentados              PedidoEquipoItem[]                   @relation("PedidoEquipoItemComentarioLogistica")
   // Descuentos cotización
-  cotizacionDescuentosSolicitados          Cotizacion[]                @relation("CotizacionDescuentoSolicitante")
-  cotizacionDescuentosAprobados            Cotizacion[]                @relation("CotizacionDescuentoAprobador")
+  cotizacionDescuentosSolicitados          Cotizacion[]                         @relation("CotizacionDescuentoSolicitante")
+  cotizacionDescuentosAprobados            Cotizacion[]                         @relation("CotizacionDescuentoAprobador")
   // Hojas de gastos
-  hojasComoEmpleado                        HojaDeGastos[]              @relation("HojaEmpleado")
-  hojasComoAprobador                       HojaDeGastos[]              @relation("HojaAprobador")
-  hojasEventos                             HojaDeGastosEvento[]        @relation("HojaEventoUsuario")
-  depositosCreados                         DepositoHoja[]              @relation("DepositoCreadoPor")
-  itemsRequerimientoCerradosSinComprobante RequerimientoMaterialItem[] @relation("ItemCerradoSinComprobante")
+  hojasComoEmpleado                        HojaDeGastos[]                       @relation("HojaEmpleado")
+  hojasComoAprobador                       HojaDeGastos[]                       @relation("HojaAprobador")
+  hojasEventos                             HojaDeGastosEvento[]                 @relation("HojaEventoUsuario")
+  depositosCreados                         DepositoHoja[]                       @relation("DepositoCreadoPor")
+  itemsRequerimientoCerradosSinComprobante RequerimientoMaterialItem[]          @relation("ItemCerradoSinComprobante")
   // Órdenes de compra
-  ordenesCompraSolicitante                 OrdenCompra[]               @relation("OCsolicitante")
-  ordenesCompraAprobador                   OrdenCompra[]               @relation("OCaprobador")
+  ordenesCompraSolicitante                 OrdenCompra[]                        @relation("OCsolicitante")
+  ordenesCompraAprobador                   OrdenCompra[]                        @relation("OCaprobador")
   // Timesheet aprobación
-  timesheetsEnviados                       TimesheetAprobacion[]       @relation("TimesheetUsuario")
-  timesheetsAprobados                      TimesheetAprobacion[]       @relation("TimesheetAprobador")
+  timesheetsEnviados                       TimesheetAprobacion[]                @relation("TimesheetUsuario")
+  timesheetsAprobados                      TimesheetAprobacion[]                @relation("TimesheetAprobador")
   // Agente IA conversaciones
   agenteConversaciones                     AgenteConversacion[]
   agenteConversacionMensajes               AgenteConversacionMensaje[]
   agenteUsage                              AgenteUsage[]
   // Catálogo equipos tracking
-  equiposCreadosPor                        CatalogoEquipo[]            @relation("EquipoCreadoPor")
-  equiposActualizadosPor                   CatalogoEquipo[]            @relation("EquipoActualizadoPor")
+  equiposCreadosPor                        CatalogoEquipo[]                     @relation("EquipoCreadoPor")
+  equiposActualizadosPor                   CatalogoEquipo[]                     @relation("EquipoActualizadoPor")
   // Recepciones pendientes
-  recepcionesConfirmadas                   RecepcionPendiente[]        @relation("RecepcionConfirmador")
-  recepcionesEntregadas                    RecepcionPendiente[]        @relation("RecepcionEntregador")
-  recepcionesRechazadas                    RecepcionPendiente[]        @relation("RecepcionRechazador")
-  cxpAdjuntos                              CxPAdjunto[]                @relation("CxPAdjuntoSubidoPor")
-  cxcAdjuntos                              CxCAdjunto[]                @relation("CxCAdjuntoSubidoPor")
+  recepcionesConfirmadas                   RecepcionPendiente[]                 @relation("RecepcionConfirmador")
+  recepcionesEntregadas                    RecepcionPendiente[]                 @relation("RecepcionEntregador")
+  recepcionesRechazadas                    RecepcionPendiente[]                 @relation("RecepcionRechazador")
+  cxpAdjuntos                              CxPAdjunto[]                         @relation("CxPAdjuntoSubidoPor")
+  cxcAdjuntos                              CxCAdjunto[]                         @relation("CxCAdjuntoSubidoPor")
   // Selección cotización ganadora
-  seleccionesRealizadas                    ListaEquipoItem[]           @relation("ListaEquipoItemSeleccionador")
+  seleccionesRealizadas                    ListaEquipoItem[]                    @relation("ListaEquipoItemSeleccionador")
   // Solicitudes de recursos de ejecución
-  solicitudesRecursoSolicitadas            SolicitudRecurso[]          @relation("SolicitudRecursoSolicitante")
-  solicitudesRecursoAprobadas              SolicitudRecurso[]          @relation("SolicitudRecursoAprobador")
+  solicitudesRecursoSolicitadas            SolicitudRecurso[]                   @relation("SolicitudRecursoSolicitante")
+  solicitudesRecursoAprobadas              SolicitudRecurso[]                   @relation("SolicitudRecursoAprobador")
   // Control de Asistencia (administrativo)
-  dispositivos                             Dispositivo[]               @relation("DispositivoUsuario")
-  dispositivosAprobados                    Dispositivo[]               @relation("DispositivoAprobador")
-  jornadasAsistenciaSupervisor             JornadaAsistencia[]         @relation("JornadaAsistenciaSupervisor")
-  asistencias                              Asistencia[]                @relation("AsistenciaUser")
-  asistenciasSupervisadas                  Asistencia[]                @relation("AsistenciaSupervisor")
-  solicitudesRemotoPropias                 SolicitudTrabajoRemoto[]    @relation("SolicitudRemotoSolicitante")
-  solicitudesRemotoAprobadas               SolicitudTrabajoRemoto[]    @relation("SolicitudRemotoAprobador")
-  ubicacionesRemotasPropias                UbicacionRemotaPersonal[]   @relation("UbicacionRemotaUsuario")
-  ubicacionesRemotasAprobadas              UbicacionRemotaPersonal[]   @relation("UbicacionRemotaAprobador")
+  dispositivos                             Dispositivo[]                        @relation("DispositivoUsuario")
+  dispositivosAprobados                    Dispositivo[]                        @relation("DispositivoAprobador")
+  jornadasAsistenciaSupervisor             JornadaAsistencia[]                  @relation("JornadaAsistenciaSupervisor")
+  asistencias                              Asistencia[]                         @relation("AsistenciaUser")
+  asistenciasSupervisadas                  Asistencia[]                         @relation("AsistenciaSupervisor")
+  solicitudesRemotoPropias                 SolicitudTrabajoRemoto[]             @relation("SolicitudRemotoSolicitante")
+  solicitudesRemotoAprobadas               SolicitudTrabajoRemoto[]             @relation("SolicitudRemotoAprobador")
+  ubicacionesRemotasPropias                UbicacionRemotaPersonal[]            @relation("UbicacionRemotaUsuario")
+  ubicacionesRemotasAprobadas              UbicacionRemotaPersonal[]            @relation("UbicacionRemotaAprobador")
   // Almacén
   movimientosAlmacen                       MovimientoAlmacen[]
-  prestamosComoUsuario                     PrestamoHerramienta[]       @relation("PrestamoUsuario")
-  prestamosEntregados                      PrestamoHerramienta[]       @relation("PrestamoEntregadoPor")
-  prestamosRecibidos                       PrestamoHerramienta[]       @relation("PrestamoRecibidoPor")
-  prestamoItemsDadosDeBaja                 PrestamoHerramientaItem[]   @relation("PrestamoItemDadoDeBajaPor")
-  solicitudesHerramienta                   SolicitudHerramienta[]      @relation("SolicitudHerramientaSolicitante")
-  solicitudesHerramientaAtendidas          SolicitudHerramienta[]      @relation("SolicitudHerramientaAtendidaPor")
-  devolucionesRegistradas                  DevolucionMaterial[]        @relation("DevolucionRegistradoPor")
-  devolucionesDevueltas                    DevolucionMaterial[]        @relation("DevolucionDevueltoPor")
-  entregasEppEntregadas                    EntregaEPP[]                @relation("EntregaEppEntregador")
+  prestamosComoUsuario                     PrestamoHerramienta[]                @relation("PrestamoUsuario")
+  prestamosEntregados                      PrestamoHerramienta[]                @relation("PrestamoEntregadoPor")
+  prestamosRecibidos                       PrestamoHerramienta[]                @relation("PrestamoRecibidoPor")
+  prestamoItemsDadosDeBaja                 PrestamoHerramientaItem[]            @relation("PrestamoItemDadoDeBajaPor")
+  solicitudesHerramienta                   SolicitudHerramienta[]               @relation("SolicitudHerramientaSolicitante")
+  solicitudesHerramientaAtendidas          SolicitudHerramienta[]               @relation("SolicitudHerramientaAtendidaPor")
+  devolucionesRegistradas                  DevolucionMaterial[]                 @relation("DevolucionRegistradoPor")
+  devolucionesDevueltas                    DevolucionMaterial[]                 @relation("DevolucionDevueltoPor")
+  entregasEppEntregadas                    EntregaEPP[]                         @relation("EntregaEppEntregador")
   // Registros de seguridad (charlas NDAD, inspecciones, observaciones)
-  registrosSeguridad                       RegistroSeguridad[]         @relation("RegistrosSeguridadIngeniero")
-  evidenciasSeguridadCreadas               EvidenciaSeguridad[]        @relation("EvidenciasSeguridad")
+  registrosSeguridad                       RegistroSeguridad[]                  @relation("RegistrosSeguridadIngeniero")
+  evidenciasSeguridadCreadas               EvidenciaSeguridad[]                 @relation("EvidenciasSeguridad")
   // Evidencias técnicas / de avance (área de proyectos)
-  evidenciasAvance                         EvidenciaAvance[]           @relation("EvidenciasAvance")
-  registrosAvance                          RegistroAvance[]            @relation("RegistrosAvanceAutor")
+  evidenciasAvance                         EvidenciaAvance[]                    @relation("EvidenciasAvance")
+  registrosAvance                          RegistroAvance[]                     @relation("RegistrosAvanceAutor")
   // Reportes semanales de seguridad
-  reportesSeguridadCreados                 ReporteSemanalSeguridad[]   @relation("ReportesSeguridadIngeniero")
-  reportesSeguridadAprobados               ReporteSemanalSeguridad[]   @relation("ReportesSeguridadAprobador")
+  reportesSeguridadCreados                 ReporteSemanalSeguridad[]            @relation("ReportesSeguridadIngeniero")
+  reportesSeguridadAprobados               ReporteSemanalSeguridad[]            @relation("ReportesSeguridadAprobador")
   // Reportes semanales de avance (área de proyectos)
-  reportesAvanceAutor                      ReporteSemanalAvance[]      @relation("ReportesAvanceAutor")
-  reportesAvanceAprobados                  ReporteSemanalAvance[]      @relation("ReportesAvanceAprobador")
-  avanceSnapshotsTomados                   ProyectoAvanceSnapshot[]    @relation("AvanceSnapshotsTomadoPor")
+  reportesAvanceAutor                      ReporteSemanalAvance[]               @relation("ReportesAvanceAutor")
+  reportesAvanceAprobados                  ReporteSemanalAvance[]               @relation("ReportesAvanceAprobador")
+  avanceSnapshotsTomados                   ProyectoAvanceSnapshot[]             @relation("AvanceSnapshotsTomadoPor")
   orgNodos                                 ProyectoOrgNodo[]
   planTrabajoGeneraciones                  PlanTrabajoGeneracion[]
   planTrabajoImagenes                      PlanTrabajoImagen[]
@@ -2093,18 +2127,18 @@ model User {
   responsableAsignacionesRecibidas         ProyectoTareaResponsableAsignacion[] @relation("AsignacionResponsableAutomatico")
   responsableAsignacionesCreadas           ProyectoTareaResponsableAsignacion[] @relation("AsignacionResponsableCreador")
   // Módulo Ausencias
-  solicitudesAusencia                      SolicitudAusencia[]      @relation("AusenciaSolicitante")
-  ausenciasComoAprobador1                  SolicitudAusencia[]      @relation("AusenciaAprobador1")
-  ausenciasComoAprobador2                  SolicitudAusencia[]      @relation("AusenciaAprobador2")
-  ausenciasComoRechazador                  SolicitudAusencia[]      @relation("AusenciaRechazador")
-  saldosAusencia                           SaldoAusencia[]          @relation("SaldosAusencia")
-  movimientosSaldoAusencia                 MovimientoSaldoAusencia[] @relation("MovimientoSaldoCreador")
+  solicitudesAusencia                      SolicitudAusencia[]                  @relation("AusenciaSolicitante")
+  ausenciasComoAprobador1                  SolicitudAusencia[]                  @relation("AusenciaAprobador1")
+  ausenciasComoAprobador2                  SolicitudAusencia[]                  @relation("AusenciaAprobador2")
+  ausenciasComoRechazador                  SolicitudAusencia[]                  @relation("AusenciaRechazador")
+  saldosAusencia                           SaldoAusencia[]                      @relation("SaldosAusencia")
+  movimientosSaldoAusencia                 MovimientoSaldoAusencia[]            @relation("MovimientoSaldoCreador")
   // Módulo Planificación
-  planificacionesDia                       PlanificacionDia[]       @relation("PlanificacionPersona")
-  planificacionesDiaCreadas                PlanificacionDia[]       @relation("PlanificacionCreador")
-  planificacionesDiaActualizadas           PlanificacionDia[]       @relation("PlanificacionActualizador")
+  planificacionesDia                       PlanificacionDia[]                   @relation("PlanificacionPersona")
+  planificacionesDiaCreadas                PlanificacionDia[]                   @relation("PlanificacionCreador")
+  planificacionesDiaActualizadas           PlanificacionDia[]                   @relation("PlanificacionActualizador")
   // Ventas de equipos
-  ventasEquipoComercial                    VentaEquipo[]            @relation("VentaEquipoComercial")
+  ventasEquipoComercial                    VentaEquipo[]                        @relation("VentaEquipoComercial")
   avancesTareaRegistrados                  ProyectoTareaAvance[]
   plantillaOrgNodos                        PlantillaOrgNodo[]
 
@@ -2157,7 +2191,7 @@ model Empleado {
   fechaCese            DateTime?
   activo               Boolean              @default(true)
   documentoIdentidad   String?
-  cip                  String?  // número de colegiatura
+  cip                  String? // número de colegiatura
   telefono             String?
   direccion            String?
   contactoEmergencia   String?
@@ -2244,10 +2278,10 @@ model Valorizacion {
   // es el habilitador para emitir la factura. Se hereda a la CxC al facturar.
   // tipoConformidad: 'hes' (Hoja de Entrada de Servicios) | 'guia_remision' | 'acta' | 'otro'
   tipoConformidad              String?
-  numeroHES                    String?            // N° de HES (cuando es servicio)
-  numeroGuiaRemision           String?            // N° de Guía de Remisión (cuando es bien)
-  fechaConformidad             DateTime?          // Cuándo el cliente firmó/emitió la conformidad
-  fechaSolicitudHES            DateTime?          // Cuándo se solicitó el HES al cliente (inicio de hes_pendiente)
+  numeroHES                    String? // N° de HES (cuando es servicio)
+  numeroGuiaRemision           String? // N° de Guía de Remisión (cuando es bien)
+  fechaConformidad             DateTime? // Cuándo el cliente firmó/emitió la conformidad
+  fechaSolicitudHES            DateTime? // Cuándo se solicitó el HES al cliente (inicio de hes_pendiente)
   observaciones                String?
   createdAt                    DateTime           @default(now())
   updatedAt                    DateTime
@@ -2283,43 +2317,43 @@ model ValorizacionAdjunto {
 }
 
 model CobroValorizacion {
-  id                   String    @id @default(cuid())
-  valorizacionId       String    @unique
-  tipo                 String    // 'factoring' | 'directo'
+  id                     String    @id @default(cuid())
+  valorizacionId         String    @unique
+  tipo                   String // 'factoring' | 'directo'
   // Factoring — datos de operación
-  financiera             String?   // "Banpro", "BCP", nombre libre
-  tasaDescuentoPct       Float?    // tasa mensual (ej. 1.38%)
+  financiera             String? // "Banpro", "BCP", nombre libre
+  tasaDescuentoPct       Float? // tasa mensual (ej. 1.38%)
   fechaDesembolso        DateTime?
   fechaVencimiento       DateTime? // fecha fin del periodo
   numeroOperacion        String?
-  numeroDocumentos       Int?      // N° de facturas incluidas
-  diasFinanciamiento     Int?      // ej. 126 días
+  numeroDocumentos       Int? // N° de facturas incluidas
+  diasFinanciamiento     Int? // ej. 126 días
   // Factoring — hoja de liquidación
-  detraccionPct          Float?    // ej. 12.0 (Peru)
+  detraccionPct          Float? // ej. 12.0 (Peru)
   detraccionMonto        Float?
-  excedentePct           Float?    // % que retiene la financiera, ej. 1.0
+  excedentePct           Float? // % que retiene la financiera, ej. 1.0
   excedenteMonto         Float?
-  valorAFinanciar        Float?    // = valor neto - excedente
-  interesMonto           Float?    // interés calculado por la financiera
+  valorAFinanciar        Float? // = valor neto - excedente
+  interesMonto           Float? // interés calculado por la financiera
   comisionEstructuracion Float?
   gastosAdicionales      Float?
-  igvGastos              Float?    // IGV sobre los gastos de la operación
-  montoADesembolsar      Float?    // lo que efectivamente recibe GYS
-  adelantoBanpro         Float?    // si ya se giró un adelanto
-  saldoAGirar            Float?    // = montoADesembolsar - adelantoBanpro
-  numeroFacturaInteres   String?   // N° de factura emitida por la financiera por el interés
-  numeroFacturaGastos    String?   // N° de factura emitida por la financiera por comisión/gastos
+  igvGastos              Float? // IGV sobre los gastos de la operación
+  montoADesembolsar      Float? // lo que efectivamente recibe GYS
+  adelantoBanpro         Float? // si ya se giró un adelanto
+  saldoAGirar            Float? // = montoADesembolsar - adelantoBanpro
+  numeroFacturaInteres   String? // N° de factura emitida por la financiera por el interés
+  numeroFacturaGastos    String? // N° de factura emitida por la financiera por comisión/gastos
   // Legacy (mantener para compatibilidad)
-  montoDescontado        Float?    // total costos/descuentos
-  montoNeto              Float?    // = montoADesembolsar (alias)
+  montoDescontado        Float? // total costos/descuentos
+  montoNeto              Float? // = montoADesembolsar (alias)
   // Cobro directo
-  confirmacionCliente  String?   // 'pendiente' | 'confirmado' | 'en_disputa'
-  fechaVencimientoPago DateTime?
-  observaciones        String?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  confirmacionCliente    String? // 'pendiente' | 'confirmado' | 'en_disputa'
+  fechaVencimientoPago   DateTime?
+  observaciones          String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
-  valorizacion Valorizacion       @relation(fields: [valorizacionId], references: [id], onDelete: Cascade)
+  valorizacion Valorizacion        @relation(fields: [valorizacionId], references: [id], onDelete: Cascade)
   abonos       AbonoValorizacion[]
 
   @@map("cobro_valorizacion")
@@ -2782,19 +2816,19 @@ model CrmCompetidorLicitacion {
 }
 
 model CrmContactoCliente {
-  id                  String    @id
+  id                  String                    @id
   clienteId           String
   nombre              String
   cargo               String?
   email               String?
   telefono            String?
   celular             String?
-  esDecisionMaker     Boolean   @default(false)
+  esDecisionMaker     Boolean                   @default(false)
   areasInfluencia     String?
   relacionComercial   String?
   fechaUltimoContacto DateTime?
   notas               String?
-  createdAt           DateTime  @default(now())
+  createdAt           DateTime                  @default(now())
   updatedAt           DateTime
   cliente             Cliente                   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   proyectos           ProyectoContactoCliente[]
@@ -3324,22 +3358,22 @@ model ProyectoActividad {
 }
 
 model ProyectoCronograma {
-  id                       String              @id
+  id                       String                           @id
   proyectoId               String
   tipo                     String
   nombre                   String
-  copiadoDesdeCotizacionId String?             @unique
-  esBaseline               Boolean             @default(false)
-  version                  Int                 @default(1)
-  bloqueado                Boolean             @default(false)
-  createdAt                DateTime            @default(now())
+  copiadoDesdeCotizacionId String?                          @unique
+  esBaseline               Boolean                          @default(false)
+  version                  Int                              @default(1)
+  bloqueado                Boolean                          @default(false)
+  createdAt                DateTime                         @default(now())
   updatedAt                DateTime
   // Lock de concurrencia para el generador de cronograma con IA (mismo patrón
   // que PlanTrabajo.operacionIAEnCurso — ver src/lib/cronogramaIA/mutex.ts).
   operacionIAEnCurso       String?
   operacionIAIniciadaEn    DateTime?
   proyectoActividad        ProyectoActividad[]
-  proyecto                 Proyecto            @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  proyecto                 Proyecto                         @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
   proyectoEdt              ProyectoEdt[]
   proyectoFase             ProyectoFase[]
   proyectoTarea            ProyectoTarea[]
@@ -3367,18 +3401,18 @@ model ProyectoCronogramaGeneracionIA {
   /// Auditoría del flujo de esquemas en 2 etapas de CON/PRO (ver
   /// EsquemaAgrupacionPropuesto) — Record<edtNombre, EsquemaAgrupacionPropuesto[]>,
   /// los 2-3 esquemas alternativos ofrecidos por la IA en la Etapa A.
-  esquemasPropuestos Json?
+  esquemasPropuestos   Json?
   /// Record<edtNombre, EsquemaElegido> — el esquema (posiblemente editado
   /// por el usuario) con el que se confirmó la Etapa B, para auditoría.
-  esquemaElegido     Json?
-  estado               String   @default("borrador")
+  esquemaElegido       Json?
+  estado               String @default("borrador")
 
   generadoPorId String
   generadoPor   User      @relation(fields: [generadoPorId], references: [id])
   generadoEn    DateTime  @default(now())
   aplicadoEn    DateTime?
 
-  tareaDecisiones CronogramaIATareaDecision[]
+  tareaDecisiones      CronogramaIATareaDecision[]
   sugerenciasAceptadas CronogramaIASugerenciaAceptada[]
 
   @@index([proyectoCronogramaId, generadoEn(sort: Desc)])
@@ -3403,8 +3437,8 @@ model CronogramaIATareaDecision {
   catalogoServicioId String
   catalogoServicio   CatalogoServicio @relation(fields: [catalogoServicioId], references: [id], onDelete: Cascade)
 
-  edtNombre       String
-  actividadNombre String
+  edtNombre        String
+  actividadNombre  String
   /// Clave de la regla que decidió la preselección inicial (ej.
   /// "cmm.instrumentacion", "ing.control") — null si la tarea no tenía
   /// ninguna regla de sub-alcance (siempre incluida por defecto) y aun así
@@ -3533,33 +3567,33 @@ model ProyectoDependenciasTarea {
 }
 
 model ProyectoEdt {
-  id                   String               @id
+  id                   String                   @id
   proyectoId           String
   edtId                String
   fechaInicioPlan      DateTime?
   fechaFinPlan         DateTime?
-  horasPlan            Decimal?             @default(0) @db.Decimal(10, 2)
+  horasPlan            Decimal?                 @default(0) @db.Decimal(10, 2)
   fechaInicioReal      DateTime?
   fechaFinReal         DateTime?
-  horasReales          Decimal              @default(0) @db.Decimal(10, 2)
-  estado               EstadoEdt            @default(planificado)
+  horasReales          Decimal                  @default(0) @db.Decimal(10, 2)
+  estado               EstadoEdt                @default(planificado)
   responsableId        String?
-  porcentajeAvance     Int                  @default(0)
+  porcentajeAvance     Int                      @default(0)
   descripcion          String?
-  prioridad            PrioridadEdt         @default(media)
-  createdAt            DateTime             @default(now())
+  prioridad            PrioridadEdt             @default(media)
+  createdAt            DateTime                 @default(now())
   updatedAt            DateTime
   nombre               String
-  orden                Int                  @default(0)
+  orden                Int                      @default(0)
   proyectoCronogramaId String
   proyectoFaseId       String?
   registroHoras        RegistroHoras[]
   proyectoActividad    ProyectoActividad[]
-  edt                  Edt                  @relation(fields: [edtId], references: [id])
-  proyectoCronograma   ProyectoCronograma   @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
-  proyectoFase         ProyectoFase?        @relation(fields: [proyectoFaseId], references: [id])
-  proyecto             Proyecto             @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
-  user                 User?                @relation(fields: [responsableId], references: [id])
+  edt                  Edt                      @relation(fields: [edtId], references: [id])
+  proyectoCronograma   ProyectoCronograma       @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
+  proyectoFase         ProyectoFase?            @relation(fields: [proyectoFaseId], references: [id])
+  proyecto             Proyecto                 @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  user                 User?                    @relation(fields: [responsableId], references: [id])
   proyectoTarea        ProyectoTarea[]
   registrosCampo       RegistroHorasCampo[]
   matrizFilas          MatrizComunicacionFila[]
@@ -3620,54 +3654,54 @@ model ProyectoSubtarea {
 }
 
 model ProyectoTarea {
-  id                          String                      @id
+  id                          String                               @id
   proyectoEdtId               String
   proyectoCronogramaId        String
   nombre                      String
   descripcion                 String?
-  orden                       Int                         @default(0)
+  orden                       Int                                  @default(0)
   fechaInicio                 DateTime
   fechaFin                    DateTime
   fechaInicioReal             DateTime?
   fechaFinReal                DateTime?
-  horasEstimadas              Decimal?                    @db.Decimal(10, 2)
-  horasReales                 Decimal                     @default(0) @db.Decimal(10, 2)
-  personasEstimadas           Int                         @default(1)
-  estado                      EstadoTarea                 @default(pendiente)
-  prioridad                   PrioridadTarea              @default(media)
-  porcentajeCompletado        Int                         @default(0)
+  horasEstimadas              Decimal?                             @db.Decimal(10, 2)
+  horasReales                 Decimal                              @default(0) @db.Decimal(10, 2)
+  personasEstimadas           Int                                  @default(1)
+  estado                      EstadoTarea                          @default(pendiente)
+  prioridad                   PrioridadTarea                       @default(media)
+  porcentajeCompletado        Int                                  @default(0)
   dependenciaId               String?
   responsableId               String?
   creadoPorId                 String?
   proyectoActividadId         String?
   recursoId                   String?
   catalogoServicioId          String?
-  esExtra                     Boolean                     @default(false)
+  esExtra                     Boolean                              @default(false)
   /// true si esta tarea fue propuesta por la IA (Etapa B de CON/PRO) sin
   /// respaldo de catálogo — catalogoServicioId siempre null en ese caso.
   /// Ver validarTareasNuevasPropuestas.ts y matchTareaCatalogo.ts.
-  esPropuestaIA               Boolean                     @default(false)
+  esPropuestaIA               Boolean                              @default(false)
   /// Justificación de 1 línea dada por la IA al proponerla — solo presente
   /// cuando esPropuestaIA es true.
   justificacionIA             String?
-  createdAt                   DateTime                    @default(now())
+  createdAt                   DateTime                             @default(now())
   updatedAt                   DateTime
   registroHoras               RegistroHoras[]
-  dependenciasComoDependiente ProyectoDependenciasTarea[] @relation("dependenciasTareaDependiente")
-  dependenciasComoOrigen      ProyectoDependenciasTarea[] @relation("dependenciasTareaOrigen")
+  dependenciasComoDependiente ProyectoDependenciasTarea[]          @relation("dependenciasTareaDependiente")
+  dependenciasComoOrigen      ProyectoDependenciasTarea[]          @relation("dependenciasTareaOrigen")
   proyectoSubtarea            ProyectoSubtarea[]
-  tareaPadre                  ProyectoTarea?              @relation("proyectoTareaHijas", fields: [dependenciaId], references: [id])
-  tareasHijas                 ProyectoTarea[]             @relation("proyectoTareaHijas")
-  proyectoActividad           ProyectoActividad?          @relation(fields: [proyectoActividadId], references: [id])
-  proyectoCronograma          ProyectoCronograma          @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
-  proyectoEdt                 ProyectoEdt                 @relation(fields: [proyectoEdtId], references: [id], onDelete: Cascade)
-  user                        User?                       @relation("TareaResponsable", fields: [responsableId], references: [id])
-  creadoPor                   User?                       @relation("TareaCreadaPor", fields: [creadoPorId], references: [id])
-  recurso                     Recurso?                    @relation(fields: [recursoId], references: [id], onDelete: SetNull)
-  catalogoServicio            CatalogoServicio?           @relation(fields: [catalogoServicioId], references: [id], onDelete: SetNull)
+  tareaPadre                  ProyectoTarea?                       @relation("proyectoTareaHijas", fields: [dependenciaId], references: [id])
+  tareasHijas                 ProyectoTarea[]                      @relation("proyectoTareaHijas")
+  proyectoActividad           ProyectoActividad?                   @relation(fields: [proyectoActividadId], references: [id])
+  proyectoCronograma          ProyectoCronograma                   @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
+  proyectoEdt                 ProyectoEdt                          @relation(fields: [proyectoEdtId], references: [id], onDelete: Cascade)
+  user                        User?                                @relation("TareaResponsable", fields: [responsableId], references: [id])
+  creadoPor                   User?                                @relation("TareaCreadaPor", fields: [creadoPorId], references: [id])
+  recurso                     Recurso?                             @relation(fields: [recursoId], references: [id], onDelete: SetNull)
+  catalogoServicio            CatalogoServicio?                    @relation(fields: [catalogoServicioId], references: [id], onDelete: SetNull)
   registrosCampoTarea         RegistroHorasCampoTarea[]
   registrosAvance             RegistroAvance[]
-  avanceSnapshotsTarea        ProyectoAvanceSnapshotTarea[] @relation("AvanceSnapshotTareaProyectoTarea")
+  avanceSnapshotsTarea        ProyectoAvanceSnapshotTarea[]        @relation("AvanceSnapshotTareaProyectoTarea")
   avances                     ProyectoTareaAvance[]
   responsableAsignaciones     ProyectoTareaResponsableAsignacion[]
 
@@ -3684,18 +3718,18 @@ model ProyectoTarea {
 }
 
 model ProyectoTareaAvance {
-  id               String            @id @default(cuid())
-  proyectoTareaId  String
-  proyectoId       String
-  fecha            DateTime          // fecha del avance (fechaTrabajo en campo, now() en oficina)
-  porcentaje       Int               // 0-100
-  origen           OrigenAvanceTarea
-  usuarioId        String?
-  createdAt        DateTime          @default(now())
+  id              String            @id @default(cuid())
+  proyectoTareaId String
+  proyectoId      String
+  fecha           DateTime // fecha del avance (fechaTrabajo en campo, now() en oficina)
+  porcentaje      Int // 0-100
+  origen          OrigenAvanceTarea
+  usuarioId       String?
+  createdAt       DateTime          @default(now())
 
-  proyectoTarea    ProyectoTarea     @relation(fields: [proyectoTareaId], references: [id], onDelete: Cascade)
-  proyecto         Proyecto          @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
-  usuario          User?             @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  proyectoTarea ProyectoTarea @relation(fields: [proyectoTareaId], references: [id], onDelete: Cascade)
+  proyecto      Proyecto      @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  usuario       User?         @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
 
   @@unique([proyectoTareaId, fecha])
   @@index([proyectoId, fecha])
@@ -4201,22 +4235,26 @@ model HojaDeGastos {
   tipoPropósito          String         @default("gastos_viaticos") @map("tipo_proposito")
   // "gastos_viaticos" | "compra_materiales"
   justificacionMateriales String?        @map("justificacion_materiales")
+  // Trazabilidad: si la hoja se creó automáticamente desde el botón "Requerimiento del día"
+  origenRegistroCampoId   String?
 
-  proyecto        Proyecto?                   @relation(fields: [proyectoId], references: [id])
-  centroCosto     CentroCosto?                @relation(fields: [centroCostoId], references: [id])
-  empleado        User                        @relation("HojaEmpleado", fields: [empleadoId], references: [id])
-  aprobador       User?                       @relation("HojaAprobador", fields: [aprobadorId], references: [id])
-  lineas          GastoLinea[]
-  adjuntos        HojaDeGastosAdjunto[]
-  eventos         HojaDeGastosEvento[]
-  itemsMateriales RequerimientoMaterialItem[]
-  comprobantes    GastoComprobante[]
-  depositos       DepositoHoja[]
+  proyecto            Proyecto?                   @relation(fields: [proyectoId], references: [id])
+  centroCosto         CentroCosto?                @relation(fields: [centroCostoId], references: [id])
+  empleado            User                        @relation("HojaEmpleado", fields: [empleadoId], references: [id])
+  aprobador           User?                       @relation("HojaAprobador", fields: [aprobadorId], references: [id])
+  origenRegistroCampo RegistroHorasCampo?         @relation("HojaDeGastosOrigenRegistroCampo", fields: [origenRegistroCampoId], references: [id])
+  lineas              GastoLinea[]
+  adjuntos            HojaDeGastosAdjunto[]
+  eventos             HojaDeGastosEvento[]
+  itemsMateriales     RequerimientoMaterialItem[]
+  comprobantes        GastoComprobante[]
+  depositos           DepositoHoja[]
 
   @@index([proyectoId, estado])
   @@index([centroCostoId, estado])
   @@index([empleadoId, estado])
   @@index([tipoPropósito, estado])
+  @@index([origenRegistroCampoId])
   @@map("hoja_de_gastos")
 }
 
@@ -4638,37 +4676,37 @@ model PagoCobro {
 }
 
 model CuentaPorPagar {
-  id                 String            @id @default(cuid())
-  proveedorId        String
-  proyectoId         String?
-  ordenCompraId      String?
-  pedidoEquipoId     String?
-  pedidoEquipoItemId String?
-  tipoOrigen         String? // "oc" | "atencion_directa" | "importacion_gerencia"
-  numeroFactura      String? // número de factura del proveedor
-  descripcion        String?
-  monto              Float
-  moneda             String            @default("PEN")
-  tipoCambio         Float?
-  montoPagado        Float             @default(0) // calculado: SUM(pagosPagar.monto)
-  saldoPendiente     Float             @default(0) // calculado: monto - montoPagado
-  fechaRecepcion     DateTime
-  fechaVencimiento   DateTime
-  condicionPago      String            @default("contado") // 'contado' | 'credito' | 'adelanto'
-  formaPago          String? // 'transferencia' | 'factura' | 'cheque' | 'letra' | 'factura_negociable' | 'otro'
-  diasCredito        Int?
+  id                   String            @id @default(cuid())
+  proveedorId          String
+  proyectoId           String?
+  ordenCompraId        String?
+  pedidoEquipoId       String?
+  pedidoEquipoItemId   String?
+  tipoOrigen           String? // "oc" | "atencion_directa" | "importacion_gerencia"
+  numeroFactura        String? // número de factura del proveedor
+  descripcion          String?
+  monto                Float
+  moneda               String            @default("PEN")
+  tipoCambio           Float?
+  montoPagado          Float             @default(0) // calculado: SUM(pagosPagar.monto)
+  saldoPendiente       Float             @default(0) // calculado: monto - montoPagado
+  fechaRecepcion       DateTime
+  fechaVencimiento     DateTime
+  condicionPago        String            @default("contado") // 'contado' | 'credito' | 'adelanto'
+  formaPago            String? // 'transferencia' | 'factura' | 'cheque' | 'letra' | 'factura_negociable' | 'otro'
+  diasCredito          Int?
   // % de detracción que SUNAT exige sobre esta factura (4, 10, 12...). Null si no aplica.
   // El monto efectivamente depositado al BN se registra en PagoPagar.detraccionMonto.
   detraccionPorcentaje Float?
-  estado             EstadoCuentaPagar @default(pendiente)
-  observaciones      String?
+  estado               EstadoCuentaPagar @default(pendiente)
+  observaciones        String?
   // Nros. de cheque/letra vinculados a esta CxP (para control interno)
-  numeroCheque       String?
-  numeroLetra        String?
-  tipoDocumento      String            @default("factura") // 'factura' | 'nota_credito'
-  registroContador   String?           // '1ro' | '2do' | '3ro' | null
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime
+  numeroCheque         String?
+  numeroLetra          String?
+  tipoDocumento        String            @default("factura") // 'factura' | 'nota_credito'
+  registroContador     String? // '1ro' | '2do' | '3ro' | null
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime
 
   proveedor        Proveedor         @relation(fields: [proveedorId], references: [id])
   proyecto         Proyecto?         @relation(fields: [proyectoId], references: [id])
@@ -4987,7 +5025,7 @@ model JornadaAsistencia {
   id                   String              @id @default(cuid())
   supervisorId         String
   ubicacionId          String
-  proyectoId           String?             // proyecto al que corresponde esta jornada
+  proyectoId           String? // proyecto al que corresponde esta jornada
   registroHorasCampoId String?             @unique // jornada de trabajo creada automáticamente
   fecha                DateTime            @db.Date
   qrSecret             String
@@ -5445,38 +5483,38 @@ model DevolucionMaterialItem {
 // contaminar selectores de equipos de proyecto y mantener campos
 // específicos (vida útil, talla, sub-categoría) sin bloat.
 model CatalogoEPP {
-  id                  String              @id @default(cuid())
-  codigo              String              @unique
-  descripcion         String
-  marca               String?
-  modelo              String?
+  id                String          @id @default(cuid())
+  codigo            String          @unique
+  descripcion       String
+  marca             String?
+  modelo            String?
   // Talla específica de este SKU (S/M/L o 38/39/40). Convención: cada
   // talla es un SKU distinto; este campo guarda el valor explícito para
   // poder filtrar/agrupar y hacer auto-match con la talla del empleado.
   // Vacío para items que no requieren talla (mascarillas, tapones, etc.).
-  talla               String?
-  unidadId            String
-  subcategoria        SubcategoriaEPP
-  requiereTalla       Boolean             @default(false)
+  talla             String?
+  unidadId          String
+  subcategoria      SubcategoriaEPP
+  requiereTalla     Boolean         @default(false)
   // Si requiereTalla=true, qué campo del Empleado consultar para sugerir
   // la talla al hacer la entrega (ej. para casco -> Empleado.tallaCasco).
-  tallaCampo          TallaCampo?
+  tallaCampo        TallaCampo?
   // Vida útil estimada en días. null = consumible o sin vencimiento individual.
-  vidaUtilDias        Int?
-  esConsumible        Boolean             @default(false)
-  imagenUrl           String?
-  precioReferencial   Float?
-  monedaReferencial   String              @default("PEN")
-  activo              Boolean             @default(true)
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
+  vidaUtilDias      Int?
+  esConsumible      Boolean         @default(false)
+  imagenUrl         String?
+  precioReferencial Float?
+  monedaReferencial String          @default("PEN")
+  activo            Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
-  unidad              Unidad              @relation(fields: [unidadId], references: [id])
-  stockAlmacen        StockAlmacen[]
-  movimientos         MovimientoAlmacen[]
-  ordenCompraItems    OrdenCompraItem[]
-  pedidoEquipoItems   PedidoEquipoItem[]
-  entregaItems        EntregaEPPItem[]
+  unidad            Unidad              @relation(fields: [unidadId], references: [id])
+  stockAlmacen      StockAlmacen[]
+  movimientos       MovimientoAlmacen[]
+  ordenCompraItems  OrdenCompraItem[]
+  pedidoEquipoItems PedidoEquipoItem[]
+  entregaItems      EntregaEPPItem[]
 
   @@index([subcategoria, activo])
   @@map("catalogo_epp")
@@ -5503,26 +5541,26 @@ enum TallaCampo {
 }
 
 model EntregaEPP {
-  id              String              @id @default(cuid())
-  numero          String              @unique
-  empleadoId      String
-  almacenId       String
-  proyectoId      String?
-  centroCostoId   String?
-  fechaEntrega    DateTime            @default(now())
-  entregadoPorId  String
-  observaciones   String?
-  firmaUrl        String?
-  estado          EstadoEntregaEPP    @default(vigente)
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  id             String           @id @default(cuid())
+  numero         String           @unique
+  empleadoId     String
+  almacenId      String
+  proyectoId     String?
+  centroCostoId  String?
+  fechaEntrega   DateTime         @default(now())
+  entregadoPorId String
+  observaciones  String?
+  firmaUrl       String?
+  estado         EstadoEntregaEPP @default(vigente)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
-  empleado        Empleado            @relation(fields: [empleadoId], references: [id])
-  almacen         Almacen             @relation(fields: [almacenId], references: [id])
-  proyecto        Proyecto?           @relation(fields: [proyectoId], references: [id])
-  centroCosto    CentroCosto?         @relation(fields: [centroCostoId], references: [id])
-  entregadoPor    User                @relation("EntregaEppEntregador", fields: [entregadoPorId], references: [id])
-  items           EntregaEPPItem[]
+  empleado     Empleado         @relation(fields: [empleadoId], references: [id])
+  almacen      Almacen          @relation(fields: [almacenId], references: [id])
+  proyecto     Proyecto?        @relation(fields: [proyectoId], references: [id])
+  centroCosto  CentroCosto?     @relation(fields: [centroCostoId], references: [id])
+  entregadoPor User             @relation("EntregaEppEntregador", fields: [entregadoPorId], references: [id])
+  items        EntregaEPPItem[]
 
   @@index([empleadoId, fechaEntrega(sort: Desc)])
   @@index([fechaEntrega(sort: Desc)])
@@ -5530,27 +5568,27 @@ model EntregaEPP {
 }
 
 model EntregaEPPItem {
-  id                      String                @id @default(cuid())
+  id                      String               @id @default(cuid())
   entregaId               String
   catalogoEppId           String
   cantidad                Float
   talla                   String?
   costoUnitario           Float? // Snapshot del costo ponderado al momento de la entrega
-  costoMoneda             String                @default("PEN")
+  costoMoneda             String               @default("PEN")
   fechaEntrega            DateTime
   fechaReposicionEstimada DateTime?
-  estado                  EstadoEntregaEPPItem  @default(vigente)
+  estado                  EstadoEntregaEPPItem @default(vigente)
   motivoBaja              String? // perdido | dañado | renovado | empleado_baja | otro
   reemplazadoPorItemId    String?
   observaciones           String?
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @updatedAt
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
 
-  entrega                 EntregaEPP            @relation(fields: [entregaId], references: [id], onDelete: Cascade)
-  catalogoEpp             CatalogoEPP           @relation(fields: [catalogoEppId], references: [id])
-  reemplazadoPor          EntregaEPPItem?       @relation("EppReemplazo", fields: [reemplazadoPorItemId], references: [id])
-  reemplazos              EntregaEPPItem[]      @relation("EppReemplazo")
-  movimientos             MovimientoAlmacen[]
+  entrega        EntregaEPP          @relation(fields: [entregaId], references: [id], onDelete: Cascade)
+  catalogoEpp    CatalogoEPP         @relation(fields: [catalogoEppId], references: [id])
+  reemplazadoPor EntregaEPPItem?     @relation("EppReemplazo", fields: [reemplazadoPorItemId], references: [id])
+  reemplazos     EntregaEPPItem[]    @relation("EppReemplazo")
+  movimientos    MovimientoAlmacen[]
 
   @@index([catalogoEppId, estado])
   @@index([fechaReposicionEstimada])
@@ -5598,7 +5636,7 @@ model PlantillaOrgNodo {
   recursoId      String?
   userId         String?
   esObligatorio  Boolean  @default(true)
-  gysParentLabel  String?
+  gysParentLabel String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -5613,19 +5651,19 @@ model PlantillaOrgNodo {
 }
 
 model ProyectoOrgNodo {
-  id          String   @id @default(cuid())
-  proyectoId  String
-  parentId    String?
-  orden       Int      @default(0)
-  cargoLabel  String
-  recursoId   String?
-  userId      String?
+  id               String   @id @default(cuid())
+  proyectoId       String
+  parentId         String?
+  orden            Int      @default(0)
+  cargoLabel       String
+  recursoId        String?
+  userId           String?
   cipOverride      String?
   telefonoOverride String?
   empresaOverride  String?
-  esFijoGys   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  esFijoGys        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   proyecto Proyecto          @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
   parent   ProyectoOrgNodo?  @relation("ProyectoOrgJerarquia", fields: [parentId], references: [id])
@@ -5638,13 +5676,13 @@ model ProyectoOrgNodo {
 }
 
 model MatrizComunicacion {
-  id           String   @id @default(cuid())
-  proyectoId   String   @unique
-  version      String   @default("1.0")
-  estado       String   @default("borrador")
-  generadoConIA Boolean @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(cuid())
+  proyectoId    String   @unique
+  version       String   @default("1.0")
+  estado        String   @default("borrador")
+  generadoConIA Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   /// Datos del entregable real (plantilla oficial de cliente) — distintos de `version`
   /// (versión interna del sistema). `codigoDocumento` nunca se sintetiza automáticamente:
@@ -5657,10 +5695,10 @@ model MatrizComunicacion {
   /// Nombres de los 4 firmantes (Desarrolló/Verificó/Aprobó/Autorizó) — texto plano, NO FK
   /// a User: "Autorizó" suele ser un contacto externo del cliente, no un usuario del
   /// sistema. Las siglas para el formato "AP: ALONSO PISCOYA" se derivan en el render.
-  desarrolloNombre String?
-  verificoNombre   String?
-  aproboNombre     String?
-  autorizoNombre   String?
+  desarrolloNombre  String?
+  verificoNombre    String?
+  aproboNombre      String?
+  autorizoNombre    String?
 
   proyecto Proyecto                 @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
   filas    MatrizComunicacionFila[]
@@ -5689,8 +5727,8 @@ model MatrizComunicacionFila {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  matriz MatrizComunicacion @relation(fields: [matrizId], references: [id], onDelete: Cascade)
-  edt    ProyectoEdt?       @relation(fields: [edtId], references: [id], onDelete: SetNull)
+  matriz                  MatrizComunicacion                   @relation(fields: [matrizId], references: [id], onDelete: Cascade)
+  edt                     ProyectoEdt?                         @relation(fields: [edtId], references: [id], onDelete: SetNull)
   responsableAsignaciones ProyectoTareaResponsableAsignacion[]
 
   @@index([matrizId])
@@ -5839,11 +5877,11 @@ model PlanTrabajo {
   numeroConsultor String?
 
   // Firmantes (texto libre, no FK)
-  preparadoPor  String?
+  preparadoPor   String?
   preparadoCargo String?
-  revisadoPor   String?
+  revisadoPor    String?
   revisadoCargo  String?
-  aprobadoPor   String?
+  aprobadoPor    String?
   aprobadoCargo  String?
 
   // Secciones de texto largo
@@ -5863,11 +5901,11 @@ model PlanTrabajo {
   referencias          Json?
 
   // Toggles de inclusión en DOCX
-  incluirOrganigrama  Boolean @default(true)
-  incluirMatriz       Boolean @default(true)
-  incluirCronograma   Boolean @default(true)
-  incluirHistogramas  Boolean @default(true)
-  incluirTDR          Boolean @default(true)
+  incluirOrganigrama Boolean @default(true)
+  incluirMatriz      Boolean @default(true)
+  incluirCronograma  Boolean @default(true)
+  incluirHistogramas Boolean @default(true)
+  incluirTDR         Boolean @default(true)
 
   // Tracking de completitud por sección
   bloquesCompletitud Json?
@@ -5941,13 +5979,13 @@ model PlanTrabajoImagen {
  * nunca duplica el archivo: PlanTrabajoImagen solo referencia su driveFileId.
  */
 model CatalogoImagen {
-  id            String   @id @default(cuid())
-  nombre        String
-  keywords      String[] @default([])
-  categoria     String // 'EQUIPO' | 'HERRAMIENTA' | 'EPP' | 'OTRO'
-  driveFileId   String
-  thumbnailUrl  String?
-  activo        Boolean  @default(true)
+  id           String   @id @default(cuid())
+  nombre       String
+  keywords     String[] @default([])
+  categoria    String // 'EQUIPO' | 'HERRAMIENTA' | 'EPP' | 'OTRO'
+  driveFileId  String
+  thumbnailUrl String?
+  activo       Boolean  @default(true)
 
   createdAt   DateTime @default(now())
   createdById String?
@@ -5961,9 +5999,9 @@ model CatalogoImagen {
 // ─── IPERC (Identificación de Peligros, Evaluación de Riesgos y Controles) ──
 
 model Iperc {
-  id                 String   @id @default(cuid())
-  proyectoId         String   @unique
-  proyecto           Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  proyectoId String   @unique
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
 
   codigoDocumento    String
   revision           String   @default("01")
@@ -5973,13 +6011,13 @@ model Iperc {
   area               String
   evaluadores        Json     @default("[]")
 
-  estado             String   @default("borrador") // borrador | revisado | aprobado
+  estado String @default("borrador") // borrador | revisado | aprobado
 
-  filas              IpercFila[]
-  generaciones       IpercGeneracion[]
+  filas        IpercFila[]
+  generaciones IpercGeneracion[]
 
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("iperc")
 }
@@ -6014,8 +6052,8 @@ model IpercFila {
   severidadResidual    Int
   probabilidadResidual String
 
-  accionesMejora  String @default("")
-  responsables    String @default("")
+  accionesMejora String @default("")
+  responsables   String @default("")
 
   tareaCronogramaRefId     String?
   actividadCronogramaRefId String?
@@ -6105,8 +6143,8 @@ model MppItem {
   mppEppCatalogoId String
   mppEppCatalogo   MppEppCatalogo @relation(fields: [mppEppCatalogoId], references: [id])
 
-  orden        Int
-  asignaciones Json    // { [puesto: string]: boolean }
+  orden         Int
+  asignaciones  Json // { [puesto: string]: boolean }
   observaciones String? @db.Text
 
   createdAt DateTime @default(now())
@@ -6170,8 +6208,8 @@ model Pets {
 
   estado String? @default("borrador")
 
-  @@map("pets")
   @@index([proyectoId])
+  @@map("pets")
 }
 
 // ============================================================
@@ -6180,8 +6218,8 @@ model Pets {
 
 enum TipoCicloSaldo {
   anio_calendario // resetea el 1 de enero
-  anio_servicio   // resetea en aniversario de Empleado.fechaIngreso
-  sin_ciclo       // no resetea (tipos sin saldo o acumulativos)
+  anio_servicio // resetea en aniversario de Empleado.fechaIngreso
+  sin_ciclo // no resetea (tipos sin saldo o acumulativos)
 }
 
 enum EstadoSolicitudAusencia {
@@ -6190,18 +6228,18 @@ enum EstadoSolicitudAusencia {
   aprobada
   rechazada
   cancelada
-  en_curso   // activado por cron al llegar fechaInicio
+  en_curso // activado por cron al llegar fechaInicio
   finalizada // activado por cron al pasar fechaFin
 }
 
 // Turno del día — compartido por SolicitudAusencia y PlanificacionDia
 enum TurnoDia {
   dia_completo // legacy — migrado a turno_a; ya no se usa para nuevas celdas
-  am          // deprecated — no usar; existe por compatibilidad histórica
-  pm          // deprecated — no usar
-  turno_a     // Día (turno por defecto)
-  turno_b     // Tarde / Noche
-  turno_c     // Noche
+  am // deprecated — no usar; existe por compatibilidad histórica
+  pm // deprecated — no usar
+  turno_a // Día (turno por defecto)
+  turno_b // Tarde / Noche
+  turno_c // Noche
   turno_noche // deprecated — usar turno_c
 }
 
@@ -6232,7 +6270,7 @@ model TipoAusencia {
 }
 
 model SolicitudAusencia {
-  id             String @id @default(cuid())
+  id             String  @id @default(cuid())
   tipoAusenciaId String
   solicitanteId  String
   empleadoId     String? // Empleado.id — guardado para queries RRHH sin JOIN extra
@@ -6292,20 +6330,20 @@ model SolicitudAusenciaAdjunto {
 }
 
 model SaldoAusencia {
-  id             String @id @default(cuid())
-  userId         String
-  tipoAusenciaId String
-  anio           Int // año calendario de referencia (aun cuando el ciclo es por servicio)
-  diasAsignados  Float @default(0)
-  diasGozados    Float @default(0) // aprobadas + finalizadas acumuladas en el año
-  diasPendientes Float @default(0) // en flujo (pendiente o aprobada, aún no finalizadas)
+  id              String   @id @default(cuid())
+  userId          String
+  tipoAusenciaId  String
+  anio            Int // año calendario de referencia (aun cuando el ciclo es por servicio)
+  diasAsignados   Float    @default(0)
+  diasGozados     Float    @default(0) // aprobadas + finalizadas acumuladas en el año
+  diasPendientes  Float    @default(0) // en flujo (pendiente o aprobada, aún no finalizadas)
   /// = diasAsignados - diasGozados - diasPendientes. Recalculado por service en cada movimiento.
   diasDisponibles Float    @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  user         User         @relation("SaldosAusencia", fields: [userId], references: [id])
-  tipoAusencia TipoAusencia @relation(fields: [tipoAusenciaId], references: [id])
+  user         User                      @relation("SaldosAusencia", fields: [userId], references: [id])
+  tipoAusencia TipoAusencia              @relation(fields: [tipoAusenciaId], references: [id])
   movimientos  MovimientoSaldoAusencia[]
 
   @@unique([userId, tipoAusenciaId, anio])
@@ -6339,10 +6377,10 @@ model MovimientoSaldoAusencia {
 /// proyectoId y solicitudAusenciaId son mutuamente excluyentes:
 /// exactamente uno debe estar presente (también validado en API).
 model PlanificacionDia {
-  id                  String   @id @default(cuid())
-  userId              String
-  fecha               DateTime @db.Date
-  turno               TurnoDia @default(turno_a)
+  id     String   @id @default(cuid())
+  userId String
+  fecha  DateTime @db.Date
+  turno  TurnoDia @default(turno_a)
 
   proyectoId          String? // asignación productiva a proyecto
   solicitudAusenciaId String? // ausencia materializada al aprobar SolicitudAusencia
@@ -6387,30 +6425,30 @@ model PlanificacionTurnoHora {
 // ─── Venta de Equipos ──────────────────────────────────────────────────────────
 
 model VentaEquipo {
-  id                   String             @id @default(cuid())
-  codigo               String             @unique
+  id                   String            @id @default(cuid())
+  codigo               String            @unique
   numeroSecuencia      Int
   nombre               String
-  estado               EstadoVentaEquipo  @default(creado)
+  estado               EstadoVentaEquipo @default(creado)
   clienteId            String
   comercialId          String
   cotizacionId         String
-  moneda               String             @default("USD")
-  tipoCambio           Float              @default(1)
-  totalInterno         Float              @default(0)
-  totalCliente         Float              @default(0)
-  descuento            Float              @default(0)
-  grandTotal           Float              @default(0)
+  moneda               String            @default("USD")
+  tipoCambio           Float             @default(1)
+  totalInterno         Float             @default(0)
+  totalCliente         Float             @default(0)
+  descuento            Float             @default(0)
+  grandTotal           Float             @default(0)
   fechaEntregaEstimada DateTime?
   observacion          String?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
-  cliente    Cliente      @relation(fields: [clienteId], references: [id])
-  comercial  User         @relation("VentaEquipoComercial", fields: [comercialId], references: [id], onDelete: Restrict)
-  cotizacion Cotizacion   @relation(fields: [cotizacionId], references: [id])
-  items      VentaEquipoItem[]
-  pedidos    PedidoEquipo[]
+  cliente       Cliente           @relation(fields: [clienteId], references: [id])
+  comercial     User              @relation("VentaEquipoComercial", fields: [comercialId], references: [id], onDelete: Restrict)
+  cotizacion    Cotizacion        @relation(fields: [cotizacionId], references: [id])
+  items         VentaEquipoItem[]
+  pedidos       PedidoEquipo[]
   ordenesCompra OrdenCompra[]
 
   @@index([clienteId, estado])
@@ -6419,20 +6457,20 @@ model VentaEquipo {
 }
 
 model VentaEquipoItem {
-  id               String   @id @default(cuid())
-  ventaEquipoId    String
-  catalogoEquipoId String?
-  codigo           String?
-  descripcion      String
-  categoria        String?
-  unidad           String?
-  marca            String?
-  cantidad         Float
+  id                    String   @id @default(cuid())
+  ventaEquipoId         String
+  catalogoEquipoId      String?
+  codigo                String?
+  descripcion           String
+  categoria             String?
+  unidad                String?
+  marca                 String?
+  cantidad              Float
   precioUnitarioCliente Float
-  costoCliente     Float    @default(0)
-  costoInterno     Float    @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  costoCliente          Float    @default(0)
+  costoInterno          Float    @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   ventaEquipo    VentaEquipo     @relation(fields: [ventaEquipoId], references: [id], onDelete: Cascade)
   catalogoEquipo CatalogoEquipo? @relation(fields: [catalogoEquipoId], references: [id])

@@ -64,8 +64,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
       )
     }
 
-    // Calcular estadísticas
-    const cantidadTareas = jornada.tareas.length
+    // Calcular estadísticas. cantidadMiembros/totalHoras sobre TODAS las tareas
+    // (incluida la placeholder de asistencia); cantidadTareas y `tareas` la excluyen.
+    const tareasVisibles = jornada.tareas.filter(t => !t.esAutoAsistencia)
+    const cantidadTareas = tareasVisibles.length
     const cantidadMiembros = new Set(
       jornada.tareas.flatMap(t => t.miembros.map(m => m.usuarioId))
     ).size
@@ -78,6 +80,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       success: true,
       data: {
         ...jornada,
+        tareas: tareasVisibles,
         cantidadTareas,
         cantidadMiembros,
         totalHoras

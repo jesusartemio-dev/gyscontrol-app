@@ -97,7 +97,13 @@ interface JornadaActivaData {
   objetivosDia?: string | null
   ubicacion?: string | null
   personalPlanificado: PersonalPlanificado[]
+  // `tareas` viene filtrada por el backend (excluye la tarea placeholder "Asistencia
+  // (auto)"), por eso el headcount real se toma de `cantidadMiembros`/`totalHoras`
+  // (calculados server-side sobre TODAS las tareas), no recalculado desde `tareas`.
   tareas: TareaJornada[]
+  cantidadTareas?: number
+  cantidadMiembros?: number
+  totalHoras?: number
   // Presente cuando la jornada fue devuelta por el aprobador (volvió a 'iniciado')
   motivoRechazo?: string | null
 }
@@ -126,12 +132,15 @@ export function JornadaActiva({
   const [tareaAEliminar, setTareaAEliminar] = useState<TareaJornada | null>(null)
   const [eliminandoTarea, setEliminandoTarea] = useState(false)
 
-  // Calcular estadisticas
-  const cantidadTareas = jornada.tareas.length
-  const miembrosUnicos = new Set(
+  // Estadisticas: preferir los valores ya calculados por el servidor (incluyen a
+  // quienes marcaron asistencia aunque aún no tengan horas cargadas en `tareas`,
+  // que llega filtrada sin la tarea placeholder). Fallback a recalcular por si
+  // algún caller no las provee.
+  const cantidadTareas = jornada.cantidadTareas ?? jornada.tareas.length
+  const miembrosUnicos = jornada.cantidadMiembros ?? new Set(
     jornada.tareas.flatMap(t => t.miembros.map(m => m.usuario.id))
   ).size
-  const totalHoras = jornada.tareas.reduce(
+  const totalHoras = jornada.totalHoras ?? jornada.tareas.reduce(
     (sum, t) => sum + t.miembros.reduce((s, m) => s + m.horas, 0),
     0
   )

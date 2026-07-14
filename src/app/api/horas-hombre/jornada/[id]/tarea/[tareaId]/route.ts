@@ -191,9 +191,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         where: { registroCampoTareaId: tareaId }
       })
 
-      // Crear nuevos miembros
+      // Crear nuevos miembros (dedupe por usuarioId: el nuevo índice único
+      // (registroCampoTareaId, usuarioId) haría fallar createMany completo si
+      // el payload trajera al mismo usuario repetido)
+      const miembrosUnicos = Array.from(
+        new Map(miembros.map(m => [m.usuarioId, m])).values()
+      )
       await tx.registroHorasCampoMiembro.createMany({
-        data: miembros.map(m => ({
+        data: miembrosUnicos.map(m => ({
           registroCampoTareaId: tareaId,
           usuarioId: m.usuarioId,
           horas: m.horas ?? 0,

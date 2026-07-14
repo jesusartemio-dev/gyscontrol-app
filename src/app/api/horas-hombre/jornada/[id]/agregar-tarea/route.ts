@@ -237,7 +237,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
       porcentajeInicial = tareaActual?.porcentajeCompletado ?? 0
     }
 
-    // Crear la tarea con sus miembros
+    // Crear la tarea con sus miembros (dedupe por usuarioId: el índice único
+    // (registroCampoTareaId, usuarioId) haría fallar la creación si el payload
+    // trajera al mismo usuario repetido)
+    const miembrosUnicos = Array.from(
+      new Map(miembros.map(m => [m.usuarioId, m])).values()
+    )
     const tareaCampo = await prisma.registroHorasCampoTarea.create({
       data: {
         registroCampoId: jornadaId,
@@ -246,7 +251,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         descripcion: descripcion || null,
         porcentajeInicial,
         miembros: {
-          create: miembros.map(m => ({
+          create: miembrosUnicos.map(m => ({
             usuarioId: m.usuarioId,
             horas: m.horas ?? 0,
             observaciones: m.observaciones || null

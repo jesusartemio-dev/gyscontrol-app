@@ -94,16 +94,18 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       )
     }
 
-    // Validar que tiene al menos una tarea
-    if (jornada.tareas.length === 0) {
+    // Validar que tiene al menos una tarea real (la placeholder de asistencia,
+    // esAutoAsistencia=true, no cuenta como trabajo reportado)
+    const tareasRealesIniciales = jornada.tareas.filter(t => !t.esAutoAsistencia)
+    if (tareasRealesIniciales.length === 0) {
       return NextResponse.json(
         { error: 'No se puede cerrar una jornada sin tareas registradas' },
         { status: 400 }
       )
     }
 
-    // Validar que las tareas tienen miembros
-    const tareasSinMiembros = jornada.tareas.filter(t => t.miembros.length === 0)
+    // Validar que las tareas reales tienen miembros
+    const tareasSinMiembros = tareasRealesIniciales.filter(t => t.miembros.length === 0)
     if (tareasSinMiembros.length > 0) {
       return NextResponse.json(
         { error: 'Todas las tareas deben tener al menos un miembro asignado' },
@@ -156,8 +158,9 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       }) as typeof jornada
     }
 
-    // Calcular estadísticas
-    const cantidadTareas = jornada.tareas.length
+    // Calcular estadísticas. cantidadMiembros/totalHoras sobre TODAS las tareas
+    // (incluida la placeholder de asistencia); cantidadTareas la excluye.
+    const cantidadTareas = jornada.tareas.filter(t => !t.esAutoAsistencia).length
     const cantidadMiembros = new Set(
       jornada.tareas.flatMap(t => t.miembros.map(m => m.usuarioId))
     ).size

@@ -147,3 +147,33 @@ export const cerrarHoja = (id: string) => postAction(id, 'cerrar')
 export const rechazarHoja = (id: string, comentario: string) =>
   postAction(id, 'rechazar', { comentario })
 export const retrocederHoja = (id: string) => postAction(id, 'retroceder')
+
+// Requerimiento del día (desde una Jornada de Campo en curso)
+export interface RequerimientoDelDiaPayload {
+  registroCampoId: string
+  montoAlmuerzo: number
+  pasajes: Array<{ usuarioId: string; nombre: string; monto: number }>
+  confirmarDuplicado?: boolean
+}
+
+export type RequerimientoDelDiaResult =
+  | { ok: true; hoja: HojaDeGastos }
+  | { ok: false; duplicado: true; mensaje: string }
+
+export async function crearRequerimientoDelDia(
+  payload: RequerimientoDelDiaPayload
+): Promise<RequerimientoDelDiaResult> {
+  const res = await fetch(`${BASE_URL}/requerimiento-del-dia`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    if (res.status === 409 && data.codigo === 'ya_existe_requerimiento') {
+      return { ok: false, duplicado: true, mensaje: data.error }
+    }
+    throw new Error(data.error || 'Error al crear requerimiento del día')
+  }
+  return { ok: true, hoja: data }
+}

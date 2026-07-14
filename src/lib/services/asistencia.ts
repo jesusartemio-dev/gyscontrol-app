@@ -3,6 +3,9 @@ import type { EstadoMarcaje, TipoMarcaje } from '@prisma/client'
 import { obtenerCalendarioLaboral } from '@/lib/utils/calendarioLaboral'
 import { haversineMetros } from '@/lib/utils/geofence'
 
+// Infer transaction client type from our prisma instance (mismo patrón que jornadaCleanup.ts)
+type TransactionClient = Omit<typeof prisma, '$transaction' | '$connect' | '$disconnect' | '$on' | '$extends'>
+
 interface CalcularEstadoInput {
   fechaMarcaje: Date
   fechaEsperada: Date
@@ -242,4 +245,56 @@ export async function determinarModoRemoto(
   }
 
   return { esRemoto: false }
+}
+
+/**
+ * Registra a un usuario como miembro (horas=0) de la jornada de campo (RegistroHorasCampo)
+ * ligada a la jornada de asistencia, para que el conteo de "personas en campo" sea preciso
+ * en tiempo real desde el momento en que marcan ingreso, sin depender de que alguien les
+ * cargue horas a una tarea real más tarde.
+ *
+ * Usa una tarea "placeholder" (esAutoAsistencia=true, una sola por RegistroHorasCampo,
+ * garantizada por índice único parcial en la migración) para no interferir con las tareas
+ * reales del cronograma. Idempotente: si el usuario ya está registrado (por asistencia o
+ * porque ya tiene horas cargadas en otra tarea), no hace nada.
+ */
+export async function registrarMiembroJornadaCampo(
+  tx: TransactionClient,
+  registroCampoId: string,
+  usuarioId: string,
+): Promise<void> {
+  let tarea = await tx.registroHorasCampoTarea.findFirst({
+    where: { registroCampoId, esAutoAsistencia: true },
+    select: { id: true },
+  })
+
+  if (!tarea) {
+    try {
+      tarea = await tx.registroHorasCampoTarea.create({
+        data: {
+          registroCampoId,
+          esAutoAsistencia: true,
+          nombreTareaExtra: 'Asistencia (auto)',
+          descripcion: 'Generada automáticamente al marcar ingreso — agrupa el headcount de asistencia, no es trabajo real.',
+        },
+        select: { id: true },
+      })
+    } catch (error: any) {
+      // P2002: otra marcación concurrente ya creó la tarea placeholder (índice único parcial).
+      if (error?.code === 'P2002') {
+        tarea = await tx.registroHorasCampoTarea.findFirstOrThrow({
+          where: { registroCampoId, esAutoAsistencia: true },
+          select: { id: true },
+        })
+      } else {
+        throw error
+      }
+    }
+  }
+
+  await tx.registroHorasCampoMiembro.upsert({
+    where: { registroCampoTareaId_usuarioId: { registroCampoTareaId: tarea.id, usuarioId } },
+    update: {},
+    create: { registroCampoTareaId: tarea.id, usuarioId, horas: 0 },
+  })
 }
