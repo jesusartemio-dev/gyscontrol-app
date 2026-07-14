@@ -301,30 +301,39 @@ describe('renderizarPlanTrabajoDocx — viñetas de tareas por subItem (Bloque 4
 })
 
 describe('renderizarPlanTrabajoDocx — personalRequerido condicional (plantilla v5, {#tienePersonalRequerido})', () => {
-  it('un EDT con personalRequerido renderiza el párrafo + la fila de personal, sin tags crudos', async () => {
+  const LINEA_INTRO_PERSONAL = 'Para el desarrollo de los trabajos se necesitará la intervención del siguiente personal:'
+
+  it('un EDT con personalRequerido: dataBag.tienePersonalRequerido=true y el docx renderiza la línea introductoria + la fila de personal, sin tags crudos', async () => {
     const dataBag = construirDataBag({
       plan: planFixture([edtDetallado()]),
       proyecto: proyectoFixture,
       organigramaPngBase64: `data:image/png;base64,${PNG_1X1_BASE64}`,
     })
+    const alcance = dataBag.alcanceDetallado as Array<{ edtNombre: string; tienePersonalRequerido: boolean }>
+    expect(alcance.find(a => a.edtNombre === 'Construcción')!.tienePersonalRequerido).toBe(true)
 
     const buffer = await renderizarPlanTrabajoDocx({ dataBag })
     const partes = asertarPaqueteBienFormado(buffer)
     const documentXml = partes.find(p => p.nombre === 'word/document.xml')!.contenido
 
+    expect(documentXml).toContain(LINEA_INTRO_PERSONAL)
     expect(documentXml).toContain('Técnico Operario')
     expect(documentXml).not.toMatch(/\{#tienePersonalRequerido\}|\{\/tienePersonalRequerido\}/)
   })
 
-  it('un EDT sin personalRequerido no rompe el export (bloque condicional simplemente no se renderiza)', async () => {
+  it('un EDT sin personalRequerido: dataBag.tienePersonalRequerido=false y el docx NO renderiza ni la línea introductoria ni la lista (bloque completo ausente)', async () => {
     const dataBag = construirDataBag({
       plan: planFixture([edtResumido()]),
       proyecto: proyectoFixture,
       organigramaPngBase64: `data:image/png;base64,${PNG_1X1_BASE64}`,
     })
+    const alcance = dataBag.alcanceDetallado as Array<{ edtNombre: string; tienePersonalRequerido: boolean }>
+    expect(alcance.find(a => a.edtNombre === 'Planificación General')!.tienePersonalRequerido).toBe(false)
 
     const buffer = await renderizarPlanTrabajoDocx({ dataBag })
-    expect(Buffer.isBuffer(buffer)).toBe(true)
-    asertarPaqueteBienFormado(buffer)
+    const partes = asertarPaqueteBienFormado(buffer)
+    const documentXml = partes.find(p => p.nombre === 'word/document.xml')!.contenido
+
+    expect(documentXml).not.toContain(LINEA_INTRO_PERSONAL)
   })
 })
