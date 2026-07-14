@@ -34,6 +34,9 @@ export const planAlcanceDetalladoTareaSchema = z.object({
   tareaRefId: z.string().optional(),
   nombre: z.string().min(1),
   texto: z.string().min(1),
+  // Solo UI (Bloque 4.2 sesión 2, Tarea 2) — nunca se exporta al docx, puede quedar vacía.
+  // Un campo no declarado acá se descarta en silencio al validar (ver ac1f0672 / bug de Tarea 5).
+  fotoSugerida: z.string().optional(),
 })
 
 // ─── Nuevo formato (basado en EDTs del cronograma de planificación) ───

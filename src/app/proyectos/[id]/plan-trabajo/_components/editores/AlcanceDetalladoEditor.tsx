@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { PlanAlcanceDetalladoEdt, PlanAlcanceDetalladoSubItem } from '@/types/planTrabajo'
+import type { PlanAlcanceDetalladoEdt, PlanAlcanceDetalladoSubItem, PlanAlcanceDetalladoTarea } from '@/types/planTrabajo'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
@@ -84,15 +84,16 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
       return { ...it, subItems: (it.subItems ?? []).filter((_, si) => si !== subIdx) }
     }))
 
-  // Viñetas de tareas (Bloque 4.2, Tarea 1) — el texto redactado por IA es
-  // corregible a mano; nunca se agregan/quitan tareas acá (vienen 1:1 del
-  // cronograma real, ver alcanceEstructura.ts).
-  const updateTarea = (edtIdx: number, subIdx: number, tareaIdx: number, texto: string) =>
+  // Viñetas de tareas (Bloque 4.2, Tarea 1) y fotoSugerida por tarea (Bloque
+  // 4.2 sesión 2, Tarea 2) — el texto redactado por IA es corregible a mano;
+  // nunca se agregan/quitan tareas acá (vienen 1:1 del cronograma real, ver
+  // alcanceEstructura.ts).
+  const updateTarea = (edtIdx: number, subIdx: number, tareaIdx: number, patch: Partial<PlanAlcanceDetalladoTarea>) =>
     setItems(prev => prev.map((it, i) => {
       if (i !== edtIdx) return it
       const subs = (it.subItems ?? []).map((s, si) => {
         if (si !== subIdx) return s
-        const tareas = (s.tareas ?? []).map((t, ti) => ti === tareaIdx ? { ...t, texto } : t)
+        const tareas = (s.tareas ?? []).map((t, ti) => ti === tareaIdx ? { ...t, ...patch } : t)
         return { ...s, tareas }
       })
       return { ...it, subItems: subs }
@@ -197,18 +198,36 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                           <Textarea value={sub.descripcion} onChange={e => updateSubItem(edtIdx, subIdx, { descripcion: e.target.value })} rows={3} className="text-xs resize-none" placeholder="Descripción narrativa de la actividad..." />
 
                           {(sub.tareas ?? []).length > 0 && (
-                            <div className="space-y-1 pl-2 border-l-2 border-gray-200">
+                            <div className="space-y-2 pl-2 border-l-2 border-gray-200">
                               <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Tareas</p>
                               {(sub.tareas ?? []).map((tarea, tareaIdx) => (
-                                <div key={tarea.tareaRefId ?? tareaIdx} className="flex items-start gap-1">
-                                  <span className="text-[10px] text-muted-foreground mt-1.5 shrink-0">•</span>
-                                  <Textarea
-                                    value={tarea.texto}
-                                    onChange={e => updateTarea(edtIdx, subIdx, tareaIdx, e.target.value)}
-                                    rows={1}
-                                    className="text-xs resize-none min-h-0 py-1"
-                                    placeholder={tarea.nombre}
-                                  />
+                                <div key={tarea.tareaRefId ?? tareaIdx} className="space-y-1">
+                                  <div className="flex items-start gap-1">
+                                    <span className="text-[10px] text-muted-foreground mt-1.5 shrink-0">•</span>
+                                    <Textarea
+                                      value={tarea.texto}
+                                      onChange={e => updateTarea(edtIdx, subIdx, tareaIdx, { texto: e.target.value })}
+                                      rows={1}
+                                      className="text-xs resize-none min-h-0 py-1"
+                                      placeholder={tarea.nombre}
+                                    />
+                                  </div>
+                                  {item.tipoDetalle === 'detallado' && (
+                                    <div className="pl-3 space-y-1">
+                                      {tarea.fotoSugerida && (
+                                        <div className="flex items-start gap-1.5 rounded bg-amber-50 border border-amber-200 px-2 py-1 text-[10px] text-amber-800">
+                                          <Camera size={11} className="shrink-0 mt-0.5" />
+                                          <span><strong>Foto sugerida:</strong> {tarea.fotoSugerida}</span>
+                                        </div>
+                                      )}
+                                      <Input
+                                        value={tarea.fotoSugerida ?? ''}
+                                        onChange={e => updateTarea(edtIdx, subIdx, tareaIdx, { fotoSugerida: e.target.value })}
+                                        className="h-6 text-[10px]"
+                                        placeholder="Foto sugerida para esta tarea (opcional, no se exporta al docx)"
+                                      />
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>

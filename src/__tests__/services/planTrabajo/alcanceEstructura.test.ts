@@ -194,6 +194,7 @@ describe('mergearDescripcionesEnEstructura', () => {
         subItems: new Map(subItemIds.map((id, i) => [id, `Descripción específica y distinta de la actividad #${i + 1}.`])),
         tareas: new Map<string, Map<string, string>>(),
         fotosSugeridas: new Map<string, string>(),
+        tareasFotosSugeridas: new Map<string, Map<string, string>>(),
       },
     ]
 
@@ -214,7 +215,13 @@ describe('mergearDescripcionesEnEstructura', () => {
 
   it('si la IA no devuelve nada (fallo total), cada subItem cae a un fallback determinista distinto por actividad — nunca vacío ni repetido', () => {
     const resumidoMapa = new Map<string, string>()
-    const detalladoResultados = [{ edtDescripcion: '', subItems: new Map<string, string>(), tareas: new Map<string, Map<string, string>>(), fotosSugeridas: new Map<string, string>() }]
+    const detalladoResultados = [{
+      edtDescripcion: '',
+      subItems: new Map<string, string>(),
+      tareas: new Map<string, Map<string, string>>(),
+      fotosSugeridas: new Map<string, string>(),
+      tareasFotosSugeridas: new Map<string, Map<string, string>>(),
+    }]
 
     const final = mergearDescripcionesEnEstructura(estructura, resumidoMapa, detalladoResultados)
     const conFinal = final.find(e => e.edtNombre === 'Construcción')!
@@ -284,6 +291,7 @@ describe('tareas por subItem (Bloque 4.2, Tarea 4)', () => {
           ],
         ]),
         fotosSugeridas: new Map([[subItemId, 'Foto del área antes de iniciar el tendido de cable.']]),
+        tareasFotosSugeridas: new Map<string, Map<string, string>>(),
       },
     ]
 
@@ -309,11 +317,47 @@ describe('tareas por subItem (Bloque 4.2, Tarea 4)', () => {
         subItems: new Map([[subItemId, 'Descripción del subItem.']]),
         tareas: new Map<string, Map<string, string>>(),
         fotosSugeridas: new Map([[subItemId, 'Foto del área antes de iniciar el tendido de cable.']]),
+        tareasFotosSugeridas: new Map<string, Map<string, string>>(),
       },
     ]
 
     const final = mergearDescripcionesEnEstructura(estructura, resumidoMapa, detalladoResultados)
     const conFinal = final.find(e => e.edtNombre === 'Construcción')!
     expect(conFinal.subItems![0].fotoSugerida).toBe('Foto del área antes de iniciar el tendido de cable.')
+  })
+
+  it('(Tarea 2, sesión 2) asigna la fotoSugerida de IA a CADA TAREA por id — independiente de la fotoSugerida del subItem', () => {
+    const { data: estructura } = calcularEstructuraAlcanceDetallado(cronConTresTareas, personalFixture)
+    const con = estructura.find(e => e.edtNombre === 'Construcción')!
+    const subItemId = con.subItems![0].actividadRefId!
+    const tareaIds = con.subItems![0].tareas!.map(t => t.tareaRefId!)
+
+    const resumidoMapa = new Map<string, string>()
+    const detalladoResultados = [
+      {
+        edtDescripcion: 'Descripción del EDT.',
+        subItems: new Map([[subItemId, 'Descripción del subItem.']]),
+        tareas: new Map<string, Map<string, string>>(),
+        fotosSugeridas: new Map<string, string>(),
+        tareasFotosSugeridas: new Map([
+          [
+            subItemId,
+            new Map([
+              [tareaIds[0], 'Foto del punto de bloqueo antes de intervenir.'],
+              // tareaIds[1] deliberadamente ausente — sin fallback obligatorio, cae a ''.
+              [tareaIds[2], 'Foto del multímetro marcando 0V.'],
+            ]),
+          ],
+        ]),
+      },
+    ]
+
+    const final = mergearDescripcionesEnEstructura(estructura, resumidoMapa, detalladoResultados)
+    const conFinal = final.find(e => e.edtNombre === 'Construcción')!
+    const fotos = conFinal.subItems![0].tareas!.map(t => t.fotoSugerida)
+
+    expect(fotos[0]).toBe('Foto del punto de bloqueo antes de intervenir.')
+    expect(fotos[1]).toBe('')
+    expect(fotos[2]).toBe('Foto del multímetro marcando 0V.')
   })
 })

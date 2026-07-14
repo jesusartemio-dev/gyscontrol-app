@@ -9,6 +9,8 @@ export interface PlanAlcanceDetalladoTarea {
   tareaRefId?: string
   nombre: string
   texto: string
+  /** 1 línea sugiriendo qué foto tomar para documentar ESTA tarea (Bloque 4.2 sesión 2, Tarea 2) — solo UI, nunca se exporta al docx. */
+  fotoSugerida?: string
 }
 
 // ─── Alcance detallado (formato nuevo — basado en EDTs del cronograma) ───

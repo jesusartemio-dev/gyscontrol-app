@@ -73,7 +73,7 @@ function edtDetallado(): PlanAlcanceDetalladoEdt {
         descripcion: 'Descripción específica de tendido.',
         actividadRefId: 'act-1',
         tareas: [
-          { tareaRefId: 'tarea-1', nombre: 'desenergizar', texto: 'Desenergizar y bloquear la alimentación mediante dispositivos DAE.' },
+          { tareaRefId: 'tarea-1', nombre: 'desenergizar', texto: 'Desenergizar y bloquear la alimentación mediante dispositivos DAE.', fotoSugerida: 'Foto del punto de bloqueo antes de intervenir.' },
           { tareaRefId: 'tarea-2', nombre: 'delimitar-area', texto: 'Delimitar el área de trabajo con cinta de seguridad y señalización visible.' },
           { tareaRefId: 'tarea-3', nombre: 'verificar-tension', texto: 'Verificar ausencia de tensión con multímetro certificado.' },
         ],
@@ -157,10 +157,17 @@ describe('construirDataBag — alcanceDetallado.subItems', () => {
     expect(plan.subItems).toEqual([])
   })
 
-  it('(Tarea 5) fotoSugerida NUNCA llega al dataBag — es solo UI, no se exporta al docx', () => {
+  it('(Tarea 5) fotoSugerida de actividad NUNCA llega al dataBag — es solo UI, no se exporta al docx', () => {
     // El fixture del subItem[0] trae fotoSugerida (ver arriba) — confirma que
     // construirDataBag no la incluye en ningún campo del objeto mapeado.
     expect(con.subItems[0]).not.toHaveProperty('fotoSugerida')
     expect(Object.keys(con.subItems[0])).toEqual(['numeracion', 'actividadNombre', 'descripcion', 'tareas', 'imagenes'])
+  })
+
+  it('(Tarea 2, sesión 2) fotoSugerida de tarea NUNCA llega al dataBag — es solo UI, no se exporta al docx', () => {
+    // El fixture de la tarea 0 del subItem[0] trae fotoSugerida (ver arriba).
+    const primeraTarea = con.subItems[0].tareas[0] as Record<string, unknown>
+    expect(primeraTarea).not.toHaveProperty('fotoSugerida')
+    expect(Object.keys(primeraTarea)).toEqual(['texto', 'imagenes'])
   })
 })
