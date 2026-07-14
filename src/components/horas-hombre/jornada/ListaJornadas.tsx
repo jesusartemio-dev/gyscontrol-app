@@ -81,6 +81,12 @@ interface PersonalPlanificado {
   rolJornada?: 'trabajador' | 'supervisor' | 'seguridad'
 }
 
+interface MiembroTareaResumen {
+  id: string
+  usuario: { id: string; name: string | null; email: string }
+  horas: number
+}
+
 interface TareaJornadaResumen {
   id: string
   proyectoTareaId?: string | null
@@ -93,6 +99,7 @@ interface TareaJornadaResumen {
   nombreTareaExtra?: string | null
   porcentajeInicial?: number | null
   porcentajeFinal?: number | null
+  miembros?: MiembroTareaResumen[]
 }
 
 interface JornadaResumen {
@@ -223,6 +230,20 @@ export function ListaJornadas({
 
   const getEquipo = (personal?: PersonalPlanificado[] | null) => {
     return personal?.filter(p => p.rolJornada === 'trabajador' || !p.rolJornada) || []
+  }
+
+  // Miembros reales (de las tareas de la jornada, incluida la de asistencia auto),
+  // deduplicados por usuario. Se usa como fallback cuando no hay plan del día
+  // (personalPlanificado vacío), que es el caso normal cuando la jornada nace
+  // automáticamente desde el check-in de asistencia.
+  const getMiembrosReales = (tareas?: TareaJornadaResumen[]) => {
+    const map = new Map<string, string>()
+    for (const t of tareas || []) {
+      for (const m of t.miembros || []) {
+        if (!map.has(m.usuario.id)) map.set(m.usuario.id, m.usuario.name || m.usuario.email)
+      }
+    }
+    return Array.from(map.entries()).map(([id, nombre]) => ({ id, nombre }))
   }
 
   const getFirstName = (nombre: string) => {
@@ -629,30 +650,54 @@ export function ListaJornadas({
                     <TableCell>
                       {(() => {
                         const personal = jornada.personalPlanificado || []
-                        if (personal.length === 0) return <span className="text-gray-400">-</span>
-                        const sup = getSupervisorAsignado(personal)
-                        const seg = getSeguridadAsignado(personal)
-                        const equipo = getEquipo(personal)
+                        if (personal.length > 0) {
+                          const sup = getSupervisorAsignado(personal)
+                          const seg = getSeguridadAsignado(personal)
+                          const equipo = getEquipo(personal)
+                          return (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center gap-1.5 cursor-default">
+                                  <Users className="h-3.5 w-3.5 text-orange-500" />
+                                  <span className="text-sm font-medium">{personal.length}</span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[250px]">
+                                <div className="space-y-0.5">
+                                  <p className="font-medium text-[11px] opacity-70">Plan del día</p>
+                                  {sup && <p className="text-[11px]"><span className="opacity-60">Sup:</span> {sup.nombre}</p>}
+                                  {seg && <p className="text-[11px]"><span className="opacity-60">Seg:</span> {seg.nombre}</p>}
+                                  {equipo.length > 0 && (
+                                    <>
+                                      <p className="font-medium text-[11px] opacity-70 mt-1">Equipo ({equipo.length})</p>
+                                      {equipo.map((p, i) => (
+                                        <p key={i} className="text-[11px]">{p.nombre}</p>
+                                      ))}
+                                    </>
+                                  )}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          )
+                        }
+                        // Sin plan del día: usar la asistencia real (check-in / tareas) como
+                        // fallback, para no mostrar "-" cuando en realidad sí hay gente en la jornada.
+                        const reales = getMiembrosReales(jornada.tareas)
+                        if (reales.length === 0) return <span className="text-gray-400">-</span>
                         return (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div className="flex items-center gap-1.5 cursor-default">
                                 <Users className="h-3.5 w-3.5 text-orange-500" />
-                                <span className="text-sm font-medium">{personal.length}</span>
+                                <span className="text-sm font-medium">{reales.length}</span>
                               </div>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-[250px]">
                               <div className="space-y-0.5">
-                                {sup && <p className="text-[11px]"><span className="opacity-60">Sup:</span> {sup.nombre}</p>}
-                                {seg && <p className="text-[11px]"><span className="opacity-60">Seg:</span> {seg.nombre}</p>}
-                                {equipo.length > 0 && (
-                                  <>
-                                    <p className="font-medium text-[11px] opacity-70 mt-1">Equipo ({equipo.length})</p>
-                                    {equipo.map((p, i) => (
-                                      <p key={i} className="text-[11px]">{p.nombre}</p>
-                                    ))}
-                                  </>
-                                )}
+                                <p className="font-medium text-[11px] opacity-70">Asistencia real ({reales.length})</p>
+                                {reales.map((p) => (
+                                  <p key={p.id} className="text-[11px]">{p.nombre}</p>
+                                ))}
                               </div>
                             </TooltipContent>
                           </Tooltip>
@@ -947,6 +992,31 @@ export function ListaJornadas({
                     </div>
                   )
                 })()}
+
+                {/* Sin plan del día: mostrar asistencia real (check-in / tareas) como fallback */}
+                {(!jornada.personalPlanificado || jornada.personalPlanificado.length === 0) &&
+                  (() => {
+                    const reales = getMiembrosReales(jornada.tareas)
+                    if (reales.length === 0) return null
+                    return (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="flex items-center gap-1 cursor-default">
+                            <HardHat className="h-3 w-3 text-orange-500" />
+                            <span className="text-xs font-medium">{reales.length} personas (asistencia)</span>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[220px]">
+                          <div className="space-y-0.5">
+                            <p className="font-medium text-[11px] opacity-70 mb-1">Asistencia real ({reales.length})</p>
+                            {reales.map((p) => (
+                              <p key={p.id} className="text-[11px]">{p.nombre}</p>
+                            ))}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    )
+                  })()}
 
                 {/* Objetivos - truncated */}
                 {jornada.objetivosDia && (
