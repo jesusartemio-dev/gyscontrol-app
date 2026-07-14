@@ -4,6 +4,7 @@
  * servidor. Matching simple por substring normalizado (sin tildes,
  * lowercase) — nada de IA (Bloque 4.2, Tarea 6).
  */
+import { normalizarTexto } from '@/lib/utils/normalizarTexto'
 
 export interface CatalogoImagenParaSugerir {
   id: string
@@ -19,12 +20,16 @@ export interface SugerenciaCatalogoImagen {
   categoria: string
 }
 
-function normalizar(texto: string): string {
-  return texto
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
+/**
+ * Migración suave (dato heredado o editado fuera del formulario, ej. Prisma
+ * Studio): un elemento de `keywords` puede traer varios términos separados
+ * por coma en un solo string ("roscadora, roscado, tubería, conduit") en vez
+ * de un array ya dividido. El formulario de la Biblioteca (`CatalogoImagenModal`)
+ * SIEMPRE divide antes de guardar, pero el matching se blinda igual — así una
+ * imagen ya cargada con ese defecto empieza a sugerir sin necesidad de reeditarla.
+ */
+function keywordsPlanas(keywords: string[]): string[] {
+  return keywords.flatMap(k => k.split(',').map(t => t.trim())).filter(Boolean)
 }
 
 /**
@@ -39,12 +44,12 @@ export function matchearSugerenciasCatalogoImagen(
 ): SugerenciaCatalogoImagen[] {
   const contextoNormalizado = textosContexto
     .filter(t => t && t.trim().length > 0)
-    .map(normalizar)
+    .map(normalizarTexto)
 
   if (contextoNormalizado.length === 0) return []
 
   const coincide = (candidato: string): boolean => {
-    const n = normalizar(candidato)
+    const n = normalizarTexto(candidato)
     if (!n) return false
     return contextoNormalizado.some(ctx => ctx.includes(n) || n.includes(ctx))
   }
@@ -54,7 +59,7 @@ export function matchearSugerenciasCatalogoImagen(
 
   for (const img of catalogo) {
     if (!img.activo || vistos.has(img.id)) continue
-    const terminos = [img.nombre, ...img.keywords]
+    const terminos = [img.nombre, ...keywordsPlanas(img.keywords)]
     if (terminos.some(coincide)) {
       vistos.add(img.id)
       resultado.push({ id: img.id, nombre: img.nombre, categoria: img.categoria })

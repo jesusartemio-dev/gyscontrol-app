@@ -17,6 +17,7 @@ import { REFERENCIAS_BASE } from './referenciasBase'
 import { calcularTotalHH } from './calcularDatos'
 import { IMAGEN_PLACEHOLDER, type ImagenResueltaTag } from './exportDocx'
 import { captionEfectivo } from './imagenCaption'
+import { normalizarTexto } from '@/lib/utils/normalizarTexto'
 
 type ProyectoConCliente = Proyecto & { cliente: Cliente | null }
 
@@ -92,14 +93,8 @@ function construirDetalleMeses(meses: string[], valoresPorMes: number[]): string
   return meses.map((mes, i) => `${mes}: ${valoresPorMes[i] ?? 0}`).join(' · ')
 }
 
-/** trim + minúsculas + sin tildes — para comparar nombres sin que mayúsculas/acentos los dupliquen (addendum C.1). */
-function normalizarNombre(nombre: string): string {
-  return nombre
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-}
+/** Alias local — comparar nombres sin que mayúsculas/acentos los dupliquen (addendum C.1). */
+const normalizarNombre = normalizarTexto
 
 /** Si el nombre viene todo en mayúsculas (o sin ninguna minúscula), lo convierte a Title Case (addendum C — typo de origen no se corrige, solo se normaliza el render). */
 function toTitleCase(nombre: string): string {

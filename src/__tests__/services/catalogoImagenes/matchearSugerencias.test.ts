@@ -39,3 +39,41 @@ describe('matchearSugerenciasCatalogoImagen', () => {
     expect(sugeridas).toEqual([])
   })
 })
+
+describe('matchearSugerenciasCatalogoImagen — caso real reportado en producción (CJM49, Roscadora/tubería conduit)', () => {
+  const roscadoraKeywordsDivididas: CatalogoImagenParaSugerir = {
+    id: 'img-roscadora',
+    nombre: 'Roscadora Automatica de 2 Velocidades',
+    keywords: ['roscadora', 'roscado', 'tubería', 'tuberías', 'conduit'],
+    categoria: 'EQUIPO',
+    activo: true,
+  }
+  // Migración suave: dato heredado/editado fuera del formulario con las 5
+  // keywords guardadas como UN solo elemento separado por comas (el defecto
+  // que se sospechaba como causa del bug) — debe matchear igual, sin reeditar.
+  const roscadoraKeywordsSinDividir: CatalogoImagenParaSugerir = {
+    ...roscadoraKeywordsDivididas,
+    keywords: ['roscadora, roscado, tubería, tuberías, conduit'],
+  }
+
+  const textoTarea = 'Elevador - Instalación de bandejas y tuberías conduit'
+  const textoVineta = 'Instalar bandejas portacables y tubería conduit EMT según trazado establecido en planos.'
+
+  it('con keywords ya divididas en el array (estado correcto actual) matchea contra el nombre de la tarea y la viñeta', () => {
+    const sugeridas = matchearSugerenciasCatalogoImagen([roscadoraKeywordsDivididas], [textoTarea, textoVineta])
+    expect(sugeridas.map(s => s.id)).toEqual(['img-roscadora'])
+  })
+
+  it('con las 5 keywords guardadas como un solo string separado por comas (dato heredado) también matchea — split defensivo', () => {
+    const sugeridas = matchearSugerenciasCatalogoImagen([roscadoraKeywordsSinDividir], [textoTarea, textoVineta])
+    expect(sugeridas.map(s => s.id)).toEqual(['img-roscadora'])
+  })
+
+  it('caso negativo: una tarea sin ninguna relación (ni por nombre ni por keyword) no sugiere la Roscadora', () => {
+    const sugeridas = matchearSugerenciasCatalogoImagen(
+      [roscadoraKeywordsDivididas],
+      ['Excavación y relleno de zanjas para fundaciones']
+    )
+    expect(sugeridas).toEqual([])
+  })
+})
