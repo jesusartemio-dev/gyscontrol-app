@@ -248,4 +248,19 @@ describe('construirDataBag — imágenes por tarea (Tarea 3, sesión 2)', () => 
     expect(con.subItems[1].imagenesSubItem).toHaveLength(0)
     expect(con.subItems[2].imagenesSubItem).toHaveLength(0)
   })
+
+  it('(tarea menor) numera los captions como "Figura {n}." correlativo, en el MISMO orden en que la plantilla las renderiza (tareas → imagenesSubItem → imagenes de EDT)', () => {
+    const alcanceConCaptions = dataBag.alcanceDetallado as Array<{
+      edtNombre: string
+      imagenes: { caption: string }[]
+      subItems: { imagenesSubItem: { caption: string }[]; tareas: { imagenes: { caption: string }[] }[] }[]
+    }>
+    const construccion = alcanceConCaptions.find(a => a.edtNombre === 'Construcción')!
+
+    // Orden real de la plantilla: tarea-1 (2 imgs) -> imagenesSubItem del subItem (1 img) -> imagenes del EDT (1 img, al final).
+    expect(construccion.subItems[0].tareas[0].imagenes[0].caption).toMatch(/^Figura 1\. /)
+    expect(construccion.subItems[0].tareas[0].imagenes[1].caption).toMatch(/^Figura 2\. /)
+    expect(construccion.subItems[0].imagenesSubItem[0].caption).toMatch(/^Figura 3\. /)
+    expect(construccion.imagenes[0].caption).toMatch(/^Figura 4\. /)
+  })
 })

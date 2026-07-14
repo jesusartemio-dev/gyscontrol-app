@@ -339,6 +339,46 @@ describe('renderizarPlanTrabajoDocx — imágenes por subItem (plantilla v6, {#i
   })
 })
 
+describe('renderizarPlanTrabajoDocx — numeración de figura correlativa (tarea menor, "Figura {n}.")', () => {
+  it('numera los captions "Figura 1.", "Figura 2.", "Figura 3." en el mismo orden en que aparecen en el docx (tarea → subItem → EDT)', async () => {
+    const imagenTarea = { ...imagenFixture('img-tarea'), tareaRef: 'tarea-1', caption: 'Vista general del tendido' } as unknown as PlanTrabajoImagen
+    const imagenSubItem = { ...imagenFixture('img-subitem'), subItemRef: 'act-1', caption: 'Actividad completa' } as unknown as PlanTrabajoImagen
+    const imagenEdt = { ...imagenFixture('img-edt'), caption: 'Frente de obra' } as unknown as PlanTrabajoImagen
+
+    const png = { data: `data:image/png;base64,${PNG_1X1_BASE64}`, width: 300, height: 180 }
+    const imagenesResueltas = new Map<string, ImagenResueltaTag | null>([
+      ['img-tarea', png],
+      ['img-subitem', png],
+      ['img-edt', png],
+    ])
+
+    const dataBag = construirDataBag({
+      plan: planFixture([edtDetalladoConTareas()]),
+      proyecto: proyectoFixture,
+      organigramaPngBase64: `data:image/png;base64,${PNG_1X1_BASE64}`,
+      imagenesAlcance: [imagenTarea, imagenSubItem, imagenEdt],
+      imagenesResueltas,
+    })
+
+    const buffer = await renderizarPlanTrabajoDocx({ dataBag })
+    const partes = asertarPaqueteBienFormado(buffer)
+    const documentXml = partes.find(p => p.nombre === 'word/document.xml')!.contenido
+    const textoPlano = documentXml.replace(/<[^>]+>/g, '')
+
+    expect(textoPlano).toContain('Figura 1. Vista general del tendido')
+    expect(textoPlano).toContain('Figura 2. Actividad completa')
+    expect(textoPlano).toContain('Figura 3. Frente de obra')
+
+    // Mismo orden de aparición que en el documento (tarea antes que subItem, subItem antes que EDT).
+    const posTarea = textoPlano.indexOf('Figura 1.')
+    const posSubItem = textoPlano.indexOf('Figura 2.')
+    const posEdt = textoPlano.indexOf('Figura 3.')
+    expect(posTarea).toBeGreaterThan(-1)
+    expect(posSubItem).toBeGreaterThan(posTarea)
+    expect(posEdt).toBeGreaterThan(posSubItem)
+  })
+})
+
 describe('renderizarPlanTrabajoDocx — personalRequerido condicional (plantilla v5, {#tienePersonalRequerido})', () => {
   const LINEA_INTRO_PERSONAL = 'Para el desarrollo de los trabajos se necesitará la intervención del siguiente personal:'
 

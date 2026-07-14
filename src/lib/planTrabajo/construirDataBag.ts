@@ -74,6 +74,25 @@ function construirImagenesDeNodo(
     }))
 }
 
+/**
+ * Prefija cada caption con "Figura {n}." correlativo (como los planes
+ * manuales del cliente) — `contador` es COMPARTIDO por todas las llamadas de
+ * un mismo export, así la numeración es global a todo el documento y no se
+ * reinicia por EDT/subItem/tarea. Determinista, cero IA (tarea menor, Bloque
+ * 4.2 sesión 3). Solo numera las imágenes del alcance detallado — el
+ * organigrama y los gráficos de histograma no tienen tag `{caption}` en la
+ * plantilla, así que no hay dónde insertarles un número de figura.
+ */
+function numerarFiguras(
+  imgs: { img: ImagenResueltaTag; caption: string }[],
+  contador: { n: number }
+): { img: ImagenResueltaTag; caption: string }[] {
+  return imgs.map(item => {
+    contador.n += 1
+    return { img: item.img, caption: `Figura ${contador.n}. ${item.caption}` }
+  })
+}
+
 function fmtDate(d: Date | string | null | undefined): string {
   if (!d) return ''
   const date = typeof d === 'string' ? new Date(d) : d
@@ -249,6 +268,12 @@ export function construirDataBag({
 
   const totalHH = calcularTotalHH(histogramas)
 
+  // Contador compartido para "Figura {n}." — recorre el alcance detallado en
+  // el MISMO orden que la plantilla lo renderiza (tareas → imagenesSubItem →
+  // imagenes de EDT, EDT tras EDT), así el número coincide con el orden real
+  // de aparición en el docx.
+  const contadorFigura = { n: 0 }
+
   return {
     // ─── Cabecera y carátula (BD, sin IA) ───
     ordenCompra: proyecto.ordenCompraCliente ?? '',
@@ -353,12 +378,16 @@ export function construirDataBag({
           // {#personalRequerido} — sin el flag, docxtemplater no renderiza el bloque
           // condicional cuando personalRequerido está vacío.
           tienePersonalRequerido: (n.personalRequerido ?? []).length > 0,
-          imagenes: n.edtRefId ? construirImagenesDeNodo(n.edtRefId, undefined, undefined, n.edtNombre, imagenesAlcance, imagenesResueltas) : [],
           // Mismos nombres que el builder/validador/editor (numeracion/actividadNombre/
           // descripcion) — NUNCA renombrar acá. La plantilla .docx ya usa estos nombres
           // dentro de {#subItems}; renombrarlos hacía que docxtemplater, al no encontrar
           // el tag en el subItem, resolviera contra el scope del EDT padre (numeracion/
           // descripcion clonados, actividadNombre vacío) — causa raíz del bug auditado.
+          //
+          // El orden en que se ESCRIBEN estas dos propiedades (subItems antes que
+          // imagenes) importa: numerarFiguras() muta un contador compartido, y debe
+          // recorrer las imágenes en el MISMO orden que la plantilla las renderiza
+          // (tareas → imagenesSubItem de cada subItem, y recién al final las del EDT).
           subItems: (n.subItems ?? []).map(s => ({
             numeracion: s.numeracion,
             actividadNombre: s.actividadNombre,
@@ -372,7 +401,7 @@ export function construirDataBag({
             tareas: (s.tareas ?? []).map(t => ({
               texto: t.texto || t.nombre,
               imagenes: n.edtRefId && t.tareaRefId
-                ? construirImagenesDeNodo(n.edtRefId, undefined, t.tareaRefId, t.nombre, imagenesAlcance, imagenesResueltas)
+                ? numerarFiguras(construirImagenesDeNodo(n.edtRefId, undefined, t.tareaRefId, t.nombre, imagenesAlcance, imagenesResueltas), contadorFigura)
                 : [],
             })),
             // Plantilla v6 (Bloque 4.2 sesión 2, micro-fix): loop propio
@@ -380,9 +409,10 @@ export function construirDataBag({
             // {#imagenes} anidado en cada tarea — mismo nivel/filtro que antes
             // (subItemRef sin tareaRef), solo cambia el nombre del tag.
             imagenesSubItem: n.edtRefId && s.actividadRefId
-              ? construirImagenesDeNodo(n.edtRefId, s.actividadRefId, undefined, s.actividadNombre, imagenesAlcance, imagenesResueltas)
+              ? numerarFiguras(construirImagenesDeNodo(n.edtRefId, s.actividadRefId, undefined, s.actividadNombre, imagenesAlcance, imagenesResueltas), contadorFigura)
               : [],
           })),
+          imagenes: n.edtRefId ? numerarFiguras(construirImagenesDeNodo(n.edtRefId, undefined, undefined, n.edtNombre, imagenesAlcance, imagenesResueltas), contadorFigura) : [],
         }
       }
       const l = a as PlanAlcanceItem
