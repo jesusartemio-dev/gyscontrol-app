@@ -10,6 +10,7 @@ import { Loader2, Trash2, Upload, ChevronUp, ChevronDown, ImageIcon, LibraryBig,
 import type { PlanTrabajoImagen, CatalogoImagen } from '@prisma/client'
 import { captionEfectivo } from '@/lib/planTrabajo/imagenCaption'
 import { matchearSugerenciasCatalogoImagen } from '@/lib/catalogoImagenes/matchearSugerencias'
+import { ImagenConLightbox } from '@/components/catalogoImagenes/ImagenConLightbox'
 
 interface Props {
   proyectoId: string
@@ -249,10 +250,10 @@ export function GaleriaImagenesAlcance({ proyectoId, edtRef, subItemRef, tareaRe
         <div className="grid grid-cols-2 gap-2">
           {propias.map((img, idx) => (
             <div key={img.id} className="border rounded overflow-hidden bg-gray-50">
-              <img
+              <ImagenConLightbox
                 src={`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes/${img.id}/contenido`}
                 alt={img.caption ?? img.nombreArchivo}
-                className="w-full h-24 object-cover"
+                alturaClase="h-28"
               />
               <div className="p-1.5 space-y-1">
                 <Input
@@ -309,11 +310,11 @@ export function GaleriaImagenesAlcance({ proyectoId, edtRef, subItemRef, tareaRe
                     onClick={() => adjuntarDesdeBiblioteca(img.id)}
                     className="border rounded overflow-hidden bg-gray-50 text-left hover:ring-2 hover:ring-indigo-300 disabled:opacity-50"
                   >
-                    <div className="aspect-square bg-gray-100">
+                    <div className="aspect-square bg-gray-100 flex items-center justify-center">
                       <img
                         src={`/api/catalogo-imagenes/${img.id}/contenido`}
                         alt={img.nombre}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                       />
                     </div>
                     <p className="text-[10px] px-1 py-0.5 truncate" title={img.nombre}>

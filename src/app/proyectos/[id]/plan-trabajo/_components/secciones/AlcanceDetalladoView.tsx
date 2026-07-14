@@ -1,6 +1,7 @@
 import type { PlanTrabajo, PlanTrabajoImagen } from '@prisma/client'
 import type { PlanAlcanceDetalladoEdt, PlanAlcanceItem } from '@/types/planTrabajo'
 import { captionEfectivo } from '@/lib/planTrabajo/imagenCaption'
+import { ImagenConLightbox } from '@/components/catalogoImagenes/ImagenConLightbox'
 
 interface Props {
   plan: PlanTrabajo
@@ -46,10 +47,10 @@ function GaleriaSoloLectura({
     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
       {propias.map(img => (
         <figure key={img.id} className="border rounded overflow-hidden bg-gray-50">
-          <img
+          <ImagenConLightbox
             src={`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes/${img.id}/contenido`}
             alt={captionEfectivo(img, '')}
-            className="w-full h-20 object-cover"
+            alturaClase="h-24"
           />
           <figcaption className="text-[10px] text-gray-600 px-1 py-0.5 truncate" title={captionEfectivo(img, '')}>
             {captionEfectivo(img, '')}

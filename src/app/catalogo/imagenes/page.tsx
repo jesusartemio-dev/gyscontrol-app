@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Plus, Search, Loader2, Pencil, Power, PowerOff } from 'lucide-react'
 import { CatalogoImagenModal } from '@/components/catalogoImagenes/CatalogoImagenModal'
+import { ImagenConLightbox } from '@/components/catalogoImagenes/ImagenConLightbox'
 import { CATEGORIAS_CATALOGO_IMAGEN } from '@/lib/validators/catalogoImagen'
 import type { CatalogoImagen } from '@prisma/client'
 
@@ -116,13 +117,11 @@ export default function CatalogoImagenesPage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           {imagenes.map(img => (
             <div key={img.id} className={`border rounded-lg overflow-hidden bg-white ${!img.activo ? 'opacity-50' : ''}`}>
-              <div className="aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
-                <img
-                  src={`/api/catalogo-imagenes/${img.id}/contenido`}
-                  alt={img.nombre}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+              <ImagenConLightbox
+                src={`/api/catalogo-imagenes/${img.id}/contenido`}
+                alt={img.nombre}
+                alturaClase="aspect-square"
+              />
               <div className="p-2 space-y-1">
                 <p className="text-xs font-medium truncate" title={img.nombre}>{img.nombre}</p>
                 <Badge variant="outline" className="text-[10px]">{CATEGORIA_LABEL[img.categoria] ?? img.categoria}</Badge>
