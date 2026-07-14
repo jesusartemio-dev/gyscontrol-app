@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { PlanAlcanceDetalladoEdt, PlanAlcanceDetalladoSubItem, PlanAlcanceDetalladoTarea } from '@/types/planTrabajo'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
@@ -8,8 +8,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Plus, Trash2, PlusCircle, Camera } from 'lucide-react'
-import { GaleriaImagenesAlcance } from './GaleriaImagenesAlcance'
+import { Plus, Trash2, PlusCircle } from 'lucide-react'
+import { GaleriaImagenesAlcance, type GaleriaImagenesAlcanceHandle } from './GaleriaImagenesAlcance'
+import { HintFotoSugerida } from '@/components/catalogoImagenes/HintFotoSugerida'
 import type { PlanTrabajoImagen } from '@prisma/client'
 import type { PlanHerramientasYEquipos } from '@/types/planTrabajo'
 
@@ -47,6 +48,11 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
     valor.length > 0 ? valor : [edtVacio()]
   )
   const [saving, setSaving] = useState(false)
+
+  // Refs a cada instancia de galería (una por tarea/subItem/EDT) — el popover
+  // de "Foto sugerida" (Prioridad 2) dispara subir/elegir-de-biblioteca de la
+  // galería correspondiente sin duplicar esa lógica.
+  const galeriaRefs = useRef(new Map<string, GaleriaImagenesAlcanceHandle | null>())
 
   // Nombres de equipos/herramientas/materiales del plan — señal de contexto para
   // sugerir imágenes del catálogo global en cada galería (Bloque 4.2, Tarea 6).
@@ -186,11 +192,26 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                   {(item.subItems ?? []).length > 0 && (
                     <div className="space-y-2 border-l-2 border-indigo-100 pl-3">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Actividades</p>
-                      {(item.subItems ?? []).map((sub, subIdx) => (
+                      {(item.subItems ?? []).map((sub, subIdx) => {
+                        const claveGaleriaSub = `subitem:${sub.actividadRefId ?? `${edtIdx}-${subIdx}`}`
+                        const imagenesDelSubItem = imagenes.filter(
+                          img => img.edtRef === (item.edtRefId ?? '') && !img.tareaRef && (img.subItemRef ?? undefined) === sub.actividadRefId
+                        )
+                        return (
                         <div key={subIdx} className="space-y-1.5 border rounded p-2 bg-gray-50">
                           <div className="flex items-center gap-2">
                             <Input value={sub.numeracion} onChange={e => updateSubItem(edtIdx, subIdx, { numeracion: e.target.value })} className="h-7 text-xs w-20 font-mono" placeholder="11.1.1" />
                             <Input value={sub.actividadNombre} onChange={e => updateSubItem(edtIdx, subIdx, { actividadNombre: e.target.value })} className="h-7 text-xs flex-1" placeholder="Nombre de la actividad" />
+                            {item.tipoDetalle === 'detallado' && (
+                              <HintFotoSugerida
+                                value={sub.fotoSugerida ?? ''}
+                                editable
+                                activo={Boolean(sub.fotoSugerida) && imagenesDelSubItem.length === 0}
+                                onChange={v => updateSubItem(edtIdx, subIdx, { fotoSugerida: v })}
+                                onSubir={() => galeriaRefs.current.get(claveGaleriaSub)?.abrirSelectorArchivo()}
+                                onElegirBiblioteca={() => galeriaRefs.current.get(claveGaleriaSub)?.abrirPicker()}
+                              />
+                            )}
                             <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" onClick={() => removeSubItem(edtIdx, subIdx)}>
                               <Trash2 size={12} />
                             </Button>
@@ -204,6 +225,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                 const imagenesDeLaTarea = imagenes.filter(
                                   img => img.edtRef === (item.edtRefId ?? '') && img.tareaRef === tarea.tareaRefId
                                 )
+                                const claveGaleria = `tarea:${tarea.tareaRefId ?? `${edtIdx}-${subIdx}-${tareaIdx}`}`
                                 return (
                                   <div key={tarea.tareaRefId ?? tareaIdx} className="space-y-1">
                                     <div className="flex items-start gap-1">
@@ -215,32 +237,31 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                         className="text-xs resize-none min-h-0 py-1"
                                         placeholder={tarea.nombre}
                                       />
-                                    </div>
-                                    {item.tipoDetalle === 'detallado' && (
-                                      <div className="pl-3 space-y-1">
-                                        {tarea.fotoSugerida && imagenesDeLaTarea.length === 0 && (
-                                          <div className="flex items-start gap-1.5 rounded bg-amber-50 border border-amber-200 px-2 py-1 text-[10px] text-amber-800">
-                                            <Camera size={11} className="shrink-0 mt-0.5" />
-                                            <span><strong>Foto sugerida:</strong> {tarea.fotoSugerida}</span>
-                                          </div>
-                                        )}
-                                        <Input
-                                          value={tarea.fotoSugerida ?? ''}
-                                          onChange={e => updateTarea(edtIdx, subIdx, tareaIdx, { fotoSugerida: e.target.value })}
-                                          className="h-6 text-[10px]"
-                                          placeholder="Foto sugerida para esta tarea (opcional, no se exporta al docx)"
-                                        />
-                                        {tarea.tareaRefId && (
-                                          <GaleriaImagenesAlcance
-                                            proyectoId={proyectoId}
-                                            edtRef={item.edtRefId ?? ''}
-                                            tareaRef={tarea.tareaRefId}
-                                            nombreDefault={tarea.nombre}
-                                            textosContexto={[...textosHerramientas, tarea.texto, tarea.nombre]}
-                                            imagenes={imagenes}
-                                            onChanged={onImagenesChanged}
+                                      {item.tipoDetalle === 'detallado' && (
+                                        <div className="mt-1.5 shrink-0">
+                                          <HintFotoSugerida
+                                            value={tarea.fotoSugerida ?? ''}
+                                            editable
+                                            activo={Boolean(tarea.fotoSugerida) && imagenesDeLaTarea.length === 0}
+                                            onChange={v => updateTarea(edtIdx, subIdx, tareaIdx, { fotoSugerida: v })}
+                                            onSubir={() => galeriaRefs.current.get(claveGaleria)?.abrirSelectorArchivo()}
+                                            onElegirBiblioteca={() => galeriaRefs.current.get(claveGaleria)?.abrirPicker()}
                                           />
-                                        )}
+                                        </div>
+                                      )}
+                                    </div>
+                                    {item.tipoDetalle === 'detallado' && tarea.tareaRefId && (
+                                      <div className="pl-3">
+                                        <GaleriaImagenesAlcance
+                                          ref={el => { galeriaRefs.current.set(claveGaleria, el) }}
+                                          proyectoId={proyectoId}
+                                          edtRef={item.edtRefId ?? ''}
+                                          tareaRef={tarea.tareaRefId}
+                                          nombreDefault={tarea.nombre}
+                                          textosContexto={[...textosHerramientas, tarea.texto, tarea.nombre]}
+                                          imagenes={imagenes}
+                                          onChanged={onImagenesChanged}
+                                        />
                                       </div>
                                     )}
                                   </div>
@@ -249,29 +270,9 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                             </div>
                           )}
 
-                          {item.tipoDetalle === 'detallado' && (() => {
-                            const imagenesDelSubItem = imagenes.filter(
-                              img => img.edtRef === (item.edtRefId ?? '') && !img.tareaRef && (img.subItemRef ?? undefined) === sub.actividadRefId
-                            )
-                            return (
-                              <>
-                                {sub.fotoSugerida && imagenesDelSubItem.length === 0 && (
-                                  <div className="flex items-start gap-1.5 rounded bg-amber-50 border border-amber-200 px-2 py-1.5 text-[11px] text-amber-800">
-                                    <Camera size={12} className="shrink-0 mt-0.5" />
-                                    <span><strong>Foto sugerida:</strong> {sub.fotoSugerida}</span>
-                                  </div>
-                                )}
-                                <Input
-                                  value={sub.fotoSugerida ?? ''}
-                                  onChange={e => updateSubItem(edtIdx, subIdx, { fotoSugerida: e.target.value })}
-                                  className="h-7 text-xs"
-                                  placeholder="Foto sugerida para el levantamiento (opcional, no se exporta al docx)"
-                                />
-                              </>
-                            )
-                          })()}
                           {item.tipoDetalle === 'detallado' && sub.actividadRefId && (
                             <GaleriaImagenesAlcance
+                              ref={el => { galeriaRefs.current.set(claveGaleriaSub, el) }}
                               proyectoId={proyectoId}
                               edtRef={item.edtRefId ?? ''}
                               subItemRef={sub.actividadRefId}
@@ -282,7 +283,8 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                             />
                           )}
                         </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
 

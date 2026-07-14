@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,13 +28,23 @@ interface Props {
 
 const MAX_IMAGENES = 10
 
+export interface GaleriaImagenesAlcanceHandle {
+  /** Abre el selector de archivo — usado por el popover de "Foto sugerida" (Prioridad 2). */
+  abrirSelectorArchivo: () => void
+  /** Abre el picker "Desde biblioteca" — usado por el popover de "Foto sugerida" (Prioridad 2). */
+  abrirPicker: () => void
+}
+
 /**
  * Galería de imágenes de un EDT/subItem/tarea de fase EJECUCIÓN (Bloque 4,
  * Tarea 3; nivel tarea agregado en Bloque 4.2 sesión 2, Tarea 3). Las
  * imágenes NUNCA pasan por IA — solo suben/reordenan/borran vía estos
  * endpoints REST directos a Google Drive (mismo patrón que evidencias/seguridad).
  */
-export function GaleriaImagenesAlcance({ proyectoId, edtRef, subItemRef, tareaRef, nombreDefault, textosContexto = [], imagenes, onChanged }: Props) {
+export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, Props>(function GaleriaImagenesAlcance(
+  { proyectoId, edtRef, subItemRef, tareaRef, nombreDefault, textosContexto = [], imagenes, onChanged },
+  ref
+) {
   const [subiendo, setSubiendo] = useState(false)
   const [procesandoId, setProcesandoId] = useState<string | null>(null)
   const [catalogo, setCatalogo] = useState<CatalogoImagen[]>([])
@@ -42,6 +52,11 @@ export function GaleriaImagenesAlcance({ proyectoId, edtRef, subItemRef, tareaRe
   const [busquedaPicker, setBusquedaPicker] = useState('')
   const [adjuntandoId, setAdjuntandoId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  useImperativeHandle(ref, () => ({
+    abrirSelectorArchivo: () => inputRef.current?.click(),
+    abrirPicker: () => setPickerAbierto(true),
+  }))
 
   useEffect(() => {
     fetch('/api/catalogo-imagenes?activo=true')
@@ -330,4 +345,4 @@ export function GaleriaImagenesAlcance({ proyectoId, edtRef, subItemRef, tareaRe
       )}
     </div>
   )
-}
+})

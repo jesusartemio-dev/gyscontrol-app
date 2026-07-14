@@ -2,6 +2,7 @@ import type { PlanTrabajo, PlanTrabajoImagen } from '@prisma/client'
 import type { PlanAlcanceDetalladoEdt, PlanAlcanceItem } from '@/types/planTrabajo'
 import { captionEfectivo } from '@/lib/planTrabajo/imagenCaption'
 import { ImagenConLightbox } from '@/components/catalogoImagenes/ImagenConLightbox'
+import { HintFotoSugerida } from '@/components/catalogoImagenes/HintFotoSugerida'
 
 interface Props {
   plan: PlanTrabajo
@@ -126,7 +127,13 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
                             </span>
                           </div>
                           {sub.descripcion && (
-                            <p className="text-xs text-gray-500 leading-relaxed">{sub.descripcion}</p>
+                            <p className="text-xs text-gray-500 leading-relaxed">
+                              {sub.descripcion}
+                              {item.tipoDetalle === 'detallado' &&
+                                imagenes.filter(img => img.edtRef === (item.edtRefId ?? '') && !img.tareaRef && (img.subItemRef ?? undefined) === sub.actividadRefId).length === 0 && (
+                                  <HintFotoSugerida value={sub.fotoSugerida ?? ''} />
+                              )}
+                            </p>
                           )}
                           {(sub.tareas ?? []).length > 0 && (
                             <ul className="list-disc list-inside space-y-1.5 pl-1">
@@ -137,10 +144,8 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
                                 return (
                                   <li key={tarea.tareaRefId ?? ti} className="text-xs text-gray-500 leading-relaxed">
                                     {tarea.texto || tarea.nombre}
-                                    {item.tipoDetalle === 'detallado' && tarea.fotoSugerida && imagenesDeLaTarea.length === 0 && (
-                                      <p className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 mt-0.5 list-none">
-                                        📷 <strong>Foto sugerida:</strong> {tarea.fotoSugerida}
-                                      </p>
+                                    {item.tipoDetalle === 'detallado' && imagenesDeLaTarea.length === 0 && (
+                                      <HintFotoSugerida value={tarea.fotoSugerida ?? ''} />
                                     )}
                                     {item.tipoDetalle === 'detallado' && tarea.tareaRefId && (
                                       <div className="list-none mt-1">
@@ -156,12 +161,6 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
                                 )
                               })}
                             </ul>
-                          )}
-                          {item.tipoDetalle === 'detallado' && sub.fotoSugerida &&
-                            imagenes.filter(img => img.edtRef === (item.edtRefId ?? '') && !img.tareaRef && (img.subItemRef ?? undefined) === sub.actividadRefId).length === 0 && (
-                              <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                                📷 <strong>Foto sugerida:</strong> {sub.fotoSugerida}
-                              </p>
                           )}
                           {item.tipoDetalle === 'detallado' && sub.actividadRefId && (
                             <GaleriaSoloLectura
