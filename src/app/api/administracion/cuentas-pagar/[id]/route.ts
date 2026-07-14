@@ -60,6 +60,19 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       }
     }
 
+    // fechaRecepcion (Fecha de Emisión) y fechaVencimiento son DateTime NOT NULL: no aceptan null
+    if ('fechaRecepcion' in body && body.fechaRecepcion) {
+      data.fechaRecepcion = new Date(body.fechaRecepcion)
+    }
+    if ('fechaVencimiento' in body && body.fechaVencimiento) {
+      data.fechaVencimiento = new Date(body.fechaVencimiento)
+    }
+    const nuevaRecepcion = data.fechaRecepcion ?? existing.fechaRecepcion
+    const nuevoVencimiento = data.fechaVencimiento ?? existing.fechaVencimiento
+    if ((data.fechaRecepcion || data.fechaVencimiento) && nuevoVencimiento < nuevaRecepcion) {
+      return NextResponse.json({ error: 'La fecha de vencimiento no puede ser anterior a la de emisión' }, { status: 400 })
+    }
+
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: 'No hay campos para actualizar' }, { status: 400 })
     }

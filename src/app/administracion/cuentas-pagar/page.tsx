@@ -215,6 +215,8 @@ export default function CuentasPagarPage() {
     observaciones: '',
     numeroCheque: '',
     numeroLetra: '',
+    fechaRecepcion: '',
+    fechaVencimiento: '',
   })
 
   // OCs sin factura panel
@@ -501,6 +503,8 @@ export default function CuentasPagarPage() {
       observaciones: cuenta.observaciones ?? '',
       numeroCheque: cuenta.numeroCheque ?? '',
       numeroLetra: cuenta.numeroLetra ?? '',
+      fechaRecepcion: cuenta.fechaRecepcion.slice(0, 10),
+      fechaVencimiento: cuenta.fechaVencimiento.slice(0, 10),
     })
   }
 
@@ -521,6 +525,14 @@ export default function CuentasPagarPage() {
       toast.error('Días de crédito inválidos')
       return
     }
+    if (!editForm.fechaRecepcion || !editForm.fechaVencimiento) {
+      toast.error('Fecha de Emisión y Vencimiento son requeridas')
+      return
+    }
+    if (new Date(editForm.fechaVencimiento) < new Date(editForm.fechaRecepcion)) {
+      toast.error('La fecha de vencimiento no puede ser anterior a la de emisión')
+      return
+    }
     setSaving(true)
     try {
       const res = await fetch(`/api/administracion/cuentas-pagar/${editCuenta.id}`, {
@@ -538,6 +550,8 @@ export default function CuentasPagarPage() {
           observaciones: editForm.observaciones || null,
           numeroCheque: editForm.numeroCheque || null,
           numeroLetra: editForm.numeroLetra || null,
+          fechaRecepcion: editForm.fechaRecepcion,
+          fechaVencimiento: editForm.fechaVencimiento,
         }),
       })
       if (!res.ok) {
@@ -1574,7 +1588,7 @@ export default function CuentasPagarPage() {
           </DialogHeader>
           {showDetail && (
             <div className="space-y-4 text-sm max-h-[60vh] overflow-y-auto">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Badge className={getEstadoColor(showDetail.estado)}>
                   {ESTADOS_CXP.find(e => e.value === showDetail.estado)?.label || showDetail.estado}
                 </Badge>
@@ -1605,7 +1619,7 @@ export default function CuentasPagarPage() {
                       </div>
                     ) : (
                       <div className="flex items-center gap-1">
-                        <span className="text-right text-sm text-muted-foreground">{showDetail.observaciones || <span className="italic text-xs text-muted-foreground/60">Sin observaciones</span>}</span>
+                        <span className="text-right text-sm text-muted-foreground max-w-[200px] truncate">{showDetail.observaciones || <span className="italic text-xs text-muted-foreground/60">Sin observaciones</span>}</span>
                         <Button size="sm" variant="ghost" className="h-5 w-5 p-0 shrink-0" onClick={() => setEditingObs(showDetail.observaciones || '')}><Pencil className="h-3 w-3" /></Button>
                       </div>
                     )}
@@ -1738,33 +1752,36 @@ export default function CuentasPagarPage() {
               </div>
             </div>
           )}
-          <DialogFooter>
-            {showDetail && showDetail.estado !== 'anulada' && (
-              <Button variant="outline" size="sm" onClick={() => { const c = showDetail; setShowDetail(null); openEdit(c) }} disabled={saving}>
-                <Pencil className="h-4 w-4 mr-1" />
-                Editar
-              </Button>
-            )}
-            {showDetail && showDetail.estado !== 'anulada' && (
-              <Button variant="destructive" size="sm" onClick={() => handleAnular(showDetail)} disabled={saving}>
-                <Ban className="h-4 w-4 mr-1" />
-                Anular
-              </Button>
-            )}
-            {showDetail && (showDetail.estado === 'anulada' || (showDetail.montoPagado === 0 && showDetail.estado !== 'pagada')) && (
-              <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleEliminar(showDetail)} disabled={saving}>
-                <Trash2 className="h-4 w-4 mr-1" />
-                Eliminar
-              </Button>
-            )}
-            <div className="flex-1" />
-            <Button variant="outline" onClick={() => setShowDetail(null)}>Cerrar</Button>
-            {showDetail && (showDetail.estado === 'pendiente' || showDetail.estado === 'parcial') && (
-              <Button onClick={() => { setShowDetail(null); openPago(showDetail) }}>
-                <ArrowUpCircle className="h-4 w-4 mr-2" />
-                Registrar Pago
-              </Button>
-            )}
+          <DialogFooter className="flex-row flex-wrap items-center justify-between gap-2 sm:justify-between">
+            <div className="flex flex-wrap gap-2">
+              {showDetail && showDetail.estado !== 'anulada' && (
+                <Button variant="outline" size="sm" onClick={() => { const c = showDetail; setShowDetail(null); openEdit(c) }} disabled={saving}>
+                  <Pencil className="h-4 w-4 mr-1" />
+                  Editar
+                </Button>
+              )}
+              {showDetail && showDetail.estado !== 'anulada' && (
+                <Button variant="destructive" size="sm" onClick={() => handleAnular(showDetail)} disabled={saving}>
+                  <Ban className="h-4 w-4 mr-1" />
+                  Anular
+                </Button>
+              )}
+              {showDetail && (showDetail.estado === 'anulada' || (showDetail.montoPagado === 0 && showDetail.estado !== 'pagada')) && (
+                <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleEliminar(showDetail)} disabled={saving}>
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Eliminar
+                </Button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => setShowDetail(null)}>Cerrar</Button>
+              {showDetail && (showDetail.estado === 'pendiente' || showDetail.estado === 'parcial') && (
+                <Button onClick={() => { setShowDetail(null); openPago(showDetail) }}>
+                  <ArrowUpCircle className="h-4 w-4 mr-2" />
+                  Registrar Pago
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1784,8 +1801,33 @@ export default function CuentasPagarPage() {
               {editCuenta?.proyecto && <div className="flex justify-between"><span className="text-muted-foreground">Proyecto</span><span className="font-mono">{editCuenta.proyecto.codigo}</span></div>}
               {editCuenta?.ordenCompra && <div className="flex justify-between"><span className="text-muted-foreground">OC</span><span className="font-mono">{editCuenta.ordenCompra.numero}</span></div>}
               <div className="flex justify-between"><span className="text-muted-foreground">Monto</span><span className="font-mono">{editCuenta && formatCurrency(editCuenta.monto, editCuenta.moneda)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Recepción / Vencimiento</span><span>{editCuenta && `${formatDate(editCuenta.fechaRecepcion)} → ${formatDate(editCuenta.fechaVencimiento)}`}</span></div>
-              <div className="text-muted-foreground italic pt-1">Proveedor, proyecto, OC, monto y fechas base no son editables. Para cambiarlos, anula y crea una nueva.</div>
+              <div className="text-muted-foreground italic pt-1">Proveedor, proyecto, OC y monto no son editables. Para cambiarlos, anula y crea una nueva.</div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Fecha Emisión *</Label>
+                <Input
+                  type="date"
+                  value={editForm.fechaRecepcion}
+                  onChange={e => {
+                    const fecha = e.target.value
+                    setEditForm(f => ({
+                      ...f,
+                      fechaRecepcion: fecha,
+                      fechaVencimiento: calcularFechaVencimiento(fecha, f.condicionPago, f.diasCredito) || f.fechaVencimiento,
+                    }))
+                  }}
+                />
+              </div>
+              <div>
+                <Label>Fecha Vencimiento *</Label>
+                <Input
+                  type="date"
+                  value={editForm.fechaVencimiento}
+                  onChange={e => setEditForm(f => ({ ...f, fechaVencimiento: e.target.value }))}
+                />
+              </div>
             </div>
 
             <div>
