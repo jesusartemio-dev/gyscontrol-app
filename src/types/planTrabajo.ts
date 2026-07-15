@@ -81,6 +81,8 @@ export interface PlanAlcanceDetalladoEdt {
   /** Imágenes adjuntas a nivel EDT (solo 'detallado') — nunca generadas por IA. */
   imagenes?: PlanAlcanceImagen[]
   edtRefId?: string
+  /** El usuario editó a mano la `descripcion` de este EDT (Bloque 4.2 sesión 5) — se preserva al regenerar. */
+  descripcionEditadaManualmente?: boolean
 }
 
 // ─── Alcance detallado (formato legacy — basado en servicios de cotización) ───

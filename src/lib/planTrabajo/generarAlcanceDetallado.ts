@@ -167,6 +167,72 @@ export function preservarEstadoManualTareas(
   }))
 }
 
+/**
+ * Aplica el ALCANCE de una regeneración (granular por EDT o completa) y
+ * protege el texto editado a mano (Bloque 4.2 sesión 5):
+ * - Un EDT que NO está en `edtsRefIdEnAlcance` se restaura TAL CUAL estaba
+ *   en `estructuraAnterior` — sin importar qué haya calculado
+ *   `calcularEstructuraAlcanceDetallado`/`mergearDescripcionesEnEstructura`
+ *   como fallback para un EDT que ni se llegó a llamar a la IA. Así el resto
+ *   del documento queda intacto cuando se regenera un solo EDT.
+ * - Dentro de un EDT en alcance, toda descripción/viñeta marcada
+ *   `descripcionEditadaManualmente`/`textoEditadoManualmente` en el estado
+ *   ANTERIOR se preserva — salvo que `sobrescribirEditados` sea true, en
+ *   cuyo caso se usa el texto nuevo y la marca se libera (queda disponible
+ *   para que la IA la reescriba en el futuro).
+ * Pura y testeable: no decide nada por IA, solo reconcilia dos estructuras.
+ * Debe aplicarse DESPUÉS de `preservarEstadoManualTareas` (que ya reconcilió
+ * excluida/orden/catalogoImagenesRechazadas por tareaRefId) — esta función
+ * no toca esos campos.
+ */
+export function aplicarAlcanceDeRegeneracion(
+  estructuraNueva: PlanAlcanceDetalladoEdt[],
+  estructuraAnterior: PlanAlcanceDetalladoEdt[],
+  edtsRefIdEnAlcance: Set<string>,
+  sobrescribirEditados: boolean
+): PlanAlcanceDetalladoEdt[] {
+  const anterioresPorEdt = new Map(estructuraAnterior.filter(e => e.edtRefId).map(e => [e.edtRefId!, e]))
+
+  return estructuraNueva.map(edt => {
+    const anteriorEdt = edt.edtRefId ? anterioresPorEdt.get(edt.edtRefId) : undefined
+
+    if (!edt.edtRefId || !edtsRefIdEnAlcance.has(edt.edtRefId)) {
+      // Fuera del alcance de esta regeneración — se restaura tal cual estaba,
+      // ignorando cualquier texto de fallback que se le haya calculado.
+      return anteriorEdt ?? edt
+    }
+
+    const usarDescripcionAnteriorEdt = Boolean(anteriorEdt?.descripcionEditadaManualmente) && !sobrescribirEditados
+    const anterioresPorSubItem = new Map((anteriorEdt?.subItems ?? []).filter(s => s.actividadRefId).map(s => [s.actividadRefId!, s]))
+
+    return {
+      ...edt,
+      descripcion: usarDescripcionAnteriorEdt ? anteriorEdt!.descripcion : edt.descripcion,
+      descripcionEditadaManualmente: usarDescripcionAnteriorEdt,
+      subItems: (edt.subItems ?? []).map(s => {
+        const anteriorSub = s.actividadRefId ? anterioresPorSubItem.get(s.actividadRefId) : undefined
+        const usarDescripcionAnteriorSub = Boolean(anteriorSub?.descripcionEditadaManualmente) && !sobrescribirEditados
+        const anterioresPorTarea = new Map((anteriorSub?.tareas ?? []).filter(t => t.tareaRefId).map(t => [t.tareaRefId!, t]))
+
+        return {
+          ...s,
+          descripcion: usarDescripcionAnteriorSub ? anteriorSub!.descripcion : s.descripcion,
+          descripcionEditadaManualmente: usarDescripcionAnteriorSub,
+          tareas: (s.tareas ?? []).map(t => {
+            const anteriorTarea = t.tareaRefId ? anterioresPorTarea.get(t.tareaRefId) : undefined
+            const usarTextoAnterior = Boolean(anteriorTarea?.textoEditadoManualmente) && !sobrescribirEditados
+            return {
+              ...t,
+              texto: usarTextoAnterior ? anteriorTarea!.texto : t.texto,
+              textoEditadoManualmente: usarTextoAnterior,
+            }
+          }),
+        }
+      }),
+    }
+  })
+}
+
 function extraerTexto(response: Anthropic.Message): string {
   return response.content
     .filter((b): b is Anthropic.TextBlock => b.type === 'text')
@@ -179,6 +245,7 @@ function extraerTexto(response: Anthropic.Message): string {
 async function generarDescripcionesResumido(
   edtsResumido: PlanAlcanceDetalladoEdt[],
   hechosEtapa1: string,
+  instruccionesUsuario: string,
   userId: string,
   proyectoId: string,
   signal?: AbortSignal
@@ -200,7 +267,7 @@ async function generarDescripcionesResumido(
       model: MODELS.haiku,
       max_tokens: 8192,
       system: SYSTEM_RESUMEN_EDTS,
-      messages: [{ role: 'user', content: buildUserResumenEdts(payload, hechosEtapa1, notaCorrectiva) }],
+      messages: [{ role: 'user', content: buildUserResumenEdts(payload, hechosEtapa1, notaCorrectiva, instruccionesUsuario) }],
     }, { signal })
 
     trackUsage({
@@ -252,6 +319,7 @@ async function generarDescripcionesDetallado(
   tareasPorActividad: Map<string, { id: string; nombre: string; horasEstimadas: number | null; personasEstimadas: number }[]>,
   hechosEtapa1: string,
   catalogoImagenes: CatalogoImagenParaPrompt[],
+  instruccionesUsuario: string,
   userId: string,
   proyectoId: string,
   signal?: AbortSignal
@@ -332,7 +400,7 @@ async function generarDescripcionesDetallado(
       model: MODELS.sonnet,
       max_tokens: tokensParaIntento,
       system: SYSTEM_DETALLE_EDT,
-      messages: [{ role: 'user', content: buildUserDetalleEdt(payload, hechosEtapa1, catalogoImagenes, notaCorrectiva) }],
+      messages: [{ role: 'user', content: buildUserDetalleEdt(payload, hechosEtapa1, catalogoImagenes, notaCorrectiva, instruccionesUsuario) }],
     }, { signal })
 
     trackUsage({
@@ -414,6 +482,20 @@ async function generarDescripcionesDetallado(
 
 // ─── Orquestador ────────────────────────────────────────────────────────────
 
+export interface OpcionesGenerarAlcanceDetallado {
+  /**
+   * Regeneración GRANULAR (Bloque 4.2 sesión 5): si se indica, la IA solo se
+   * llama para ESTE EDT (por edtRefId) — el resto de la estructura se calcula
+   * igual (numeración, personalRequerido) pero no consume tokens ni tiempo de
+   * IA; el caller (regenerar-seccion) restaura el resto tal cual estaba con
+   * `aplicarAlcanceDeRegeneracion`. `undefined` = regenerar TODOS los EDTs
+   * (comportamiento histórico).
+   */
+  edtRefIdObjetivo?: string
+  /** Instrucciones libres del usuario para esta regeneración, aplicadas a los EDTs en alcance. */
+  instruccionesAdicionales?: string
+}
+
 export async function generarAlcanceDetallado(
   cron: NonNullable<CronogramaContexto> | null,
   personal: PlanPersonal[],
@@ -421,6 +503,7 @@ export async function generarAlcanceDetallado(
   catalogoImagenes: CatalogoImagenParaPrompt[],
   userId: string,
   proyectoId: string,
+  opciones: OpcionesGenerarAlcanceDetallado = {},
   signal?: AbortSignal
 ): Promise<ResultadoCalculo<PlanAlcanceDetalladoEdt[]> & { sugerenciasImagenes: SugerenciaImagenIA[] }> {
   if (!cron) {
@@ -430,6 +513,8 @@ export async function generarAlcanceDetallado(
       sugerenciasImagenes: [],
     }
   }
+
+  const { edtRefIdObjetivo, instruccionesAdicionales = '' } = opciones
 
   const { data: estructura, advertencias: advEstructura } = calcularEstructuraAlcanceDetallado(cron, personal)
   const advertencias = [...advEstructura]
@@ -448,13 +533,18 @@ export async function generarAlcanceDetallado(
     }
   }
 
-  const edtsResumido = estructura.filter(e => e.tipoDetalle === 'resumido')
-  const edtsDetallado = estructura.filter(e => e.tipoDetalle === 'detallado')
+  // Regeneración granular: solo se llama a la IA para edtRefIdObjetivo — el
+  // resto de EDTs queda fuera de estos dos arrays y nunca incurre en costo/
+  // tiempo de IA (aunque `estructura` completa igual se calculó arriba, sin
+  // IA, para mantener numeración/personalRequerido consistentes).
+  const enAlcance = (e: PlanAlcanceDetalladoEdt) => !edtRefIdObjetivo || e.edtRefId === edtRefIdObjetivo
+  const edtsResumido = estructura.filter(e => e.tipoDetalle === 'resumido' && enAlcance(e))
+  const edtsDetallado = estructura.filter(e => e.tipoDetalle === 'detallado' && enAlcance(e))
 
   const [resumidoResultado, ...detalladoResultados] = await Promise.all([
-    generarDescripcionesResumido(edtsResumido, hechosEtapa1, userId, proyectoId, signal),
+    generarDescripcionesResumido(edtsResumido, hechosEtapa1, instruccionesAdicionales, userId, proyectoId, signal),
     ...edtsDetallado.map(edt =>
-      generarDescripcionesDetallado(edt, tareasPorActividad, hechosEtapa1, catalogoImagenes, userId, proyectoId, signal)
+      generarDescripcionesDetallado(edt, tareasPorActividad, hechosEtapa1, catalogoImagenes, instruccionesAdicionales, userId, proyectoId, signal)
     ),
   ])
 

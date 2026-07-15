@@ -34,13 +34,15 @@ interface EdtParaResumen {
 export function buildUserResumenEdts(
   edts: EdtParaResumen[],
   hechosEtapa1: string,
-  notaCorrectiva = ''
+  notaCorrectiva = '',
+  instruccionesUsuario = ''
 ): string {
   return [
     hechosEtapa1,
     '',
     'EDTs A DESCRIBIR (devolvé una descripción por cada uno, con el mismo "id"):',
     JSON.stringify(edts, null, 2),
+    instruccionesUsuario ? `\nINSTRUCCIONES ADICIONALES DEL USUARIO PARA ESTA REGENERACIÓN:\n${instruccionesUsuario}` : '',
     notaCorrectiva,
     '',
     'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown):',
@@ -161,7 +163,8 @@ export function buildUserDetalleEdt(
   edt: EdtParaDetalle,
   hechosEtapa1: string,
   catalogoImagenes: CatalogoImagenParaPrompt[],
-  notaCorrectiva = ''
+  notaCorrectiva = '',
+  instruccionesUsuario = ''
 ): string {
   return [
     hechosEtapa1,
@@ -171,6 +174,7 @@ export function buildUserDetalleEdt(
     '',
     'CATÁLOGO DE IMÁGENES (lista CERRADA — elegí catalogoImagenIds solo de acá, nunca inventes uno):',
     JSON.stringify(catalogoImagenes, null, 2),
+    instruccionesUsuario ? `\nINSTRUCCIONES ADICIONALES DEL USUARIO PARA ESTE EDT:\n${instruccionesUsuario}` : '',
     notaCorrectiva,
     '',
     'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown):',

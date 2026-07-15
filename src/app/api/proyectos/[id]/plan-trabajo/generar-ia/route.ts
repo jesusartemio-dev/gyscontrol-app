@@ -311,6 +311,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
               catalogoImagenes,
               userId,
               proyectoId,
+              {}, // sin edtRefIdObjetivo — regenera TODOS los EDTs (generación total del plan)
               signal
             )
             for (const adv of advAlcance) console.warn(`[generar-ia] alcanceDetallado: ${adv}`)

@@ -16,7 +16,7 @@ import { PLAN_TRABAJO_SYSTEM_INSTRUCCIONES } from '@/lib/planTrabajo/prompts/gen
 import { buildPromptRegeneracion } from '@/lib/planTrabajo/prompts/regenerarSeccion'
 import { parseJsonIA } from '@/lib/planTrabajo/parseJsonIA'
 import { calcularDatosEtapa1 } from '@/lib/planTrabajo/calcularDatos'
-import { generarAlcanceDetallado, preservarEstadoManualTareas } from '@/lib/planTrabajo/generarAlcanceDetallado'
+import { generarAlcanceDetallado, preservarEstadoManualTareas, aplicarAlcanceDeRegeneracion } from '@/lib/planTrabajo/generarAlcanceDetallado'
 import { obtenerCatalogoImagenesActivo, aplicarSugerenciasImagenesIA } from '@/lib/planTrabajo/aplicarSugerenciasImagenesIA'
 import { esSeccionEtapa1, etapa1Completa } from '@/lib/planTrabajo/etapas'
 import type { SeccionRegenerable, PlanPersonal, PlanAlcanceDetalladoEdt } from '@/types/planTrabajo'
@@ -44,6 +44,12 @@ const SECCIONES_REGENERABLES = [
 const bodySchema = z.object({
   seccion: z.enum(SECCIONES_REGENERABLES),
   instruccionesAdicionales: z.string().max(2000).optional(),
+  // Regeneración granular por EDT — solo válido para seccion="alcanceDetallado"
+  // (Bloque 4.2 sesión 5); se ignora para el resto de las secciones.
+  edtRefId: z.string().optional(),
+  // Reescribe también los textos marcados como editados a mano (default false —
+  // por defecto siempre se preservan).
+  sobrescribirEditados: z.boolean().optional(),
 })
 
 // ─── Helper — Etapa 2 (redacción IA) ───────────────────────────────────────
@@ -156,7 +162,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     )
   }
 
-  const { seccion, instruccionesAdicionales } = body
+  const { seccion, instruccionesAdicionales, edtRefId, sobrescribirEditados } = body
 
   if (seccion === 'responsabilidades') {
     return Response.json(
@@ -278,8 +284,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
         // alcanceDetallado: estructura del servidor + IA solo redacta descripcion
         // (Bloque 4 — mismo flujo que generar-ia, ver generarAlcanceDetallado.ts).
+        // Granular por EDT (Bloque 4.2 sesión 5): si viene `edtRefId`, la IA
+        // solo se llama para ESE EDT — el resto del alcance se restaura tal
+        // cual estaba (aplicarAlcanceDeRegeneracion), sin tocarse.
         if (seccion === 'alcanceDetallado') {
-          send('status', { fase: 'generando', mensaje: 'Generando Alcance Detallado...' })
+          send('status', {
+            fase: 'generando',
+            mensaje: edtRefId ? 'Regenerando el EDT seleccionado...' : 'Generando Alcance Detallado...',
+          })
           const personalCalculado = (planActual.personalAsignado as PlanPersonal[] | null) ?? []
           const catalogoImagenes = await obtenerCatalogoImagenesActivo()
           const { data, advertencias, sugerenciasImagenes } = await generarAlcanceDetallado(
@@ -288,16 +300,31 @@ export async function POST(req: NextRequest, { params }: Ctx) {
             hechosEtapa1,
             catalogoImagenes,
             userId,
-            proyectoId
+            proyectoId,
+            { edtRefIdObjetivo: edtRefId, instruccionesAdicionales }
           )
 
-          // Preserva tareas excluidas del plan + su orden manual (Bloque 4.2 sesión 3)
-          // a través de esta regeneración — nunca resucita lo que el usuario borró.
+          // Preserva tareas excluidas del plan + su orden manual + rechazos de
+          // imagen (Bloque 4.2 sesión 3/4) a través de esta regeneración —
+          // nunca resucita lo que el usuario borró/rechazó.
           const estructuraAnterior = (planActual.alcanceDetallado as PlanAlcanceDetalladoEdt[] | null) ?? []
           const dataConEstadoManual = preservarEstadoManualTareas(data, estructuraAnterior)
 
+          // Alcance de esta regeneración + protección de texto editado a mano
+          // (Bloque 4.2 sesión 5): sin edtRefId (regeneración completa), TODOS
+          // los EDTs quedan en alcance — mismo comportamiento de siempre.
+          const edtsRefIdEnAlcance = edtRefId
+            ? new Set([edtRefId])
+            : new Set(data.map(e => e.edtRefId).filter((id): id is string => Boolean(id)))
+          const dataFinal = aplicarAlcanceDeRegeneracion(
+            dataConEstadoManual,
+            estructuraAnterior,
+            edtsRefIdEnAlcance,
+            sobrescribirEditados ?? false
+          )
+
           send('status', { fase: 'validacion', mensaje: 'Validando estructura del resultado...' })
-          const { data: validado, error } = validarSeccionIndividual(seccion, { alcanceDetallado: dataConEstadoManual })
+          const { data: validado, error } = validarSeccionIndividual(seccion, { alcanceDetallado: dataFinal })
           if (error) {
             send('error', { mensaje: `Validación fallida para "${seccion}": ${error}` })
             return
@@ -308,11 +335,17 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           // Adjunta automáticamente las imágenes de catálogo que la IA propuso
           // (Bloque 4.2 sesión 4) — best-effort, nunca bloquea la regeneración.
           try {
-            await aplicarSugerenciasImagenesIA(planId, userId, sugerenciasImagenes, dataConEstadoManual)
+            await aplicarSugerenciasImagenesIA(planId, userId, sugerenciasImagenes, validado as PlanAlcanceDetalladoEdt[])
           } catch (errImg) {
             console.error('[regenerar-seccion] alcanceDetallado: fallo al aplicar sugerencias de imagen IA:', errImg)
           }
-          send('done', { seccionGuardada: seccion, advertencias })
+          send('done', {
+            seccionGuardada: seccion,
+            advertencias,
+            // El editor (Sheet abierto) usa esto para actualizar SOLO ese EDT
+            // en su estado local, sin perder ediciones locales de otros EDTs.
+            edtRegenerado: edtRefId ? (validado as PlanAlcanceDetalladoEdt[]).find(e => e.edtRefId === edtRefId) ?? null : null,
+          })
           return
         }
 
