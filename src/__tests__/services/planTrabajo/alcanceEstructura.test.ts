@@ -3,8 +3,9 @@ import {
   mergearDescripcionesEnEstructura,
   descripcionFallbackSubItem,
   preservarEstadoManualTareas,
+  aplicarAlcanceDeRegeneracion,
 } from '@/lib/planTrabajo/generarAlcanceDetallado'
-import type { CronogramaContexto, PlanPersonal } from '@/types/planTrabajo'
+import type { CronogramaContexto, PlanPersonal, PlanAlcanceDetalladoEdt } from '@/types/planTrabajo'
 
 function tarea(nombre: string) {
   return {
@@ -479,5 +480,136 @@ describe('tareas por subItem (Bloque 4.2, Tarea 4)', () => {
       const resultado = preservarEstadoManualTareas(estructuraRecienGenerada, [])
       expect(resultado).toEqual(estructuraRecienGenerada)
     })
+  })
+})
+
+describe('aplicarAlcanceDeRegeneracion (Bloque 4.2 sesión 5) — regeneración granular por EDT + protección de texto editado', () => {
+  const { data: estructuraBase } = calcularEstructuraAlcanceDetallado(cronogramaFixture, personalFixture)
+
+  function estructuraAnteriorConEdicionesManuales(): PlanAlcanceDetalladoEdt[] {
+    return estructuraBase.map(edt => {
+      if (edt.edtNombre === 'Planificación General') {
+        return { ...edt, descripcion: 'Descripción de Planificación tal como quedó guardada antes.' }
+      }
+      // Construcción: descripción de EDT y de su primer subItem editadas a mano,
+      // más la viñeta de su primera tarea también editada a mano.
+      return {
+        ...edt,
+        descripcion: 'Descripción de Construcción editada a mano por el usuario.',
+        descripcionEditadaManualmente: true,
+        subItems: (edt.subItems ?? []).map((s, si) => si !== 0 ? s : {
+          ...s,
+          descripcion: 'Descripción de la actividad editada a mano por el usuario.',
+          descripcionEditadaManualmente: true,
+          tareas: (s.tareas ?? []).map((t, ti) => ti !== 0 ? t : {
+            ...t,
+            texto: 'Viñeta editada a mano por el usuario.',
+            textoEditadoManualmente: true,
+          }),
+        }),
+      }
+    })
+  }
+
+  // Simula "la IA regeneró Construcción" — descripciones/viñetas todas nuevas,
+  // Planificación queda con texto de fallback (nunca se llamó a la IA para ella).
+  function estructuraReciénRegenerada(): PlanAlcanceDetalladoEdt[] {
+    return estructuraBase.map(edt => {
+      if (edt.edtNombre === 'Planificación General') {
+        return { ...edt, descripcion: 'FALLBACK — nunca se llamó a la IA para este EDT en esta regeneración granular.' }
+      }
+      return {
+        ...edt,
+        descripcion: 'Descripción NUEVA de Construcción, redactada por la IA.',
+        subItems: (edt.subItems ?? []).map((s, si) => ({
+          ...s,
+          descripcion: si === 0 ? 'Descripción NUEVA de la actividad, redactada por la IA.' : s.descripcion,
+          tareas: (s.tareas ?? []).map((t, ti) => ({
+            ...t,
+            texto: si === 0 && ti === 0 ? 'Viñeta NUEVA, redactada por la IA.' : t.texto,
+          })),
+        })),
+      }
+    })
+  }
+
+  it('(a) un EDT fuera del alcance se restaura TAL CUAL estaba — no el texto de fallback recién calculado', () => {
+    const anterior = estructuraAnteriorConEdicionesManuales()
+    const nueva = estructuraReciénRegenerada()
+    const edtsEnAlcance = new Set(['edt-con']) // solo Construcción está en el alcance de esta regeneración
+
+    const resultado = aplicarAlcanceDeRegeneracion(nueva, anterior, edtsEnAlcance, false)
+    const plan = resultado.find(e => e.edtNombre === 'Planificación General')!
+    const planAnterior = anterior.find(e => e.edtNombre === 'Planificación General')!
+
+    // Ni rastro del texto de fallback — Planificación vuelve exactamente como estaba.
+    expect(plan).toEqual(planAnterior)
+    expect(plan.descripcion).not.toContain('FALLBACK')
+  })
+
+  it('(b) el texto marcado como editado a mano sobrevive a la regeneración de SU PROPIO EDT (sin sobrescribirEditados)', () => {
+    const anterior = estructuraAnteriorConEdicionesManuales()
+    const nueva = estructuraReciénRegenerada()
+    const edtsEnAlcance = new Set(['edt-con'])
+
+    const resultado = aplicarAlcanceDeRegeneracion(nueva, anterior, edtsEnAlcance, false)
+    const con = resultado.find(e => e.edtNombre === 'Construcción')!
+
+    expect(con.descripcion).toBe('Descripción de Construcción editada a mano por el usuario.')
+    expect(con.descripcionEditadaManualmente).toBe(true)
+    expect(con.subItems![0].descripcion).toBe('Descripción de la actividad editada a mano por el usuario.')
+    expect(con.subItems![0].descripcionEditadaManualmente).toBe(true)
+    expect(con.subItems![0].tareas![0].texto).toBe('Viñeta editada a mano por el usuario.')
+    expect(con.subItems![0].tareas![0].textoEditadoManualmente).toBe(true)
+
+    // Lo que NO estaba editado a mano sí se actualiza con el texto nuevo.
+    const conNueva = estructuraReciénRegenerada().find(e => e.edtNombre === 'Construcción')!
+    expect(con.subItems![1].descripcion).toBe(conNueva.subItems![1].descripcion)
+  })
+
+  it('(c) con sobrescribirEditados=true, el texto editado a mano SÍ se reescribe y la marca se libera', () => {
+    const anterior = estructuraAnteriorConEdicionesManuales()
+    const nueva = estructuraReciénRegenerada()
+    const edtsEnAlcance = new Set(['edt-con'])
+
+    const resultado = aplicarAlcanceDeRegeneracion(nueva, anterior, edtsEnAlcance, true)
+    const con = resultado.find(e => e.edtNombre === 'Construcción')!
+
+    expect(con.descripcion).toBe('Descripción NUEVA de Construcción, redactada por la IA.')
+    expect(con.descripcionEditadaManualmente).toBe(false)
+    expect(con.subItems![0].descripcion).toBe('Descripción NUEVA de la actividad, redactada por la IA.')
+    expect(con.subItems![0].descripcionEditadaManualmente).toBe(false)
+    expect(con.subItems![0].tareas![0].texto).toBe('Viñeta NUEVA, redactada por la IA.')
+    expect(con.subItems![0].tareas![0].textoEditadoManualmente).toBe(false)
+  })
+
+  it('(d) compuesta con preservarEstadoManualTareas: exclusión/orden/rechazos de imagen siguen preservándose junto con la protección de texto', () => {
+    const anterior = estructuraAnteriorConEdicionesManuales().map(edt => {
+      if (edt.edtNombre !== 'Construcción') return edt
+      return {
+        ...edt,
+        subItems: (edt.subItems ?? []).map((s, si) => si !== 0 ? s : {
+          ...s,
+          tareas: (s.tareas ?? []).map((t, ti) => ti !== 0 ? t : {
+            ...t,
+            excluida: true,
+            catalogoImagenesRechazadas: ['cat-roscadora'],
+          }),
+        }),
+      }
+    })
+    const nueva = estructuraReciénRegenerada()
+    const edtsEnAlcance = new Set(['edt-con'])
+
+    // Orden real: primero se reconcilia excluida/orden/rechazos (por tareaRefId),
+    // DESPUÉS se aplica el alcance + protección de texto — igual que en la ruta.
+    const conEstadoManual = preservarEstadoManualTareas(nueva, anterior)
+    const resultado = aplicarAlcanceDeRegeneracion(conEstadoManual, anterior, edtsEnAlcance, false)
+    const con = resultado.find(e => e.edtNombre === 'Construcción')!
+
+    expect(con.subItems![0].tareas![0].excluida).toBe(true)
+    expect(con.subItems![0].tareas![0].catalogoImagenesRechazadas).toEqual(['cat-roscadora'])
+    // La protección de texto editado a mano sigue aplicando sobre esa misma tarea.
+    expect(con.subItems![0].tareas![0].textoEditadoManualmente).toBe(true)
   })
 })
