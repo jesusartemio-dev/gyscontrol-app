@@ -70,6 +70,12 @@ function getAsignadoA(hoja: HojaDeGastos): string {
   return '-'
 }
 
+function getAsignadoACodigo(hoja: HojaDeGastos): string {
+  if (hoja.proyecto) return hoja.proyecto.codigo
+  if (hoja.centroCosto) return hoja.centroCosto.nombre
+  return '-'
+}
+
 function getCCExtras(hoja: HojaDeGastos): number {
   if (!hoja.lineas?.length) return 0
   const headerCC = hoja.proyectoId || hoja.centroCostoId || ''
@@ -640,10 +646,10 @@ function GestionGastosContent() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Número</TableHead>
+                      <TableHead className="whitespace-nowrap">Número</TableHead>
                       <TableHead>Empleado</TableHead>
                       <TableHead>Proyecto / CC</TableHead>
-                      <TableHead>Motivo</TableHead>
+                      <TableHead className="w-full">Motivo</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead className="text-right">Solicitado</TableHead>
                       <TableHead className="text-right">Gastado</TableHead>
@@ -659,19 +665,21 @@ function GestionGastosContent() {
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => router.push(`/gastos/mis-requerimientos/${hoja.id}?from=administracion`)}
                       >
-                        <TableCell className="font-mono text-sm font-medium">{hoja.numero}</TableCell>
+                        <TableCell className="font-mono text-xs font-medium whitespace-nowrap">{hoja.numero}</TableCell>
                         <TableCell className="text-sm max-w-[130px] truncate">
                           {hoja.empleado?.name || hoja.empleado?.email || '-'}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground max-w-[220px]">
-                          <span className="truncate block">{getAsignadoA(hoja)}</span>
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                          <span title={getAsignadoA(hoja)}>{getAsignadoACodigo(hoja)}</span>
                           {getCCExtras(hoja) > 0 && (
-                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 mt-0.5 bg-amber-50 text-amber-700 border-amber-200">
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 mt-0.5 ml-1 bg-amber-50 text-amber-700 border-amber-200">
                               +{getCCExtras(hoja)} CC
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell className="max-w-[160px] truncate text-sm">{hoja.motivo}</TableCell>
+                        <TableCell className="text-sm">
+                          <span className="line-clamp-2">{hoja.motivo}</span>
+                        </TableCell>
                         <TableCell>
                           <Badge className={`text-xs ${estadoColor[hoja.estado] || ''}`}>
                             {hoja.estado}
