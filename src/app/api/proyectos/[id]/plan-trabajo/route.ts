@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { planTrabajoPatchSchema } from '@/lib/validators/planTrabajo'
 import { calcularCompletitud } from '@/lib/planTrabajo/completitud'
 import { toPrismaJsonNullable } from '@/lib/planTrabajo/prismaJson'
+import { resolverFirmantesIniciales } from '@/lib/planTrabajo/resolverFirmantesIniciales'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -25,6 +26,14 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       codigo: true,
       ordenCompraCliente: true,
       planTrabajo: true,
+      orgNodos: {
+        select: {
+          id: true,
+          orden: true,
+          cargoLabel: true,
+          user: { select: { name: true, email: true } },
+        },
+      },
     },
   })
 
@@ -43,6 +52,12 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   const codigoDocumento = proyecto.ordenCompraCliente
     ? `PT-${proyecto.codigo}-${proyecto.ordenCompraCliente}`
     : `PT-${proyecto.codigo}-GYS-001`
+
+  // Firmantes iniciales derivados del organigrama (Residente/Coordinador/Gerente
+  // de Proyectos) — si el organigrama todavía no tiene a esas personas, quedan
+  // vacíos y CabeceraEditor.tsx ya tiene su propio fallback (usuario logueado)
+  // para "preparadoPor" cuando el campo sigue vacío al abrir el editor.
+  const firmantes = resolverFirmantesIniciales(proyecto.orgNodos)
 
   const bloquesVacios = {
     objetivo: false,
@@ -65,6 +80,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       codigoDocumento,
       numeroRevision: 'A',
       tipoEmision: 'B - Para Revisión',
+      ...firmantes,
       incluirOrganigrama: true,
       incluirMatriz: true,
       incluirCronograma: true,
