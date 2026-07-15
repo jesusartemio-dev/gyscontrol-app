@@ -42,6 +42,8 @@ export const planAlcanceDetalladoTareaSchema = z.object({
   excluida: z.boolean().optional(),
   // Rechazos de sugerencias de imagen por IA (Bloque 4.2 sesión 4) — mismo riesgo.
   catalogoImagenesRechazadas: z.array(z.string()).optional(),
+  // El usuario editó "texto" a mano (Bloque 4.2 sesión 5) — se preserva al regenerar. Mismo riesgo.
+  textoEditadoManualmente: z.boolean().optional(),
 })
 
 // ─── Nuevo formato (basado en EDTs del cronograma de planificación) ───
@@ -54,6 +56,8 @@ export const planAlcanceDetalladoSubItemSchema = z.object({
   // Solo UI (Bloque 4.2, Tarea 5) — nunca se exporta al docx, puede quedar vacía.
   fotoSugerida: z.string().optional(),
   imagenes: z.array(planAlcanceImagenSchema).optional(),
+  // El usuario editó "descripcion" a mano (Bloque 4.2 sesión 5) — se preserva al regenerar. Mismo riesgo.
+  descripcionEditadaManualmente: z.boolean().optional(),
 })
 
 export const planAlcanceDetalladoEdtSchema = z.object({
@@ -67,6 +71,8 @@ export const planAlcanceDetalladoEdtSchema = z.object({
   tipoDetalle: z.enum(['detallado', 'resumido']).default('resumido'),
   subItems: z.array(planAlcanceDetalladoSubItemSchema).optional(),
   personalRequerido: z.array(planPersonalRequeridoSchema).optional(),
+  // El usuario editó "descripcion" a mano (Bloque 4.2 sesión 5) — se preserva al regenerar. Mismo riesgo.
+  descripcionEditadaManualmente: z.boolean().optional(),
   imagenes: z.array(planAlcanceImagenSchema).optional(),
   edtRefId: z.string().optional(),
 })

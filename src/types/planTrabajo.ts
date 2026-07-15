@@ -27,6 +27,13 @@ export interface PlanAlcanceDetalladoTarea {
    * se exporta al docx; solo lo lee aplicarSugerenciasImagenesIA.ts.
    */
   catalogoImagenesRechazadas?: string[]
+  /**
+   * El usuario editó a mano el `texto` (viñeta) de esta tarea (Bloque 4.2
+   * sesión 5) — una regeneración posterior lo PRESERVA por defecto, salvo
+   * que el usuario marque explícitamente "sobrescribir editados". Se libera
+   * (vuelve a false) al sobrescribir o al usar la acción "Liberar" del editor.
+   */
+  textoEditadoManualmente?: boolean
 }
 
 // ─── Alcance detallado (formato nuevo — basado en EDTs del cronograma) ───
@@ -41,6 +48,8 @@ export interface PlanAlcanceDetalladoSubItem {
   fotoSugerida?: string
   /** Imágenes adjuntas (solo EDTs/subItems de fase EJECUCIÓN) — nunca generadas por IA. */
   imagenes?: PlanAlcanceImagen[]
+  /** El usuario editó a mano la `descripcion` de esta actividad (Bloque 4.2 sesión 5) — ver PlanAlcanceDetalladoTarea.textoEditadoManualmente. */
+  descripcionEditadaManualmente?: boolean
 }
 
 /** {cantidad, cargo} inferido de personasEstimadas del cronograma + cargos del organigrama — nunca por IA. */
