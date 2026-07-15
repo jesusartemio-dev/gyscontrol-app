@@ -5962,6 +5962,17 @@ model PlanTrabajoImagen {
   caption       String?
   orden         Int     @default(0)
 
+  // Selección automática de imágenes por IA (Bloque 4.2 sesión 4) — 'MANUAL'
+  // cubre tanto la subida directa como el picker "Desde biblioteca" (una
+  // decisión humana explícita); 'IA_AUTO' es una propuesta automática
+  // pendiente de revisión; 'CONFIRMADA' es una 'IA_AUTO' que un humano validó.
+  origen String @default("MANUAL") // 'MANUAL' | 'IA_AUTO' | 'CONFIRMADA'
+  // CatalogoImagen.id de origen — presente cuando la imagen viene del picker
+  // "Desde biblioteca" o de una sugerencia de IA; null si es una foto subida
+  // directamente. Permite registrar el rechazo de una sugerencia por tarea
+  // (ver rechazosImagenesIA.ts) sin depender de resolver por driveFileId.
+  catalogoImagenId String?
+
   createdAt   DateTime @default(now())
   createdById String?
   createdBy   User?    @relation(fields: [createdById], references: [id])
