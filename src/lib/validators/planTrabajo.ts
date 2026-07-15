@@ -40,6 +40,8 @@ export const planAlcanceDetalladoTareaSchema = z.object({
   // Borrado lógico del plan (Bloque 4.2 sesión 3) — nunca toca el cronograma real.
   // Mismo riesgo que fotoSugerida: si no se declara acá, se descarta en silencio al guardar.
   excluida: z.boolean().optional(),
+  // Rechazos de sugerencias de imagen por IA (Bloque 4.2 sesión 4) — mismo riesgo.
+  catalogoImagenesRechazadas: z.array(z.string()).optional(),
 })
 
 // ─── Nuevo formato (basado en EDTs del cronograma de planificación) ───

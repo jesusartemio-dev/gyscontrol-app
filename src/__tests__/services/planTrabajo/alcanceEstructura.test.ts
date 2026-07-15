@@ -391,6 +391,31 @@ describe('tareas por subItem (Bloque 4.2, Tarea 4)', () => {
       expect(tareas.find(t => t.tareaRefId === tareaIds[2])!.excluida).toBeFalsy()
     })
 
+    it('(Bloque 4.2 sesión 4) las catalogoImagenesRechazadas de una tarea sobreviven a la regeneración', () => {
+      const con = estructuraRecienGenerada.find(e => e.edtNombre === 'Construcción')!
+      const subItemId = con.subItems![0].actividadRefId!
+      const tareaIds = con.subItems![0].tareas!.map(t => t.tareaRefId!)
+
+      const estructuraAnterior = estructuraRecienGenerada.map(edt =>
+        edt.edtNombre !== 'Construcción' ? edt : {
+          ...edt,
+          subItems: edt.subItems!.map(s =>
+            s.actividadRefId !== subItemId ? s : {
+              ...s,
+              tareas: s.tareas!.map(t => t.tareaRefId === tareaIds[0] ? { ...t, catalogoImagenesRechazadas: ['cat-roscadora'] } : t),
+            }
+          ),
+        }
+      )
+
+      const resultado = preservarEstadoManualTareas(estructuraRecienGenerada, estructuraAnterior)
+      const conResultado = resultado.find(e => e.edtNombre === 'Construcción')!
+      const tareas = conResultado.subItems![0].tareas!
+
+      expect(tareas.find(t => t.tareaRefId === tareaIds[0])!.catalogoImagenesRechazadas).toEqual(['cat-roscadora'])
+      expect(tareas.find(t => t.tareaRefId === tareaIds[1])!.catalogoImagenesRechazadas).toEqual([])
+    })
+
     it('el orden manual del usuario (reordenar viñetas) se reaplica tras regenerar', () => {
       const con = estructuraRecienGenerada.find(e => e.edtNombre === 'Construcción')!
       const subItemId = con.subItems![0].actividadRefId!

@@ -105,13 +105,15 @@ export function mergearDescripcionesEnEstructura(
 
 /**
  * Preserva el estado manual del usuario (tareas excluidas del plan + su orden
- * personalizado, Bloque 4.2 sesión 3) a través de una regeneración —
+ * personalizado, Bloque 4.2 sesión 3; rechazos de sugerencias de imagen por
+ * IA, Bloque 4.2 sesión 4) a través de una regeneración —
  * `calcularEstructuraAlcanceDetallado` reconstruye toda la estructura desde el
  * cronograma real en su orden natural, sin saber nada de estos ajustes. Acá
  * se matchea por `tareaRefId` contra el estado ANTERIOR del plan (antes de
- * sobrescribirlo): una tarea marcada `excluida` sigue excluida, y el orden
- * relativo del usuario se reaplica. Una tarea nueva en el cronograma (no
- * existía en el estado anterior) se agrega al final, en su orden natural.
+ * sobrescribirlo): una tarea marcada `excluida` sigue excluida, sus
+ * `catalogoImagenesRechazadas` se conservan, y el orden relativo del usuario
+ * se reaplica. Una tarea nueva en el cronograma (no existía en el estado
+ * anterior) se agrega al final, en su orden natural.
  * Pura y testeable: no decide nada por IA, solo reconcilia dos estructuras.
  */
 export function preservarEstadoManualTareas(
@@ -133,9 +135,14 @@ export function preservarEstadoManualTareas(
 
       const ordenAnterior = new Map(anteriores.map((t, i) => [t.tareaRefId, i]))
       const excluidasPorId = new Map(anteriores.map(t => [t.tareaRefId, t.excluida ?? false]))
+      const rechazadasPorId = new Map(anteriores.map(t => [t.tareaRefId, t.catalogoImagenesRechazadas ?? []]))
 
       const conExclusionYPosicion = (s.tareas ?? [])
-        .map(t => ({ ...t, excluida: t.tareaRefId ? (excluidasPorId.get(t.tareaRefId) ?? false) : false }))
+        .map(t => ({
+          ...t,
+          excluida: t.tareaRefId ? (excluidasPorId.get(t.tareaRefId) ?? false) : false,
+          catalogoImagenesRechazadas: t.tareaRefId ? (rechazadasPorId.get(t.tareaRefId) ?? []) : [],
+        }))
         .map((t, i) => ({ t, i, pos: t.tareaRefId ? ordenAnterior.get(t.tareaRefId) : undefined }))
 
       conExclusionYPosicion.sort((a, b) => {

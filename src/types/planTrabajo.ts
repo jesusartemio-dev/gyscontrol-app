@@ -20,6 +20,13 @@ export interface PlanAlcanceDetalladoTarea {
    * usuario la restaure explícitamente desde el editor.
    */
   excluida?: boolean
+  /**
+   * CatalogoImagen.id que el usuario RECHAZÓ explícitamente para esta tarea
+   * (quitó una sugerencia de IA, Bloque 4.2 sesión 4) — se persiste para que
+   * una regeneración posterior no vuelva a proponer la misma imagen. Nunca
+   * se exporta al docx; solo lo lee aplicarSugerenciasImagenesIA.ts.
+   */
+  catalogoImagenesRechazadas?: string[]
 }
 
 // ─── Alcance detallado (formato nuevo — basado en EDTs del cronograma) ───
