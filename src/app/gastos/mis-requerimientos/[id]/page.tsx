@@ -661,7 +661,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   })()
   const motivoNoReembolso: string | null = (() => {
     if (hoja.estado === 'cerrado') return 'No se puede modificar una hoja cerrada'
-    if (hoja.estado !== 'validado') return 'Disponible solo cuando la hoja esté en estado "Validado"'
+    if (!estaEnSeccion) return 'Disponible solo a partir del estado "Aprobado"'
     if (hoja.saldo >= 0) return hoja.saldo === 0
       ? 'No hay saldo pendiente a reembolsar'
       : 'No corresponde reembolso: el saldo es positivo, en su caso debería registrarse una devolución'
@@ -670,7 +670,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   })()
   const motivoNoDevolucion: string | null = (() => {
     if (hoja.estado === 'cerrado') return 'No se puede modificar una hoja cerrada'
-    if (hoja.estado !== 'validado') return 'Disponible solo cuando la hoja esté en estado "Validado"'
+    if (!estaEnSeccion) return 'Disponible solo a partir del estado "Aprobado"'
     if (hoja.saldo <= 0) return hoja.saldo === 0
       ? 'No hay saldo pendiente a devolver'
       : 'No corresponde devolución: el saldo es negativo, en su caso debería registrarse un reembolso'

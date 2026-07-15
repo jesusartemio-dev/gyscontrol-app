@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
+// Estados desde "aprobado" (inclusive) hasta antes de "cerrado", donde vive la sección de pagos.
+const ESTADOS_CON_SECCION_PAGOS = ['aprobado', 'depositado', 'rendido', 'revisado', 'validado']
+
 /**
  * GET /api/hoja-de-gastos/[id]/depositos
  * Lista todos los depósitos de la hoja con sus adjuntos.
@@ -35,8 +38,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
  * POST /api/hoja-de-gastos/[id]/depositos
  * Tipos de depósito:
  *   - "anticipo"   → empresa → empleado, ANTES de gastar (aprobado/depositado/rendido)
- *   - "reembolso"  → empresa → empleado, DESPUÉS de validar (rendido/validado), solo si saldo < 0
- *   - "devolucion" → empleado → empresa, DESPUÉS de gastar (depositado/rendido/validado), solo si saldo > 0
+ *   - "reembolso"  → empresa → empleado, desde que está aprobada (aprobado..validado), solo si saldo < 0
+ *   - "devolucion" → empleado → empresa, desde que está aprobada (aprobado..validado), solo si saldo > 0
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -71,9 +74,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (!['admin', 'gerente', 'administracion'].includes(session.user.role)) {
         return NextResponse.json({ error: 'Sin permisos para registrar reembolso' }, { status: 403 })
       }
-      if (hoja.estado !== 'validado') {
+      if (hoja.estado === 'cerrado') {
+        return NextResponse.json({ error: 'No se puede modificar una hoja cerrada' }, { status: 400 })
+      }
+      if (!ESTADOS_CON_SECCION_PAGOS.includes(hoja.estado)) {
         return NextResponse.json({
-          error: 'Solo se pueden registrar reembolsos cuando la hoja está en estado validado',
+          error: 'Solo se pueden registrar reembolsos a partir del estado aprobado',
         }, { status: 400 })
       }
       if (hoja.saldo >= 0) {
@@ -92,8 +98,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (!esEmpleado && !esAdmin) {
         return NextResponse.json({ error: 'Sin permisos para registrar esta devolución' }, { status: 403 })
       }
-      if (hoja.estado !== 'validado') {
-        return NextResponse.json({ error: 'Solo se pueden registrar devoluciones cuando la hoja está en estado validado' }, { status: 400 })
+      if (hoja.estado === 'cerrado') {
+        return NextResponse.json({ error: 'No se puede modificar una hoja cerrada' }, { status: 400 })
+      }
+      if (!ESTADOS_CON_SECCION_PAGOS.includes(hoja.estado)) {
+        return NextResponse.json({ error: 'Solo se pueden registrar devoluciones a partir del estado aprobado' }, { status: 400 })
       }
       if (hoja.saldo <= 0) {
         return NextResponse.json({ error: 'No hay saldo pendiente por devolver a la empresa' }, { status: 400 })
