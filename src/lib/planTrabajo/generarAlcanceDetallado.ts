@@ -8,6 +8,7 @@ import {
   buildUserResumenEdts,
   SYSTEM_DETALLE_EDT,
   buildUserDetalleEdt,
+  type CatalogoImagenParaPrompt,
 } from './prompts/alcanceDetallado'
 import type { CronogramaContexto, PlanAlcanceDetalladoEdt, PlanAlcanceDetalladoTarea, PlanPersonal } from '@/types/planTrabajo'
 import type { ResultadoCalculo } from './calcularDatos'
@@ -49,6 +50,15 @@ export interface ResultadoDetalladoEdt {
   fotosSugeridas: Map<string, string>
   /** subItemId -> (tareaId -> fotoSugerida) — Bloque 4.2 sesión 2, Tarea 2 (solo UI, nunca se exporta al docx). */
   tareasFotosSugeridas: Map<string, Map<string, string>>
+  /** subItemId -> (tareaId -> catalogoImagenIds ya validados contra el catálogo activo, máx. 2) — Bloque 4.2 sesión 4. */
+  tareasImagenesSugeridas: Map<string, Map<string, string[]>>
+}
+
+/** Sugerencia de imagen de catálogo por tarea, ya validada anti-alucinación (Bloque 4.2 sesión 4). */
+export interface SugerenciaImagenIA {
+  edtRef: string
+  tareaRef: string
+  catalogoImagenIds: string[]
 }
 
 /**
@@ -241,6 +251,7 @@ async function generarDescripcionesDetallado(
   edt: PlanAlcanceDetalladoEdt,
   tareasPorActividad: Map<string, { id: string; nombre: string; horasEstimadas: number | null; personasEstimadas: number }[]>,
   hechosEtapa1: string,
+  catalogoImagenes: CatalogoImagenParaPrompt[],
   userId: string,
   proyectoId: string,
   signal?: AbortSignal
@@ -250,10 +261,29 @@ async function generarDescripcionesDetallado(
   tareas: Map<string, Map<string, string>>
   fotosSugeridas: Map<string, string>
   tareasFotosSugeridas: Map<string, Map<string, string>>
+  tareasImagenesSugeridas: Map<string, Map<string, string[]>>
   advertencias: string[]
 }> {
   const advertencias: string[] = []
   const subItems = edt.subItems ?? []
+  // Anti-alucinación (Bloque 4.2 sesión 4): la IA solo puede elegir de esta
+  // lista cerrada — cualquier id que no exista acá se descarta y se loguea,
+  // nunca se crea una imagen a partir de un id inventado.
+  const idsCatalogoValidos = new Set(catalogoImagenes.map(c => c.id))
+  function filtrarCatalogoImagenIds(ids: string[] | undefined, tareaId: string): string[] {
+    if (!ids || ids.length === 0) return []
+    const validos: string[] = []
+    for (const id of ids) {
+      if (idsCatalogoValidos.has(id)) {
+        validos.push(id)
+      } else {
+        console.warn(
+          `[generarAlcanceDetallado] catalogoImagenId inexistente "${id}" propuesto por la IA para la tarea ${tareaId} del EDT "${edt.edtNombre}" — descartado.`
+        )
+      }
+    }
+    return validos.slice(0, 2) // máximo 2 por tarea
+  }
   const idsSubItemsEsperados = new Set(subItems.map(s => s.actividadRefId).filter((id): id is string => !!id))
   // subItemId -> Set(tareaId) esperados — misma validación estructural que los subItems (Tarea 4).
   const idsTareasEsperadasPorSubItem = new Map<string, Set<string>>(
@@ -282,7 +312,7 @@ async function generarDescripcionesDetallado(
     subItems?: {
       id: string
       descripcion: string
-      tareas?: { id: string; texto: string; fotoSugerida?: string }[]
+      tareas?: { id: string; texto: string; fotoSugerida?: string; catalogoImagenIds?: string[] }[]
       fotoSugerida?: string
     }[]
   } = {}
@@ -302,7 +332,7 @@ async function generarDescripcionesDetallado(
       model: MODELS.sonnet,
       max_tokens: tokensParaIntento,
       system: SYSTEM_DETALLE_EDT,
-      messages: [{ role: 'user', content: buildUserDetalleEdt(payload, hechosEtapa1, notaCorrectiva) }],
+      messages: [{ role: 'user', content: buildUserDetalleEdt(payload, hechosEtapa1, catalogoImagenes, notaCorrectiva) }],
     }, { signal })
 
     trackUsage({
@@ -343,6 +373,7 @@ async function generarDescripcionesDetallado(
         tareas: new Map(subItemsRecibidos.map(s => [s.id, new Map((s.tareas ?? []).map(t => [t.id, t.texto]))])),
         fotosSugeridas: new Map(subItemsRecibidos.map(s => [s.id, s.fotoSugerida ?? ''])),
         tareasFotosSugeridas: new Map(subItemsRecibidos.map(s => [s.id, new Map((s.tareas ?? []).map(t => [t.id, t.fotoSugerida ?? '']))])),
+        tareasImagenesSugeridas: new Map(subItemsRecibidos.map(s => [s.id, new Map((s.tareas ?? []).map(t => [t.id, filtrarCatalogoImagenIds(t.catalogoImagenIds, t.id)]))])),
         advertencias,
       }
     }
@@ -353,6 +384,7 @@ async function generarDescripcionesDetallado(
   const mapaTareas = new Map<string, Map<string, string>>()
   const mapaFotosSugeridas = new Map<string, string>()
   const mapaTareasFotosSugeridas = new Map<string, Map<string, string>>()
+  const mapaTareasImagenesSugeridas = new Map<string, Map<string, string[]>>()
   for (const s of ultimaRespuesta.subItems ?? []) {
     if (!idsSubItemsEsperados.has(s.id)) continue
     mapaSubItems.set(s.id, s.descripcion)
@@ -360,6 +392,7 @@ async function generarDescripcionesDetallado(
     const tareasRecibidas = (s.tareas ?? []).filter(t => idsTareasEsperadas.has(t.id))
     mapaTareas.set(s.id, new Map(tareasRecibidas.map(t => [t.id, t.texto])))
     mapaTareasFotosSugeridas.set(s.id, new Map(tareasRecibidas.map(t => [t.id, t.fotoSugerida ?? ''])))
+    mapaTareasImagenesSugeridas.set(s.id, new Map(tareasRecibidas.map(t => [t.id, filtrarCatalogoImagenIds(t.catalogoImagenIds, t.id)])))
     mapaFotosSugeridas.set(s.id, s.fotoSugerida ?? '')
   }
   const faltantes = subItems.filter(s => !mapaSubItems.has(s.actividadRefId ?? ''))
@@ -374,6 +407,7 @@ async function generarDescripcionesDetallado(
     tareas: mapaTareas,
     fotosSugeridas: mapaFotosSugeridas,
     tareasFotosSugeridas: mapaTareasFotosSugeridas,
+    tareasImagenesSugeridas: mapaTareasImagenesSugeridas,
     advertencias,
   }
 }
@@ -384,12 +418,17 @@ export async function generarAlcanceDetallado(
   cron: NonNullable<CronogramaContexto> | null,
   personal: PlanPersonal[],
   hechosEtapa1: string,
+  catalogoImagenes: CatalogoImagenParaPrompt[],
   userId: string,
   proyectoId: string,
   signal?: AbortSignal
-): Promise<ResultadoCalculo<PlanAlcanceDetalladoEdt[]>> {
+): Promise<ResultadoCalculo<PlanAlcanceDetalladoEdt[]> & { sugerenciasImagenes: SugerenciaImagenIA[] }> {
   if (!cron) {
-    return { data: [], advertencias: ['No hay cronograma de planificación — no se pudo generar el alcance detallado.'] }
+    return {
+      data: [],
+      advertencias: ['No hay cronograma de planificación — no se pudo generar el alcance detallado.'],
+      sugerenciasImagenes: [],
+    }
   }
 
   const { data: estructura, advertencias: advEstructura } = calcularEstructuraAlcanceDetallado(cron, personal)
@@ -415,7 +454,7 @@ export async function generarAlcanceDetallado(
   const [resumidoResultado, ...detalladoResultados] = await Promise.all([
     generarDescripcionesResumido(edtsResumido, hechosEtapa1, userId, proyectoId, signal),
     ...edtsDetallado.map(edt =>
-      generarDescripcionesDetallado(edt, tareasPorActividad, hechosEtapa1, userId, proyectoId, signal)
+      generarDescripcionesDetallado(edt, tareasPorActividad, hechosEtapa1, catalogoImagenes, userId, proyectoId, signal)
     ),
   ])
 
@@ -424,5 +463,25 @@ export async function generarAlcanceDetallado(
 
   const final = mergearDescripcionesEnEstructura(estructura, resumidoResultado.mapa, detalladoResultados)
 
-  return { data: final, advertencias }
+  // Sugerencias de imagen por tarea (Bloque 4.2 sesión 4) — planas, listas
+  // para que la ruta llamante las persista como PlanTrabajoImagen origen
+  // IA_AUTO (ver aplicarSugerenciasImagenesIA.ts). Nunca se mergean en el
+  // JSON de la estructura — las imágenes viven solo en su propia tabla.
+  const sugerenciasImagenes: SugerenciaImagenIA[] = []
+  edtsDetallado.forEach((edt, i) => {
+    if (!edt.edtRefId) return
+    const resultado = detalladoResultados[i]
+    for (const s of edt.subItems ?? []) {
+      const porTarea = resultado.tareasImagenesSugeridas.get(s.actividadRefId ?? '')
+      if (!porTarea) continue
+      for (const t of s.tareas ?? []) {
+        const ids = t.tareaRefId ? porTarea.get(t.tareaRefId) : undefined
+        if (ids && ids.length > 0) {
+          sugerenciasImagenes.push({ edtRef: edt.edtRefId!, tareaRef: t.tareaRefId!, catalogoImagenIds: ids })
+        }
+      }
+    }
+  })
+
+  return { data: final, advertencias, sugerenciasImagenes }
 }

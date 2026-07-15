@@ -17,6 +17,7 @@ import { buildPromptRegeneracion } from '@/lib/planTrabajo/prompts/regenerarSecc
 import { parseJsonIA } from '@/lib/planTrabajo/parseJsonIA'
 import { calcularDatosEtapa1 } from '@/lib/planTrabajo/calcularDatos'
 import { generarAlcanceDetallado, preservarEstadoManualTareas } from '@/lib/planTrabajo/generarAlcanceDetallado'
+import { obtenerCatalogoImagenesActivo, aplicarSugerenciasImagenesIA } from '@/lib/planTrabajo/aplicarSugerenciasImagenesIA'
 import { esSeccionEtapa1, etapa1Completa } from '@/lib/planTrabajo/etapas'
 import type { SeccionRegenerable, PlanPersonal, PlanAlcanceDetalladoEdt } from '@/types/planTrabajo'
 
@@ -280,10 +281,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         if (seccion === 'alcanceDetallado') {
           send('status', { fase: 'generando', mensaje: 'Generando Alcance Detallado...' })
           const personalCalculado = (planActual.personalAsignado as PlanPersonal[] | null) ?? []
-          const { data, advertencias } = await generarAlcanceDetallado(
+          const catalogoImagenes = await obtenerCatalogoImagenesActivo()
+          const { data, advertencias, sugerenciasImagenes } = await generarAlcanceDetallado(
             contexto.cronograma.cronogramaSeleccionado,
             personalCalculado,
             hechosEtapa1,
+            catalogoImagenes,
             userId,
             proyectoId
           )
@@ -302,6 +305,13 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
           send('status', { fase: 'persistencia', mensaje: 'Guardando sección validada...' })
           await guardarSeccionIndividual(proyectoId, seccion, validado)
+          // Adjunta automáticamente las imágenes de catálogo que la IA propuso
+          // (Bloque 4.2 sesión 4) — best-effort, nunca bloquea la regeneración.
+          try {
+            await aplicarSugerenciasImagenesIA(planId, userId, sugerenciasImagenes, dataConEstadoManual)
+          } catch (errImg) {
+            console.error('[regenerar-seccion] alcanceDetallado: fallo al aplicar sugerencias de imagen IA:', errImg)
+          }
           send('done', { seccionGuardada: seccion, advertencias })
           return
         }

@@ -84,6 +84,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       edtRef,
       subItemRef: subItemRefFinal,
       tareaRef: tareaRefFinal,
+      catalogoImagenId: catalogoImagen.id,
       nombreArchivo: catalogoImagen.nombre,
       urlArchivo: '',
       driveFileId: catalogoImagen.driveFileId,
@@ -91,6 +92,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       tamano: null,
       caption: catalogoImagen.nombre,
       orden: nuevoOrden,
+      // Elegida a mano por el usuario (chip de keyword o picker) — 'MANUAL',
+      // igual que una foto subida directamente (Bloque 4.2 sesión 4).
+      origen: 'MANUAL',
       createdById: userId,
     },
   })

@@ -55,12 +55,34 @@ e instrumentación.
 
 Vas a redactar la descripción técnica de UN EDT de la fase de EJECUCIÓN
 (Construcción/Comisionamiento) de un Plan de Trabajo, de cada una de sus
-actividades (subItems), de cada TAREA real de esas actividades, y de una
-sugerencia de foto por actividad Y por tarea. La estructura, numeración e
-IDs de este EDT, sus subItems y sus tareas YA ESTÁN RESUELTOS por el
+actividades (subItems), de cada TAREA real de esas actividades, de una
+sugerencia de foto por actividad Y por tarea, y de qué imágenes de un
+catálogo de referencia corresponden a cada tarea. La estructura, numeración
+e IDs de este EDT, sus subItems y sus tareas YA ESTÁN RESUELTOS por el
 sistema — tu única tarea es escribir el texto de "edtDescripcion", el
 "descripcion" de cada subItem, el "texto" de cada tarea (viñeta operativa),
-el "fotoSugerida" de cada subItem, y el "fotoSugerida" de cada tarea.
+el "fotoSugerida" de cada subItem, el "fotoSugerida" de cada tarea, y el
+"catalogoImagenIds" de cada tarea.
+
+SELECCIÓN DE IMÁGENES DEL CATÁLOGO (catalogoImagenIds, por tarea):
+- Más abajo recibís el CATÁLOGO DE IMÁGENES disponible: una LISTA CERRADA de
+  objetos {id, nombre, categoria, keywords}. Para cada tarea, elegí de ESA
+  lista (nunca de otra parte) los ids de las imágenes que correspondan.
+- Devolvé ÚNICAMENTE ids que existan literalmente en la lista recibida —
+  nunca inventes un id ni describas una imagen que no esté en el catálogo.
+  Si ninguna imagen del catálogo corresponde a una tarea, devolvé
+  "catalogoImagenIds": [] para esa tarea — es la respuesta correcta y
+  esperada en la mayoría de los casos (el catálogo es acotado).
+- Máximo 2 ids por tarea — elegí las más relevantes, no satures el documento.
+- Criterio de inclusión: adjuntá una imagen SOLO si el equipo/herramienta es
+  PROTAGONISTA de esa tarea puntual, no por mención tangencial. Ejemplos de
+  criterio correcto: la roscadora en una tarea de fabricación/roscado de
+  tubería conduit; la escalera dieléctrica con plataforma en una tarea de
+  cableado/tendido en bandejas dentro de una sala eléctrica o un CCM/MCC; el
+  andamio de la modulación adecuada (número de cuerpos según la altura real
+  del trabajo) en una tarea de trabajo en altura; el manlift en una tarea de
+  cableado de bandejas a gran altura. Si la tarea solo MENCIONA de paso un
+  equipo sin que sea el foco de la actividad, no lo adjuntes.
 
 ESTILO (plan de trabajo Nexa):
 - edtDescripcion: 2-4 oraciones técnicas describiendo el alcance general del EDT.
@@ -127,9 +149,18 @@ interface EdtParaDetalle {
   subItems: SubItemParaDetalle[]
 }
 
+/** Catálogo de imágenes activo, inyectado como lista cerrada (Bloque 4.2 sesión 4). */
+export interface CatalogoImagenParaPrompt {
+  id: string
+  nombre: string
+  categoria: string
+  keywords: string[]
+}
+
 export function buildUserDetalleEdt(
   edt: EdtParaDetalle,
   hechosEtapa1: string,
+  catalogoImagenes: CatalogoImagenParaPrompt[],
   notaCorrectiva = ''
 ): string {
   return [
@@ -137,9 +168,12 @@ export function buildUserDetalleEdt(
     '',
     'EDT A DESCRIBIR (con sus actividades/subItems y tareas reales del cronograma):',
     JSON.stringify(edt, null, 2),
+    '',
+    'CATÁLOGO DE IMÁGENES (lista CERRADA — elegí catalogoImagenIds solo de acá, nunca inventes uno):',
+    JSON.stringify(catalogoImagenes, null, 2),
     notaCorrectiva,
     '',
     'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown):',
-    `{ "id": "${edt.id}", "edtDescripcion": "string — 2-4 oraciones", "subItems": [{ "id": "string — copiado tal cual", "descripcion": "string — 2-4 oraciones", "tareas": [{ "id": "string — copiado tal cual", "texto": "string — viñeta operativa de 1 línea", "fotoSugerida": "string — 1 línea, qué foto tomar para ESTA tarea" }], "fotoSugerida": "string — 1 línea, qué foto tomar en el levantamiento" }] }`,
+    `{ "id": "${edt.id}", "edtDescripcion": "string — 2-4 oraciones", "subItems": [{ "id": "string — copiado tal cual", "descripcion": "string — 2-4 oraciones", "tareas": [{ "id": "string — copiado tal cual", "texto": "string — viñeta operativa de 1 línea", "fotoSugerida": "string — 1 línea, qué foto tomar para ESTA tarea", "catalogoImagenIds": ["string — id EXISTENTE del catálogo, máx. 2, [] si ninguna aplica"] }], "fotoSugerida": "string — 1 línea, qué foto tomar en el levantamiento" }] }`,
   ].join('\n')
 }

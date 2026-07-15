@@ -15,6 +15,7 @@ import { RESUMEN_PROYECTO_PROMPT } from '@/lib/planTrabajo/prompts/resumirProyec
 import { parseJsonIA } from '@/lib/planTrabajo/parseJsonIA'
 import { etapa1Completa } from '@/lib/planTrabajo/etapas'
 import { generarAlcanceDetallado, preservarEstadoManualTareas } from '@/lib/planTrabajo/generarAlcanceDetallado'
+import { obtenerCatalogoImagenesActivo, aplicarSugerenciasImagenesIA } from '@/lib/planTrabajo/aplicarSugerenciasImagenesIA'
 import {
   PLAN_TRABAJO_SYSTEM_INSTRUCCIONES,
   SECCIONES_CONFIG,
@@ -302,10 +303,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           send('status', { fase: `seccion-${id}`, mensaje: 'Generando Alcance Detallado...' })
           try {
             const personalCalculado = (planTrabajo.personalAsignado as PlanPersonal[] | null) ?? []
-            const { data: valor, advertencias: advAlcance } = await generarAlcanceDetallado(
+            const catalogoImagenes = await obtenerCatalogoImagenesActivo()
+            const { data: valor, advertencias: advAlcance, sugerenciasImagenes } = await generarAlcanceDetallado(
               contexto.cronograma.cronogramaSeleccionado,
               personalCalculado,
               hechosEtapa1,
+              catalogoImagenes,
               userId,
               proyectoId,
               signal
@@ -323,6 +326,13 @@ export async function POST(req: NextRequest, { params }: Ctx) {
               seccionesGuardadas.push(id)
               send('seccion', { id, advertencias: advAlcance })
               console.log(`[generar-ia] ${id}: guardado OK`)
+              // Adjunta automáticamente las imágenes de catálogo que la IA propuso
+              // (Bloque 4.2 sesión 4) — best-effort, nunca bloquea la generación.
+              try {
+                await aplicarSugerenciasImagenesIA(planId, userId, sugerenciasImagenes, valorConEstadoManual)
+              } catch (errImg) {
+                console.error('[generar-ia] alcanceDetallado: fallo al aplicar sugerencias de imagen IA:', errImg)
+              }
             } else {
               const motivo = erroresValidacion[id] ?? 'validación falló'
               seccionesConError.push(id)

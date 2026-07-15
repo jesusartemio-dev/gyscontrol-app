@@ -196,6 +196,7 @@ describe('mergearDescripcionesEnEstructura', () => {
         tareas: new Map<string, Map<string, string>>(),
         fotosSugeridas: new Map<string, string>(),
         tareasFotosSugeridas: new Map<string, Map<string, string>>(),
+        tareasImagenesSugeridas: new Map<string, Map<string, string[]>>(),
       },
     ]
 
@@ -222,6 +223,7 @@ describe('mergearDescripcionesEnEstructura', () => {
       tareas: new Map<string, Map<string, string>>(),
       fotosSugeridas: new Map<string, string>(),
       tareasFotosSugeridas: new Map<string, Map<string, string>>(),
+      tareasImagenesSugeridas: new Map<string, Map<string, string[]>>(),
     }]
 
     const final = mergearDescripcionesEnEstructura(estructura, resumidoMapa, detalladoResultados)
@@ -293,6 +295,7 @@ describe('tareas por subItem (Bloque 4.2, Tarea 4)', () => {
         ]),
         fotosSugeridas: new Map([[subItemId, 'Foto del área antes de iniciar el tendido de cable.']]),
         tareasFotosSugeridas: new Map<string, Map<string, string>>(),
+        tareasImagenesSugeridas: new Map<string, Map<string, string[]>>(),
       },
     ]
 
@@ -319,6 +322,7 @@ describe('tareas por subItem (Bloque 4.2, Tarea 4)', () => {
         tareas: new Map<string, Map<string, string>>(),
         fotosSugeridas: new Map([[subItemId, 'Foto del área antes de iniciar el tendido de cable.']]),
         tareasFotosSugeridas: new Map<string, Map<string, string>>(),
+        tareasImagenesSugeridas: new Map<string, Map<string, string[]>>(),
       },
     ]
 
@@ -350,6 +354,7 @@ describe('tareas por subItem (Bloque 4.2, Tarea 4)', () => {
             ]),
           ],
         ]),
+        tareasImagenesSugeridas: new Map<string, Map<string, string[]>>(),
       },
     ]
 
