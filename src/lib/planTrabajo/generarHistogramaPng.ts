@@ -1,6 +1,7 @@
 import sharp from 'sharp'
 import type { PlanHistogramas } from '@/types/planTrabajo'
 import type { ImagenResueltaTag } from './exportDocx'
+import { asegurarFontconfigParaHistogramas, FUENTE_HISTOGRAMAS } from './configurarFontconfig'
 
 /**
  * Gráficos de barras de la sección 13 (Bloque 4.2, Tarea 3) — compuestos a
@@ -96,7 +97,7 @@ function construirSvgBarras(titulo: string, meses: string[], series: Serie[], mo
     leyendaSvg += `<text x="${x + 13}" y="${y + 8}" font-size="10" fill="#333">${escapeXml(etiquetaCorta)}</text>`
   })
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${ANCHO}" height="${ALTO}" viewBox="0 0 ${ANCHO} ${ALTO}">
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${ANCHO}" height="${ALTO}" viewBox="0 0 ${ANCHO} ${ALTO}" font-family="${FUENTE_HISTOGRAMAS}">
     <rect width="${ANCHO}" height="${ALTO}" fill="#ffffff"/>
     <text x="${ANCHO / 2}" y="20" font-size="15" font-weight="bold" text-anchor="middle" fill="#222">${escapeXml(titulo)}</text>
     ${ejeSvg}
@@ -106,6 +107,7 @@ function construirSvgBarras(titulo: string, meses: string[], series: Serie[], mo
 }
 
 async function svgAPng(svg: string): Promise<ImagenResueltaTag> {
+  asegurarFontconfigParaHistogramas()
   const buffer = await sharp(Buffer.from(svg)).png().toBuffer()
   return { data: `data:image/png;base64,${buffer.toString('base64')}`, width: ANCHO, height: ALTO }
 }

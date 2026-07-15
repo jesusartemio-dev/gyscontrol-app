@@ -16,9 +16,27 @@ const nextConfig: NextConfig = {
   // file-tracing de Vercel (@vercel/nft) no las detecta solo con análisis
   // estático a través de indirecciones, así que se fuerzan acá explícitamente
   // (bug real: ENOENT en producción en el export Word del organigrama).
+  //
+  // Las .ttf de src/lib/planTrabajo/fonts/ son el mismo caso, pero un nivel
+  // más indirecto: no las lee Node (`fs.readFile`), las lee fontconfig (una
+  // librería C empaquetada dentro de `sharp`) a partir de una ruta escrita en
+  // un fonts.conf generado en runtime — @vercel/nft nunca puede inferir esa
+  // dependencia por análisis estático. Sin esta entrada, los histogramas del
+  // §13 del Plan de Trabajo (word/media, PNG generados con sharp+SVG)
+  // volverían a salir en blanco/con texto ilegible en producción aunque
+  // funcionen local (informe §13, Bug 1: sharp no trae fuentes empaquetadas,
+  // solo la librería de resolución de fuentes).
   outputFileTracingIncludes: {
     '/api/proyectos/*/organigrama/docx': ['./src/lib/services/Organigrama/plantilla_organigrama.docx'],
     '/api/proyectos/*/matriz-comunicacion/docx': ['./src/lib/services/Matriz/plantilla_matriz_comunicacion.docx'],
+    '/api/proyectos/*/plan-trabajo/exportar-docx': [
+      './src/lib/planTrabajo/fonts/DejaVuSans.ttf',
+      './src/lib/planTrabajo/fonts/DejaVuSans-Bold.ttf',
+    ],
+    '/api/proyectos/*/plan-trabajo/generaciones/*/regenerar': [
+      './src/lib/planTrabajo/fonts/DejaVuSans.ttf',
+      './src/lib/planTrabajo/fonts/DejaVuSans-Bold.ttf',
+    ],
   },
 
   // 🚀 Fase 3: Bundle Optimization & Code Splitting
