@@ -32,7 +32,7 @@ const ESTADOS_INACTIVOS = ['cerrado', 'pausado', 'cancelado']
  * Reglas (en orden de cortocircuito):
  * 1. Empleado activo
  * 2. Proyecto activo (no en estado inactivo)
- * 3. Fecha dentro del rango del proyecto
+ * 3. Fecha no anterior al inicio del proyecto (no se valida contra fechaFin)
  * 4. Sin ausencia aprobada que cubra esa fecha+turno
  * 5. No es fin de semana sin esExcepcional=true
  * 6. (warning) Persona no asignada oficialmente al proyecto
@@ -74,17 +74,15 @@ export async function validarAsignacion(
     }
   }
 
-  // 3. Fecha dentro del rango del proyecto
+  // 3. Fecha no anterior al inicio del proyecto.
+  // No se valida el límite superior (fechaFin): es una estimación que suele quedar
+  // desactualizada respecto al avance real, y bloquear por eso impide planificar
+  // proyectos que siguen activos.
   const fechaMs = fecha.getTime()
   if (fechaMs < proyecto.fechaInicio.getTime()) {
     errores.push({
       codigo: 'fecha_fuera_de_rango_proyecto',
       mensaje: `La fecha es anterior al inicio del proyecto (${proyecto.fechaInicio.toISOString().slice(0, 10)})`,
-    })
-  } else if (proyecto.fechaFin && fechaMs > proyecto.fechaFin.getTime()) {
-    errores.push({
-      codigo: 'fecha_fuera_de_rango_proyecto',
-      mensaje: `La fecha es posterior al fin del proyecto (${proyecto.fechaFin.toISOString().slice(0, 10)})`,
     })
   }
 

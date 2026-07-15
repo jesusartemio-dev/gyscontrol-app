@@ -169,13 +169,13 @@ describe('validarAsignacion', () => {
     expect(result.errores[0].mensaje).toContain('anterior al inicio')
   })
 
-  it('fecha posterior a fechaFin del proyecto → error fecha_fuera_de_rango_proyecto', async () => {
+  it('fecha posterior a fechaFin del proyecto → permitido (fechaFin no se valida, suele quedar desactualizada)', async () => {
     const tx = makeTx({
       proyecto: {
         findUnique: jest.fn().mockResolvedValue({
           estado: 'en_ejecucion',
           fechaInicio: new Date('2026-01-01T00:00:00.000Z'),
-          fechaFin: new Date('2026-03-31T00:00:00.000Z'), // ya terminó
+          fechaFin: new Date('2026-03-31T00:00:00.000Z'), // estimación ya vencida
         }),
       },
     })
@@ -189,9 +189,8 @@ describe('validarAsignacion', () => {
       tx,
     )
 
-    expect(result.valido).toBe(false)
-    expect(result.errores[0].codigo).toBe('fecha_fuera_de_rango_proyecto')
-    expect(result.errores[0].mensaje).toContain('posterior al fin')
+    expect(result.valido).toBe(true)
+    expect(result.errores).toHaveLength(0)
   })
 
   it('ausencia aprobada en esa fecha+turno → error conflicto_ausencia con detalle', async () => {
