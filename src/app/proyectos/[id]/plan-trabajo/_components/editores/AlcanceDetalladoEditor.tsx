@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Plus, Trash2, PlusCircle, ChevronUp, ChevronDown, EyeOff } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Plus, Trash2, PlusCircle, ChevronUp, ChevronDown, EyeOff, ListChecks, ImageIcon, Camera } from 'lucide-react'
 import { GaleriaImagenesAlcance, type GaleriaImagenesAlcanceHandle } from './GaleriaImagenesAlcance'
 import { HintFotoSugerida } from '@/components/catalogoImagenes/HintFotoSugerida'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
@@ -44,6 +45,27 @@ const subItemVacio = (numeracionPadre: string, idx: number): PlanAlcanceDetallad
   actividadNombre: '',
   descripcion: '',
 })
+
+/** Conteos de un EDT para los badges del encabezado — de un vistazo, sin expandir (Prioridad 4). */
+function contarEstadoEdt(item: PlanAlcanceDetalladoEdt, imagenes: PlanTrabajoImagen[]) {
+  const edtRef = item.edtRefId ?? ''
+  let tareas = 0
+  let fotosPendientes = 0
+
+  for (const s of item.subItems ?? []) {
+    const imagenesSub = imagenes.filter(img => img.edtRef === edtRef && !img.tareaRef && (img.subItemRef ?? undefined) === s.actividadRefId)
+    if (s.fotoSugerida && imagenesSub.length === 0) fotosPendientes++
+
+    for (const t of (s.tareas ?? []).filter(t => !t.excluida)) {
+      tareas++
+      const imagenesTarea = imagenes.filter(img => img.edtRef === edtRef && img.tareaRef === t.tareaRefId)
+      if (t.fotoSugerida && imagenesTarea.length === 0) fotosPendientes++
+    }
+  }
+
+  const totalImagenes = edtRef ? imagenes.filter(img => img.edtRef === edtRef).length : 0
+  return { tareas, imagenes: totalImagenes, fotosPendientes }
+}
 
 export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos, imagenes, onImagenesChanged, onSave, onCancel }: Props) {
   const [items, setItems] = useState<PlanAlcanceDetalladoEdt[]>(
@@ -150,43 +172,93 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
         </SheetHeader>
 
         <div className="mt-4 space-y-3">
-          <Accordion type="multiple" className="space-y-2">
-            {items.map((item, edtIdx) => (
+          {/* Colapsado por defecto lo 'resumido' (Planificación/Ingeniería/Procura/Cierre);
+              expandido lo 'detallado' (Ejecución) — es donde hay más que revisar (Prioridad 4). */}
+          <Accordion
+            type="multiple"
+            className="space-y-2"
+            defaultValue={items.map((it, idx) => ({ it, idx })).filter(x => x.it.tipoDetalle === 'detallado').map(x => String(x.idx))}
+          >
+            {items.map((item, edtIdx) => {
+              const estado = contarEstadoEdt(item, imagenes)
+              return (
               <AccordionItem key={edtIdx} value={String(edtIdx)} className="border rounded-lg px-3">
                 <AccordionTrigger className="hover:no-underline py-2">
-                  <div className="flex items-center gap-2 text-left min-w-0">
+                  <div className="flex items-center gap-2 text-left min-w-0 flex-1">
                     <span className="text-xs font-mono text-muted-foreground shrink-0">{item.numeracion || '–'}</span>
                     <span className="text-sm font-medium truncate">
                       {item.faseAbreviatura ? `${item.faseAbreviatura} · ` : ''}{item.edtNombre || '(sin nombre)'}
                     </span>
+                    {item.tipoDetalle === 'detallado' && (
+                      <div className="flex items-center gap-1 ml-auto mr-2 shrink-0">
+                        {estado.tareas > 0 && (
+                          <Badge variant="outline" className="text-[10px] gap-1 font-normal">
+                            <ListChecks size={10} /> {estado.tareas}
+                          </Badge>
+                        )}
+                        {estado.imagenes > 0 && (
+                          <Badge variant="outline" className="text-[10px] gap-1 font-normal">
+                            <ImageIcon size={10} /> {estado.imagenes}
+                          </Badge>
+                        )}
+                        {estado.fotosPendientes > 0 && (
+                          <Badge variant="outline" className="text-[10px] gap-1 font-normal text-amber-700 border-amber-300 bg-amber-50">
+                            <Camera size={10} /> {estado.fotosPendientes}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="pb-3 space-y-3">
-                  {/* Identificación */}
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <Label className="text-xs">N° (11.1)</Label>
-                      <Input value={item.numeracion} onChange={e => updateItem(edtIdx, { numeracion: e.target.value })} className="h-8 text-sm" placeholder="11.1" />
+                  {/* Identificación — de solo lectura cuando viene del cronograma real
+                      (item.edtRefId): numeración/código/fase/nombre NO se editan acá.
+                      Un EDT agregado a mano ("Agregar EDT", sin edtRefId) sigue 100% editable. */}
+                  {item.edtRefId ? (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground bg-gray-50 border rounded-md px-3 py-2">
+                      <span><span className="text-gray-400">N°</span> <span className="font-mono text-gray-700">{item.numeracion}</span></span>
+                      <span><span className="text-gray-400">Código</span> <span className="font-mono text-gray-700">{item.edtCodigo}</span></span>
+                      <span><span className="text-gray-400">Fase</span> <span className="text-gray-700">{item.faseNombre} ({item.faseAbreviatura})</span></span>
+                      <span className="text-gray-700 font-medium">{item.edtNombre}</span>
                     </div>
-                    <div>
-                      <Label className="text-xs">Código EDT</Label>
-                      <Input value={item.edtCodigo} onChange={e => updateItem(edtIdx, { edtCodigo: e.target.value })} className="h-8 text-sm" placeholder="CON" />
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <Label className="text-xs">N° (11.1)</Label>
+                          <Input value={item.numeracion} onChange={e => updateItem(edtIdx, { numeracion: e.target.value })} className="h-8 text-sm" placeholder="11.1" />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Código EDT</Label>
+                          <Input value={item.edtCodigo} onChange={e => updateItem(edtIdx, { edtCodigo: e.target.value })} className="h-8 text-sm" placeholder="CON" />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Abrev. Fase</Label>
+                          <Input value={item.faseAbreviatura} onChange={e => updateItem(edtIdx, { faseAbreviatura: e.target.value })} className="h-8 text-sm" placeholder="EJEC" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-xs">Nombre EDT</Label>
+                          <Input value={item.edtNombre} onChange={e => updateItem(edtIdx, { edtNombre: e.target.value })} className="h-8 text-sm" placeholder="Construcción" />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Fase</Label>
+                          <Input value={item.faseNombre} onChange={e => updateItem(edtIdx, { faseNombre: e.target.value })} className="h-8 text-sm" placeholder="EJECUCIÓN" />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  {item.tipoDetalle === 'detallado' && (item.personalRequerido ?? []).length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                      <span className="text-muted-foreground shrink-0">Personal requerido:</span>
+                      {item.personalRequerido!.map((p, pi) => (
+                        <Badge key={pi} variant="outline" className="text-[10px] font-normal">
+                          {p.cantidad}× {p.cargo}
+                        </Badge>
+                      ))}
                     </div>
-                    <div>
-                      <Label className="text-xs">Abrev. Fase</Label>
-                      <Input value={item.faseAbreviatura} onChange={e => updateItem(edtIdx, { faseAbreviatura: e.target.value })} className="h-8 text-sm" placeholder="EJEC" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs">Nombre EDT</Label>
-                      <Input value={item.edtNombre} onChange={e => updateItem(edtIdx, { edtNombre: e.target.value })} className="h-8 text-sm" placeholder="Construcción" />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Fase</Label>
-                      <Input value={item.faseNombre} onChange={e => updateItem(edtIdx, { faseNombre: e.target.value })} className="h-8 text-sm" placeholder="EJECUCIÓN" />
-                    </div>
-                  </div>
+                  )}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <Label className="text-xs">Ubicación (opcional)</Label>
@@ -232,8 +304,17 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                         return (
                         <div key={subIdx} className="space-y-1.5 border rounded p-2 bg-gray-50">
                           <div className="flex items-center gap-2">
-                            <Input value={sub.numeracion} onChange={e => updateSubItem(edtIdx, subIdx, { numeracion: e.target.value })} className="h-7 text-xs w-20 font-mono" placeholder="11.1.1" />
-                            <Input value={sub.actividadNombre} onChange={e => updateSubItem(edtIdx, subIdx, { actividadNombre: e.target.value })} className="h-7 text-xs flex-1" placeholder="Nombre de la actividad" />
+                            {sub.actividadRefId ? (
+                              <span className="text-xs flex-1 min-w-0 truncate">
+                                <span className="font-mono text-gray-400">{sub.numeracion}</span>{' '}
+                                <span className="text-gray-700 font-medium">{sub.actividadNombre}</span>
+                              </span>
+                            ) : (
+                              <>
+                                <Input value={sub.numeracion} onChange={e => updateSubItem(edtIdx, subIdx, { numeracion: e.target.value })} className="h-7 text-xs w-20 font-mono" placeholder="11.1.1" />
+                                <Input value={sub.actividadNombre} onChange={e => updateSubItem(edtIdx, subIdx, { actividadNombre: e.target.value })} className="h-7 text-xs flex-1" placeholder="Nombre de la actividad" />
+                              </>
+                            )}
                             {item.tipoDetalle === 'detallado' && (
                               <HintFotoSugerida
                                 value={sub.fotoSugerida ?? ''}
@@ -372,7 +453,8 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                   </div>
                 </AccordionContent>
               </AccordionItem>
-            ))}
+              )
+            })}
           </Accordion>
 
           <Button variant="outline" className="w-full" onClick={addEdt}>

@@ -18,6 +18,7 @@ import { calcularTotalHH } from './calcularDatos'
 import { IMAGEN_PLACEHOLDER, type ImagenResueltaTag } from './exportDocx'
 import { captionEfectivo } from './imagenCaption'
 import { normalizarTexto } from '@/lib/utils/normalizarTexto'
+import { calcularNumerosDeFigura } from './numerosDeFigura'
 
 type ProyectoConCliente = Proyecto & { cliente: Cliente | null }
 
@@ -47,6 +48,13 @@ export interface ConstruirDataBagOpciones {
  * Exactamente un nivel por imagen: si `tareaRef` está presente, filtra SOLO
  * por tareaRef (ignora subItemRef); si no, filtra por subItemRef excluyendo
  * las que sí tienen tareaRef (esas pertenecen a una tarea, no al subItem).
+ *
+ * El caption sale prefijado "Figura {n}." (como los planes manuales del
+ * cliente) usando `numerosDeFigura` — precalculado UNA vez por
+ * `calcularNumerosDeFigura` (numerosDeFigura.ts), compartido con la vista de
+ * lectura de la app para que el número coincida siempre con el del docx. El
+ * organigrama y los gráficos de histograma no tienen tag `{caption}` en la
+ * plantilla, así que no entran en esta numeración.
  */
 function construirImagenesDeNodo(
   edtRef: string,
@@ -54,7 +62,8 @@ function construirImagenesDeNodo(
   tareaRef: string | undefined,
   nombreDefault: string,
   imagenesAlcance: PlanTrabajoImagen[],
-  imagenesResueltas: Map<string, ImagenResueltaTag | null>
+  imagenesResueltas: Map<string, ImagenResueltaTag | null>,
+  numerosDeFigura: Map<string, number>
 ): { img: ImagenResueltaTag; caption: string }[] {
   return imagenesAlcance
     .filter(img => {
@@ -63,34 +72,19 @@ function construirImagenesDeNodo(
       return !img.tareaRef && (img.subItemRef ?? undefined) === subItemRef
     })
     .sort((a, b) => a.orden - b.orden)
-    .map(img => ({
-      // NUNCA null acá — un {%img} con valor null/falsy rompe doc.renderAsync
-      // (ver IMAGEN_PLACEHOLDER en exportDocx.ts). Imagen inaccesible en Drive
-      // → placeholder 1x1, mismo resultado visual que antes.
-      img: imagenesResueltas.get(img.id) ?? IMAGEN_PLACEHOLDER,
-      // Migración suave (Bloque 4.2, Tarea 1): si el caption persistido es el
-      // filename subido, se sustituye por el nombre de la actividad/EDT/tarea.
-      caption: captionEfectivo(img, nombreDefault),
-    }))
-}
-
-/**
- * Prefija cada caption con "Figura {n}." correlativo (como los planes
- * manuales del cliente) — `contador` es COMPARTIDO por todas las llamadas de
- * un mismo export, así la numeración es global a todo el documento y no se
- * reinicia por EDT/subItem/tarea. Determinista, cero IA (tarea menor, Bloque
- * 4.2 sesión 3). Solo numera las imágenes del alcance detallado — el
- * organigrama y los gráficos de histograma no tienen tag `{caption}` en la
- * plantilla, así que no hay dónde insertarles un número de figura.
- */
-function numerarFiguras(
-  imgs: { img: ImagenResueltaTag; caption: string }[],
-  contador: { n: number }
-): { img: ImagenResueltaTag; caption: string }[] {
-  return imgs.map(item => {
-    contador.n += 1
-    return { img: item.img, caption: `Figura ${contador.n}. ${item.caption}` }
-  })
+    .map(img => {
+      const captionBase = captionEfectivo(img, nombreDefault)
+      const numeroFigura = numerosDeFigura.get(img.id)
+      return {
+        // NUNCA null acá — un {%img} con valor null/falsy rompe doc.renderAsync
+        // (ver IMAGEN_PLACEHOLDER en exportDocx.ts). Imagen inaccesible en Drive
+        // → placeholder 1x1, mismo resultado visual que antes.
+        img: imagenesResueltas.get(img.id) ?? IMAGEN_PLACEHOLDER,
+        // Migración suave (Bloque 4.2, Tarea 1): si el caption persistido es el
+        // filename subido, se sustituye por el nombre de la actividad/EDT/tarea.
+        caption: numeroFigura ? `Figura ${numeroFigura}. ${captionBase}` : captionBase,
+      }
+    })
 }
 
 function fmtDate(d: Date | string | null | undefined): string {
@@ -268,11 +262,13 @@ export function construirDataBag({
 
   const totalHH = calcularTotalHH(histogramas)
 
-  // Contador compartido para "Figura {n}." — recorre el alcance detallado en
-  // el MISMO orden que la plantilla lo renderiza (tareas → imagenesSubItem →
-  // imagenes de EDT, EDT tras EDT), así el número coincide con el orden real
-  // de aparición en el docx.
-  const contadorFigura = { n: 0 }
+  // Números de "Figura {n}." — compartidos con la vista de lectura de la app
+  // (ver numerosDeFigura.ts) para que el número que ve el usuario coincida
+  // siempre con el del docx exportado.
+  const alcanceDetalladoNuevoFormato = alcanceDetallado.filter(
+    (a): a is PlanAlcanceDetalladoEdt => 'edtNombre' in a && Boolean((a as PlanAlcanceDetalladoEdt).edtNombre)
+  )
+  const numerosDeFigura = calcularNumerosDeFigura(alcanceDetalladoNuevoFormato, imagenesAlcance)
 
   return {
     // ─── Cabecera y carátula (BD, sin IA) ───
@@ -383,11 +379,6 @@ export function construirDataBag({
           // dentro de {#subItems}; renombrarlos hacía que docxtemplater, al no encontrar
           // el tag en el subItem, resolviera contra el scope del EDT padre (numeracion/
           // descripcion clonados, actividadNombre vacío) — causa raíz del bug auditado.
-          //
-          // El orden en que se ESCRIBEN estas dos propiedades (subItems antes que
-          // imagenes) importa: numerarFiguras() muta un contador compartido, y debe
-          // recorrer las imágenes en el MISMO orden que la plantilla las renderiza
-          // (tareas → imagenesSubItem de cada subItem, y recién al final las del EDT).
           subItems: (n.subItems ?? []).map(s => ({
             numeracion: s.numeracion,
             actividadNombre: s.actividadNombre,
@@ -404,7 +395,7 @@ export function construirDataBag({
             tareas: (s.tareas ?? []).filter(t => !t.excluida).map(t => ({
               texto: t.texto || t.nombre,
               imagenes: n.edtRefId && t.tareaRefId
-                ? numerarFiguras(construirImagenesDeNodo(n.edtRefId, undefined, t.tareaRefId, t.nombre, imagenesAlcance, imagenesResueltas), contadorFigura)
+                ? construirImagenesDeNodo(n.edtRefId, undefined, t.tareaRefId, t.nombre, imagenesAlcance, imagenesResueltas, numerosDeFigura)
                 : [],
             })),
             // Plantilla v6 (Bloque 4.2 sesión 2, micro-fix): loop propio
@@ -412,10 +403,10 @@ export function construirDataBag({
             // {#imagenes} anidado en cada tarea — mismo nivel/filtro que antes
             // (subItemRef sin tareaRef), solo cambia el nombre del tag.
             imagenesSubItem: n.edtRefId && s.actividadRefId
-              ? numerarFiguras(construirImagenesDeNodo(n.edtRefId, s.actividadRefId, undefined, s.actividadNombre, imagenesAlcance, imagenesResueltas), contadorFigura)
+              ? construirImagenesDeNodo(n.edtRefId, s.actividadRefId, undefined, s.actividadNombre, imagenesAlcance, imagenesResueltas, numerosDeFigura)
               : [],
           })),
-          imagenes: n.edtRefId ? numerarFiguras(construirImagenesDeNodo(n.edtRefId, undefined, undefined, n.edtNombre, imagenesAlcance, imagenesResueltas), contadorFigura) : [],
+          imagenes: n.edtRefId ? construirImagenesDeNodo(n.edtRefId, undefined, undefined, n.edtNombre, imagenesAlcance, imagenesResueltas, numerosDeFigura) : [],
         }
       }
       const l = a as PlanAlcanceItem

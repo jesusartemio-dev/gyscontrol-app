@@ -1,6 +1,7 @@
 import type { PlanTrabajo, PlanTrabajoImagen } from '@prisma/client'
 import type { PlanAlcanceDetalladoEdt, PlanAlcanceItem } from '@/types/planTrabajo'
 import { captionEfectivo } from '@/lib/planTrabajo/imagenCaption'
+import { calcularNumerosDeFigura } from '@/lib/planTrabajo/numerosDeFigura'
 import { ImagenConLightbox } from '@/components/catalogoImagenes/ImagenConLightbox'
 import { HintFotoSugerida } from '@/components/catalogoImagenes/HintFotoSugerida'
 
@@ -26,6 +27,7 @@ function GaleriaSoloLectura({
   subItemRef,
   tareaRef,
   imagenes,
+  numerosDeFigura,
 }: {
   proyectoId: string
   edtRef: string
@@ -33,6 +35,8 @@ function GaleriaSoloLectura({
   /** tareaRefId de la tarea (Bloque 4.2 sesión 2, Tarea 3) — si está presente, filtra SOLO por tareaRef. */
   tareaRef?: string
   imagenes: PlanTrabajoImagen[]
+  /** id de imagen -> número de Figura (Bloque 4.2 sesión 3) — el MISMO que sale en el docx exportado. */
+  numerosDeFigura: Map<string, number>
 }) {
   const propias = imagenes
     .filter(img => {
@@ -46,18 +50,22 @@ function GaleriaSoloLectura({
 
   return (
     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-      {propias.map(img => (
-        <figure key={img.id} className="border rounded overflow-hidden bg-gray-50">
-          <ImagenConLightbox
-            src={`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes/${img.id}/contenido`}
-            alt={captionEfectivo(img, '')}
-            alturaClase="h-24"
-          />
-          <figcaption className="text-[10px] text-gray-600 px-1 py-0.5 truncate" title={captionEfectivo(img, '')}>
-            {captionEfectivo(img, '')}
-          </figcaption>
-        </figure>
-      ))}
+      {propias.map(img => {
+        const n = numerosDeFigura.get(img.id)
+        const caption = n ? `Figura ${n}. ${captionEfectivo(img, '')}` : captionEfectivo(img, '')
+        return (
+          <figure key={img.id} className="border rounded overflow-hidden bg-gray-50">
+            <ImagenConLightbox
+              src={`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes/${img.id}/contenido`}
+              alt={caption}
+              alturaClase="h-24"
+            />
+            <figcaption className="text-[10px] text-gray-600 px-1 py-0.5 truncate" title={caption}>
+              {caption}
+            </figcaption>
+          </figure>
+        )
+      })}
     </div>
   )
 }
@@ -70,6 +78,8 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
 
   if (todosNuevoFormato) {
     const items = raw as PlanAlcanceDetalladoEdt[]
+    // Mismos números "Figura N." que salen en el docx exportado (Bloque 4.2 sesión 3).
+    const numerosDeFigura = calcularNumerosDeFigura(items, imagenes)
 
     // Agrupar por faseNombre manteniendo orden de aparición
     const grupos: Record<string, PlanAlcanceDetalladoEdt[]> = {}
@@ -111,7 +121,7 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
                   )}
                   {item.tipoDetalle === 'detallado' && item.edtRefId && (
                     <div className="ml-8">
-                      <GaleriaSoloLectura proyectoId={proyectoId} edtRef={item.edtRefId} imagenes={imagenes} />
+                      <GaleriaSoloLectura proyectoId={proyectoId} edtRef={item.edtRefId} imagenes={imagenes} numerosDeFigura={numerosDeFigura} />
                     </div>
                   )}
                   {(item.subItems ?? []).length > 0 && (
@@ -154,6 +164,7 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
                                           edtRef={item.edtRefId ?? ''}
                                           tareaRef={tarea.tareaRefId}
                                           imagenes={imagenes}
+                                          numerosDeFigura={numerosDeFigura}
                                         />
                                       </div>
                                     )}
@@ -168,6 +179,7 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
                               edtRef={item.edtRefId ?? ''}
                               subItemRef={sub.actividadRefId}
                               imagenes={imagenes}
+                              numerosDeFigura={numerosDeFigura}
                             />
                           )}
                         </div>
