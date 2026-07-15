@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, Trash2, Upload, ChevronUp, ChevronDown, ImageIcon, LibraryBig, Search } from 'lucide-react'
+import { Loader2, Trash2, Upload, ChevronUp, ChevronDown, ImageIcon, LibraryBig, Search, Sparkles, Check } from 'lucide-react'
 import type { PlanTrabajoImagen, CatalogoImagen } from '@prisma/client'
 import { captionEfectivo } from '@/lib/planTrabajo/imagenCaption'
 import { matchearSugerenciasCatalogoImagen } from '@/lib/catalogoImagenes/matchearSugerencias'
@@ -163,6 +163,24 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
     }
   }
 
+  /** Confirma una sugerencia de IA (origen IA_AUTO -> CONFIRMADA, Bloque 4.2 sesión 4). */
+  const handleConfirmar = async (imagenId: string) => {
+    setProcesandoId(imagenId)
+    try {
+      const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes/${imagenId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ origen: 'CONFIRMADA' }),
+      })
+      if (!res.ok) throw new Error('Error al confirmar la imagen')
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al confirmar la imagen')
+    } finally {
+      setProcesandoId(null)
+    }
+  }
+
   const handleCaption = async (imagenId: string, caption: string) => {
     try {
       const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes/${imagenId}`, {
@@ -263,13 +281,23 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
         <p className="text-[11px] text-muted-foreground italic">Sin imágenes adjuntas.</p>
       ) : (
         <div className="grid grid-cols-2 gap-2">
-          {propias.map((img, idx) => (
-            <div key={img.id} className="border rounded overflow-hidden bg-gray-50">
-              <ImagenConLightbox
-                src={`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes/${img.id}/contenido`}
-                alt={img.caption ?? img.nombreArchivo}
-                alturaClase="h-28"
-              />
+          {propias.map((img, idx) => {
+            const esSugeridaIA = img.origen === 'IA_AUTO'
+            return (
+            <div key={img.id} className={`border rounded overflow-hidden bg-gray-50 ${esSugeridaIA ? 'border-amber-300 ring-1 ring-amber-200' : ''}`}>
+              <div className="relative">
+                <ImagenConLightbox
+                  src={`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes/${img.id}/contenido`}
+                  alt={img.caption ?? img.nombreArchivo}
+                  alturaClase="h-28"
+                  className={esSugeridaIA ? 'opacity-80' : ''}
+                />
+                {esSugeridaIA && (
+                  <Badge variant="outline" className="absolute top-1 left-1 text-[9px] gap-1 bg-amber-50 border-amber-300 text-amber-800">
+                    <Sparkles size={9} /> Sugerida por IA
+                  </Badge>
+                )}
+              </div>
               <div className="p-1.5 space-y-1">
                 <Input
                   defaultValue={captionEfectivo(img, nombreDefault)}
@@ -286,13 +314,21 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
                       <ChevronDown size={11} />
                     </Button>
                   </div>
-                  <Button type="button" variant="ghost" size="sm" className="h-5 w-5 p-0 text-red-500" disabled={procesandoId === img.id} onClick={() => handleDelete(img.id)}>
-                    {procesandoId === img.id ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
-                  </Button>
+                  <div className="flex gap-0.5">
+                    {esSugeridaIA && (
+                      <Button type="button" variant="ghost" size="sm" className="h-5 w-5 p-0 text-emerald-600" title="Confirmar" disabled={procesandoId === img.id} onClick={() => handleConfirmar(img.id)}>
+                        <Check size={11} />
+                      </Button>
+                    )}
+                    <Button type="button" variant="ghost" size="sm" className="h-5 w-5 p-0 text-red-500" title={esSugeridaIA ? 'Quitar sugerencia' : 'Eliminar'} disabled={procesandoId === img.id} onClick={() => handleDelete(img.id)}>
+                      {procesandoId === img.id ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

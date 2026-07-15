@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Trash2, PlusCircle, ChevronUp, ChevronDown, EyeOff, ListChecks, ImageIcon, Camera } from 'lucide-react'
+import { Plus, Trash2, PlusCircle, ChevronUp, ChevronDown, EyeOff, ListChecks, ImageIcon, Camera, Sparkles } from 'lucide-react'
 import { GaleriaImagenesAlcance, type GaleriaImagenesAlcanceHandle } from './GaleriaImagenesAlcance'
 import { HintFotoSugerida } from '@/components/catalogoImagenes/HintFotoSugerida'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
@@ -64,7 +64,9 @@ function contarEstadoEdt(item: PlanAlcanceDetalladoEdt, imagenes: PlanTrabajoIma
   }
 
   const totalImagenes = edtRef ? imagenes.filter(img => img.edtRef === edtRef).length : 0
-  return { tareas, imagenes: totalImagenes, fotosPendientes }
+  // Sugerencias de imagen de IA pendientes de revisión (Bloque 4.2 sesión 4).
+  const sugeridasIA = edtRef ? imagenes.filter(img => img.edtRef === edtRef && img.origen === 'IA_AUTO').length : 0
+  return { tareas, imagenes: totalImagenes, fotosPendientes, sugeridasIA }
 }
 
 export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos, imagenes, onImagenesChanged, onSave, onCancel }: Props) {
@@ -85,6 +87,29 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
     ...herramientasYEquipos.herramientas,
     ...herramientasYEquipos.materiales,
   ].map(h => h.nombre)
+
+  // "Confirmar todas" / "Quitar todas" las sugerencias de imagen de IA de un
+  // EDT completo (Bloque 4.2 sesión 4) — reutiliza los mismos endpoints que
+  // cada imagen individual, en paralelo.
+  const confirmarTodasSugeridas = async (edtRefId: string) => {
+    const pendientes = imagenes.filter(img => img.edtRef === edtRefId && img.origen === 'IA_AUTO')
+    await Promise.all(pendientes.map(img =>
+      fetch(`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes/${img.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ origen: 'CONFIRMADA' }),
+      })
+    ))
+    await onImagenesChanged()
+  }
+
+  const quitarTodasSugeridas = async (edtRefId: string) => {
+    const pendientes = imagenes.filter(img => img.edtRef === edtRefId && img.origen === 'IA_AUTO')
+    await Promise.all(pendientes.map(img =>
+      fetch(`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes/${img.id}`, { method: 'DELETE' })
+    ))
+    await onImagenesChanged()
+  }
 
   const updateItem = (idx: number, patch: Partial<PlanAlcanceDetalladoEdt>) =>
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it))
@@ -206,6 +231,11 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                             <Camera size={10} /> {estado.fotosPendientes}
                           </Badge>
                         )}
+                        {estado.sugeridasIA > 0 && (
+                          <Badge variant="outline" className="text-[10px] gap-1 font-normal text-indigo-700 border-indigo-300 bg-indigo-50">
+                            <Sparkles size={10} /> {estado.sugeridasIA}
+                          </Badge>
+                        )}
                       </div>
                     )}
                   </div>
@@ -237,6 +267,22 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                           <Input value={item.faseAbreviatura} onChange={e => updateItem(edtIdx, { faseAbreviatura: e.target.value })} className="h-8 text-sm" placeholder="EJEC" />
                         </div>
                       </div>
+                    </>
+                  )}
+                  {item.edtRefId && estado.sugeridasIA > 0 && (
+                    <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
+                      <Sparkles size={12} className="shrink-0" />
+                      <span className="flex-1">{estado.sugeridasIA} imagen{estado.sugeridasIA > 1 ? 'es' : ''} sugerida{estado.sugeridasIA > 1 ? 's' : ''} por IA pendiente{estado.sugeridasIA > 1 ? 's' : ''} de revisión</span>
+                      <Button type="button" variant="outline" size="sm" className="h-6 text-[10px] px-2 bg-white" onClick={() => confirmarTodasSugeridas(item.edtRefId!)}>
+                        Confirmar todas
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" className="h-6 text-[10px] px-2 bg-white text-red-600" onClick={() => quitarTodasSugeridas(item.edtRefId!)}>
+                        Quitar todas
+                      </Button>
+                    </div>
+                  )}
+                  {!item.edtRefId && (
+                    <>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <Label className="text-xs">Nombre EDT</Label>
