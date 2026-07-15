@@ -1,6 +1,6 @@
 import { construirDataBag } from '@/lib/planTrabajo/construirDataBag'
 import type { ImagenResueltaTag } from '@/lib/planTrabajo/exportDocx'
-import type { PlanAlcanceDetalladoEdt } from '@/types/planTrabajo'
+import type { PlanAlcanceDetalladoEdt, PlanHistogramas } from '@/types/planTrabajo'
 import type { PlanTrabajo, Cliente, Proyecto, PlanTrabajoImagen } from '@prisma/client'
 
 /**
@@ -334,5 +334,45 @@ describe('construirDataBag — tareas excluidas del plan (Bloque 4.2 sesión 3)'
       'Desenergizar y bloquear la alimentación mediante dispositivos DAE.',
       'Verificar ausencia de tensión con multímetro certificado.',
     ])
+  })
+})
+
+/**
+ * Capa dataBag/export para el histograma de equipo (informe §13, Bug 2):
+ * `construirDataBag` es un passthrough — el `total` que llega a la plantilla
+ * es exactamente el `total` que ya calculó `calcularHistogramasYCronograma`
+ * (Etapa 1), sin recalcular nada. Este test fija ese contrato con un fixture
+ * REALISTA (no `histogramas: null` como el resto del archivo) para que un
+ * futuro refactor de construirDataBag no reintroduzca una suma silenciosa —
+ * antes, ningún test tocaba este dato con valores que distinguieran
+ * "suma de meses activos" de "pico real de personas" (12 tests verdes con un
+ * docx roto, ver informe §13).
+ */
+describe('construirDataBag — histogramaEquipo (dataBag/export layer)', () => {
+  it('el total que llega al tag {total} de la plantilla es el pico real, no la suma de meses activos', () => {
+    const histogramas: PlanHistogramas = {
+      meses: ['2026-07', '2026-08', '2026-09'],
+      equipoTrabajo: [
+        { etiqueta: 'Procura', valoresPorMes: [1, 1, 0], total: 1 }, // ya viene correcto de Etapa 1
+        { etiqueta: 'Construccion', valoresPorMes: [0, 3, 4], total: 4 },
+      ],
+      horasHombre: [
+        { etiqueta: 'Procura', valoresPorMes: [50, 50, 0], total: 100 },
+        { etiqueta: 'Construccion', valoresPorMes: [0, 184, 184], total: 368 },
+      ],
+    }
+
+    const plan = planFixture([])
+    ;(plan as unknown as { histogramas: unknown }).histogramas = histogramas as unknown as PlanTrabajo['histogramas']
+
+    const dataBag = construirDataBag({ plan, proyecto: proyectoFixture, organigramaPngBase64: '' })
+    const histogramaEquipo = dataBag.histogramaEquipo as { etiqueta: string; total: number }[]
+    const histogramaHH = dataBag.histogramaHH as { etiqueta: string; total: number }[]
+
+    expect(histogramaEquipo.find(f => f.etiqueta === 'Procura')!.total).toBe(1)
+    expect(histogramaEquipo.find(f => f.etiqueta === 'Construccion')!.total).toBe(4)
+    // Regresión: el histograma de HH sigue siendo una suma, y totalHH sigue coincidiendo.
+    expect(histogramaHH.reduce((s, f) => s + f.total, 0)).toBe(468)
+    expect(dataBag.totalHH).toBe(468)
   })
 })

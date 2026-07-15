@@ -191,6 +191,8 @@ interface EdtParaCronograma {
   fechaFinPlan: Date | null
   horasPlan: number | null
   actividades: { nombre: string }[]
+  /** Tareas reales del EDT (todas las actividades aplanadas) — fuente del pico de dotación de `equipoTrabajo` (informe §13, bug de histograma fabricado). */
+  tareasConFecha: { personasEstimadas: number; fechaInicio: Date; fechaFin: Date }[]
 }
 
 /** "" si no hay actividades, el nombre si hay 1, "{n} actividades" si hay varias (nunca vacío — addendum E). */
@@ -216,11 +218,16 @@ function mesesEntre(inicio: Date, fin: Date): string[] {
 }
 
 /**
- * histogramaEquipo/HH y cronogramaResumen — mapeo directo desde ProyectoEdt
+ * histogramaHH y cronogramaResumen — mapeo directo desde ProyectoEdt
  * (una fila por EDT, granularidad elegida para GARANTIZAR que totalHH ==
  * Σ histogramaHH[].total == Σ cronogramaResumen[].horasPlan, ya que las tres
  * cifras derivan del mismo conjunto de EDTs con fecha y del mismo horasPlan
  * — informe §4.2, causa raíz de las cifras de HH incoherentes).
+ * `equipoTrabajo` (dotación de personas) es una granularidad DISTINTA: baja
+ * hasta la tarea real (`personasEstimadas`) para poder calcular un pico real
+ * por mes — ver comentario de `equipoTrabajo` más abajo (informe §13, bug de
+ * histograma fabricado: antes era un flag binario de actividad del EDT, no
+ * una cantidad de personas).
  * EDTs sin fechaInicioPlan/fechaFinPlan se excluyen (no se pueden ubicar en
  * un mes) y generan una advertencia — nunca se inventan fechas.
  */
@@ -238,6 +245,9 @@ export function calcularHistogramasYCronograma(
       fechaFinPlan: e.fechaFinPlan,
       horasPlan: e.horasPlan,
       actividades: e.actividades.map(a => ({ nombre: a.nombre })),
+      tareasConFecha: e.actividades.flatMap(a =>
+        a.tareas.map(t => ({ personasEstimadas: t.personasEstimadas, fechaInicio: t.fechaInicio, fechaFin: t.fechaFin }))
+      ),
     }))
   )
 
@@ -263,10 +273,32 @@ export function calcularHistogramasYCronograma(
       )
     : []
 
+  // Pico de dotación real por mes (informe §13, bug de histograma fabricado):
+  // antes `valoresPorMes` era un flag binario "¿el EDT está activo este mes?"
+  // (0/1) y `total` era la SUMA de esos flags — es decir, un Gantt codificado
+  // en unos y ceros, nunca una cantidad de personas (la columna "MÁX." de la
+  // plantilla mentía). Ahora, para cada mes en que el EDT está activo (mismo
+  // gate que siempre, por fechaInicioPlan/fechaFinPlan — no se toca, sigue
+  // gobernando `meses`/`horasHombre`/`cronogramaResumen`), el valor es el
+  // MÁXIMO real de `personasEstimadas` entre las tareas de ese EDT cuya
+  // fechaInicio/fechaFin se solapan con ese mes. Si el EDT está activo ese
+  // mes pero ninguna tarea suya tiene fechas que lo cubran, el valor es 0
+  // (nunca se asume/hereda 1 — ver informe §13, "prohibido cualquier
+  // fallback"). `total` pasa a ser el máximo de la fila, no la suma — así el
+  // rótulo estático "MÁX." de la plantilla queda correcto sin tocarla.
   const equipoTrabajo = edtsConFecha.map(e => {
     const mesesEdt = new Set(mesesEntre(e.fechaInicioPlan, e.fechaFinPlan))
-    const valoresPorMes: number[] = meses.map(m => (mesesEdt.has(m) ? 1 : 0))
-    return { etiqueta: e.nombre, valoresPorMes, total: valoresPorMes.reduce((s, v) => s + v, 0) }
+    const tareasConMeses = e.tareasConFecha.map(t => ({
+      personasEstimadas: t.personasEstimadas,
+      meses: new Set(mesesEntre(t.fechaInicio, t.fechaFin)),
+    }))
+    const valoresPorMes: number[] = meses.map(m => {
+      if (!mesesEdt.has(m)) return 0
+      return tareasConMeses
+        .filter(t => t.meses.has(m))
+        .reduce((max, t) => Math.max(max, t.personasEstimadas ?? 0), 0)
+    })
+    return { etiqueta: e.nombre, valoresPorMes, total: valoresPorMes.reduce((max, v) => Math.max(max, v), 0) }
   })
 
   const horasHombre = edtsConFecha.map(e => {

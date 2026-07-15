@@ -12,10 +12,18 @@ import { asegurarFontconfigParaHistogramas, FUENTE_HISTOGRAMAS } from './configu
  * colores planos, sin librería de gráficos externa.
  *
  * Nota de datos: cada fila de `equipoTrabajo`/`horasHombre` es UN EDT (no un
- * cargo/persona individual — así se calculan en calcularDatos.ts a propósito,
- * para garantizar que totalHH == Σ histograma == Σ cronograma). Por eso la
- * "leyenda" de estos gráficos son EDTs, no cargos — no existe en el schema
- * un desglose real de HH por persona/cargo y mes, así que no se inventa uno.
+ * cargo/persona individual). Por eso la "leyenda" de estos gráficos son EDTs,
+ * no cargos.
+ *
+ * Corrección (informe §13): este comentario decía antes que "no existe en el
+ * schema un desglose real de HH por persona/cargo y mes" — es falso.
+ * `ProyectoTarea` tiene `personasEstimadas` (Int, NOT NULL) y
+ * `fechaInicio`/`fechaFin` (NOT NULL) reales, y `calcularHistogramasYCronograma`
+ * (calcularDatos.ts) ya calcula `equipoTrabajo` como el pico real de
+ * `personasEstimadas` por EDT y mes (Math.max sobre las tareas activas ese
+ * mes), no una suma de flags de actividad. `horasHombre` sigue siendo
+ * un mapeo por EDT (no por persona/cargo) a propósito, para garantizar que
+ * totalHH == Σ histograma == Σ cronograma (mismo motivo de siempre).
  */
 
 const ANCHO = 900
