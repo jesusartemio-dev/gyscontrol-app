@@ -10,10 +10,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Trash2, PlusCircle, ChevronUp, ChevronDown, EyeOff, ListChecks, ImageIcon, Camera, Sparkles } from 'lucide-react'
+import { Plus, Trash2, PlusCircle, ChevronUp, ChevronDown, EyeOff, ListChecks, ImageIcon, Camera, Sparkles, Lock } from 'lucide-react'
 import { GaleriaImagenesAlcance, type GaleriaImagenesAlcanceHandle } from './GaleriaImagenesAlcance'
 import { HintFotoSugerida } from '@/components/catalogoImagenes/HintFotoSugerida'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
+import { RegenerarEdtDialog } from './RegenerarEdtDialog'
 import type { PlanTrabajoImagen } from '@prisma/client'
 import type { PlanHerramientasYEquipos } from '@/types/planTrabajo'
 
@@ -114,6 +115,16 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
   const updateItem = (idx: number, patch: Partial<PlanAlcanceDetalladoEdt>) =>
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it))
 
+  // Regenerar SOLO un EDT (Bloque 4.2 sesión 5) — reemplaza únicamente ese
+  // EDT en el estado local por el que devolvió el servidor; los demás EDTs
+  // (incluidas sus ediciones locales sin guardar) no se tocan.
+  const handleEdtRegenerado = (edtFresco: PlanAlcanceDetalladoEdt) =>
+    setItems(prev => prev.map(it => it.edtRefId === edtFresco.edtRefId ? edtFresco : it))
+
+  const marcarDescripcionEditada = (edtIdx: number, texto: string) =>
+    updateItem(edtIdx, { descripcion: texto, descripcionEditadaManualmente: true })
+  const liberarDescripcionEdt = (edtIdx: number) => updateItem(edtIdx, { descripcionEditadaManualmente: false })
+
   const addEdt = () => setItems(prev => [...prev, edtVacio()])
 
   const removeEdt = (idx: number) =>
@@ -132,6 +143,11 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
       const subs = (it.subItems ?? []).map((s, si) => si === subIdx ? { ...s, ...patch } : s)
       return { ...it, subItems: subs }
     }))
+
+  const marcarDescripcionSubItemEditada = (edtIdx: number, subIdx: number, texto: string) =>
+    updateSubItem(edtIdx, subIdx, { descripcion: texto, descripcionEditadaManualmente: true })
+  const liberarDescripcionSubItem = (edtIdx: number, subIdx: number) =>
+    updateSubItem(edtIdx, subIdx, { descripcionEditadaManualmente: false })
 
   const removeSubItem = (edtIdx: number, subIdx: number) =>
     setItems(prev => prev.map((it, i) => {
@@ -163,6 +179,15 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
 
   const restaurarTarea = (edtIdx: number, subIdx: number, tareaIdx: number) =>
     updateTarea(edtIdx, subIdx, tareaIdx, { excluida: false })
+
+  // Protección de texto editado a mano (Bloque 4.2 sesión 5) — una regeneración
+  // posterior preserva por defecto cualquier viñeta marcada así (ver
+  // aplicarAlcanceDeRegeneracion.ts); "Liberar" la deja disponible de nuevo
+  // para que la IA la reescriba, sin cambiar el texto actual.
+  const marcarTextoTareaEditado = (edtIdx: number, subIdx: number, tareaIdx: number, texto: string) =>
+    updateTarea(edtIdx, subIdx, tareaIdx, { texto, textoEditadoManualmente: true })
+  const liberarTextoTarea = (edtIdx: number, subIdx: number, tareaIdx: number) =>
+    updateTarea(edtIdx, subIdx, tareaIdx, { textoEditadoManualmente: false })
 
   // Reordena viñetas — el orden del cronograma no siempre es el orden
   // narrativo deseado. Salta tareas ocultas (excluida) al buscar el vecino,
@@ -250,6 +275,12 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                       <span><span className="text-gray-400">Código</span> <span className="font-mono text-gray-700">{item.edtCodigo}</span></span>
                       <span><span className="text-gray-400">Fase</span> <span className="text-gray-700">{item.faseNombre} ({item.faseAbreviatura})</span></span>
                       <span className="text-gray-700 font-medium">{item.edtNombre}</span>
+                      <RegenerarEdtDialog
+                        proyectoId={proyectoId}
+                        edtRefId={item.edtRefId}
+                        nombreEdt={item.edtNombre}
+                        onRegenerado={handleEdtRegenerado}
+                      />
                     </div>
                   ) : (
                     <>
@@ -323,8 +354,20 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                     </div>
                   </div>
                   <div>
-                    <Label className="text-xs">Descripción narrativa</Label>
-                    <Textarea value={item.descripcion} onChange={e => updateItem(edtIdx, { descripcion: e.target.value })} rows={4} className="text-sm resize-none" placeholder="Párrafo narrativo de 80-150 palabras describiendo el flujo de trabajo..." />
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Descripción narrativa</Label>
+                      {item.descripcionEditadaManualmente && (
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 text-[10px] text-amber-700 hover:text-amber-800"
+                          title="Editado a mano — se conservará al regenerar este EDT"
+                          onClick={() => liberarDescripcionEdt(edtIdx)}
+                        >
+                          <Lock size={10} /> Editado a mano · <span className="underline">Liberar</span>
+                        </button>
+                      )}
+                    </div>
+                    <Textarea value={item.descripcion} onChange={e => marcarDescripcionEditada(edtIdx, e.target.value)} rows={4} className="text-sm resize-none" placeholder="Párrafo narrativo de 80-150 palabras describiendo el flujo de trabajo..." />
                   </div>
 
                   {item.tipoDetalle === 'detallado' && item.edtRefId && (
@@ -375,7 +418,17 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                               <Trash2 size={12} />
                             </Button>
                           </div>
-                          <Textarea value={sub.descripcion} onChange={e => updateSubItem(edtIdx, subIdx, { descripcion: e.target.value })} rows={3} className="text-xs resize-none" placeholder="Descripción narrativa de la actividad..." />
+                          {sub.descripcionEditadaManualmente && (
+                            <button
+                              type="button"
+                              className="flex items-center gap-1 text-[10px] text-amber-700 hover:text-amber-800"
+                              title="Editado a mano — se conservará al regenerar este EDT"
+                              onClick={() => liberarDescripcionSubItem(edtIdx, subIdx)}
+                            >
+                              <Lock size={10} /> Editado a mano · <span className="underline">Liberar</span>
+                            </button>
+                          )}
+                          <Textarea value={sub.descripcion} onChange={e => marcarDescripcionSubItemEditada(edtIdx, subIdx, e.target.value)} rows={3} className="text-xs resize-none" placeholder="Descripción narrativa de la actividad..." />
 
                           {(sub.tareas ?? []).length > 0 && (() => {
                             const conIndice = (sub.tareas ?? []).map((tarea, tareaIdx) => ({ tarea, tareaIdx }))
@@ -395,11 +448,21 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                         <span className="text-[10px] text-muted-foreground mt-1.5 shrink-0">•</span>
                                         <Textarea
                                           value={tarea.texto}
-                                          onChange={e => updateTarea(edtIdx, subIdx, tareaIdx, { texto: e.target.value })}
+                                          onChange={e => marcarTextoTareaEditado(edtIdx, subIdx, tareaIdx, e.target.value)}
                                           rows={1}
                                           className="text-xs resize-none min-h-0 py-1"
                                           placeholder={tarea.nombre}
                                         />
+                                        {tarea.textoEditadoManualmente && (
+                                          <button
+                                            type="button"
+                                            className="flex items-center shrink-0 mt-1.5 text-amber-700 hover:text-amber-800"
+                                            title="Editado a mano — se conservará al regenerar. Click para liberar."
+                                            onClick={() => liberarTextoTarea(edtIdx, subIdx, tareaIdx)}
+                                          >
+                                            <Lock size={11} />
+                                          </button>
+                                        )}
                                         {item.tipoDetalle === 'detallado' && (
                                           <div className="mt-1.5 shrink-0">
                                             <HintFotoSugerida

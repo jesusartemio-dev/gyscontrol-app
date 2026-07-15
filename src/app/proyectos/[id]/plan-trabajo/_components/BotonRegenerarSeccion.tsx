@@ -72,6 +72,16 @@ export function BotonRegenerarSeccion({ seccion, isRegenerando, iaOcupada, onReg
                 </>
               )}
             </p>
+            {seccion === 'alcanceDetallado' && (
+              <div className="flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800">
+                <span>
+                  <strong>Esto reprocesará TODOS los EDTs</strong> (Construcción, Comisionamiento, etc.), incluidas
+                  las descripciones y viñetas ya redactadas. Si solo necesitás actualizar uno, cerrá este diálogo y
+                  usá &quot;Regenerar&quot; a nivel de ese EDT individual desde el editor de Alcance Detallado.
+                  Los textos editados a mano se preservan salvo que los liberes desde el editor antes de regenerar.
+                </span>
+              </div>
+            )}
             {!esEtapa1 && (
               <div className="space-y-1.5">
                 <Label className="text-xs">Instrucciones adicionales (opcional)</Label>
