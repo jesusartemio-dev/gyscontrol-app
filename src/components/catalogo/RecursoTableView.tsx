@@ -29,7 +29,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
   getCostoHoraUSD,
-  calcularCostoRealCuadrilla,
+  calcularCostoRealCuadrillaPorPerfiles,
   calcularCostoRealIndividual,
   formatUSD,
   getConfiguracionCostos,
@@ -97,13 +97,19 @@ function SortableRow({
     transition,
   }
 
+  const esCuadrilla = recurso.tipo === 'cuadrilla'
   const composiciones = recurso.composiciones || []
-  const tienePersonal = composiciones.length > 0
-  const totalPersonas = composiciones.reduce((sum, c) => sum + (c.cantidad ?? 1), 0)
+  const perfiles = recurso.perfiles || []
+  // Cuadrilla: dotación real vive en `perfiles` (recursos individuales × cantidad).
+  // Individual: `composiciones` sigue siendo el pool de empleados de referencia de costo.
+  const tienePersonal = esCuadrilla ? perfiles.length > 0 : composiciones.length > 0
+  const totalPersonas = esCuadrilla
+    ? perfiles.reduce((sum, p) => sum + (p.cantidad ?? 1), 0)
+    : composiciones.reduce((sum, c) => sum + (c.cantidad ?? 1), 0)
 
   const costoReal = tienePersonal
-    ? recurso.tipo === 'cuadrilla'
-      ? calcularCostoRealCuadrilla(composiciones, config)
+    ? esCuadrilla
+      ? calcularCostoRealCuadrillaPorPerfiles(perfiles, config)
       : calcularCostoRealIndividual(composiciones, config)
     : 0
 
@@ -193,20 +199,29 @@ function SortableRow({
             <TooltipTrigger asChild>
               <div className="flex items-center gap-1 cursor-help">
                 <div className="flex -space-x-1">
-                  {composiciones.slice(0, 3).map((comp, idx) => (
-                    <div
-                      key={comp.id || idx}
-                      className={cn(
-                        "w-5 h-5 rounded-full border border-white flex items-center justify-center text-[8px] font-medium",
-                        recurso.tipo === 'cuadrilla' ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
-                      )}
-                    >
-                      {comp.empleado?.user?.name?.charAt(0) || '?'}
-                    </div>
-                  ))}
-                  {composiciones.length > 3 && (
+                  {esCuadrilla ? (
+                    perfiles.slice(0, 3).map((p, idx) => (
+                      <div
+                        key={p.id || idx}
+                        className="w-5 h-5 rounded-full border border-white flex items-center justify-center text-[8px] font-medium bg-purple-100 text-purple-700"
+                        title={p.recursoMiembro?.nombre}
+                      >
+                        {p.recursoMiembro?.nombre?.charAt(0) || '?'}
+                      </div>
+                    ))
+                  ) : (
+                    composiciones.slice(0, 3).map((comp, idx) => (
+                      <div
+                        key={comp.id || idx}
+                        className="w-5 h-5 rounded-full border border-white flex items-center justify-center text-[8px] font-medium bg-blue-100 text-blue-700"
+                      >
+                        {comp.empleado?.user?.name?.charAt(0) || '?'}
+                      </div>
+                    ))
+                  )}
+                  {(esCuadrilla ? perfiles.length : composiciones.length) > 3 && (
                     <div className="w-5 h-5 rounded-full bg-gray-200 border border-white flex items-center justify-center text-[8px] font-medium">
-                      +{composiciones.length - 3}
+                      +{(esCuadrilla ? perfiles.length : composiciones.length) - 3}
                     </div>
                   )}
                 </div>
@@ -218,26 +233,28 @@ function SortableRow({
             <TooltipContent side="right" className="max-w-xs">
               <div className="space-y-1">
                 <p className="font-semibold text-xs mb-2">
-                  {recurso.tipo === 'cuadrilla' ? 'Composición:' : 'Personal asignado:'}
+                  {esCuadrilla ? 'Composición:' : 'Personal asignado:'}
                 </p>
-                {composiciones.map((comp, idx) => {
-                  const costoEmp = getCostoHoraUSD(comp.empleado, config)
-                  const cant = comp.cantidad ?? 1
-                  return (
-                    <div key={comp.id || idx} className="flex items-center justify-between gap-4 text-xs">
+                {esCuadrilla ? (
+                  perfiles.map((p, idx) => (
+                    <div key={p.id || idx} className="flex items-center justify-between gap-4 text-xs">
                       <span>
-                        {cant > 1 && <span className="font-semibold">{cant}× </span>}
-                        {comp.empleado?.user?.name || 'Sin nombre'}
-                      </span>
-                      <span className="text-muted-foreground">
-                        {recurso.tipo === 'cuadrilla'
-                          ? `${comp.rol ? `${comp.rol} · ` : ''}${cant > 1 ? `${cant}×` : ''}${formatUSD(costoEmp)}/h`
-                          : formatUSD(costoEmp) + '/h'
-                        }
+                        {(p.cantidad ?? 1) > 1 && <span className="font-semibold">{p.cantidad}× </span>}
+                        {p.recursoMiembro?.nombre || 'Perfil'}
                       </span>
                     </div>
-                  )
-                })}
+                  ))
+                ) : (
+                  composiciones.map((comp, idx) => {
+                    const costoEmp = getCostoHoraUSD(comp.empleado, config)
+                    return (
+                      <div key={comp.id || idx} className="flex items-center justify-between gap-4 text-xs">
+                        <span>{comp.empleado?.user?.name || 'Sin nombre'}</span>
+                        <span className="text-muted-foreground">{formatUSD(costoEmp)}/h</span>
+                      </div>
+                    )
+                  })
+                )}
               </div>
             </TooltipContent>
           </Tooltip>

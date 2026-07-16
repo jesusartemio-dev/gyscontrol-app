@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react'
 import { Calculator, Save, X, Plus, Trash2, User, UsersRound, Loader2, TrendingUp, TrendingDown, Minus, UserCheck, Building2 } from 'lucide-react'
 import type { Recurso, Empleado } from '@/types'
-import { createRecurso, updateRecurso } from '@/lib/services/recurso'
+import { createRecurso, updateRecurso, getRecursos } from '@/lib/services/recurso'
 import { getEmpleados } from '@/lib/services/empleado'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,7 +29,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
   getCostoHoraUSD,
-  calcularCostoRealCuadrilla,
+  calcularCostoRealCuadrillaPorPerfiles,
   calcularCostoRealIndividual,
   formatUSD,
   getConfiguracionCostos,
@@ -42,6 +42,13 @@ interface ComposicionItem {
   empleado?: Empleado
   cantidad: number
   rol: string
+}
+
+/** Perfil de una cuadrilla: un recurso individual × cantidad (ej. "3× Tecnico") — ver docs/analisis-composicion-recursos.md. */
+interface PerfilItem {
+  recursoMiembroId: string
+  recursoMiembro?: Recurso
+  cantidad: number
 }
 
 interface Props {
@@ -61,9 +68,12 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
   const [porcentajeProyecto, setPorcentajeProyecto] = useState<string>('')
   const [descripcion, setDescripcion] = useState('')
   const [composiciones, setComposiciones] = useState<ComposicionItem[]>([])
+  const [perfiles, setPerfiles] = useState<PerfilItem[]>([])
   const [loading, setLoading] = useState(false)
   const [empleados, setEmpleados] = useState<Empleado[]>([])
   const [loadingEmpleados, setLoadingEmpleados] = useState(false)
+  const [recursosIndividuales, setRecursosIndividuales] = useState<Recurso[]>([])
+  const [loadingRecursos, setLoadingRecursos] = useState(false)
   const [config, setConfig] = useState<ConfiguracionCostos>({
     tipoCambio: DEFAULTS.TIPO_CAMBIO,
     horasSemanales: DEFAULTS.HORAS_SEMANALES,
@@ -74,10 +84,11 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
 
   const isEditing = !!recurso
 
-  // Cargar empleados, configuración y datos del recurso al abrir el modal
+  // Cargar empleados, recursos individuales, configuración y datos del recurso al abrir el modal
   useEffect(() => {
     if (isOpen) {
       loadEmpleados()
+      loadRecursosIndividuales()
       getConfiguracionCostos().then(setConfig)
 
       if (recurso) {
@@ -95,7 +106,7 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
         }
         setDescripcion(recurso.descripcion || '')
 
-        // Cargar composiciones si existen
+        // Cargar composiciones (individual) si existen
         if (recurso.composiciones && recurso.composiciones.length > 0) {
           setComposiciones(
             recurso.composiciones.map(comp => ({
@@ -107,6 +118,19 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
           )
         } else {
           setComposiciones([])
+        }
+
+        // Cargar perfiles (cuadrilla) si existen
+        if (recurso.perfiles && recurso.perfiles.length > 0) {
+          setPerfiles(
+            recurso.perfiles.map(p => ({
+              recursoMiembroId: p.recursoMiembroId,
+              recursoMiembro: p.recursoMiembro,
+              cantidad: p.cantidad ?? 1,
+            }))
+          )
+        } else {
+          setPerfiles([])
         }
       } else {
         // Modo creación: resetear formulario
@@ -124,6 +148,7 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
     setPorcentajeProyecto('35')
     setDescripcion('')
     setComposiciones([])
+    setPerfiles([])
   }
 
   const loadEmpleados = async () => {
@@ -138,9 +163,27 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
     }
   }
 
+  // Recursos individuales activos — son los "perfiles" que puede componer una cuadrilla.
+  const loadRecursosIndividuales = async () => {
+    setLoadingRecursos(true)
+    try {
+      const data = await getRecursos(true)
+      setRecursosIndividuales(data.filter(r => r.tipo === 'individual'))
+    } catch (error) {
+      console.error('Error al cargar recursos individuales:', error)
+    } finally {
+      setLoadingRecursos(false)
+    }
+  }
+
   // Empleados disponibles (no agregados a la composición)
   const empleadosDisponibles = empleados.filter(
     e => !composiciones.some(c => c.empleadoId === e.id)
+  )
+
+  // Recursos individuales disponibles (no agregados ya como perfil de esta cuadrilla)
+  const recursosDisponibles = recursosIndividuales.filter(
+    r => !perfiles.some(p => p.recursoMiembroId === r.id)
   )
 
   const handleAddMember = (empleadoId: string) => {
@@ -165,6 +208,23 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
     ))
   }
 
+  const handleAddPerfil = (recursoMiembroId: string) => {
+    const recursoMiembro = recursosIndividuales.find(r => r.id === recursoMiembroId)
+    if (recursoMiembro) {
+      setPerfiles([...perfiles, { recursoMiembroId, recursoMiembro, cantidad: 1 }])
+    }
+  }
+
+  const handleRemovePerfil = (recursoMiembroId: string) => {
+    setPerfiles(perfiles.filter(p => p.recursoMiembroId !== recursoMiembroId))
+  }
+
+  const handleUpdatePerfilCantidad = (recursoMiembroId: string, cantidad: number) => {
+    setPerfiles(perfiles.map(p =>
+      p.recursoMiembroId === recursoMiembroId ? { ...p, cantidad } : p
+    ))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -178,8 +238,8 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
       return
     }
 
-    if (tipo === 'cuadrilla' && composiciones.length < 2) {
-      toast.error('Una cuadrilla debe tener al menos 2 miembros')
+    if (tipo === 'cuadrilla' && perfiles.length === 0) {
+      toast.error('Una cuadrilla debe tener al menos 1 perfil (ej. "3× Tecnico")')
       return
     }
 
@@ -192,12 +252,14 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
         costoHora,
         costoHoraProyecto: costoHoraProyecto || null,
         descripcion: descripcion.trim() || undefined,
-        // Enviar composiciones para ambos tipos
-        composiciones: composiciones.map(c => ({
-          empleadoId: c.empleadoId,
-          cantidad: tipo === 'cuadrilla' ? c.cantidad : 1,
-          rol: tipo === 'cuadrilla' ? (c.rol || undefined) : undefined,
-        }))
+        // Cada tipo maneja su propia tabla — se envían ambas explícitas
+        // (array vacío incluido) para que un cambio de tipo limpie la otra.
+        composiciones: tipo === 'individual'
+          ? composiciones.map(c => ({ empleadoId: c.empleadoId, cantidad: 1 }))
+          : [],
+        perfiles: tipo === 'cuadrilla'
+          ? perfiles.map(p => ({ recursoMiembroId: p.recursoMiembroId, cantidad: p.cantidad }))
+          : [],
       }
 
       if (isEditing && recurso) {
@@ -249,7 +311,7 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
                 type="button"
                 onClick={() => {
                   setTipo('individual')
-                  if (!isEditing) setComposiciones([])
+                  if (!isEditing) setPerfiles([])
                 }}
                 className={cn(
                   "flex items-center gap-3 p-3 rounded-lg border-2 transition-all",
@@ -277,7 +339,10 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
               </button>
               <button
                 type="button"
-                onClick={() => setTipo('cuadrilla')}
+                onClick={() => {
+                  setTipo('cuadrilla')
+                  if (!isEditing) setComposiciones([])
+                }}
                 className={cn(
                   "flex items-center gap-3 p-3 rounded-lg border-2 transition-all",
                   tipo === 'cuadrilla'
@@ -471,181 +536,251 @@ export default function RecursoModal({ isOpen, onClose, recurso, onCreated, onUp
             />
           </div>
 
-          {/* Personal Asignado / Composición de Cuadrilla */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label>
-                {tipo === 'cuadrilla' ? 'Composición del Equipo' : 'Personal Asignado'}
-              </Label>
-              <Badge variant="outline" className="text-xs">
-                {composiciones.length} {tipo === 'cuadrilla' ? 'miembro' : 'persona'}{composiciones.length !== 1 ? 's' : ''}
-              </Badge>
-            </div>
-
-            {/* Comparación de costos */}
-            {composiciones.length > 0 && (
-              <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-                {(() => {
-                  // Para CUADRILLAS: suma de costos (ponderada por %)
-                  // Para INDIVIDUALES: promedio de costos
-                  const costoReal = tipo === 'cuadrilla'
-                    ? calcularCostoRealCuadrilla(composiciones, config)
-                    : calcularCostoRealIndividual(composiciones, config)
-
-                  const diferencia = costoHora - costoReal
-                  const porcentajeDif = costoReal > 0
-                    ? ((diferencia / costoReal) * 100).toFixed(1)
-                    : 0
-
-                  return (
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <div>
-                        <p className="text-[10px] text-muted-foreground uppercase">Costo Recurso</p>
-                        <p className="text-sm font-bold text-blue-600">{formatUSD(costoHora)}/h</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-muted-foreground uppercase">
-                          {tipo === 'cuadrilla' ? 'Costo Real Total' : 'Costo Real Prom.'}
-                        </p>
-                        <p className="text-sm font-bold text-gray-700">{formatUSD(costoReal)}/h</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-muted-foreground uppercase">Diferencia</p>
-                        <div className={cn(
-                          "flex items-center justify-center gap-1 text-sm font-bold",
-                          diferencia > 0 ? "text-green-600" : diferencia < 0 ? "text-red-600" : "text-gray-600"
-                        )}>
-                          {diferencia > 0 ? (
-                            <TrendingUp className="h-3.5 w-3.5" />
-                          ) : diferencia < 0 ? (
-                            <TrendingDown className="h-3.5" />
-                          ) : (
-                            <Minus className="h-3.5 w-3.5" />
-                          )}
-                          <span>{diferencia >= 0 ? '+' : ''}{formatUSD(diferencia)}</span>
-                        </div>
-                        <p className="text-[9px] text-muted-foreground">({porcentajeDif}%)</p>
-                      </div>
-                    </div>
-                  )
-                })()}
+          {/* Personal Asignado (individual) / Composición de Cuadrilla (perfiles) */}
+          {tipo === 'individual' ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Personal Asignado</Label>
+                <Badge variant="outline" className="text-xs">
+                  {composiciones.length} persona{composiciones.length !== 1 ? 's' : ''}
+                </Badge>
               </div>
-            )}
 
-            {/* Lista de miembros/empleados */}
-            {composiciones.length > 0 && (
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {composiciones.map((comp) => {
-                  const costoEmpleado = getCostoHoraUSD(comp.empleado, config)
-                  return (
-                    <div
-                      key={comp.empleadoId}
-                      className={cn(
-                        "flex items-center gap-2 p-2 rounded-lg",
-                        tipo === 'cuadrilla' ? "bg-purple-50" : "bg-blue-50"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium",
-                        tipo === 'cuadrilla' ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
-                      )}>
-                        {comp.empleado?.user?.name?.charAt(0) || '?'}
+              {composiciones.length > 0 && (
+                <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                  {(() => {
+                    const costoReal = calcularCostoRealIndividual(composiciones, config)
+                    const diferencia = costoHora - costoReal
+                    const porcentajeDif = costoReal > 0 ? ((diferencia / costoReal) * 100).toFixed(1) : 0
+                    return (
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase">Costo Recurso</p>
+                          <p className="text-sm font-bold text-blue-600">{formatUSD(costoHora)}/h</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase">Costo Real Prom.</p>
+                          <p className="text-sm font-bold text-gray-700">{formatUSD(costoReal)}/h</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase">Diferencia</p>
+                          <div className={cn(
+                            "flex items-center justify-center gap-1 text-sm font-bold",
+                            diferencia > 0 ? "text-green-600" : diferencia < 0 ? "text-red-600" : "text-gray-600"
+                          )}>
+                            {diferencia > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : diferencia < 0 ? <TrendingDown className="h-3.5" /> : <Minus className="h-3.5 w-3.5" />}
+                            <span>{diferencia >= 0 ? '+' : ''}{formatUSD(diferencia)}</span>
+                          </div>
+                          <p className="text-[9px] text-muted-foreground">({porcentajeDif}%)</p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {comp.empleado?.user?.name || 'Sin nombre'}
-                        </p>
-                        {tipo === 'individual' && (
+                    )
+                  })()}
+                </div>
+              )}
+
+              {composiciones.length > 0 && (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {composiciones.map((comp) => {
+                    const costoEmpleado = getCostoHoraUSD(comp.empleado, config)
+                    return (
+                      <div key={comp.empleadoId} className="flex items-center gap-2 p-2 rounded-lg bg-blue-50">
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium bg-blue-100 text-blue-700">
+                          {comp.empleado?.user?.name?.charAt(0) || '?'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{comp.empleado?.user?.name || 'Sin nombre'}</p>
                           <p className="text-[10px] text-muted-foreground">
                             {comp.empleado?.cargo?.nombre || 'Sin cargo'} · {formatUSD(costoEmpleado)}/h
                           </p>
-                        )}
-                      </div>
-                      {tipo === 'cuadrilla' && (
-                        <>
-                          <Input
-                            type="text"
-                            placeholder="Rol"
-                            value={comp.rol}
-                            onChange={(e) => handleUpdateMember(comp.empleadoId, 'rol', e.target.value)}
-                            className="w-24 h-7 text-xs"
-                          />
-                          <Input
-                            type="number"
-                            min="1"
-                            max="99"
-                            value={comp.cantidad}
-                            onChange={(e) => handleUpdateMember(comp.empleadoId, 'cantidad', parseInt(e.target.value) || 1)}
-                            className="w-14 h-7 text-xs text-center"
-                          />
-                          <span className="text-xs text-muted-foreground">pers.</span>
-                        </>
-                      )}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveMember(comp.empleadoId)}
-                        className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* Mensaje cuando no hay personal asignado (solo para individuales) */}
-            {tipo === 'individual' && composiciones.length === 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
-                <p className="text-xs text-amber-700">
-                  Sin personal asignado. Asigna empleados para comparar costos reales.
-                </p>
-              </div>
-            )}
-
-            {/* Agregar miembro */}
-            {loadingEmpleados ? (
-              <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Cargando empleados...
-              </div>
-            ) : empleadosDisponibles.length > 0 ? (
-              <Select onValueChange={handleAddMember}>
-                <SelectTrigger className="w-full">
-                  <div className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    <span>{tipo === 'cuadrilla' ? 'Agregar miembro' : 'Asignar empleado'}</span>
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  {empleadosDisponibles.map((emp) => {
-                    const costoEmp = getCostoHoraUSD(emp, config)
-                    return (
-                      <SelectItem key={emp.id} value={emp.id}>
-                        <div className="flex items-center gap-2">
-                          <span>{emp.user?.name || emp.user?.email}</span>
-                          {emp.cargo?.nombre && (
-                            <span className="text-xs text-muted-foreground">({emp.cargo.nombre})</span>
-                          )}
-                          {tipo === 'individual' && costoEmp > 0 && (
-                            <span className="text-xs text-green-600 font-medium">{formatUSD(costoEmp)}/h</span>
-                          )}
                         </div>
-                      </SelectItem>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveMember(comp.empleadoId)}
+                          className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     )
                   })}
-                </SelectContent>
-              </Select>
-            ) : (
-              <p className="text-xs text-muted-foreground text-center py-2">
-                {empleados.length === 0
-                  ? 'No hay empleados registrados. Registra empleados en Admin → Personal'
-                  : 'Todos los empleados ya fueron agregados'}
+                </div>
+              )}
+
+              {composiciones.length === 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
+                  <p className="text-xs text-amber-700">
+                    Sin personal asignado. Asigna empleados para comparar costos reales.
+                  </p>
+                </div>
+              )}
+
+              {loadingEmpleados ? (
+                <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Cargando empleados...
+                </div>
+              ) : empleadosDisponibles.length > 0 ? (
+                <Select onValueChange={handleAddMember}>
+                  <SelectTrigger className="w-full">
+                    <div className="flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      <span>Asignar empleado</span>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {empleadosDisponibles.map((emp) => {
+                      const costoEmp = getCostoHoraUSD(emp, config)
+                      return (
+                        <SelectItem key={emp.id} value={emp.id}>
+                          <div className="flex items-center gap-2">
+                            <span>{emp.user?.name || emp.user?.email}</span>
+                            {emp.cargo?.nombre && (
+                              <span className="text-xs text-muted-foreground">({emp.cargo.nombre})</span>
+                            )}
+                            {costoEmp > 0 && (
+                              <span className="text-xs text-green-600 font-medium">{formatUSD(costoEmp)}/h</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-2">
+                  {empleados.length === 0
+                    ? 'No hay empleados registrados. Registra empleados en Admin → Personal'
+                    : 'Todos los empleados ya fueron agregados'}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Composición del Equipo (perfiles)</Label>
+                <Badge variant="outline" className="text-xs">
+                  {perfiles.reduce((s, p) => s + (p.cantidad || 1), 0)} persona{perfiles.reduce((s, p) => s + (p.cantidad || 1), 0) !== 1 ? 's' : ''}
+                </Badge>
+              </div>
+              <p className="text-[10px] text-muted-foreground -mt-2">
+                Una cuadrilla se compone de recursos individuales (perfiles), no de personas —
+                ej. "1 SSOMA + 1 Supervisor + 3 Tecnico".
               </p>
-            )}
-          </div>
+
+              {perfiles.length > 0 && (
+                <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+                  {(() => {
+                    const costoReal = calcularCostoRealCuadrillaPorPerfiles(perfiles, config)
+                    const diferencia = costoHora - costoReal
+                    const porcentajeDif = costoReal > 0 ? ((diferencia / costoReal) * 100).toFixed(1) : 0
+                    return (
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase">Costo Recurso</p>
+                          <p className="text-sm font-bold text-blue-600">{formatUSD(costoHora)}/h</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase">Costo Real Total</p>
+                          <p className="text-sm font-bold text-gray-700">{formatUSD(costoReal)}/h</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase">Diferencia</p>
+                          <div className={cn(
+                            "flex items-center justify-center gap-1 text-sm font-bold",
+                            diferencia > 0 ? "text-green-600" : diferencia < 0 ? "text-red-600" : "text-gray-600"
+                          )}>
+                            {diferencia > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : diferencia < 0 ? <TrendingDown className="h-3.5" /> : <Minus className="h-3.5 w-3.5" />}
+                            <span>{diferencia >= 0 ? '+' : ''}{formatUSD(diferencia)}</span>
+                          </div>
+                          <p className="text-[9px] text-muted-foreground">({porcentajeDif}%)</p>
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+              )}
+
+              {perfiles.length > 0 && (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {perfiles.map((p) => {
+                    const costoPerfil = calcularCostoRealIndividual(p.recursoMiembro?.composiciones ?? [], config)
+                    return (
+                      <div key={p.recursoMiembroId} className="flex items-center gap-2 p-2 rounded-lg bg-purple-50">
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium bg-purple-100 text-purple-700">
+                          {p.recursoMiembro?.nombre?.charAt(0) || '?'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{p.recursoMiembro?.nombre || 'Perfil'}</p>
+                          <p className="text-[10px] text-muted-foreground">{formatUSD(costoPerfil)}/h prom.</p>
+                        </div>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="99"
+                          value={p.cantidad}
+                          onChange={(e) => handleUpdatePerfilCantidad(p.recursoMiembroId, parseInt(e.target.value) || 1)}
+                          className="w-14 h-7 text-xs text-center"
+                        />
+                        <span className="text-xs text-muted-foreground">pers.</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemovePerfil(p.recursoMiembroId)}
+                          className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {perfiles.length === 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
+                  <p className="text-xs text-amber-700">
+                    Sin perfiles asignados. Agrega recursos individuales para componer la cuadrilla.
+                  </p>
+                </div>
+              )}
+
+              {loadingRecursos ? (
+                <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Cargando recursos...
+                </div>
+              ) : recursosDisponibles.length > 0 ? (
+                <Select onValueChange={handleAddPerfil}>
+                  <SelectTrigger className="w-full">
+                    <div className="flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      <span>Agregar perfil</span>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {recursosDisponibles.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{r.nombre}</span>
+                          <span className="text-xs text-muted-foreground">({formatUSD(r.costoHora)}/h comercial)</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-2">
+                  {recursosIndividuales.length === 0
+                    ? 'No hay recursos individuales en el catálogo. Crea recursos individuales primero.'
+                    : 'Todos los recursos individuales ya fueron agregados'}
+                </p>
+              )}
+            </div>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
