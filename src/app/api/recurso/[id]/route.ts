@@ -29,6 +29,18 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
           include: {
             empleado: empleadoInclude
           }
+        },
+        perfiles: {
+          include: {
+            recursoMiembro: {
+              include: {
+                composiciones: {
+                  where: { activo: true },
+                  include: { empleado: empleadoInclude }
+                }
+              }
+            }
+          }
         }
       }
     })
@@ -46,7 +58,21 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   try {
     const { id } = await params
     const body = await req.json()
-    const { composiciones, ...recursoData } = body
+    const { composiciones, perfiles, ...recursoData } = body
+
+    // Nunca cuadrillas anidadas — ver mismo check en POST /api/recurso.
+    if (perfiles?.length > 0) {
+      const miembros = await prisma.recurso.findMany({
+        where: { id: { in: perfiles.map((p: { recursoMiembroId: string }) => p.recursoMiembroId) } },
+        select: { id: true, tipo: true, nombre: true },
+      })
+      const invalidos = miembros.filter(m => m.tipo !== 'individual')
+      if (invalidos.length > 0) {
+        return NextResponse.json({
+          error: `Los perfiles de una cuadrilla deben ser recursos individuales. "${invalidos.map(m => m.nombre).join(', ')}" no lo son.`,
+        }, { status: 400 })
+      }
+    }
 
     // Actualizar recurso
     const updateData: Record<string, unknown> = {}
@@ -59,14 +85,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (recursoData.orden !== undefined) updateData.orden = recursoData.orden
     if (recursoData.activo !== undefined) updateData.activo = recursoData.activo
 
-    // Si se envían composiciones, reemplazar las existentes
+    // Si se envían composiciones (individual), reemplazar las existentes.
+    // Reemplazo total sin diff — pierde `id`/`createdAt` de filas existentes
+    // (mismo comportamiento que ya tenía este endpoint, no se cambia acá).
     if (composiciones !== undefined) {
-      // Eliminar composiciones existentes
       await prisma.recursoComposicion.deleteMany({
         where: { recursoId: id }
       })
-
-      // Crear nuevas composiciones si hay
       if (composiciones.length > 0) {
         await prisma.recursoComposicion.createMany({
           data: composiciones.map((comp: { empleadoId: string; cantidad?: number; horasAsignadas?: number; rol?: string }) => ({
@@ -80,6 +105,23 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       }
     }
 
+    // Si se envían perfiles (cuadrilla), reemplazar los existentes — mismo
+    // patrón de reemplazo total que composiciones arriba.
+    if (perfiles !== undefined) {
+      await prisma.recursoPerfil.deleteMany({
+        where: { recursoId: id }
+      })
+      if (perfiles.length > 0) {
+        await prisma.recursoPerfil.createMany({
+          data: perfiles.map((p: { recursoMiembroId: string; cantidad?: number }) => ({
+            recursoId: id,
+            recursoMiembroId: p.recursoMiembroId,
+            cantidad: p.cantidad || 1,
+          }))
+        })
+      }
+    }
+
     const data = await prisma.recurso.update({
       where: { id },
       data: updateData,
@@ -87,6 +129,18 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         composiciones: {
           include: {
             empleado: empleadoInclude
+          }
+        },
+        perfiles: {
+          include: {
+            recursoMiembro: {
+              include: {
+                composiciones: {
+                  where: { activo: true },
+                  include: { empleado: empleadoInclude }
+                }
+              }
+            }
           }
         }
       }
@@ -103,6 +157,10 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     const { id } = await params
 
     // Pre-flight: check usage across all related models
+    // Nota (informe §13/análisis de recursos): este pre-check YA no cubría
+    // TarifaClienteRecurso/LineaHH/PlantillaOrgNodo/ProyectoOrgNodo antes de
+    // esta sesión (deuda preexistente, fuera de alcance acá) — se agrega acá
+    // `usadoEnPerfiles` porque es la relación NUEVA que introduce esta sesión.
     const usage = await prisma.recurso.findUnique({
       where: { id },
       select: {
@@ -114,6 +172,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
             registroHoras: true,
             plantillaServicioItem: true,
             plantillaServicioItemIndependiente: true,
+            usadoEnPerfiles: true,
           }
         }
       }
@@ -125,7 +184,8 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
 
     const refs = usage._count
     const totalUsos = refs.catalogoServicio + refs.cotizacionServicioItem +
-      refs.registroHoras + refs.plantillaServicioItem + refs.plantillaServicioItemIndependiente
+      refs.registroHoras + refs.plantillaServicioItem + refs.plantillaServicioItemIndependiente +
+      refs.usadoEnPerfiles
 
     if (totalUsos > 0) {
       const detalles: string[] = []
@@ -133,6 +193,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
       if (refs.cotizacionServicioItem > 0) detalles.push(`${refs.cotizacionServicioItem} ítem(s) de cotización`)
       if (refs.registroHoras > 0) detalles.push(`${refs.registroHoras} registro(s) de horas`)
       if (refs.plantillaServicioItem > 0) detalles.push(`${refs.plantillaServicioItem} ítem(s) de plantilla`)
+      if (refs.usadoEnPerfiles > 0) detalles.push(`${refs.usadoEnPerfiles} cuadrilla(s) lo usan como perfil`)
       if (refs.plantillaServicioItemIndependiente > 0) detalles.push(`${refs.plantillaServicioItemIndependiente} ítem(s) de plantilla independiente`)
 
       return NextResponse.json({

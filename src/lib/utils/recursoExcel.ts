@@ -10,8 +10,12 @@ import { Recurso } from '@/types'
  */
 export function exportarRecursosAExcel(recursos: Recurso[]) {
   const data = recursos.map((r) => {
-    // Obtener nombres del personal asignado
-    const personal = r.composiciones?.map(c => c.empleado?.user?.name).filter(Boolean).join(', ') || ''
+    // Cuadrilla: composición por perfiles (recursos individuales), nunca nombres
+    // de persona (ver docs/analisis-composicion-recursos.md). Individual: sigue
+    // siendo el pool de empleados de referencia de costo, sin cambios.
+    const personal = r.tipo === 'cuadrilla'
+      ? r.perfiles?.map(p => `${(p.cantidad ?? 1) > 1 ? `${p.cantidad}× ` : ''}${p.recursoMiembro?.nombre ?? ''}`).filter(Boolean).join(', ') || ''
+      : r.composiciones?.map(c => c.empleado?.user?.name).filter(Boolean).join(', ') || ''
 
     return {
       Nombre: r.nombre,

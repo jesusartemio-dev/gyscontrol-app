@@ -57,11 +57,13 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({ error: 'Recurso no encontrado o inactivo' }, { status: 404 })
       }
       if (recurso.tipo === 'cuadrilla') {
-        const composiciones = await prisma.recursoComposicion.aggregate({
+        // Dotación real vive en RecursoPerfil (recursos individuales × cantidad),
+        // no en RecursoComposicion (empleados — ver docs/analisis-composicion-recursos.md).
+        const perfiles = await prisma.recursoPerfil.aggregate({
           where: { recursoId, activo: true },
           _sum: { cantidad: true },
         })
-        personasEstimadas = composiciones._sum.cantidad || 1
+        personasEstimadas = perfiles._sum.cantidad || 1
       }
     }
 
