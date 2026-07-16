@@ -3,7 +3,7 @@
  * Centraliza constantes y funciones de conversión PEN/USD
  */
 
-import type { Empleado } from '@/types'
+import type { Empleado, RecursoPerfil } from '@/types'
 
 // Valores por defecto (se sobrescriben con configuración de BD)
 export const DEFAULTS = {
@@ -126,22 +126,9 @@ export function formatUSD(amount: number): string {
 }
 
 /**
- * Calcula el costo real de una cuadrilla (suma de costos × cantidad)
- * Cada miembro se multiplica por su cantidad (nro de personas de ese perfil)
- */
-export function calcularCostoRealCuadrilla(
-  composiciones: Array<{ empleado?: Empleado | null; cantidad?: number }>,
-  config: Partial<ConfiguracionCostos> = {}
-): number {
-  return composiciones.reduce((sum, comp) => {
-    const cant = comp.cantidad ?? 1
-    return sum + getCostoHoraUSD(comp.empleado, config) * cant
-  }, 0)
-}
-
-/**
  * Calcula el costo real promedio de un recurso individual
- * Promedio simple de los empleados asignados
+ * Promedio simple de los empleados asignados (su composición es un POOL
+ * de referencia de costo, no dotación — ver docs/analisis-composicion-recursos.md).
  */
 export function calcularCostoRealIndividual(
   composiciones: Array<{ empleado?: Empleado | null }>,
@@ -152,6 +139,30 @@ export function calcularCostoRealIndividual(
     return sum + getCostoHoraUSD(comp.empleado, config)
   }, 0)
   return suma / composiciones.length
+}
+
+/**
+ * Calcula el costo real de una cuadrilla a partir de sus PERFILES
+ * (recursos individuales × cantidad) — reemplaza el cálculo anterior que
+ * sumaba empleados reales de RecursoComposicion (ver
+ * docs/analisis-composicion-recursos.md: esos empleados eran solo referencia
+ * de costo repetida N veces, nunca personas reales de la cuadrilla).
+ *
+ * Fórmula: Σ (costo promedio del perfil individual × cantidad).
+ * El costo de CADA perfil sale de `calcularCostoRealIndividual` sobre la
+ * composición propia de ese recurso individual (su pool de empleados de
+ * referencia) — por eso `recursoMiembro` debe venir con sus `composiciones`
+ * incluidas (ver GET /api/recurso).
+ */
+export function calcularCostoRealCuadrillaPorPerfiles(
+  perfiles: Array<Pick<RecursoPerfil, 'cantidad'> & { recursoMiembro?: { composiciones?: Array<{ empleado?: Empleado | null }> } | null }>,
+  config: Partial<ConfiguracionCostos> = {}
+): number {
+  return perfiles.reduce((sum, p) => {
+    const cant = p.cantidad ?? 1
+    const costoPerfil = calcularCostoRealIndividual(p.recursoMiembro?.composiciones ?? [], config)
+    return sum + costoPerfil * cant
+  }, 0)
 }
 
 /**
