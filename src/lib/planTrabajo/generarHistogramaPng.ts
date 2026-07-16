@@ -11,19 +11,16 @@ import { asegurarFontconfigParaHistogramas, FUENTE_HISTOGRAMAS } from './configu
  * resolverImagenesAlcance.ts). Estilo "Excel simple": ejes, leyenda y
  * colores planos, sin librería de gráficos externa.
  *
- * Nota de datos: cada fila de `equipoTrabajo`/`horasHombre` es UN EDT (no un
- * cargo/persona individual). Por eso la "leyenda" de estos gráficos son EDTs,
- * no cargos.
- *
- * Corrección (informe §13): este comentario decía antes que "no existe en el
- * schema un desglose real de HH por persona/cargo y mes" — es falso.
- * `ProyectoTarea` tiene `personasEstimadas` (Int, NOT NULL) y
- * `fechaInicio`/`fechaFin` (NOT NULL) reales, y `calcularHistogramasYCronograma`
- * (calcularDatos.ts) ya calcula `equipoTrabajo` como el pico real de
- * `personasEstimadas` por EDT y mes (Math.max sobre las tareas activas ese
- * mes), no una suma de flags de actividad. `horasHombre` sigue siendo
- * un mapeo por EDT (no por persona/cargo) a propósito, para garantizar que
- * totalHH == Σ histograma == Σ cronograma (mismo motivo de siempre).
+ * Nota de datos — las dos series de esta sección tienen granularidad
+ * DISTINTA a propósito:
+ * - `horasHombre`: una fila por EDT (nunca por persona/cargo), para
+ *   garantizar que totalHH == Σ histograma == Σ cronograma (informe §4.2).
+ * - `equipoTrabajo`: una fila por CARGO real (informe §13, Bug 3 +
+ *   docs/analisis-composicion-recursos.md) — dotación real resuelta desde
+ *   `ProyectoTarea.recursoId` → `Recurso` (individual = el propio nombre del
+ *   recurso, cuadrilla = sus perfiles `RecursoPerfil` × cantidad), NUNCA
+ *   `personasEstimadas` (override manual que en la práctica nadie llena) ni
+ *   agrupado por EDT.
  */
 
 const ANCHO = 900

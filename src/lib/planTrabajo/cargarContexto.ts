@@ -175,18 +175,22 @@ export async function cargarContextoPlanTrabajo(
                         personasEstimadas: true,
                         estado: true,
                         prioridad: true,
-                        // Dotación real por cargo (histograma §13.1, informe §13 Bug 3) —
-                        // personasEstimadas NO es la fuente (override manual sin usar).
+                        // Dotación real por cargo (histograma §13.1, informe §13
+                        // Bug 3) — personasEstimadas NO es la fuente (override
+                        // manual sin usar). Cuadrilla: perfiles (recursos
+                        // individuales × cantidad, ver RecursoPerfil) — antes
+                        // se leía RecursoComposicion (empleados), que resultó
+                        // ser solo una referencia de costo repetida N veces,
+                        // nunca dotación real (docs/analisis-composicion-recursos.md).
                         recurso: {
                           select: {
                             nombre: true,
                             tipo: true,
-                            composiciones: {
+                            perfiles: {
                               where: { activo: true },
                               select: {
-                                empleadoId: true,
                                 cantidad: true,
-                                empleado: { select: { cargo: { select: { nombre: true } } } },
+                                recursoMiembro: { select: { nombre: true } },
                               },
                             },
                           },
@@ -367,10 +371,9 @@ export async function cargarContextoPlanTrabajo(
                   ? {
                       nombre: t.recurso.nombre,
                       tipo: t.recurso.tipo,
-                      composiciones: t.recurso.composiciones.map(c => ({
-                        empleadoId: c.empleadoId,
-                        cantidad: c.cantidad,
-                        cargoNombre: c.empleado.cargo?.nombre ?? null,
+                      perfiles: t.recurso.perfiles.map(p => ({
+                        cantidad: p.cantidad,
+                        recursoMiembroNombre: p.recursoMiembro.nombre,
                       })),
                     }
                   : null,

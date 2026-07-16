@@ -6,17 +6,17 @@ type TareaFixture = EdtFixture['actividades'][number]['tareas'][number]
 type RecursoFixture = NonNullable<TareaFixture['recurso']>
 
 function recursoIndividual(nombre: string): RecursoFixture {
-  return { nombre, tipo: 'individual', composiciones: [] }
+  return { nombre, tipo: 'individual', perfiles: [] }
 }
 
 function recursoCuadrilla(
   nombre: string,
-  miembros: { empleadoId: string; cargoNombre: string | null; cantidad?: number }[]
+  perfiles: { recursoMiembroNombre: string; cantidad?: number }[]
 ): RecursoFixture {
   return {
     nombre,
     tipo: 'cuadrilla',
-    composiciones: miembros.map(m => ({ empleadoId: m.empleadoId, cantidad: m.cantidad ?? 1, cargoNombre: m.cargoNombre })),
+    perfiles: perfiles.map(p => ({ recursoMiembroNombre: p.recursoMiembroNombre, cantidad: p.cantidad ?? 1 })),
   }
 }
 
@@ -26,7 +26,7 @@ function tarea(overrides: Partial<TareaFixture> & { fechaInicio: Date; fechaFin:
     nombre: 'Tarea',
     orden: 0,
     horasEstimadas: null,
-    personasEstimadas: 1, // informe §13 Bug 3: este campo YA NO es la fuente de equipoTrabajo — se deja en 1 (default) a propósito para que un test que lo mire por error falle.
+    personasEstimadas: 1, // informe §13: este campo YA NO es la fuente de equipoTrabajo — se deja en 1 (default) a propósito para que un test que lo mire por error falle.
     estado: 'pendiente',
     prioridad: 'media',
     ...overrides,
@@ -48,7 +48,7 @@ function edt(overrides: Partial<EdtFixture> & { nombre: string; fechaInicioPlan:
   }
 }
 
-describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO (informe §13, Bug 3)', () => {
+describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO real (informe §13, Bug 3 + docs/analisis-composicion-recursos.md)', () => {
   it('un recurso individual (ej. Andamiero) aporta SIEMPRE 1 a su propio cargo, sin resolver a un empleado puntual', () => {
     const construccion = edt({
       nombre: 'Construccion', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 40,
@@ -71,7 +71,7 @@ describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO (informe §
     expect(fila.total).toBe(1)
   })
 
-  it('una cuadrilla (ej. "Cuadrilla 4P") se descompone en sus 4 miembros reales por Cargo, no en una fila "Cuadrilla 4P"', () => {
+  it('una cuadrilla (ej. "Cuadrilla 4P") se descompone en sus perfiles reales, no en una fila "Cuadrilla 4P"', () => {
     const construccion = edt({
       nombre: 'Construccion', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 100,
       actividades: [{
@@ -82,10 +82,9 @@ describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO (informe §
           tarea({
             nombre: 'Montaje de soportes', fechaInicio: new Date('2026-08-05'), fechaFin: new Date('2026-08-10'),
             recurso: recursoCuadrilla('Cuadrilla 4P', [
-              { empleadoId: 'emp-1', cargoNombre: 'INGENIERO SEMI SENIOR B DE CONSTRUCCIÓN' },
-              { empleadoId: 'emp-2', cargoNombre: 'INGENIERO DE SEGURIDAD' },
-              { empleadoId: 'emp-3', cargoNombre: 'TÉCNICO SEMI SENIOR B DE CONSTRUCCIÓN' },
-              { empleadoId: 'emp-4', cargoNombre: 'TÉCNICO SEMI SENIOR B DE CONSTRUCCIÓN' },
+              { recursoMiembroNombre: 'Supervisor', cantidad: 1 },
+              { recursoMiembroNombre: 'SSOMA', cantidad: 1 },
+              { recursoMiembroNombre: 'Tecnico', cantidad: 2 }, // "3× Tecnico" ya no son 3 filas de empleado, es 1 perfil con cantidad
             ]),
           }),
         ],
@@ -95,23 +94,14 @@ describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO (informe §
     const { data } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
 
     expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'Cuadrilla 4P')).toBeUndefined() // no existe una fila "Cuadrilla 4P"
-    expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'INGENIERO SEMI SENIOR B DE CONSTRUCCIÓN')!.total).toBe(1)
-    expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'INGENIERO DE SEGURIDAD')!.total).toBe(1)
-    // emp-3 y emp-4 comparten el mismo Cargo.nombre -> son 2 personas distintas, la fila suma 2 (no dedup, son empleadoId distintos).
-    expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'TÉCNICO SEMI SENIOR B DE CONSTRUCCIÓN')!.total).toBe(2)
+    expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'Supervisor')!.total).toBe(1)
+    expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'SSOMA')!.total).toBe(1)
+    expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'Tecnico')!.total).toBe(2)
   })
 
-  it('dedup por empleadoId: la MISMA persona en 2 cuadrillas concurrentes el mismo mes NO se cuenta dos veces', () => {
-    const cuadrilla2P = recursoCuadrilla('Cuadrilla 2P', [
-      { empleadoId: 'emp-angel', cargoNombre: 'INGENIERO SEMI SENIOR B DE CONSTRUCCIÓN' },
-      { empleadoId: 'emp-yony', cargoNombre: 'INGENIERO DE SEGURIDAD' },
-    ])
-    const cuadrilla4P = recursoCuadrilla('Cuadrilla 4P', [
-      { empleadoId: 'emp-angel', cargoNombre: 'INGENIERO SEMI SENIOR B DE CONSTRUCCIÓN' }, // mismo empleado que en 2P
-      { empleadoId: 'emp-yony', cargoNombre: 'INGENIERO DE SEGURIDAD' }, // idem
-      { empleadoId: 'emp-roly', cargoNombre: 'TÉCNICO SEMI SENIOR B DE CONSTRUCCIÓN' },
-      { empleadoId: 'emp-nelson', cargoNombre: 'TÉCNICO SEMI SENIOR B DE CONSTRUCCIÓN' },
-    ])
+  it('2 tareas concurrentes del mismo perfil SUMAN (ya no se deduplica por empleado — no hay empleado en el camino)', () => {
+    const cuadrilla2P = recursoCuadrilla('Cuadrilla 2P', [{ recursoMiembroNombre: 'Tecnico', cantidad: 2 }])
+    const cuadrilla3P = recursoCuadrilla('Cuadrilla 3P', [{ recursoMiembroNombre: 'Tecnico', cantidad: 3 }])
 
     const construccion = edt({
       nombre: 'Construccion', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 200,
@@ -120,43 +110,35 @@ describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO (informe §
         fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'),
         horasPlan: 200, estado: 'pendiente', prioridad: 'media', descripcion: null,
         tareas: [
-          // 3 tareas concurrentes el mismo mes, usando cuadrillas que comparten personas (caso real CJM49: 28/08).
+          // 2 tareas concurrentes el mismo mes, cada una con su propia cuadrilla de "Tecnico".
           tarea({ nombre: 'Tarea A (2P)', fechaInicio: new Date('2026-08-28'), fechaFin: new Date('2026-08-28'), recurso: cuadrilla2P }),
-          tarea({ nombre: 'Tarea B (4P)', fechaInicio: new Date('2026-08-28'), fechaFin: new Date('2026-08-28'), recurso: cuadrilla4P }),
-          tarea({ nombre: 'Tarea C (4P)', fechaInicio: new Date('2026-08-28'), fechaFin: new Date('2026-08-28'), recurso: cuadrilla4P }),
+          tarea({ nombre: 'Tarea B (3P)', fechaInicio: new Date('2026-08-28'), fechaFin: new Date('2026-08-28'), recurso: cuadrilla3P }),
         ],
       }],
     })
 
     const { data } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
 
-    // emp-angel aparece en 3 aportes (2P, 4P x2) el mismo mes -> deduplicado a 1.
-    expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'INGENIERO SEMI SENIOR B DE CONSTRUCCIÓN')!.total).toBe(1)
-    expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'INGENIERO DE SEGURIDAD')!.total).toBe(1)
-    // emp-roly y emp-nelson (2 personas reales, ambas solo en 4P, citada 2 veces el mismo mes) -> 2, no 4.
-    expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'TÉCNICO SEMI SENIOR B DE CONSTRUCCIÓN')!.total).toBe(2)
+    // 2 (de Cuadrilla 2P) + 3 (de Cuadrilla 3P) = 5 — es una declaración de dotación real, no una coincidencia a evitar.
+    expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'Tecnico')!.total).toBe(5)
   })
 
-  it('un miembro de cuadrilla sin Cargo asignado se descarta (nunca se inventa un cargo) y se advierte', () => {
-    const cuadrillaConHueco = recursoCuadrilla('Cuadrilla X', [
-      { empleadoId: 'emp-1', cargoNombre: 'INGENIERO DE SEGURIDAD' },
-      { empleadoId: 'emp-sin-cargo', cargoNombre: null },
-    ])
+  it('una cuadrilla sin perfiles configurados aporta 0 y emite advertencia — nunca inventa una dotación', () => {
+    const cuadrillaVacia = recursoCuadrilla('Cuadrilla 5P', [])
     const construccion = edt({
       nombre: 'Construccion', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 40,
       actividades: [{
         id: 'a1', nombre: 'Montaje', orden: 0,
         fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'),
         horasPlan: 40, estado: 'pendiente', prioridad: 'media', descripcion: null,
-        tareas: [tarea({ nombre: 'Tarea', fechaInicio: new Date('2026-08-05'), fechaFin: new Date('2026-08-10'), recurso: cuadrillaConHueco })],
+        tareas: [tarea({ nombre: 'Tarea', fechaInicio: new Date('2026-08-05'), fechaFin: new Date('2026-08-10'), recurso: cuadrillaVacia })],
       }],
     })
 
     const { data, advertencias } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
 
-    expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'INGENIERO DE SEGURIDAD')!.total).toBe(1)
-    expect(data.histogramas.equipoTrabajo.some(f => f.etiqueta === 'null' || f.etiqueta === '')).toBe(false)
-    expect(advertencias.some(a => a.includes('emp-sin-cargo') && a.includes('sin Cargo'))).toBe(true)
+    expect(data.histogramas.equipoTrabajo).toEqual([])
+    expect(advertencias.some(a => a.includes('Cuadrilla 5P') && a.includes('sin perfiles'))).toBe(true)
   })
 
   it('un mes en que el EDT está activo pero ninguna tarea con recurso lo cubre da 0 para ese cargo — nunca hereda/asume 1', () => {

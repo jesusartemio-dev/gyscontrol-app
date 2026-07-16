@@ -420,11 +420,10 @@ export interface CronogramaContexto {
           recurso: {
             nombre: string
             tipo: string // enum TipoRecurso: 'individual' | 'cuadrilla'
-            /** Solo relevante para tipo='cuadrilla' — composiciones activas (miembros reales). Para 'individual' se ignora: el cargo ES `recurso.nombre`, nunca se resuelve a un empleado puntual (ver raciReglas.ts/informe §13 — el "Personal" de un recurso individual es un pool de la empresa, no dotación de la tarea). */
-            composiciones: {
-              empleadoId: string
+            /** Solo relevante para tipo='cuadrilla' — perfiles activos (recursos individuales × cantidad, ver RecursoPerfil). Para 'individual' se ignora: el cargo ES `recurso.nombre` directo, nunca se resuelve un empleado (docs/analisis-composicion-recursos.md — antes esto leía RecursoComposicion/empleados, que resultó ser solo referencia de costo repetida N veces, no dotación real). */
+            perfiles: {
               cantidad: number
-              cargoNombre: string | null // null = empleado sin Cargo asignado (no se inventa uno, ver calcularDatos.ts)
+              recursoMiembroNombre: string
             }[]
           } | null
         }[]
