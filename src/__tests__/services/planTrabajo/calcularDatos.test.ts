@@ -1,5 +1,11 @@
-import { calcularHistogramasYCronograma, calcularTotalHH } from '@/lib/planTrabajo/calcularDatos'
+import { calcularHistogramasYCronograma, calcularTotalHH, calcularMatrizRaci } from '@/lib/planTrabajo/calcularDatos'
 import type { CronogramaContexto } from '@/types/planTrabajo'
+
+type PersonaRaciFixture = Parameters<typeof calcularMatrizRaci>[1][number]
+
+function personaRaci(overrides: Partial<PersonaRaciFixture> & { nombre: string; cargo: string; userId: string }): PersonaRaciFixture {
+  return { siglas: overrides.nombre.slice(0, 2).toUpperCase(), ...overrides }
+}
 
 type EdtFixture = CronogramaContexto['fases'][number]['edts'][number]
 type TareaFixture = EdtFixture['actividades'][number]['tareas'][number]
@@ -211,5 +217,45 @@ describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO real (infor
     expect(data.cronogramaResumen.filas.reduce((s, f) => s + f.horasPlan, 0)).toBe(468)
     // equipoTrabajo queda vacío (sin tareas con recurso) — no rellena nada por default.
     expect(data.histogramas.equipoTrabajo).toEqual([])
+  })
+})
+
+describe('calcularMatrizRaci — todas las filas comparten largo/orden de asignaciones (grilla RACI, plantilla v7)', () => {
+  it('cada fila trae exactamente 1 asignación por persona, en el MISMO orden que la lista de personal recibida', () => {
+    const personal = [
+      personaRaci({ nombre: 'Residente', cargo: 'Residente', userId: 'u1' }),
+      personaRaci({ nombre: 'Gerente', cargo: 'Gerente de Proyectos', userId: 'u2' }),
+      personaRaci({ nombre: 'Ssoma', cargo: 'Supervisor SSOMA', userId: 'u3' }),
+    ]
+    const edts = [
+      { id: 'e1', nombre: 'Planificación', responsableId: 'u1' },
+      { id: 'e2', nombre: 'Construcción', responsableId: null },
+    ]
+
+    const { data } = calcularMatrizRaci(edts, personal)
+
+    expect(data.filas).toHaveLength(2)
+    for (const fila of data.filas) {
+      expect(fila.asignaciones).toHaveLength(personal.length)
+      expect(fila.asignaciones.map(a => a.siglas)).toEqual(personal.map(p => p.siglas))
+    }
+  })
+
+  it('con más de 19 personas, emite una advertencia de Etapa 1 (grilla de la plantilla reserva 1 columna por persona)', () => {
+    const personal = Array.from({ length: 20 }, (_, i) =>
+      personaRaci({ nombre: `Persona${i}`, cargo: 'Técnico', userId: `u${i}` })
+    )
+    const { advertencias } = calcularMatrizRaci([{ id: 'e1', nombre: 'Construcción', responsableId: null }], personal)
+
+    expect(advertencias.some(a => a.includes('20') && a.toLowerCase().includes('raci'))).toBe(true)
+  })
+
+  it('con 19 personas o menos, NO emite la advertencia de columnas', () => {
+    const personal = Array.from({ length: 19 }, (_, i) =>
+      personaRaci({ nombre: `Persona${i}`, cargo: 'Técnico', userId: `u${i}` })
+    )
+    const { advertencias } = calcularMatrizRaci([{ id: 'e1', nombre: 'Construcción', responsableId: null }], personal)
+
+    expect(advertencias.some(a => a.toLowerCase().includes('columnas'))).toBe(false)
   })
 })

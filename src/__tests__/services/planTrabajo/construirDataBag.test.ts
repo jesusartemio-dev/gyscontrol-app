@@ -406,3 +406,84 @@ describe('construirDataBag — histogramaEquipo (dataBag/export layer)', () => {
     expect(histogramaEquipo.some(f => f.etiqueta === 'Construccion')).toBe(false)
   })
 })
+
+describe('construirDataBag — RACI en grilla (raciPersonas + matrizRaci.roles, plantilla v7)', () => {
+  /**
+   * Plantilla real (`{-w:tc raciPersonas}{sigla}{/raciPersonas}` en la
+   * cabecera, `{-w:tc roles}{rol}{/roles}` por fila de `{#matrizRaci}`) exige
+   * que `roles[i]` de CADA fila corresponda a la MISMA persona que
+   * `raciPersonas[i]` — mismo índice, sin excepción. `rolesTexto` (el string
+   * precompuesto "PR: R · JM: A") ya no existe.
+   */
+  function raciFixture() {
+    return {
+      filas: [
+        {
+          edt: 'Planificación',
+          asignaciones: [
+            { siglas: 'PR', rol: 'R' },
+            { siglas: 'JM', rol: 'A' },
+            { siglas: 'YA', rol: 'I' },
+          ],
+        },
+        {
+          edt: 'Construcción',
+          asignaciones: [
+            { siglas: 'PR', rol: 'A' },
+            { siglas: 'JM', rol: 'C' },
+            { siglas: 'YA', rol: 'R' },
+          ],
+        },
+      ],
+    }
+  }
+
+  function dataBagConRaci() {
+    const plan = planFixture([])
+    ;(plan as unknown as { matrizRaci: unknown }).matrizRaci = raciFixture() as unknown as PlanTrabajo['matrizRaci']
+    return construirDataBag({ plan, proyecto: proyectoFixture, organigramaPngBase64: '' })
+  }
+
+  it('rolesTexto ya no existe en el dataBag — reemplazado por raciPersonas + roles', () => {
+    const dataBag = dataBagConRaci()
+    const matrizRaci = dataBag.matrizRaci as Record<string, unknown>[]
+    expect(matrizRaci.every(f => !('rolesTexto' in f))).toBe(true)
+  })
+
+  it('raciPersonas trae 1 entrada por persona, en el mismo orden que las asignaciones de la primera fila', () => {
+    const dataBag = dataBagConRaci()
+    expect(dataBag.raciPersonas).toEqual([{ sigla: 'PR' }, { sigla: 'JM' }, { sigla: 'YA' }])
+  })
+
+  it('roles.length === raciPersonas.length en TODAS las filas de matrizRaci', () => {
+    const dataBag = dataBagConRaci()
+    const raciPersonas = dataBag.raciPersonas as { sigla: string }[]
+    const matrizRaci = dataBag.matrizRaci as { roles: { rol: string }[] }[]
+    for (const fila of matrizRaci) {
+      expect(fila.roles).toHaveLength(raciPersonas.length)
+    }
+  })
+
+  it('alineación posicional: el rol en roles[i] es el de la persona raciPersonas[i], columna por columna', () => {
+    const dataBag = dataBagConRaci()
+    const matrizRaci = dataBag.matrizRaci as { edtNombre: string; roles: { rol: string }[] }[]
+
+    // JM (índice 1) es Aprobador en "Planificación" pero baja a Consultado en "Construcción" —
+    // si roles se desalineara de raciPersonas, este caso puntual (JM ni el primer ni el
+    // último rol de la fila) sería el más fácil de confundir con el de otra persona.
+    const planificacion = matrizRaci.find(f => f.edtNombre === 'Planificación')!
+    const construccion = matrizRaci.find(f => f.edtNombre === 'Construcción')!
+    expect(planificacion.roles[1]).toEqual({ rol: 'A' }) // JM
+    expect(construccion.roles[1]).toEqual({ rol: 'C' }) // JM
+
+    // YA (índice 2, última columna) pasa de Informado a Responsable.
+    expect(planificacion.roles[2]).toEqual({ rol: 'I' }) // YA
+    expect(construccion.roles[2]).toEqual({ rol: 'R' }) // YA
+  })
+
+  it('sin matrizRaci en el plan (null), raciPersonas y matrizRaci llegan vacíos, sin romper', () => {
+    const dataBag = construirDataBag({ plan: planFixture([]), proyecto: proyectoFixture, organigramaPngBase64: '' })
+    expect(dataBag.raciPersonas).toEqual([])
+    expect(dataBag.matrizRaci).toEqual([])
+  })
+})

@@ -127,7 +127,8 @@ interface EdtParaRaci {
 
 /**
  * matrizRaci — ProyectoEdt × personal, usando REGLAS_RACI_CARGO (raciReglas.ts).
- * Una fila por EDT; rolesTexto se compone en construirDataBag, no acá.
+ * Una fila por EDT; la grilla real (columnas por persona) se arma en
+ * construirDataBag a partir de `asignaciones`, no acá.
  * Post-procesa cada fila para que haya máximo UN Aprobador (A) — si 2+ cargos
  * de gerencia matchean en el mismo EDT, prioridadAprobador() decide cuál queda
  * A y el resto baja a C (addendum D.2 — antes salían dos "A" por fila).
@@ -138,6 +139,16 @@ export function calcularMatrizRaci(
 ): ResultadoCalculo<PlanRaci> {
   const advertencias: string[] = []
   const cargosNoMapeados = new Set<string>()
+
+  // La grilla RACI de la plantilla reserva 1 columna por persona (340dxa cada
+  // una, textDirection btLr) — con 19+ columnas el ancho disponible (~340×19
+  // ≈ 6460dxa) empieza a comprimir la sigla hasta ilegibilidad. Es solo un
+  // aviso de Etapa 1 (no bloquea el export).
+  if (personal.length > 19) {
+    advertencias.push(
+      `La Matriz RACI tiene ${personal.length} personas — con más de 19 columnas el diseño de la grilla puede verse apretado en el docx.`
+    )
+  }
 
   const filas = edts.map(edt => {
     const tipoEdt = clasificarTipoEdt(edt.nombre)

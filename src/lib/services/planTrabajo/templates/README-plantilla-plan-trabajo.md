@@ -83,7 +83,8 @@ Objetivo-bullets, Definiciones generales, **Responsabilidades completas (§5)**,
 | `{#referencias}` → `{codigo} {descripcion}` | array | Constante de normas (sacadas del prompt, cambio #5) + `ProyectoTdrAnalisis.normasAplicables` + OC/propuesta |
 | `{#definicionesEspecificas}` → `{termino} {definicion}` | array | Opcional (TDR o edición manual) |
 | `{#personalAsignado}` → `{nombre} {siglas} {empresa} {cargo}` | array | Directo de `ProyectoOrgNodo` con desempate + dedup de siglas server-side |
-| `{#matrizRaci}` → `{edtNombre} {rolesTexto}` | array | `ProyectoEdt` × mapeo `cargoLabel→rol`. `rolesTexto` = string precompuesto `"PR: R · JM: A · YA: C"` (evita columnas dinámicas, que Docxtemplater no soporta) |
+| `{-w:tc raciPersonas}{sigla}{/raciPersonas}` (cabecera, fuera de `{#matrizRaci}`) | array | Columnas de la grilla RACI — una por persona. SIEMPRE tomado de `raci.filas[0].asignaciones` (mismo orden/largo que `roles` de cada fila, ver construirDataBag.ts) |
+| `{#matrizRaci}` → `{edtNombre}` + `{-w:tc roles}{rol}{/roles}` | array | `ProyectoEdt` × mapeo `cargoLabel→rol`. `roles[i]` corresponde posicionalmente a `raciPersonas[i]` — grilla real por columna (loop `{-w:tc}` duplica la celda `<w:tc>`; requiere post-proceso de `tblGrid`, ver exportDocx.ts) |
 | `{#histogramaEquipo}` / `{#histogramaHH}` → `{etiqueta} {detalleMeses} {total}` | array | RESUMEN NUMÉRICO de `contextoIA.ts` usado directo. `detalleMeses` = `"2026-06: 240 · 2026-07: 120"` (incluir `valoresPorMes` que hoy se descarta) |
 | `{totalHH}` | number | Total del resumen numérico — **misma cifra** que debe citar el alcance |
 | `{#cronogramaResumen}` → `{fase} {edt} {actividad} {fechaInicio} {fechaFin} {horasPlan}` | array | Una fila por `ProyectoActividad`, mapeo directo |

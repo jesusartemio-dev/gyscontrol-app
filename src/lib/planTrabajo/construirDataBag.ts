@@ -332,11 +332,22 @@ export function construirDataBag({
     // ─── Personal (BD/IA, siglas deduplicadas server-side) ───
     personalAsignado: personalMapeado,
 
-    // ─── RACI (BD/IA — texto precompuesto porque Docxtemplater no soporta columnas dinámicas) ───
+    // ─── RACI (BD/IA — grilla real, plantilla v7) ───
+    // `raciPersonas` (cabecera de columnas) y `roles` de cada fila de
+    // `matrizRaci` SIEMPRE salen de la MISMA fila (`raci.filas[0]`), nunca de
+    // `personalMapeado` por separado — evita que un desalineo entre
+    // `personalAsignado` y `matrizRaci` (persistidos como campos JSON
+    // independientes) rompa la correspondencia columna↔rol en la plantilla.
+    // Toda fila de `raci.filas` tiene el mismo largo/orden de asignaciones
+    // porque `calcularMatrizRaci` las genera con `personal.map(...)`
+    // (ver calcularDatos.ts) — tomar la cabecera de `filas[0]` es válido y,
+    // a diferencia de usar `personalMapeado`, no depende de esa invariante
+    // externa al construirla.
+    raciPersonas: (raci.filas[0]?.asignaciones ?? []).map(a => ({ sigla: a.siglas })),
     matrizRaci: raci.filas.map(fila => ({
       edtNombre: fila.edt,
       edt: fila.edt, // alias retrocompatible
-      rolesTexto: fila.asignaciones.map(a => `${a.siglas}: ${a.rol}`).join(' · '),
+      roles: fila.asignaciones.map(a => ({ rol: a.rol })),
     })),
 
     // ─── EPP ───
