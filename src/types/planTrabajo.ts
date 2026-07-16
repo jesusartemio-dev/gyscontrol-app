@@ -416,6 +416,17 @@ export interface CronogramaContexto {
           personasEstimadas: number
           estado: string
           prioridad: string
+          /** Recurso real asignado — fuente de la dotación por cargo del histograma §13.1 (informe §13, Bug 3: `personasEstimadas` nunca se usa, es un override manual que nadie llena). `null` si la tarea no tiene recurso. */
+          recurso: {
+            nombre: string
+            tipo: string // enum TipoRecurso: 'individual' | 'cuadrilla'
+            /** Solo relevante para tipo='cuadrilla' — composiciones activas (miembros reales). Para 'individual' se ignora: el cargo ES `recurso.nombre`, nunca se resuelve a un empleado puntual (ver raciReglas.ts/informe §13 — el "Personal" de un recurso individual es un pool de la empresa, no dotación de la tarea). */
+            composiciones: {
+              empleadoId: string
+              cantidad: number
+              cargoNombre: string | null // null = empleado sin Cargo asignado (no se inventa uno, ver calcularDatos.ts)
+            }[]
+          } | null
         }[]
       }[]
     }[]

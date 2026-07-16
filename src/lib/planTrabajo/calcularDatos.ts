@@ -183,6 +183,9 @@ export function calcularMatrizRaci(
   return { data: { filas }, advertencias }
 }
 
+/** Recurso resuelto de una tarea — mismo shape que `CronogramaContexto[...]tareas[].recurso` (ver cargarContexto.ts). */
+type RecursoDeTarea = NonNullable<CronogramaContexto['fases'][number]['edts'][number]['actividades'][number]['tareas'][number]['recurso']>
+
 interface EdtParaCronograma {
   id: string
   nombre: string
@@ -191,8 +194,52 @@ interface EdtParaCronograma {
   fechaFinPlan: Date | null
   horasPlan: number | null
   actividades: { nombre: string }[]
-  /** Tareas reales del EDT (todas las actividades aplanadas) — fuente del pico de dotación de `equipoTrabajo` (informe §13, bug de histograma fabricado). */
-  tareasConFecha: { personasEstimadas: number; fechaInicio: Date; fechaFin: Date }[]
+  /** Tareas reales del EDT (todas las actividades aplanadas) — fuente de la dotación por cargo de `equipoTrabajo` (informe §13, Bug 3). */
+  tareasConFecha: { recurso: RecursoDeTarea | null; fechaInicio: Date; fechaFin: Date }[]
+}
+
+/**
+ * Un "aporte" de personas de UNA tarea al histograma de equipo, ya resuelto a
+ * cargo — informe §13, Bug 3: `personasEstimadas` es un override manual que
+ * nadie llena; la dotación real vive en `Recurso.tipo` + `RecursoComposicion`:
+ * - `individual` → el recurso ES un cargo (`Recurso.nombre` — "Gestor",
+ *   "Supervisor", "Tecnico"...) y aporta SIEMPRE 1, sin resolver a un
+ *   empleado puntual — la composición de un recurso individual es un POOL de
+ *   la empresa que puede cubrir ese rol (confirmado en producción: el
+ *   recurso "Tecnico" tiene 5 empleados en su composición pero una tarea con
+ *   ese recurso es 1 persona, no 5 — la columna "Personal" del catálogo de
+ *   recursos NO es dotación para individuales).
+ * - `cuadrilla` → se descompone en sus miembros reales
+ *   (`RecursoComposicion.activo=true`), cada uno aporta su `Cargo.nombre` real
+ *   (vía `empleadoId → Empleado.cargoId → Cargo.nombre`) con peso `cantidad`.
+ *   `identidad` es el `empleadoId` real — necesario para deduplicar cuando el
+ *   mismo empleado aparece en 2+ cuadrillas o tareas concurrentes del mismo
+ *   mes (confirmado en producción: Cuadrilla 2P y Cuadrilla 4P comparten 2 de
+ *   sus miembros).
+ * Un miembro de cuadrilla sin `Cargo` asignado se descarta (nunca se inventa
+ * un cargo) y se advierte.
+ */
+interface AportePersona {
+  cargo: string
+  /** empleadoId real (cuadrilla) o `individual:<recurso.nombre>` sintético (individual) — clave de dedup por mes. */
+  identidad: string
+  cantidad: number
+}
+
+function aportesDeTarea(recurso: RecursoDeTarea | null, advertirCargoFaltante: (empleadoId: string) => void): AportePersona[] {
+  if (!recurso) return []
+  if (recurso.tipo === 'individual') {
+    return [{ cargo: recurso.nombre, identidad: `individual:${recurso.nombre}`, cantidad: 1 }]
+  }
+  return recurso.composiciones
+    .map(c => {
+      if (!c.cargoNombre) {
+        advertirCargoFaltante(c.empleadoId)
+        return null
+      }
+      return { cargo: c.cargoNombre, identidad: c.empleadoId, cantidad: c.cantidad }
+    })
+    .filter((a): a is AportePersona => a !== null)
 }
 
 /** "" si no hay actividades, el nombre si hay 1, "{n} actividades" si hay varias (nunca vacío — addendum E). */
@@ -246,7 +293,7 @@ export function calcularHistogramasYCronograma(
       horasPlan: e.horasPlan,
       actividades: e.actividades.map(a => ({ nombre: a.nombre })),
       tareasConFecha: e.actividades.flatMap(a =>
-        a.tareas.map(t => ({ personasEstimadas: t.personasEstimadas, fechaInicio: t.fechaInicio, fechaFin: t.fechaFin }))
+        a.tareas.map(t => ({ recurso: t.recurso, fechaInicio: t.fechaInicio, fechaFin: t.fechaFin }))
       ),
     }))
   )
@@ -273,33 +320,52 @@ export function calcularHistogramasYCronograma(
       )
     : []
 
-  // Pico de dotación real por mes (informe §13, bug de histograma fabricado):
-  // antes `valoresPorMes` era un flag binario "¿el EDT está activo este mes?"
-  // (0/1) y `total` era la SUMA de esos flags — es decir, un Gantt codificado
-  // en unos y ceros, nunca una cantidad de personas (la columna "MÁX." de la
-  // plantilla mentía). Ahora, para cada mes en que el EDT está activo (mismo
-  // gate que siempre, por fechaInicioPlan/fechaFinPlan — no se toca, sigue
-  // gobernando `meses`/`horasHombre`/`cronogramaResumen`), el valor es el
-  // MÁXIMO real de `personasEstimadas` entre las tareas de ese EDT cuya
-  // fechaInicio/fechaFin se solapan con ese mes. Si el EDT está activo ese
-  // mes pero ninguna tarea suya tiene fechas que lo cubran, el valor es 0
-  // (nunca se asume/hereda 1 — ver informe §13, "prohibido cualquier
-  // fallback"). `total` pasa a ser el máximo de la fila, no la suma — así el
-  // rótulo estático "MÁX." de la plantilla queda correcto sin tocarla.
-  const equipoTrabajo = edtsConFecha.map(e => {
-    const mesesEdt = new Set(mesesEntre(e.fechaInicioPlan, e.fechaFinPlan))
-    const tareasConMeses = e.tareasConFecha.map(t => ({
-      personasEstimadas: t.personasEstimadas,
-      meses: new Set(mesesEntre(t.fechaInicio, t.fechaFin)),
-    }))
-    const valoresPorMes: number[] = meses.map(m => {
-      if (!mesesEdt.has(m)) return 0
-      return tareasConMeses
-        .filter(t => t.meses.has(m))
-        .reduce((max, t) => Math.max(max, t.personasEstimadas ?? 0), 0)
+  // Dotación real por CARGO y mes (informe §13, Bug 3 — corrige el Bug 2 de
+  // esta misma sección, que ya había arreglado suma→máximo pero seguía
+  // agrupando por EDT y usando `personasEstimadas`, un campo que en la
+  // práctica nadie llena porque la dotación real vive en el recurso).
+  // `equipoTrabajo` deja de ser "una fila por EDT" — es "una fila por CARGO",
+  // igual que el manual de referencia del cliente (Gestor de Proyecto,
+  // Supervisor, Supervisor de Seguridad, Técnicos...). Para cada mes, cada
+  // tarea activa aporta personas a UN cargo (ver `aportesDeTarea`); dentro de
+  // un mismo cargo y mes se deduplica por `identidad` (empleadoId real, o el
+  // propio recurso si es individual) — así una persona que aparece en 2
+  // cuadrillas concurrentes, o la misma cuadrilla citada por 2 tareas
+  // simultáneas, cuenta una sola vez. `total` sigue siendo el MÁXIMO de la
+  // fila (no la suma — el rótulo "MÁX." de la plantilla ya es correcto,
+  // heredado del fix anterior, no se toca la plantilla).
+  const cargosSinAsignar = new Set<string>()
+  const advertirCargoFaltante = (empleadoId: string) => cargosSinAsignar.add(empleadoId)
+
+  const todasLasTareasConFecha = edtsConFecha.flatMap(e => e.tareasConFecha)
+
+  const cargosDistintos = new Set<string>()
+  for (const t of todasLasTareasConFecha) {
+    for (const aporte of aportesDeTarea(t.recurso, advertirCargoFaltante)) cargosDistintos.add(aporte.cargo)
+  }
+
+  const equipoTrabajo = [...cargosDistintos].map(cargo => {
+    const valoresPorMes = meses.map(mes => {
+      // Map<identidad, cantidad> — Set-like dedup que además preserva el peso
+      // real de la composición (normalmente 1, pero respeta RecursoComposicion.cantidad).
+      const porIdentidad = new Map<string, number>()
+      for (const t of todasLasTareasConFecha) {
+        if (!mesesEntre(t.fechaInicio, t.fechaFin).includes(mes)) continue
+        for (const aporte of aportesDeTarea(t.recurso, () => {})) {
+          if (aporte.cargo !== cargo) continue
+          porIdentidad.set(aporte.identidad, aporte.cantidad)
+        }
+      }
+      return [...porIdentidad.values()].reduce((s, c) => s + c, 0)
     })
-    return { etiqueta: e.nombre, valoresPorMes, total: valoresPorMes.reduce((max, v) => Math.max(max, v), 0) }
+    return { etiqueta: cargo, valoresPorMes, total: valoresPorMes.reduce((max, v) => Math.max(max, v), 0) }
   })
+
+  if (cargosSinAsignar.size > 0) {
+    advertencias.push(
+      `${cargosSinAsignar.size} miembro(s) de cuadrilla sin Cargo asignado (empleadoId: ${[...cargosSinAsignar].join(', ')}) — no se cuentan en el histograma de equipo de trabajo.`
+    )
+  }
 
   const horasHombre = edtsConFecha.map(e => {
     const mesesEdt = mesesEntre(e.fechaInicioPlan, e.fechaFinPlan)

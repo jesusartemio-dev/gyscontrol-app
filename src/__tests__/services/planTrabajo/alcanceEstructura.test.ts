@@ -18,6 +18,7 @@ function tarea(nombre: string) {
     personasEstimadas: 2,
     estado: 'planificado',
     prioridad: 'media',
+    recurso: null,
   }
 }
 

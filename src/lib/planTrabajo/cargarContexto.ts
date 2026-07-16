@@ -175,6 +175,22 @@ export async function cargarContextoPlanTrabajo(
                         personasEstimadas: true,
                         estado: true,
                         prioridad: true,
+                        // Dotación real por cargo (histograma §13.1, informe §13 Bug 3) —
+                        // personasEstimadas NO es la fuente (override manual sin usar).
+                        recurso: {
+                          select: {
+                            nombre: true,
+                            tipo: true,
+                            composiciones: {
+                              where: { activo: true },
+                              select: {
+                                empleadoId: true,
+                                cantidad: true,
+                                empleado: { select: { cargo: { select: { nombre: true } } } },
+                              },
+                            },
+                          },
+                        },
                       },
                       orderBy: { orden: 'asc' },
                     },
@@ -347,6 +363,17 @@ export async function cargarContextoPlanTrabajo(
                 personasEstimadas: t.personasEstimadas,
                 estado: t.estado,
                 prioridad: t.prioridad,
+                recurso: t.recurso
+                  ? {
+                      nombre: t.recurso.nombre,
+                      tipo: t.recurso.tipo,
+                      composiciones: t.recurso.composiciones.map(c => ({
+                        empleadoId: c.empleadoId,
+                        cantidad: c.cantidad,
+                        cargoNombre: c.empleado.cargo?.nombre ?? null,
+                      })),
+                    }
+                  : null,
               })),
             })),
           })),

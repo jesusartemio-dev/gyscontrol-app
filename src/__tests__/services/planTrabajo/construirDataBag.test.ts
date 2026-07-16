@@ -375,4 +375,34 @@ describe('construirDataBag — histogramaEquipo (dataBag/export layer)', () => {
     expect(histogramaHH.reduce((s, f) => s + f.total, 0)).toBe(468)
     expect(dataBag.totalHH).toBe(468)
   })
+
+  it('informe §13 Bug 3: {etiqueta} llega como CARGO real (no EDT) — construirDataBag no reinterpreta el dato, solo lo pasa', () => {
+    // Shape real post-fix: calcularHistogramasYCronograma ya entrega una fila
+    // por cargo (miembro real de una cuadrilla, o el recurso individual),
+    // nunca "Cuadrilla 4P" como etiqueta — ver calcularDatos.test.ts.
+    const histogramas: PlanHistogramas = {
+      meses: ['2026-08'],
+      equipoTrabajo: [
+        { etiqueta: 'Andamiero', valoresPorMes: [1], total: 1 },
+        { etiqueta: 'INGENIERO SEMI SENIOR B DE CONSTRUCCIÓN', valoresPorMes: [1], total: 1 },
+        { etiqueta: 'TÉCNICO SEMI SENIOR B DE CONSTRUCCIÓN', valoresPorMes: [2], total: 2 },
+      ],
+      horasHombre: [{ etiqueta: 'Construccion', valoresPorMes: [368], total: 368 }],
+    }
+
+    const plan = planFixture([])
+    ;(plan as unknown as { histogramas: unknown }).histogramas = histogramas as unknown as PlanTrabajo['histogramas']
+
+    const dataBag = construirDataBag({ plan, proyecto: proyectoFixture, organigramaPngBase64: '' })
+    const histogramaEquipo = dataBag.histogramaEquipo as { etiqueta: string; total: number }[]
+
+    expect(histogramaEquipo.map(f => f.etiqueta)).toEqual([
+      'Andamiero',
+      'INGENIERO SEMI SENIOR B DE CONSTRUCCIÓN',
+      'TÉCNICO SEMI SENIOR B DE CONSTRUCCIÓN',
+    ])
+    expect(histogramaEquipo.find(f => f.etiqueta === 'TÉCNICO SEMI SENIOR B DE CONSTRUCCIÓN')!.total).toBe(2)
+    // {etiqueta} nunca es un nombre de EDT en este fixture — construirDataBag no lo valida ni lo necesita.
+    expect(histogramaEquipo.some(f => f.etiqueta === 'Construccion')).toBe(false)
+  })
 })
