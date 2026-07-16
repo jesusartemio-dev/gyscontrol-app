@@ -461,7 +461,10 @@ export interface Recurso {
   updatedAt: string
   servicios?: CatalogoServicio[]
   plantillaServicioItems?: PlantillaServicioItem[]
+  /** Solo aplica a tipo='individual' — pool de empleados de referencia de costo, NO dotación real. */
   composiciones?: RecursoComposicion[]
+  /** Solo aplica a tipo='cuadrilla' — perfiles (recursos individuales) que la componen, ej. "1 SSOMA + 1 Supervisor + 3 Tecnico". */
+  perfiles?: RecursoPerfil[]
   _count?: {
     catalogoServicio: number
     cotizacionServicioItem: number
@@ -553,6 +556,22 @@ export interface RecursoComposicion {
   updatedAt: string
   recurso?: Recurso
   empleado?: Empleado
+}
+
+// ======================
+// 🧩 Perfil de Cuadrilla (recurso individual × cantidad)
+// ======================
+export interface RecursoPerfil {
+  id: string
+  recursoId: string
+  recursoMiembroId: string
+  cantidad: number
+  activo: boolean
+  createdAt: string
+  updatedAt: string
+  recurso?: Recurso
+  /** El recurso individual que actúa de perfil (ej. "SSOMA", "Tecnico"), con SU PROPIA composición para calcular su costo promedio. */
+  recursoMiembro?: Recurso
 }
 
 // ======================

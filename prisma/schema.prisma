@@ -1472,7 +1472,14 @@ model Recurso {
   plantillaServicioItem              PlantillaServicioItem[]
   registroHoras                      RegistroHoras[]
   plantillaServicioItemIndependiente PlantillaServicioItemIndependiente[]
+  /// Solo aplica a tipo=individual — pool de empleados de referencia de costo
+  /// (NO es dotación real, ver RecursoPerfil para la composición de cuadrillas).
   composiciones                      RecursoComposicion[]
+  /// Perfiles (recursos individuales) que componen ESTA cuadrilla — solo
+  /// tiene sentido si tipo=cuadrilla (análisis: docs/analisis-composicion-recursos.md).
+  perfiles                           RecursoPerfil[]                      @relation("CuadrillaPerfiles")
+  /// Cuadrillas en cuya composición este recurso (individual) participa como perfil.
+  usadoEnPerfiles                    RecursoPerfil[]                      @relation("PerfilDeCuadrillas")
   proyectoTareas                     ProyectoTarea[]
   tarifasClientes                    TarifaClienteRecurso[]
   lineasHH                           LineaHH[]
@@ -1480,6 +1487,29 @@ model Recurso {
   proyectoOrgNodos                   ProyectoOrgNodo[]
 
   @@map("recurso")
+}
+
+/// Composición de una cuadrilla en RECURSOS INDIVIDUALES (perfiles), no en
+/// empleados — corrige el modelo anterior donde RecursoComposicion.empleadoId
+/// se usaba como proxy de costo repetido N veces (ver
+/// docs/analisis-composicion-recursos.md, sesión de análisis previa).
+/// Ej.: Cuadrilla 5P = 1 SSOMA + 1 Supervisor + 3 Tecnico.
+/// `recursoMiembroId` debe apuntar SIEMPRE a un Recurso tipo=individual —
+/// Prisma no puede validar esto por FK, se valida en la aplicación
+/// (nunca cuadrillas anidadas dentro de cuadrillas).
+model RecursoPerfil {
+  id               String   @id @default(cuid())
+  recursoId        String
+  recursoMiembroId String
+  cantidad         Int      @default(1)
+  activo           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  recurso          Recurso  @relation("CuadrillaPerfiles", fields: [recursoId], references: [id], onDelete: Cascade)
+  recursoMiembro   Recurso  @relation("PerfilDeCuadrillas", fields: [recursoMiembroId], references: [id])
+
+  @@unique([recursoId, recursoMiembroId])
+  @@map("recurso_perfil")
 }
 
 model RegistroHoras {

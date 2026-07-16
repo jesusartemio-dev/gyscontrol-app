@@ -125,6 +125,12 @@ export interface RecursoComposicionPayload {
   rol?: string
 }
 
+/** Perfil de una cuadrilla: un recurso individual × cantidad (ej. "3× Tecnico"). */
+export interface RecursoPerfilPayload {
+  recursoMiembroId: string
+  cantidad?: number
+}
+
 export interface RecursoPayload {
   nombre: string
   tipo?: 'individual' | 'cuadrilla'
@@ -133,7 +139,10 @@ export interface RecursoPayload {
   costoHoraProyecto?: number | null
   descripcion?: string
   orden?: number
+  /** Solo para tipo='individual' — pool de empleados de referencia de costo. */
   composiciones?: RecursoComposicionPayload[]
+  /** Solo para tipo='cuadrilla' — perfiles (recursos individuales) que la componen. */
+  perfiles?: RecursoPerfilPayload[]
 }
 export interface RecursoUpdatePayload extends Partial<RecursoPayload> {}
 
