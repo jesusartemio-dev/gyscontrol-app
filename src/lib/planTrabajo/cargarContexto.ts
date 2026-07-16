@@ -184,6 +184,7 @@ export async function cargarContextoPlanTrabajo(
                         // nunca dotación real (docs/analisis-composicion-recursos.md).
                         recurso: {
                           select: {
+                            id: true,
                             nombre: true,
                             tipo: true,
                             perfiles: {
@@ -369,6 +370,7 @@ export async function cargarContextoPlanTrabajo(
                 prioridad: t.prioridad,
                 recurso: t.recurso
                   ? {
+                      id: t.recurso.id,
                       nombre: t.recurso.nombre,
                       tipo: t.recurso.tipo,
                       perfiles: t.recurso.perfiles.map(p => ({

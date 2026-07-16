@@ -199,39 +199,44 @@ interface EdtParaCronograma {
 }
 
 /**
- * Un "aporte" de personas de UNA tarea al histograma de equipo, ya resuelto a
- * cargo — informe §13, Bug 3 (y su corrección posterior tras el análisis de
- * catálogo de recursos, docs/analisis-composicion-recursos.md): la dotación
- * real vive en `Recurso.tipo`:
+ * Un "aporte" de personas de UN recurso (no de una tarea — ver más abajo) al
+ * histograma de equipo, ya resuelto a cargo — informe §13, Bug 3 y su
+ * corrección posterior tras el análisis de catálogo de recursos
+ * (docs/analisis-composicion-recursos.md). La dotación real vive en
+ * `Recurso.tipo`:
  * - `individual` → el recurso ES un cargo (`Recurso.nombre` — "Gestor",
- *   "Supervisor", "Tecnico"...) y aporta SIEMPRE 1 — su propia composición es
- *   un POOL de la empresa que puede cubrir ese rol, nunca dotación de la tarea.
- *   Es una presencia (0/1 por mes), no una cantidad: 2 tareas concurrentes
- *   del mismo recurso individual siguen siendo 1, no 2 (sigue siendo la misma
- *   única persona/rol, a diferencia de una cuadrilla — ver `esIndividual`).
+ *   "Supervisor", "Tecnico"...) y aporta SIEMPRE 1 a su propio cargo — su
+ *   propia composición es un POOL de la empresa que puede cubrir ese rol,
+ *   nunca dotación de la tarea.
  * - `cuadrilla` → se descompone en sus PERFILES (`RecursoPerfil.activo=true`,
  *   recursos individuales × cantidad), cada uno aporta `recursoMiembroNombre`
  *   como cargo — mismo vocabulario `Recurso.nombre` que un individual, sin
  *   ningún join a `Empleado`/`Cargo` (antes esto leía `RecursoComposicion` y
  *   resolvía `empleadoId → Cargo.nombre`; se descubrió que esos empleados
  *   eran solo una referencia de costo repetida N veces — nunca dotación real
- *   ni cargo real de la cuadrilla — ver el análisis). Acá SÍ se suma entre
- *   tareas/cuadrillas concurrentes — es una declaración de dotación real
- *   (ej. "3× Tecnico"), no una identidad física a deduplicar.
+ *   ni cargo real de la cuadrilla — ver el análisis).
+ *
+ * UNA SOLA REGLA para individual y cuadrilla (confirmado por el usuario —
+ * GYS planifica por RECURSO, no por tarea: si un frente necesita más gente
+ * se planifica con una cuadrilla más grande, nunca varias cuadrillas chicas
+ * en paralelo bajo el mismo recurso): cada RECURSO aporta su dotación UNA
+ * VEZ por mes, sin importar en cuántas tareas concurrentes aparezca ese
+ * mismo recursoId — la misma cuadrilla citada por 3 tareas del mismo mes es
+ * la MISMA gente, no 3 cuadrillas (confirmado en producción: en CJM49,
+ * "Cuadrilla 4P" es un único recursoId citado por 5 tareas). El dedup es por
+ * `recurso.id` + mes (ver `calcularHistogramasYCronograma`), NO por
+ * `empleadoId` (ya no hay empleado en el camino) ni por tarea.
  */
 interface AportePersona {
   cargo: string
   cantidad: number
-  /** true = recurso individual (presencia, tapa en 1 por mes); false = perfil de cuadrilla (suma). */
-  esIndividual: boolean
 }
 
-function aportesDeTarea(recurso: RecursoDeTarea | null): AportePersona[] {
-  if (!recurso) return []
+function aportesDeRecurso(recurso: RecursoDeTarea): AportePersona[] {
   if (recurso.tipo === 'individual') {
-    return [{ cargo: recurso.nombre, cantidad: 1, esIndividual: true }]
+    return [{ cargo: recurso.nombre, cantidad: 1 }]
   }
-  return recurso.perfiles.map(p => ({ cargo: p.recursoMiembroNombre, cantidad: p.cantidad, esIndividual: false }))
+  return recurso.perfiles.map(p => ({ cargo: p.recursoMiembroNombre, cantidad: p.cantidad }))
 }
 
 /** "" si no hay actividades, el nombre si hay 1, "{n} actividades" si hay varias (nunca vacío — addendum E). */
@@ -316,12 +321,9 @@ export function calcularHistogramasYCronograma(
   // posterior tras el análisis de catálogo de recursos). `equipoTrabajo` deja
   // de ser "una fila por EDT" — es "una fila por CARGO", igual que el manual
   // de referencia del cliente (Gestor de Proyecto, Supervisor, Supervisor de
-  // Seguridad, Técnicos...). Para cada mes, cada tarea activa aporta personas
-  // a UN cargo (ver `aportesDeTarea`) — ya no hace falta deduplicar por
-  // identidad de empleado (no hay empleado en el camino, ver `AportePersona`):
-  // dos tareas concurrentes del mismo perfil simplemente SUMAN. `total` sigue
-  // siendo el MÁXIMO de la fila (no la suma — el rótulo "MÁX." de la plantilla
-  // ya es correcto, heredado del fix anterior, no se toca la plantilla).
+  // Seguridad, Técnicos...). `total` sigue siendo el MÁXIMO de la fila (no la
+  // suma — el rótulo "MÁX." de la plantilla ya es correcto, heredado del fix
+  // anterior, no se toca la plantilla).
   const todasLasTareasConFecha = edtsConFecha.flatMap(e => e.tareasConFecha)
 
   // Cuadrilla usada en una tarea pero sin perfiles cargados todavía (esperado
@@ -339,24 +341,38 @@ export function calcularHistogramasYCronograma(
     )
   }
 
+  // Por mes: recursos DISTINTOS activos ese mes, deduplicados por `recurso.id`
+  // — la MISMA cuadrilla/individual citada por N tareas concurrentes del
+  // mismo mes es la MISMA gente (GYS planifica por recurso, no por tarea: si
+  // hace falta más gente se usa una cuadrilla más grande, nunca varias en
+  // paralelo bajo el mismo recurso — confirmado con datos reales de CJM49).
+  // Recursos DISTINTOS sí se suman entre sí (son crews/roles distintos
+  // coexistiendo ese mes).
+  function recursosDistintosDelMes(mes: string): RecursoDeTarea[] {
+    const porId = new Map<string, RecursoDeTarea>()
+    for (const t of todasLasTareasConFecha) {
+      if (!t.recurso) continue
+      if (!mesesEntre(t.fechaInicio, t.fechaFin).includes(mes)) continue
+      porId.set(t.recurso.id, t.recurso)
+    }
+    return [...porId.values()]
+  }
+
   const cargosDistintos = new Set<string>()
   for (const t of todasLasTareasConFecha) {
-    for (const aporte of aportesDeTarea(t.recurso)) cargosDistintos.add(aporte.cargo)
+    if (!t.recurso) continue
+    for (const aporte of aportesDeRecurso(t.recurso)) cargosDistintos.add(aporte.cargo)
   }
 
   const equipoTrabajo = [...cargosDistintos].map(cargo => {
     const valoresPorMes = meses.map(mes => {
-      let sumaCuadrilla = 0
-      let individualPresente = false
-      for (const t of todasLasTareasConFecha) {
-        if (!mesesEntre(t.fechaInicio, t.fechaFin).includes(mes)) continue
-        for (const aporte of aportesDeTarea(t.recurso)) {
-          if (aporte.cargo !== cargo) continue
-          if (aporte.esIndividual) individualPresente = true
-          else sumaCuadrilla += aporte.cantidad
+      let suma = 0
+      for (const recurso of recursosDistintosDelMes(mes)) {
+        for (const aporte of aportesDeRecurso(recurso)) {
+          if (aporte.cargo === cargo) suma += aporte.cantidad
         }
       }
-      return sumaCuadrilla + (individualPresente ? 1 : 0)
+      return suma
     })
     return { etiqueta: cargo, valoresPorMes, total: valoresPorMes.reduce((max, v) => Math.max(max, v), 0) }
   })

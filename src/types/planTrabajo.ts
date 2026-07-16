@@ -418,6 +418,8 @@ export interface CronogramaContexto {
           prioridad: string
           /** Recurso real asignado — fuente de la dotación por cargo del histograma §13.1 (informe §13, Bug 3: `personasEstimadas` nunca se usa, es un override manual que nadie llena). `null` si la tarea no tiene recurso. */
           recurso: {
+            /** Identidad real del recurso — la MISMA cuadrilla/individual citada por N tareas concurrentes del mismo mes es la MISMA gente/rol, se deduplica por esto (confirmado: en CJM49, "Cuadrilla 4P" es un único recursoId citado por 5 tareas). */
+            id: string
             nombre: string
             tipo: string // enum TipoRecurso: 'individual' | 'cuadrilla'
             /** Solo relevante para tipo='cuadrilla' — perfiles activos (recursos individuales × cantidad, ver RecursoPerfil). Para 'individual' se ignora: el cargo ES `recurso.nombre` directo, nunca se resuelve un empleado (docs/analisis-composicion-recursos.md — antes esto leía RecursoComposicion/empleados, que resultó ser solo referencia de costo repetida N veces, no dotación real). */

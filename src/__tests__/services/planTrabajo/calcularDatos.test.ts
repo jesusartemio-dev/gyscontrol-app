@@ -5,15 +5,17 @@ type EdtFixture = CronogramaContexto['fases'][number]['edts'][number]
 type TareaFixture = EdtFixture['actividades'][number]['tareas'][number]
 type RecursoFixture = NonNullable<TareaFixture['recurso']>
 
-function recursoIndividual(nombre: string): RecursoFixture {
-  return { nombre, tipo: 'individual', perfiles: [] }
+function recursoIndividual(id: string, nombre: string): RecursoFixture {
+  return { id, nombre, tipo: 'individual', perfiles: [] }
 }
 
 function recursoCuadrilla(
+  id: string,
   nombre: string,
   perfiles: { recursoMiembroNombre: string; cantidad?: number }[]
 ): RecursoFixture {
   return {
+    id,
     nombre,
     tipo: 'cuadrilla',
     perfiles: perfiles.map(p => ({ recursoMiembroNombre: p.recursoMiembroNombre, cantidad: p.cantidad ?? 1 })),
@@ -57,8 +59,8 @@ describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO real (infor
         fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'),
         horasPlan: 40, estado: 'pendiente', prioridad: 'media', descripcion: null,
         tareas: [
-          tarea({ nombre: 'Armado de andamios', fechaInicio: new Date('2026-08-05'), fechaFin: new Date('2026-08-10'), recurso: recursoIndividual('Andamiero') }),
-          tarea({ nombre: 'Desmontaje de andamios', fechaInicio: new Date('2026-08-20'), fechaFin: new Date('2026-08-22'), recurso: recursoIndividual('Andamiero') }),
+          tarea({ nombre: 'Armado de andamios', fechaInicio: new Date('2026-08-05'), fechaFin: new Date('2026-08-10'), recurso: recursoIndividual('rec-andamiero', 'Andamiero') }),
+          tarea({ nombre: 'Desmontaje de andamios', fechaInicio: new Date('2026-08-20'), fechaFin: new Date('2026-08-22'), recurso: recursoIndividual('rec-andamiero', 'Andamiero') }),
         ],
       }],
     })
@@ -66,9 +68,41 @@ describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO real (infor
     const { data } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
     const fila = data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'Andamiero')!
 
-    // 2 tareas de Andamiero el mismo mes -> sigue siendo 1 (mismo cargo individual, no se suma por tarea).
+    // 2 tareas del MISMO recursoId el mismo mes -> sigue siendo 1 (misma persona/rol, dedup por recurso.id).
     expect(fila.valoresPorMes).toEqual([1])
     expect(fila.total).toBe(1)
+  })
+
+  it('CASO REAL CJM49 — la MISMA cuadrilla citada por 3 tareas concurrentes del mismo mes aporta 4, no 12', () => {
+    // Reproduce el caso real: "Cuadrilla 4P" (recursoId único) citada por 3
+    // tareas el mismo día/mes en producción. Confirmado por el usuario: es la
+    // MISMA gente hciendo 3 tareas secuenciales, no 3 cuadrillas en paralelo.
+    const cuadrilla4P = recursoCuadrilla('rec-cuadrilla-4p', 'Cuadrilla 4P', [
+      { recursoMiembroNombre: 'Supervisor', cantidad: 1 },
+      { recursoMiembroNombre: 'SSOMA', cantidad: 1 },
+      { recursoMiembroNombre: 'Tecnico', cantidad: 2 },
+    ])
+
+    const construccion = edt({
+      nombre: 'Construccion', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 300,
+      actividades: [{
+        id: 'a1', nombre: 'Montaje', orden: 0,
+        fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'),
+        horasPlan: 300, estado: 'pendiente', prioridad: 'media', descripcion: null,
+        tareas: [
+          tarea({ nombre: 'Elevador - Montaje de soportes y estructuras', fechaInicio: new Date('2026-08-28'), fechaFin: new Date('2026-08-28'), recurso: cuadrilla4P }),
+          tarea({ nombre: 'Elevador - Instalación de bandejas y tuberías', fechaInicio: new Date('2026-08-28'), fechaFin: new Date('2026-08-28'), recurso: cuadrilla4P }),
+          tarea({ nombre: 'Elevador - Tendido de Cables', fechaInicio: new Date('2026-08-28'), fechaFin: new Date('2026-08-28'), recurso: cuadrilla4P }),
+        ],
+      }],
+    })
+
+    const { data } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
+
+    // 1 (Supervisor) + 1 (SSOMA) + 2 (Tecnico) = 4 — NO 12 (3 tareas x 4).
+    expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'Supervisor')!.total).toBe(1)
+    expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'SSOMA')!.total).toBe(1)
+    expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'Tecnico')!.total).toBe(2)
   })
 
   it('una cuadrilla (ej. "Cuadrilla 4P") se descompone en sus perfiles reales, no en una fila "Cuadrilla 4P"', () => {
@@ -81,10 +115,10 @@ describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO real (infor
         tareas: [
           tarea({
             nombre: 'Montaje de soportes', fechaInicio: new Date('2026-08-05'), fechaFin: new Date('2026-08-10'),
-            recurso: recursoCuadrilla('Cuadrilla 4P', [
+            recurso: recursoCuadrilla('rec-4p', 'Cuadrilla 4P', [
               { recursoMiembroNombre: 'Supervisor', cantidad: 1 },
               { recursoMiembroNombre: 'SSOMA', cantidad: 1 },
-              { recursoMiembroNombre: 'Tecnico', cantidad: 2 }, // "3× Tecnico" ya no son 3 filas de empleado, es 1 perfil con cantidad
+              { recursoMiembroNombre: 'Tecnico', cantidad: 2 },
             ]),
           }),
         ],
@@ -99,9 +133,9 @@ describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO real (infor
     expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'Tecnico')!.total).toBe(2)
   })
 
-  it('2 tareas concurrentes del mismo perfil SUMAN (ya no se deduplica por empleado — no hay empleado en el camino)', () => {
-    const cuadrilla2P = recursoCuadrilla('Cuadrilla 2P', [{ recursoMiembroNombre: 'Tecnico', cantidad: 2 }])
-    const cuadrilla3P = recursoCuadrilla('Cuadrilla 3P', [{ recursoMiembroNombre: 'Tecnico', cantidad: 3 }])
+  it('2 recursos DISTINTOS (dos cuadrillas distintas) con el mismo perfil, concurrentes, SÍ se suman — son crews reales coexistiendo', () => {
+    const cuadrilla2P = recursoCuadrilla('rec-2p', 'Cuadrilla 2P', [{ recursoMiembroNombre: 'Tecnico', cantidad: 2 }])
+    const cuadrilla3P = recursoCuadrilla('rec-3p', 'Cuadrilla 3P', [{ recursoMiembroNombre: 'Tecnico', cantidad: 3 }])
 
     const construccion = edt({
       nombre: 'Construccion', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 200,
@@ -110,7 +144,7 @@ describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO real (infor
         fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'),
         horasPlan: 200, estado: 'pendiente', prioridad: 'media', descripcion: null,
         tareas: [
-          // 2 tareas concurrentes el mismo mes, cada una con su propia cuadrilla de "Tecnico".
+          // 2 tareas concurrentes el mismo mes, cada una con SU PROPIA cuadrilla (recursoId distinto).
           tarea({ nombre: 'Tarea A (2P)', fechaInicio: new Date('2026-08-28'), fechaFin: new Date('2026-08-28'), recurso: cuadrilla2P }),
           tarea({ nombre: 'Tarea B (3P)', fechaInicio: new Date('2026-08-28'), fechaFin: new Date('2026-08-28'), recurso: cuadrilla3P }),
         ],
@@ -119,12 +153,12 @@ describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO real (infor
 
     const { data } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
 
-    // 2 (de Cuadrilla 2P) + 3 (de Cuadrilla 3P) = 5 — es una declaración de dotación real, no una coincidencia a evitar.
+    // 2 (Cuadrilla 2P) + 3 (Cuadrilla 3P) = 5 — son 2 recursos DISTINTOS, no el mismo citado 2 veces.
     expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'Tecnico')!.total).toBe(5)
   })
 
   it('una cuadrilla sin perfiles configurados aporta 0 y emite advertencia — nunca inventa una dotación', () => {
-    const cuadrillaVacia = recursoCuadrilla('Cuadrilla 5P', [])
+    const cuadrillaVacia = recursoCuadrilla('rec-5p', 'Cuadrilla 5P', [])
     const construccion = edt({
       nombre: 'Construccion', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 40,
       actividades: [{
@@ -148,7 +182,7 @@ describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO real (infor
         id: 'a1', nombre: 'Seguimiento', orden: 0,
         fechaInicioPlan: new Date('2026-07-01'), fechaFinPlan: new Date('2026-09-30'),
         horasPlan: 10, estado: 'pendiente', prioridad: 'media', descripcion: null,
-        tareas: [tarea({ nombre: 'Reunión semanal', fechaInicio: new Date('2026-07-01'), fechaFin: new Date('2026-07-10'), recurso: recursoIndividual('Gestor') })],
+        tareas: [tarea({ nombre: 'Reunión semanal', fechaInicio: new Date('2026-07-01'), fechaFin: new Date('2026-07-10'), recurso: recursoIndividual('rec-gestor', 'Gestor') })],
       }],
     })
 
