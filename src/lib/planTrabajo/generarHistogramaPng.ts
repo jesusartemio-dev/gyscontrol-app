@@ -69,53 +69,60 @@ export function calcularEscalaY(maxValor: number, cantidadTicksObjetivo = 5): { 
   return { max: Math.ceil(maxValor / paso) * paso, paso }
 }
 
-export function construirSvgBarras(titulo: string, meses: string[], series: Serie[], modo: 'agrupado' | 'apilado'): string {
+/**
+ * Dibuja las barras + eje Y sobre el eje X genérico `categorias` — meses
+ * (formateados por el caller con `formatearMes`, ver generarHistogramaEquipoPng/
+ * generarHistogramaHHPng) o cualquier otra categoría de texto (actividades,
+ * ver generarHistogramaHHActividadPng). Esta función NO sabe qué representa
+ * cada categoría — solo la dibuja.
+ */
+export function construirSvgBarras(titulo: string, categorias: string[], series: Serie[], modo: 'agrupado' | 'apilado'): string {
   const anchoGrafico = ANCHO - MARGEN.left - MARGEN.right
   const altoGrafico = ALTO - MARGEN.top - MARGEN.bottom
 
   const maxValor =
     modo === 'apilado'
-      ? Math.max(1, ...meses.map((_, mi) => series.reduce((s, serie) => s + (serie.valores[mi] ?? 0), 0)))
+      ? Math.max(1, ...categorias.map((_, ci) => series.reduce((s, serie) => s + (serie.valores[ci] ?? 0), 0)))
       : Math.max(1, ...series.flatMap(s => s.valores))
   const { max: maxEscala, paso: pasoEscala } = calcularEscalaY(maxValor)
 
-  const anchoMes = anchoGrafico / Math.max(1, meses.length)
-  const anchoBarraGrupo = anchoMes * 0.7
+  const anchoCategoria = anchoGrafico / Math.max(1, categorias.length)
+  const anchoBarraGrupo = anchoCategoria * 0.7
   const anchoBarraIndividual = modo === 'agrupado' ? anchoBarraGrupo / Math.max(1, series.length) : anchoBarraGrupo
   const escalaY = (v: number) => (v / maxEscala) * altoGrafico
 
   let barrasSvg = ''
-  meses.forEach((mes, mi) => {
-    const xMes = MARGEN.left + mi * anchoMes + (anchoMes - anchoBarraGrupo) / 2
+  categorias.forEach((categoria, ci) => {
+    const xCategoria = MARGEN.left + ci * anchoCategoria + (anchoCategoria - anchoBarraGrupo) / 2
 
     if (modo === 'apilado') {
       let acumulado = 0
       series.forEach((serie, si) => {
-        const valor = serie.valores[mi] ?? 0
+        const valor = serie.valores[ci] ?? 0
         const yTope = altoGrafico - escalaY(acumulado + valor)
         const alto = escalaY(valor)
-        barrasSvg += `<rect x="${xMes.toFixed(1)}" y="${(MARGEN.top + yTope).toFixed(1)}" width="${anchoBarraIndividual.toFixed(1)}" height="${Math.max(0, alto).toFixed(1)}" fill="${COLORES[si % COLORES.length]}"/>`
+        barrasSvg += `<rect x="${xCategoria.toFixed(1)}" y="${(MARGEN.top + yTope).toFixed(1)}" width="${anchoBarraIndividual.toFixed(1)}" height="${Math.max(0, alto).toFixed(1)}" fill="${COLORES[si % COLORES.length]}"/>`
         acumulado += valor
       })
     } else {
       series.forEach((serie, si) => {
-        const valor = serie.valores[mi] ?? 0
-        const x = xMes + si * anchoBarraIndividual
+        const valor = serie.valores[ci] ?? 0
+        const x = xCategoria + si * anchoBarraIndividual
         const alto = escalaY(valor)
         const y = altoGrafico - alto
         barrasSvg += `<rect x="${x.toFixed(1)}" y="${(MARGEN.top + y).toFixed(1)}" width="${(anchoBarraIndividual * 0.9).toFixed(1)}" height="${Math.max(0, alto).toFixed(1)}" fill="${COLORES[si % COLORES.length]}"/>`
       })
     }
 
-    const etiquetaMes = formatearMes(mes, meses)
-    const xEtiqueta = xMes + anchoBarraGrupo / 2
+    const etiqueta = categoria.length > 22 ? `${categoria.slice(0, 21)}…` : categoria
+    const xEtiqueta = xCategoria + anchoBarraGrupo / 2
     const yEtiqueta = MARGEN.top + altoGrafico + 16
-    // Horizontal si entra en el ancho del mes (estilo del manual: "MAYO", "JUNIO"...);
-    // si hay muchos meses y no entra, rota -40° como antes para no superponerse.
-    const cabeEnHorizontal = etiquetaMes.length * 6.2 < anchoMes
+    // Horizontal si entra en el ancho de la categoría (estilo del manual: "MAYO", "JUNIO"...);
+    // si no entra (muchas categorías o etiquetas largas), rota -40° como antes para no superponerse.
+    const cabeEnHorizontal = etiqueta.length * 6.2 < anchoCategoria
     barrasSvg += cabeEnHorizontal
-      ? `<text x="${xEtiqueta.toFixed(1)}" y="${yEtiqueta}" font-size="11" text-anchor="middle" fill="#333">${escapeXml(etiquetaMes)}</text>`
-      : `<text x="${xEtiqueta.toFixed(1)}" y="${yEtiqueta}" font-size="11" text-anchor="end" fill="#333" transform="rotate(-40 ${xEtiqueta.toFixed(1)} ${yEtiqueta})">${escapeXml(etiquetaMes)}</text>`
+      ? `<text x="${xEtiqueta.toFixed(1)}" y="${yEtiqueta}" font-size="11" text-anchor="middle" fill="#333">${escapeXml(etiqueta)}</text>`
+      : `<text x="${xEtiqueta.toFixed(1)}" y="${yEtiqueta}" font-size="11" text-anchor="end" fill="#333" transform="rotate(-40 ${xEtiqueta.toFixed(1)} ${yEtiqueta})">${escapeXml(etiqueta)}</text>`
   })
 
   // Eje Y: gridlines horizontales + valor numérico en cada tick (0, paso, 2×paso... hasta maxEscala).
@@ -165,13 +172,35 @@ async function svgAPng(svg: string): Promise<ImagenResueltaTag> {
 /** null si no hay datos (sin meses o sin filas) — el flag `tieneHistogramaEquipoPng` queda en false y no se exporta gráfico. */
 export async function generarHistogramaEquipoPng(histogramas: PlanHistogramas): Promise<ImagenResueltaTag | null> {
   if (histogramas.meses.length === 0 || histogramas.equipoTrabajo.length === 0) return null
+  const meses = histogramas.meses.map(m => formatearMes(m, histogramas.meses))
   const series = histogramas.equipoTrabajo.map(f => ({ etiqueta: f.etiqueta, valores: f.valoresPorMes }))
-  return svgAPng(construirSvgBarras('Histograma de Equipo de Trabajo', histogramas.meses, series, 'agrupado'))
+  return svgAPng(construirSvgBarras('Histograma de Equipo de Trabajo', meses, series, 'agrupado'))
 }
 
 /** null si no hay datos (sin meses o sin filas) — el flag `tieneHistogramaHHPng` queda en false y no se exporta gráfico. */
 export async function generarHistogramaHHPng(histogramas: PlanHistogramas): Promise<ImagenResueltaTag | null> {
   if (histogramas.meses.length === 0 || histogramas.horasHombre.length === 0) return null
+  const meses = histogramas.meses.map(m => formatearMes(m, histogramas.meses))
   const series = histogramas.horasHombre.map(f => ({ etiqueta: f.etiqueta, valores: f.valoresPorMes }))
-  return svgAPng(construirSvgBarras('Histograma de Horas-Hombre', histogramas.meses, series, 'apilado'))
+  return svgAPng(construirSvgBarras('Histograma de Horas-Hombre', meses, series, 'apilado'))
+}
+
+/**
+ * §13.2 — detalle de HH por actividad, SOLO Construcción/Comisionamiento
+ * (ver `calcularHHPorActividadConCmn` en calcularDatos.ts). Es un
+ * COMPLEMENTO del histograma de horasHombre de arriba (por EDT/mes), no un
+ * total alternativo — el título lo deja explícito para no leerse como
+ * contradictorio junto a la tabla de totales mensuales.
+ * null si no hay EDTs de Construcción/Comisionamiento con datos — el flag
+ * `tieneHistogramaHHActividadPng` queda en false y no se exporta gráfico.
+ */
+export async function generarHistogramaHHActividadPng(
+  histogramas: PlanHistogramas
+): Promise<ImagenResueltaTag | null> {
+  const detalle = histogramas.hhPorActividadConCmn
+  if (!detalle || detalle.actividades.length === 0 || detalle.series.length === 0) return null
+  const series = detalle.series.map(s => ({ etiqueta: s.cargo, valores: s.valoresPorActividad }))
+  return svgAPng(
+    construirSvgBarras('Detalle HH por Actividad — Construcción y Comisionamiento', detalle.actividades, series, 'apilado')
+  )
 }

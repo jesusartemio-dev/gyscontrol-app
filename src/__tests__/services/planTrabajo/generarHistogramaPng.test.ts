@@ -2,6 +2,7 @@ import sharp from 'sharp'
 import {
   generarHistogramaEquipoPng,
   generarHistogramaHHPng,
+  generarHistogramaHHActividadPng,
   construirSvgBarras,
   formatearMes,
   calcularEscalaY,
@@ -79,17 +80,19 @@ describe('calcularEscalaY', () => {
 
 describe('construirSvgBarras — eje Y y títulos (§13, correcciones de legibilidad)', () => {
   const series = [{ etiqueta: 'Construcción', valores: [80, 80, 0] }]
-  const meses = ['2026-02', '2026-03', '2026-04']
+  // construirSvgBarras ya NO formatea fechas — recibe categorías ya formateadas
+  // (el caller, generarHistogramaEquipoPng/HHPng, aplica formatearMes antes de llamarla).
+  const categorias = ['FEBRERO', 'MARZO', 'ABRIL']
 
   it('el título ya NO dice "(por EDT)" — ni para equipo ni para horas-hombre (Bug fabricado por la sección §13.1)', () => {
-    const svgEquipo = construirSvgBarras('Histograma de Equipo de Trabajo', meses, series, 'agrupado')
-    const svgHH = construirSvgBarras('Histograma de Horas-Hombre', meses, series, 'apilado')
+    const svgEquipo = construirSvgBarras('Histograma de Equipo de Trabajo', categorias, series, 'agrupado')
+    const svgHH = construirSvgBarras('Histograma de Horas-Hombre', categorias, series, 'apilado')
     expect(svgEquipo).not.toContain('por EDT')
     expect(svgHH).not.toContain('por EDT')
   })
 
   it('el SVG trae gridlines horizontales y etiquetas numéricas en el eje Y (antes no existían)', () => {
-    const svg = construirSvgBarras('Título', meses, series, 'agrupado')
+    const svg = construirSvgBarras('Título', categorias, series, 'agrupado')
     const gridlines = svg.match(/stroke="#e0e0e0"/g) ?? []
     expect(gridlines.length).toBeGreaterThan(0)
     // maxValor=80 → calcularEscalaY(80) = {max:80, paso:20} → ticks 0,20,40,60,80
@@ -97,9 +100,39 @@ describe('construirSvgBarras — eje Y y títulos (§13, correcciones de legibil
     expect(svg).toContain('>80<')
   })
 
-  it('etiquetas de mes en formato Nexa ("FEBRERO", no "2026-02")', () => {
-    const svg = construirSvgBarras('Título', meses, series, 'agrupado')
+  it('dibuja las categorías tal cual se le pasan (no fabrica ni reformatea el eje X)', () => {
+    const svg = construirSvgBarras('Título', categorias, series, 'agrupado')
     expect(svg).toContain('FEBRERO')
-    expect(svg).not.toContain('2026-02')
+    expect(svg).toContain('MARZO')
+    expect(svg).toContain('ABRIL')
+  })
+})
+
+describe('generarHistogramaHHActividadPng (§13.2 — detalle CON/CMN)', () => {
+  it('devuelve null si no hay hhPorActividadConCmn (proyecto sin EDTs de Construcción/Comisionamiento)', async () => {
+    expect(await generarHistogramaHHActividadPng(histogramasFixture)).toBeNull()
+  })
+
+  it('devuelve null si hhPorActividadConCmn viene vacío (actividades o series en [])', async () => {
+    const sinDatos: PlanHistogramas = { ...histogramasFixture, hhPorActividadConCmn: { actividades: [], series: [] } }
+    expect(await generarHistogramaHHActividadPng(sinDatos)).toBeNull()
+  })
+
+  it('con datos, genera un PNG real cuyas series son por CARGO (no por EDT) y el título no contradice el total mensual', async () => {
+    const conDatos: PlanHistogramas = {
+      ...histogramasFixture,
+      hhPorActividadConCmn: {
+        actividades: ['Montaje de tablero', 'Pruebas eléctricas'],
+        series: [
+          { cargo: 'Supervisor', valoresPorActividad: [8, 4] },
+          { cargo: 'Tecnico', valoresPorActividad: [24, 12] },
+        ],
+      },
+    }
+    const png = await generarHistogramaHHActividadPng(conDatos)
+    expect(png).not.toBeNull()
+    const buffer = Buffer.from(png!.data.replace(/^data:image\/png;base64,/, ''), 'base64')
+    const metadata = await sharp(buffer).metadata()
+    expect(metadata.format).toBe('png')
   })
 })

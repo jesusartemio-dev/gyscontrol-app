@@ -6,7 +6,7 @@ import { construirDataBag } from '@/lib/planTrabajo/construirDataBag'
 import { renderizarPlanTrabajoDocx } from '@/lib/planTrabajo/exportDocx'
 import { validarParaExportar } from '@/lib/planTrabajo/validarParaExportar'
 import { resolverImagenesAlcance } from '@/lib/planTrabajo/resolverImagenesAlcance'
-import { generarHistogramaEquipoPng, generarHistogramaHHPng } from '@/lib/planTrabajo/generarHistogramaPng'
+import { generarHistogramaEquipoPng, generarHistogramaHHPng, generarHistogramaHHActividadPng } from '@/lib/planTrabajo/generarHistogramaPng'
 import { uploadFile } from '@/lib/services/googleDrive'
 import { getOrCreatePlanTrabajoFolder } from '@/lib/planTrabajo/getOrCreatePlanTrabajoFolder'
 import type { PlanHistogramas } from '@/types/planTrabajo'
@@ -83,10 +83,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   // Resolver imágenes de Drive a base64+dimensiones ANTES del render (Tarea 4
   // — docxtemplater-image-module-free exige getImage/getSize síncronos).
   const histogramas = (planDb.histogramas as PlanHistogramas | null) ?? { meses: [], equipoTrabajo: [], horasHombre: [] }
-  const [imagenesResueltas, histogramaEquipoPng, histogramaHHPng] = await Promise.all([
+  const [imagenesResueltas, histogramaEquipoPng, histogramaHHPng, histogramaHHActividadPng] = await Promise.all([
     resolverImagenesAlcance(imagenesAlcance),
     generarHistogramaEquipoPng(histogramas),
     generarHistogramaHHPng(histogramas),
+    generarHistogramaHHActividadPng(histogramas),
   ])
 
   // Construir dataBag
@@ -100,6 +101,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     imagenesResueltas,
     histogramaEquipoPng,
     histogramaHHPng,
+    histogramaHHActividadPng,
   })
 
   // Renderizar DOCX

@@ -41,6 +41,8 @@ export interface ConstruirDataBagOpciones {
   histogramaEquipoPng?: ImagenResueltaTag | null
   /** PNG ya generado (ver generarHistogramaPng.ts) — null si no hay datos suficientes (Bloque 4.2, Tarea 3). */
   histogramaHHPng?: ImagenResueltaTag | null
+  /** PNG ya generado (ver generarHistogramaPng.ts) — null si no hay EDTs de Construcción/Comisionamiento con datos (informe §13.2). */
+  histogramaHHActividadPng?: ImagenResueltaTag | null
 }
 
 /**
@@ -238,6 +240,7 @@ export function construirDataBag({
   imagenesResueltas = new Map(),
   histogramaEquipoPng = null,
   histogramaHHPng = null,
+  histogramaHHActividadPng = null,
 }: ConstruirDataBagOpciones): Record<string, unknown> {
   const personal = (plan.personalAsignado as PlanPersonal[] | null) ?? []
   const raci = (plan.matrizRaci as PlanRaci | null) ?? { filas: [] }
@@ -495,5 +498,13 @@ export function construirDataBag({
     histogramaEquipoPng: histogramaEquipoPng ?? IMAGEN_PLACEHOLDER,
     tieneHistogramaHHPng: histogramaHHPng !== null,
     histogramaHHPng: histogramaHHPng ?? IMAGEN_PLACEHOLDER,
+
+    // ─── §13.2 — detalle de HH por actividad, solo Construcción/Comisionamiento ───
+    // Nueva sección de la plantilla (ver README) — el usuario agrega el
+    // heading + {#tieneHistogramaHHActividadPng}{%histogramaHHActividadPng}
+    // {/tieneHistogramaHHActividadPng} a mano en Word, mismo patrón que el
+    // resto de imágenes condicionales de esta sección.
+    tieneHistogramaHHActividadPng: histogramaHHActividadPng !== null,
+    histogramaHHActividadPng: histogramaHHActividadPng ?? IMAGEN_PLACEHOLDER,
   }
 }

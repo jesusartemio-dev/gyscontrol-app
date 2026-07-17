@@ -33,6 +33,18 @@ export function esEdtDeSeguridad(nombreEdt: string): boolean {
   return /segur/i.test(nombreEdt)
 }
 
+/**
+ * EDT de Construcción o Comisionamiento específicamente (CON/CMN del manual
+ * de referencia) — MÁS ESTRECHO que `clasificarTipoEdt(...) === 'campo'`
+ * (que también incluye "montaje", "instalación", "obra" genéricos). Usado
+ * SOLO por el gráfico §13 de HH por actividad (informe §13.2) — no reutilizar
+ * para RACI, que ya tiene su propia noción (más amplia) de "campo".
+ */
+export function esEdtDeConstruccionOComisionamiento(nombreEdt: string): boolean {
+  const n = nombreEdt.toLowerCase()
+  return n.includes('construc') || n.includes('comision')
+}
+
 /** El EDT cuyo nombre refiere a planos/dibujo/documentación — usado para darle R (no solo I) al Cadista ahí. */
 export function esEdtDeDocumentacion(nombreEdt: string): boolean {
   return /plano|dibujo|documentaci/i.test(nombreEdt)

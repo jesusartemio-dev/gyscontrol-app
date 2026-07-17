@@ -5,13 +5,21 @@ import type {
   PlanRaci,
   PlanRaciRol,
   PlanHistogramas,
+  PlanHistogramaHHActividad,
   PlanCronograma,
   PlanReferencia,
   TdrContexto,
   CronogramaContexto,
 } from '@/types/planTrabajo'
 import { deduplicarSiglas, calcularSiglasBase } from './siglas'
-import { calcularRolRaci, clasificarTipoEdt, esEdtDeSeguridad, esEdtDeDocumentacion, prioridadAprobador } from './raciReglas'
+import {
+  calcularRolRaci,
+  clasificarTipoEdt,
+  esEdtDeSeguridad,
+  esEdtDeDocumentacion,
+  esEdtDeConstruccionOComisionamiento,
+  prioridadAprobador,
+} from './raciReglas'
 import { REFERENCIAS_BASE } from './referenciasBase'
 
 /**
@@ -388,6 +396,8 @@ export function calcularHistogramasYCronograma(
     return { etiqueta: cargo, valoresPorMes, total: valoresPorMes.reduce((max, v) => Math.max(max, v), 0) }
   })
 
+  const hhPorActividadConCmn = calcularHHPorActividadConCmn(fases)
+
   const horasHombre = edtsConFecha.map(e => {
     const mesesEdt = mesesEntre(e.fechaInicioPlan, e.fechaFinPlan)
     const horas = e.horasPlan ?? 0
@@ -418,12 +428,79 @@ export function calcularHistogramasYCronograma(
 
   return {
     data: {
-      histogramas: { meses, equipoTrabajo, horasHombre, porFase },
+      histogramas: { meses, equipoTrabajo, horasHombre, porFase, hhPorActividadConCmn },
       cronogramaResumen: { filas: cronogramaFilas },
       totalHH,
     },
     advertencias,
   }
+}
+
+/** Tarea con los campos que necesita el reparto de HH por cargo (informe §13.2). */
+interface TareaParaHHActividad {
+  horasEstimadas: number | null
+  recurso: RecursoDeTarea | null
+}
+
+interface HorasPorCargo {
+  cargo: string
+  horas: number
+}
+
+/**
+ * Reparte las horasEstimadas REALES de una tarea entre los cargos que aporta
+ * su recurso, proporcional a la cantidad de cada cargo (mismo criterio que
+ * `aportesDeRecurso`: individual = 100% a su propio cargo; cuadrilla =
+ * proporcional a la composición de perfiles). Nunca fabrica un total nuevo —
+ * solo distribuye el que ya existe en la tarea.
+ */
+function repartirHorasPorCargo(tarea: TareaParaHHActividad): HorasPorCargo[] {
+  if (!tarea.recurso || !tarea.horasEstimadas) return []
+  const aportes = aportesDeRecurso(tarea.recurso)
+  const totalCantidad = aportes.reduce((s, a) => s + a.cantidad, 0)
+  if (totalCantidad === 0) return []
+  return aportes.map(a => ({ cargo: a.cargo, horas: (tarea.horasEstimadas! * a.cantidad) / totalCantidad }))
+}
+
+/**
+ * HH por actividad × cargo, SOLO EDTs de Construcción/Comisionamiento
+ * (informe §13.2 — detalle que complementa, sin reemplazar, el histograma de
+ * horasHombre por EDT/mes de más arriba). Si 2 EDTs distintos tienen una
+ * actividad con el MISMO nombre, sus horas se suman bajo esa única etiqueta
+ * (mismo criterio de agregación por etiqueta que `equipoTrabajo`).
+ */
+function calcularHHPorActividadConCmn(
+  fases: { nombre: string; edts: CronogramaContexto['fases'][number]['edts'] }[]
+): PlanHistogramaHHActividad {
+  const edtsConCmn = fases.flatMap(f => f.edts).filter(e => esEdtDeConstruccionOComisionamiento(e.nombre))
+
+  const horasPorActividadYCargo = new Map<string, Map<string, number>>()
+  for (const edt of edtsConCmn) {
+    for (const actividad of edt.actividades) {
+      const porCargo = horasPorActividadYCargo.get(actividad.nombre) ?? new Map<string, number>()
+      for (const tarea of actividad.tareas) {
+        for (const aporte of repartirHorasPorCargo(tarea)) {
+          porCargo.set(aporte.cargo, (porCargo.get(aporte.cargo) ?? 0) + aporte.horas)
+        }
+      }
+      // Solo se registra la actividad si algún cargo aportó horas — una actividad
+      // sin recurso/horasEstimadas válidos no debe aparecer como una barra vacía.
+      if (porCargo.size > 0) horasPorActividadYCargo.set(actividad.nombre, porCargo)
+    }
+  }
+
+  const actividades = [...horasPorActividadYCargo.keys()]
+  const cargosDistintos = new Set<string>()
+  for (const porCargo of horasPorActividadYCargo.values()) {
+    for (const cargo of porCargo.keys()) cargosDistintos.add(cargo)
+  }
+
+  const series = [...cargosDistintos].map(cargo => ({
+    cargo,
+    valoresPorActividad: actividades.map(act => Math.round((horasPorActividadYCargo.get(act)!.get(cargo) ?? 0) * 10) / 10),
+  }))
+
+  return { actividades, series }
 }
 
 /**

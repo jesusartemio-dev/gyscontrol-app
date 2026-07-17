@@ -6,7 +6,7 @@ import { getSnapshotPlan, getSnapshotPng } from '@/lib/planTrabajo/snapshotHelpe
 import { construirDataBag } from '@/lib/planTrabajo/construirDataBag'
 import { renderizarPlanTrabajoDocx } from '@/lib/planTrabajo/exportDocx'
 import { resolverImagenesAlcance } from '@/lib/planTrabajo/resolverImagenesAlcance'
-import { generarHistogramaEquipoPng, generarHistogramaHHPng } from '@/lib/planTrabajo/generarHistogramaPng'
+import { generarHistogramaEquipoPng, generarHistogramaHHPng, generarHistogramaHHActividadPng } from '@/lib/planTrabajo/generarHistogramaPng'
 import type { PlanHistogramas } from '@/types/planTrabajo'
 
 type Ctx = { params: Promise<{ id: string; generacionId: string }> }
@@ -74,10 +74,11 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   }
 
   const histogramas = (snapshotPlan.histogramas as PlanHistogramas | null) ?? { meses: [], equipoTrabajo: [], horasHombre: [] }
-  const [imagenesResueltas, histogramaEquipoPng, histogramaHHPng] = await Promise.all([
+  const [imagenesResueltas, histogramaEquipoPng, histogramaHHPng, histogramaHHActividadPng] = await Promise.all([
     resolverImagenesAlcance(imagenesAlcance),
     generarHistogramaEquipoPng(histogramas),
     generarHistogramaHHPng(histogramas),
+    generarHistogramaHHActividadPng(histogramas),
   ])
 
   const dataBag = construirDataBag({
@@ -90,6 +91,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     imagenesResueltas,
     histogramaEquipoPng,
     histogramaHHPng,
+    histogramaHHActividadPng,
   })
 
   let docxBuffer: Buffer

@@ -259,3 +259,111 @@ describe('calcularMatrizRaci — todas las filas comparten largo/orden de asigna
     expect(advertencias.some(a => a.toLowerCase().includes('columnas'))).toBe(false)
   })
 })
+
+describe('hhPorActividadConCmn — detalle de HH por actividad, SOLO EDTs de Construcción/Comisionamiento (informe §13.2)', () => {
+  function actividad(overrides: Partial<EdtFixture['actividades'][number]> & { nombre: string; tareas: TareaFixture[] }): EdtFixture['actividades'][number] {
+    return {
+      id: `act-${overrides.nombre}`,
+      orden: 0,
+      fechaInicioPlan: new Date('2026-08-01'),
+      fechaFinPlan: new Date('2026-08-31'),
+      horasPlan: null,
+      estado: 'pendiente',
+      prioridad: 'media',
+      descripcion: null,
+      ...overrides,
+    }
+  }
+
+  it('un EDT de Planificación (gestión) queda AFUERA, aunque tenga tareas con horas y recurso', () => {
+    const planificacion = edt({
+      nombre: 'Planificación', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 40,
+      actividades: [actividad({
+        nombre: 'Elaboración de planos',
+        tareas: [tarea({ horasEstimadas: 40, recurso: recursoIndividual('rec-cad', 'Cadista'), fechaInicio: new Date('2026-08-01'), fechaFin: new Date('2026-08-10') })],
+      })],
+    })
+
+    const { data } = calcularHistogramasYCronograma([{ nombre: 'Ingeniería', edts: [planificacion] }])
+
+    expect(data.histogramas.hhPorActividadConCmn).toEqual({ actividades: [], series: [] })
+  })
+
+  it('un recurso individual en un EDT de Construcción aporta el 100% de las horas de la tarea a su propio cargo', () => {
+    const construccion = edt({
+      nombre: 'Construcción Eléctrica', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 40,
+      actividades: [actividad({
+        nombre: 'Montaje de bandejas',
+        tareas: [tarea({ horasEstimadas: 40, recurso: recursoIndividual('rec-tec', 'Tecnico'), fechaInicio: new Date('2026-08-01'), fechaFin: new Date('2026-08-10') })],
+      })],
+    })
+
+    const { data } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
+
+    expect(data.histogramas.hhPorActividadConCmn).toEqual({
+      actividades: ['Montaje de bandejas'],
+      series: [{ cargo: 'Tecnico', valoresPorActividad: [40] }],
+    })
+  })
+
+  it('una cuadrilla reparte las horas de la tarea PROPORCIONAL a la cantidad de cada perfil (nunca la suma completa a cada uno)', () => {
+    const cuadrilla = recursoCuadrilla('rec-4p', 'Cuadrilla 4P', [
+      { recursoMiembroNombre: 'Supervisor', cantidad: 1 },
+      { recursoMiembroNombre: 'Tecnico', cantidad: 3 },
+    ])
+    const comisionamiento = edt({
+      nombre: 'Comisionamiento', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 40,
+      actividades: [actividad({
+        nombre: 'Pruebas funcionales',
+        tareas: [tarea({ horasEstimadas: 40, recurso: cuadrilla, fechaInicio: new Date('2026-08-01'), fechaFin: new Date('2026-08-10') })],
+      })],
+    })
+
+    const { data } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [comisionamiento] }])
+
+    const series = data.histogramas.hhPorActividadConCmn!.series
+    expect(series.find(s => s.cargo === 'Supervisor')!.valoresPorActividad).toEqual([10]) // 1/4 de 40
+    expect(series.find(s => s.cargo === 'Tecnico')!.valoresPorActividad).toEqual([30]) // 3/4 de 40
+  })
+
+  it('2 EDTs distintos (CON y CMN) con una actividad del MISMO nombre suman sus horas bajo una sola etiqueta', () => {
+    const construccion = edt({
+      nombre: 'Construcción', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 20,
+      actividades: [actividad({
+        nombre: 'Pruebas',
+        tareas: [tarea({ horasEstimadas: 20, recurso: recursoIndividual('rec-tec', 'Tecnico'), fechaInicio: new Date('2026-08-01'), fechaFin: new Date('2026-08-05') })],
+      })],
+    })
+    const comisionamiento = edt({
+      nombre: 'Comisionamiento', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 20,
+      actividades: [actividad({
+        nombre: 'Pruebas',
+        tareas: [tarea({ horasEstimadas: 20, recurso: recursoIndividual('rec-tec', 'Tecnico'), fechaInicio: new Date('2026-08-01'), fechaFin: new Date('2026-08-05') })],
+      })],
+    })
+
+    const { data } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion, comisionamiento] }])
+
+    expect(data.histogramas.hhPorActividadConCmn).toEqual({
+      actividades: ['Pruebas'],
+      series: [{ cargo: 'Tecnico', valoresPorActividad: [40] }],
+    })
+  })
+
+  it('una tarea sin recurso o sin horasEstimadas no aporta nada (nunca inventa un reparto)', () => {
+    const construccion = edt({
+      nombre: 'Construcción', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 0,
+      actividades: [actividad({
+        nombre: 'Montaje',
+        tareas: [
+          tarea({ horasEstimadas: null, recurso: recursoIndividual('rec-tec', 'Tecnico'), fechaInicio: new Date('2026-08-01'), fechaFin: new Date('2026-08-05') }),
+          tarea({ horasEstimadas: 40, recurso: null, fechaInicio: new Date('2026-08-01'), fechaFin: new Date('2026-08-05') }),
+        ],
+      })],
+    })
+
+    const { data } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
+
+    expect(data.histogramas.hhPorActividadConCmn).toEqual({ actividades: [], series: [] })
+  })
+})

@@ -173,12 +173,33 @@ export interface PlanHistogramaFase {
   total: number
 }
 
+export interface PlanHistogramaHHActividadSerie {
+  cargo: string
+  valoresPorActividad: number[]
+}
+
+/**
+ * Detalle de HH por actividad, SOLO para EDTs de Construcción/Comisionamiento
+ * (informe §13.2) — granularidad distinta a `horasHombre` (que es por EDT
+ * completo, mes a mes): acá el eje es la actividad, no el mes, y las series
+ * son por CARGO real (mismo vocabulario que `equipoTrabajo`, nunca por
+ * instancia individual — el modelo de datos no distingue "Técnico 1" de
+ * "Técnico 2"). Es un SUBCONJUNTO de horasHombre, no un total alternativo:
+ * la suma de esta sección será menor al total mensual (§13.2) a propósito.
+ */
+export interface PlanHistogramaHHActividad {
+  actividades: string[]
+  series: PlanHistogramaHHActividadSerie[]
+}
+
 export interface PlanHistogramas {
   meses: string[]
   equipoTrabajo: PlanHistogramaFila[]
   horasHombre: PlanHistogramaFila[]
   /** HH por fase, misma fuente que totalHH — usado en el bloque de HECHOS de Etapa 2 (addendum B). */
   porFase?: PlanHistogramaFase[]
+  /** Ver PlanHistogramaHHActividad — ausente/vacío si no hay EDTs de Construcción/Comisionamiento con datos. */
+  hhPorActividadConCmn?: PlanHistogramaHHActividad
 }
 
 // ─── Cronograma resumen ───
