@@ -41,7 +41,35 @@ interface Serie {
   valores: number[]
 }
 
-function construirSvgBarras(titulo: string, meses: string[], series: Serie[], modo: 'agrupado' | 'apilado'): string {
+const NOMBRES_MES = [
+  'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
+  'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE',
+]
+
+/** "2026-08" → "AGOSTO" (estilo Nexa) — agrega el año solo si el histograma cruza más de un año, para no confundir meses homónimos. */
+export function formatearMes(mesKey: string, todosLosMeses: string[]): string {
+  const [anio, mes] = mesKey.split('-')
+  const nombre = NOMBRES_MES[Number(mes) - 1] ?? mesKey
+  const cruzaVariosAnios = new Set(todosLosMeses.map(m => m.split('-')[0])).size > 1
+  return cruzaVariosAnios ? `${nombre} ${anio}` : nombre
+}
+
+/**
+ * Escala "redonda" para el eje Y (estilo Excel: 0, 100, 200... en vez de
+ * 0, 137, 274...) — el tope real de la escala es SIEMPRE >= al valor máximo
+ * de los datos, nunca lo recorta.
+ */
+export function calcularEscalaY(maxValor: number, cantidadTicksObjetivo = 5): { max: number; paso: number } {
+  if (maxValor <= 0) return { max: cantidadTicksObjetivo, paso: 1 }
+  const pasoBruto = maxValor / cantidadTicksObjetivo
+  const magnitud = Math.pow(10, Math.floor(Math.log10(pasoBruto)))
+  const residuo = pasoBruto / magnitud
+  const pasoNormalizado = residuo <= 1 ? 1 : residuo <= 2 ? 2 : residuo <= 5 ? 5 : 10
+  const paso = pasoNormalizado * magnitud
+  return { max: Math.ceil(maxValor / paso) * paso, paso }
+}
+
+export function construirSvgBarras(titulo: string, meses: string[], series: Serie[], modo: 'agrupado' | 'apilado'): string {
   const anchoGrafico = ANCHO - MARGEN.left - MARGEN.right
   const altoGrafico = ALTO - MARGEN.top - MARGEN.bottom
 
@@ -49,11 +77,12 @@ function construirSvgBarras(titulo: string, meses: string[], series: Serie[], mo
     modo === 'apilado'
       ? Math.max(1, ...meses.map((_, mi) => series.reduce((s, serie) => s + (serie.valores[mi] ?? 0), 0)))
       : Math.max(1, ...series.flatMap(s => s.valores))
+  const { max: maxEscala, paso: pasoEscala } = calcularEscalaY(maxValor)
 
   const anchoMes = anchoGrafico / Math.max(1, meses.length)
   const anchoBarraGrupo = anchoMes * 0.7
   const anchoBarraIndividual = modo === 'agrupado' ? anchoBarraGrupo / Math.max(1, series.length) : anchoBarraGrupo
-  const escalaY = (v: number) => (v / maxValor) * altoGrafico
+  const escalaY = (v: number) => (v / maxEscala) * altoGrafico
 
   let barrasSvg = ''
   meses.forEach((mes, mi) => {
@@ -78,14 +107,30 @@ function construirSvgBarras(titulo: string, meses: string[], series: Serie[], mo
       })
     }
 
+    const etiquetaMes = formatearMes(mes, meses)
     const xEtiqueta = xMes + anchoBarraGrupo / 2
     const yEtiqueta = MARGEN.top + altoGrafico + 16
-    barrasSvg += `<text x="${xEtiqueta.toFixed(1)}" y="${yEtiqueta}" font-size="11" text-anchor="end" fill="#333" transform="rotate(-40 ${xEtiqueta.toFixed(1)} ${yEtiqueta})">${escapeXml(mes)}</text>`
+    // Horizontal si entra en el ancho del mes (estilo del manual: "MAYO", "JUNIO"...);
+    // si hay muchos meses y no entra, rota -40° como antes para no superponerse.
+    const cabeEnHorizontal = etiquetaMes.length * 6.2 < anchoMes
+    barrasSvg += cabeEnHorizontal
+      ? `<text x="${xEtiqueta.toFixed(1)}" y="${yEtiqueta}" font-size="11" text-anchor="middle" fill="#333">${escapeXml(etiquetaMes)}</text>`
+      : `<text x="${xEtiqueta.toFixed(1)}" y="${yEtiqueta}" font-size="11" text-anchor="end" fill="#333" transform="rotate(-40 ${xEtiqueta.toFixed(1)} ${yEtiqueta})">${escapeXml(etiquetaMes)}</text>`
   })
 
+  // Eje Y: gridlines horizontales + valor numérico en cada tick (0, paso, 2×paso... hasta maxEscala).
+  let gridSvg = ''
+  const cantidadTicks = Math.round(maxEscala / pasoEscala)
+  for (let i = 0; i <= cantidadTicks; i++) {
+    const valorTick = i * pasoEscala
+    const y = MARGEN.top + altoGrafico - escalaY(valorTick)
+    gridSvg += `<line x1="${MARGEN.left}" y1="${y.toFixed(1)}" x2="${(MARGEN.left + anchoGrafico).toFixed(1)}" y2="${y.toFixed(1)}" stroke="${i === 0 ? '#888' : '#e0e0e0'}" stroke-width="1"/>`
+    gridSvg += `<text x="${MARGEN.left - 8}" y="${(y + 3.5).toFixed(1)}" font-size="10" text-anchor="end" fill="#666">${Math.round(valorTick)}</text>`
+  }
+
   const ejeSvg = `
+    ${gridSvg}
     <line x1="${MARGEN.left}" y1="${MARGEN.top}" x2="${MARGEN.left}" y2="${MARGEN.top + altoGrafico}" stroke="#888" stroke-width="1"/>
-    <line x1="${MARGEN.left}" y1="${MARGEN.top + altoGrafico}" x2="${MARGEN.left + anchoGrafico}" y2="${MARGEN.top + altoGrafico}" stroke="#888" stroke-width="1"/>
   `
 
   // Leyenda — hasta 3 columnas para no desbordar el ancho con muchos EDTs.
@@ -121,12 +166,12 @@ async function svgAPng(svg: string): Promise<ImagenResueltaTag> {
 export async function generarHistogramaEquipoPng(histogramas: PlanHistogramas): Promise<ImagenResueltaTag | null> {
   if (histogramas.meses.length === 0 || histogramas.equipoTrabajo.length === 0) return null
   const series = histogramas.equipoTrabajo.map(f => ({ etiqueta: f.etiqueta, valores: f.valoresPorMes }))
-  return svgAPng(construirSvgBarras('Histograma de Equipo de Trabajo (por EDT)', histogramas.meses, series, 'agrupado'))
+  return svgAPng(construirSvgBarras('Histograma de Equipo de Trabajo', histogramas.meses, series, 'agrupado'))
 }
 
 /** null si no hay datos (sin meses o sin filas) — el flag `tieneHistogramaHHPng` queda en false y no se exporta gráfico. */
 export async function generarHistogramaHHPng(histogramas: PlanHistogramas): Promise<ImagenResueltaTag | null> {
   if (histogramas.meses.length === 0 || histogramas.horasHombre.length === 0) return null
   const series = histogramas.horasHombre.map(f => ({ etiqueta: f.etiqueta, valores: f.valoresPorMes }))
-  return svgAPng(construirSvgBarras('Histograma de Horas-Hombre (por EDT)', histogramas.meses, series, 'apilado'))
+  return svgAPng(construirSvgBarras('Histograma de Horas-Hombre', histogramas.meses, series, 'apilado'))
 }
