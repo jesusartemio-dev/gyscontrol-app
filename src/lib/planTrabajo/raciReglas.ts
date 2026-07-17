@@ -37,7 +37,7 @@ export function esEdtDeSeguridad(nombreEdt: string): boolean {
  * EDT de Construcción o Comisionamiento específicamente (CON/CMN del manual
  * de referencia) — MÁS ESTRECHO que `clasificarTipoEdt(...) === 'campo'`
  * (que también incluye "montaje", "instalación", "obra" genéricos). Usado
- * SOLO por el gráfico §13 de HH por actividad (informe §13.2) — no reutilizar
+ * SOLO por el gráfico de HH por actividad (§13.3) — no reutilizar
  * para RACI, que ya tiene su propia noción (más amplia) de "campo".
  */
 export function esEdtDeConstruccionOComisionamiento(nombreEdt: string): boolean {

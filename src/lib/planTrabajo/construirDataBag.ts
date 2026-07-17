@@ -41,7 +41,7 @@ export interface ConstruirDataBagOpciones {
   histogramaEquipoPng?: ImagenResueltaTag | null
   /** PNG ya generado (ver generarHistogramaPng.ts) — null si no hay datos suficientes (Bloque 4.2, Tarea 3). */
   histogramaHHPng?: ImagenResueltaTag | null
-  /** PNG ya generado (ver generarHistogramaPng.ts) — null si no hay EDTs de Construcción/Comisionamiento con datos (informe §13.2). */
+  /** PNG ya generado (ver generarHistogramaPng.ts) — null si no hay EDTs de Construcción/Comisionamiento con datos (§13.3). */
   histogramaHHActividadPng?: ImagenResueltaTag | null
 }
 
@@ -499,11 +499,7 @@ export function construirDataBag({
     tieneHistogramaHHPng: histogramaHHPng !== null,
     histogramaHHPng: histogramaHHPng ?? IMAGEN_PLACEHOLDER,
 
-    // ─── §13.2 — detalle de HH por actividad, solo Construcción/Comisionamiento ───
-    // Nueva sección de la plantilla (ver README) — el usuario agrega el
-    // heading + {#tieneHistogramaHHActividadPng}{%histogramaHHActividadPng}
-    // {/tieneHistogramaHHActividadPng} a mano en Word, mismo patrón que el
-    // resto de imágenes condicionales de esta sección.
+    // ─── §13.3 — detalle de HH por actividad, solo Construcción/Comisionamiento ───
     tieneHistogramaHHActividadPng: histogramaHHActividadPng !== null,
     histogramaHHActividadPng: histogramaHHActividadPng ?? IMAGEN_PLACEHOLDER,
   }

@@ -1,6 +1,6 @@
 import type { PlanTrabajoContexto, OrgNodoContexto, SeccionRegenerable, PlanPersonal, PlanHistogramas } from '@/types/planTrabajo'
 import type { PlanTrabajo } from '@prisma/client'
-import { calcularTotalHH } from './calcularDatos'
+import { calcularTotalHH, calcularHHRealDeTarea } from './calcularDatos'
 
 /**
  * Bloque de "hechos" de Etapa 1 que se inyecta en el prompt de Etapa 2
@@ -247,9 +247,10 @@ export function serializarContextoParaIA(contexto: PlanTrabajoContexto): string 
   const totalHorasTareas = todasLasTareas.reduce(
     (sum, t) => sum + (Number(t.horasEstimadas) || 0), 0
   )
-  const totalHH = todasLasTareas.reduce(
-    (sum, t) => sum + ((Number(t.horasEstimadas) || 0) * (t.personasEstimadas || 1)), 0
-  )
+  // HH real = horasEstimadas × personas del recurso EN VIVO — NUNCA personasEstimadas
+  // (mismo cálculo que calcularHistogramasYCronograma, para que este resumen preliminar
+  // de FaseA no le muestre a la IA un número distinto del que Fase B cita como "hechos").
+  const totalHH = todasLasTareas.reduce((sum, t) => sum + calcularHHRealDeTarea(t), 0)
 
   const fechasEdts = todasLasEdts
     .flatMap(e => [e.fechaInicioPlan, e.fechaFinPlan])

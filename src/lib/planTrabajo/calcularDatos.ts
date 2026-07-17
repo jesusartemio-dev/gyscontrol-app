@@ -203,7 +203,33 @@ export function calcularMatrizRaci(
 }
 
 /** Recurso resuelto de una tarea — mismo shape que `CronogramaContexto[...]tareas[].recurso` (ver cargarContexto.ts). */
-type RecursoDeTarea = NonNullable<CronogramaContexto['fases'][number]['edts'][number]['actividades'][number]['tareas'][number]['recurso']>
+export type RecursoDeTarea = NonNullable<CronogramaContexto['fases'][number]['edts'][number]['actividades'][number]['tareas'][number]['recurso']>
+
+/**
+ * HH real de UNA tarea = horasEstimadas × personas del recurso EN VIVO.
+ * `horasEstimadas` es DURACIÓN, no horas-hombre (confirmado por su uso real
+ * en la calendarización — ver docs/analisis-pesos-avance.md, sección 4): una
+ * Cuadrilla 2P trabajando 4h de duración son 8 HH, no 4 (informe "el TOTAL
+ * HH: 468 no son horas-hombre"). NUNCA usa `personasEstimadas` — ese campo es
+ * un snapshot manual/histórico que casi siempre vale 1 aunque el recurso sea
+ * una cuadrilla real (ver el análisis, sección 5) — la fuente autoritativa es
+ * `Recurso`/`RecursoPerfil` en vivo, igual que ya hace `equipoTrabajo` (§13.1).
+ *
+ * "Sin dato no se rellena": sin recurso asignado, o cuadrilla sin perfiles
+ * cargados, esta función devuelve 0 — NUNCA asume 1 persona por defecto. El
+ * caller decide si eso amerita una advertencia (`calcularHistogramasYCronograma`
+ * sí la emite; ver `tareasSinRecursoConHoras`).
+ *
+ * Exportada para que `contextoIA.ts` (bloque de resumen numérico de la IA)
+ * use el MISMO número — nunca un cálculo propio derivado de personasEstimadas.
+ */
+export function calcularHHRealDeTarea(t: { horasEstimadas: number | null; recurso: RecursoDeTarea | null }): number {
+  const horas = Number(t.horasEstimadas) || 0
+  if (horas === 0 || !t.recurso) return 0
+  if (t.recurso.tipo === 'individual') return horas
+  const personas = t.recurso.perfiles.reduce((s, p) => s + p.cantidad, 0)
+  return horas * personas
+}
 
 interface EdtParaCronograma {
   id: string
@@ -211,10 +237,14 @@ interface EdtParaCronograma {
   faseNombre: string
   fechaInicioPlan: Date | null
   fechaFinPlan: Date | null
-  horasPlan: number | null
   actividades: { nombre: string }[]
-  /** Tareas reales del EDT (todas las actividades aplanadas) — fuente de la dotación por cargo de `equipoTrabajo` (informe §13, Bug 3). */
-  tareasConFecha: { recurso: RecursoDeTarea | null; fechaInicio: Date; fechaFin: Date }[]
+  /**
+   * Tareas reales del EDT (todas las actividades aplanadas) — fuente de la
+   * dotación por cargo de `equipoTrabajo` (informe §13, Bug 3) Y del HH real
+   * de horasHombre/totalHH/cronogramaResumen (`horasEstimadas × personas del
+   * recurso` — ver `hhRealDeTarea`, corrección del "468 no son horas-hombre").
+   */
+  tareasConFecha: { nombre: string; recurso: RecursoDeTarea | null; fechaInicio: Date; fechaFin: Date; horasEstimadas: number | null }[]
 }
 
 /**
@@ -281,16 +311,20 @@ function mesesEntre(inicio: Date, fin: Date): string[] {
 }
 
 /**
- * histogramaHH y cronogramaResumen — mapeo directo desde ProyectoEdt
- * (una fila por EDT, granularidad elegida para GARANTIZAR que totalHH ==
- * Σ histogramaHH[].total == Σ cronogramaResumen[].horasPlan, ya que las tres
- * cifras derivan del mismo conjunto de EDTs con fecha y del mismo horasPlan
- * — informe §4.2, causa raíz de las cifras de HH incoherentes).
- * `equipoTrabajo` (dotación de personas) es una granularidad DISTINTA: baja
- * hasta la tarea real (`personasEstimadas`) para poder calcular un pico real
- * por mes — ver comentario de `equipoTrabajo` más abajo (informe §13, bug de
- * histograma fabricado: antes era un flag binario de actividad del EDT, no
- * una cantidad de personas).
+ * histogramaHH y cronogramaResumen — una fila por EDT, con el HH REAL de ese
+ * EDT (`hhRealDelEdt` = Σ de sus tareas, cada una `horasEstimadas × personas
+ * del recurso en vivo` — NUNCA `edt.horasPlan` ni `personasEstimadas`, ver
+ * `hhRealDeTarea`). Antes esta sección leía `edt.horasPlan` directo — que es
+ * DURACIÓN sumada, no horas-hombre (el "TOTAL HH: 468" de CJM49 no eran
+ * horas-hombre reales: una Cuadrilla 2P de 4h de duración sumaba 4, no 8).
+ *
+ * Granularidad elegida para GARANTIZAR que totalHH == Σ histogramaHH[].total
+ * == Σ cronogramaResumen[].horasPlan (informe §4.2), ahora con el número real
+ * — las tres leen `edtsConHH`, computado una sola vez.
+ *
+ * `equipoTrabajo` (dotación de personas, §13.1) es una granularidad DISTINTA
+ * y NO se toca acá: baja hasta la tarea real para un pico por mes — ver su
+ * propio comentario más abajo.
  * EDTs sin fechaInicioPlan/fechaFinPlan se excluyen (no se pueden ubicar en
  * un mes) y generan una advertencia — nunca se inventan fechas.
  */
@@ -306,10 +340,9 @@ export function calcularHistogramasYCronograma(
       faseNombre: f.nombre,
       fechaInicioPlan: e.fechaInicioPlan,
       fechaFinPlan: e.fechaFinPlan,
-      horasPlan: e.horasPlan,
       actividades: e.actividades.map(a => ({ nombre: a.nombre })),
       tareasConFecha: e.actividades.flatMap(a =>
-        a.tareas.map(t => ({ recurso: t.recurso, fechaInicio: t.fechaInicio, fechaFin: t.fechaFin }))
+        a.tareas.map(t => ({ nombre: t.nombre, recurso: t.recurso, fechaInicio: t.fechaInicio, fechaFin: t.fechaFin, horasEstimadas: t.horasEstimadas }))
       ),
     }))
   )
@@ -326,7 +359,23 @@ export function calcularHistogramasYCronograma(
       e.fechaInicioPlan != null && e.fechaFinPlan != null
   )
 
-  const totalHH = edtsConFecha.reduce((sum, e) => sum + (e.horasPlan ?? 0), 0)
+  // HH REAL por tarea — ver `calcularHHRealDeTarea` (exportada para que
+  // contextoIA.ts use el MISMO número, nunca uno propio derivado de
+  // personasEstimadas). Reemplaza `edt.horasPlan` como fuente de
+  // horasHombre/totalHH/cronogramaResumen/porFase.
+  const tareasSinRecursoConHoras = new Set<string>()
+  function hhRealDeTarea(t: { nombre: string; horasEstimadas: number | null; recurso: RecursoDeTarea | null }): number {
+    if ((Number(t.horasEstimadas) || 0) > 0 && !t.recurso) tareasSinRecursoConHoras.add(t.nombre)
+    return calcularHHRealDeTarea(t) // 0 si sin recurso, o cuadrilla sin perfiles — nunca fabrica una dotación
+  }
+  function hhRealDelEdt(e: Pick<EdtParaCronograma, 'tareasConFecha'>): number {
+    return e.tareasConFecha.reduce((sum, t) => sum + hhRealDeTarea(t), 0)
+  }
+  // Se computa una sola vez por EDT — horasHombre, totalHH, cronogramaResumen y
+  // porFase leen todos el mismo número (garantiza la triple igualdad).
+  const edtsConHH = edtsConFecha.map(e => ({ ...e, hhReal: hhRealDelEdt(e) }))
+
+  const totalHH = edtsConHH.reduce((sum, e) => sum + e.hhReal, 0)
 
   const todasFechas = edtsConFecha.flatMap(e => [e.fechaInicioPlan, e.fechaFinPlan])
   const meses = todasFechas.length > 0
@@ -357,6 +406,11 @@ export function calcularHistogramasYCronograma(
   if (cuadrillasSinPerfiles.size > 0) {
     advertencias.push(
       `${cuadrillasSinPerfiles.size} cuadrilla(s) sin perfiles configurados (${[...cuadrillasSinPerfiles].join(', ')}) — sus tareas no aportan dotación al histograma de equipo hasta que se recargue su composición en /catalogo/recursos.`
+    )
+  }
+  if (tareasSinRecursoConHoras.size > 0) {
+    advertencias.push(
+      `${tareasSinRecursoConHoras.size} tarea(s) con horas estimadas cargadas pero SIN recurso asignado (${[...tareasSinRecursoConHoras].slice(0, 10).join(', ')}${tareasSinRecursoConHoras.size > 10 ? '...' : ''}) — no aportan a horasHombre/totalHH hasta que se les asigne un recurso (nunca se asume 1 persona por defecto).`
     )
   }
 
@@ -399,31 +453,31 @@ export function calcularHistogramasYCronograma(
   const { data: hhPorActividadConCmn, advertencias: advHHActividad } = calcularHHPorActividadConCmn(fases)
   advertencias.push(...advHHActividad)
 
-  const horasHombre = edtsConFecha.map(e => {
+  const horasHombre = edtsConHH.map(e => {
     const mesesEdt = mesesEntre(e.fechaInicioPlan, e.fechaFinPlan)
-    const horas = e.horasPlan ?? 0
+    const horas = e.hhReal
     const horasPorMes = mesesEdt.length > 0 ? horas / mesesEdt.length : 0
     const mesesEdtSet = new Set(mesesEdt)
     const valoresPorMes = meses.map(m => (mesesEdtSet.has(m) ? horasPorMes : 0))
     return { etiqueta: e.nombre, valoresPorMes, total: horas }
   })
 
-  const cronogramaFilas = edtsConFecha.map(e => ({
+  const cronogramaFilas = edtsConHH.map(e => ({
     fase: e.faseNombre,
     edt: e.nombre,
     actividad: resumenActividades(e.actividades),
     fechaInicio: e.fechaInicioPlan.toISOString().slice(0, 10),
     fechaFin: e.fechaFinPlan.toISOString().slice(0, 10),
-    horasPlan: e.horasPlan ?? 0,
+    horasPlan: e.hhReal,
   }))
 
-  // HH por fase — misma fuente (edtsConFecha) que totalHH, para que el bloque
+  // HH por fase — misma fuente (edtsConHH) que totalHH, para que el bloque
   // de HECHOS de Etapa 2 pueda citar horas por fase sin que la IA las invente
   // (addendum B — el docx auditado mostró una distribución de HH por fase
   // completamente distinta a la real aunque el total coincidía).
   const porFaseMap = new Map<string, number>()
-  for (const e of edtsConFecha) {
-    porFaseMap.set(e.faseNombre, (porFaseMap.get(e.faseNombre) ?? 0) + (e.horasPlan ?? 0))
+  for (const e of edtsConHH) {
+    porFaseMap.set(e.faseNombre, (porFaseMap.get(e.faseNombre) ?? 0) + e.hhReal)
   }
   const porFase = Array.from(porFaseMap.entries()).map(([fase, total]) => ({ fase, total }))
 
@@ -437,7 +491,7 @@ export function calcularHistogramasYCronograma(
   }
 }
 
-/** Tarea con los campos que necesita el reparto de HH por cargo (informe §13.2). */
+/** Tarea con los campos que necesita el reparto de HH por cargo (§13.3). */
 interface TareaParaHHActividad {
   horasEstimadas: number | null
   recurso: RecursoDeTarea | null
@@ -449,26 +503,28 @@ interface HorasPorCargo {
 }
 
 /**
- * Reparte las horasEstimadas REALES de una tarea entre los cargos que aporta
- * su recurso, proporcional a la cantidad de cada cargo (mismo criterio que
- * `aportesDeRecurso`: individual = 100% a su propio cargo; cuadrilla =
- * proporcional a la composición de perfiles). Nunca fabrica un total nuevo —
- * solo distribuye el que ya existe en la tarea.
+ * Reparte el HH REAL de una tarea (horasEstimadas × personas del recurso —
+ * ver `hhRealDeTarea`) entre los cargos que aporta su recurso: cada cargo se
+ * lleva `horasEstimadas × cantidad_de_ese_cargo` (NUNCA normalizado por el
+ * total de personas — normalizar volvía a la duración cruda, perdiendo
+ * exactamente la corrección de personas que motivó este cambio). Para un
+ * individual (`aportesDeRecurso` da 1 solo cargo con cantidad=1) esto es
+ * `horasEstimadas × 1` — sin cambios. La suma de todos los cargos de una
+ * tarea da exactamente su HH real (mismo número que `hhRealDeTarea`).
  */
 function repartirHorasPorCargo(tarea: TareaParaHHActividad): HorasPorCargo[] {
   if (!tarea.recurso || !tarea.horasEstimadas) return []
   const aportes = aportesDeRecurso(tarea.recurso)
-  const totalCantidad = aportes.reduce((s, a) => s + a.cantidad, 0)
-  if (totalCantidad === 0) return []
-  return aportes.map(a => ({ cargo: a.cargo, horas: (tarea.horasEstimadas! * a.cantidad) / totalCantidad }))
+  return aportes.map(a => ({ cargo: a.cargo, horas: tarea.horasEstimadas! * a.cantidad }))
 }
 
 /**
- * HH por actividad × cargo, SOLO EDTs de Construcción/Comisionamiento
- * (informe §13.2 — detalle que complementa, sin reemplazar, el histograma de
- * horasHombre por EDT/mes de más arriba). Si 2 EDTs distintos tienen una
- * actividad con el MISMO nombre, sus horas se suman bajo esa única etiqueta
- * (mismo criterio de agregación por etiqueta que `equipoTrabajo`).
+ * HH por actividad × cargo, SOLO EDTs de Construcción/Comisionamiento (§13.3
+ * — detalle que complementa, sin reemplazar, el histograma de horasHombre
+ * por EDT/mes de §13.2). Si 2 EDTs distintos tienen una actividad con el
+ * MISMO nombre, sus horas se suman bajo esa única etiqueta (mismo criterio
+ * de agregación por etiqueta que `equipoTrabajo`). Misma unidad HH real que
+ * el resto del documento (§1/§2/§13.2/§14) — nunca duración cruda.
  *
  * COMPUERTA DE COBERTURA (post-mortem del gráfico al 23%): este detalle
  * depende de `horasEstimadas` a nivel TAREA, un campo que en la práctica se
@@ -495,7 +551,7 @@ function calcularHHPorActividadConCmn(
     return {
       data: { actividades: [], series: [] },
       advertencias: [
-        `Detalle de HH por Actividad (Construcción/Comisionamiento, §13.2) NO se generó: solo ${tareasConHoras.length} de ${tareasConRecurso.length} tareas con recurso asignado (${pct}%) tienen "horas estimadas" cargadas. Completá las horas estimadas de TODAS las tareas de Construcción/Comisionamiento con recurso para habilitar este gráfico — un gráfico parcial se vería igual de completo que uno real.`,
+        `Detalle de HH por Actividad (Construcción/Comisionamiento, §13.3) NO se generó: solo ${tareasConHoras.length} de ${tareasConRecurso.length} tareas con recurso asignado (${pct}%) tienen "horas estimadas" cargadas. Completá las horas estimadas de TODAS las tareas de Construcción/Comisionamiento con recurso para habilitar este gráfico — un gráfico parcial se vería igual de completo que uno real.`,
       ],
     }
   }

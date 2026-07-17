@@ -180,12 +180,13 @@ export interface PlanHistogramaHHActividadSerie {
 
 /**
  * Detalle de HH por actividad, SOLO para EDTs de Construcción/Comisionamiento
- * (informe §13.2) — granularidad distinta a `horasHombre` (que es por EDT
+ * (§13.3) — granularidad distinta a `horasHombre` (§13.2, que es por EDT
  * completo, mes a mes): acá el eje es la actividad, no el mes, y las series
  * son por CARGO real (mismo vocabulario que `equipoTrabajo`, nunca por
  * instancia individual — el modelo de datos no distingue "Técnico 1" de
- * "Técnico 2"). Es un SUBCONJUNTO de horasHombre, no un total alternativo:
- * la suma de esta sección será menor al total mensual (§13.2) a propósito.
+ * "Técnico 2"). Es un SUBCONJUNTO de horasHombre (solo 2 de los EDTs del
+ * proyecto), no un total alternativo — misma unidad HH real que §13.2/§14,
+ * nunca duración cruda (ver calcularHHPorActividadConCmn).
  */
 export interface PlanHistogramaHHActividad {
   actividades: string[]

@@ -405,6 +405,39 @@ describe('construirDataBag — histogramaEquipo (dataBag/export layer)', () => {
     // {etiqueta} nunca es un nombre de EDT en este fixture — construirDataBag no lo valida ni lo necesita.
     expect(histogramaEquipo.some(f => f.etiqueta === 'Construccion')).toBe(false)
   })
+
+  it('el "TOTAL HH" no son horas-hombre — la triple igualdad (totalHH = Σ histogramaHH = Σ cronogramaResumen) llega intacta hasta el dataBag con el número REAL (recurso en vivo, no duración cruda)', () => {
+    // Escenario real (informe): "Preparación y Traslado de Material" 4h × Cuadrilla 2P (2
+    // personas) = 8 HH, no 4. calcularDatos.ts ya hace esta cuenta — acá se verifica que
+    // construirDataBag no la rompe al pasar de histogramas/cronogramaResumen al dataBag.
+    const histogramas: PlanHistogramas = {
+      meses: ['2026-08'],
+      equipoTrabajo: [],
+      horasHombre: [
+        { etiqueta: 'Procura', valoresPorMes: [100], total: 100 }, // Gestor, individual: 100h × 1 = 100
+        { etiqueta: 'Construccion', valoresPorMes: [11], total: 11 }, // 4h×Cuadrilla 2P(2) + 3h×Andamiero(1) = 8+3
+      ],
+    }
+    const cronogramaResumen = {
+      filas: [
+        { fase: 'Planificación', edt: 'Procura', actividad: 'Compras', fechaInicio: '2026-07-01', fechaFin: '2026-08-31', horasPlan: 100 },
+        { fase: 'Planificación', edt: 'Construccion', actividad: 'Montaje', fechaInicio: '2026-08-01', fechaFin: '2026-09-30', horasPlan: 11 },
+      ],
+    }
+
+    const plan = planFixture([])
+    ;(plan as unknown as { histogramas: unknown; cronogramaResumen: unknown }).histogramas = histogramas as unknown as PlanTrabajo['histogramas']
+    ;(plan as unknown as { histogramas: unknown; cronogramaResumen: unknown }).cronogramaResumen = cronogramaResumen as unknown as PlanTrabajo['cronogramaResumen']
+
+    const dataBag = construirDataBag({ plan, proyecto: proyectoFixture, organigramaPngBase64: '' })
+    const histogramaHH = dataBag.histogramaHH as { etiqueta: string; total: number }[]
+    const cronogramaResumenBag = dataBag.cronogramaResumen as { horasPlan: number }[]
+
+    const totalEsperado = 111
+    expect(dataBag.totalHH).toBe(totalEsperado)
+    expect(histogramaHH.reduce((s, f) => s + f.total, 0)).toBe(totalEsperado)
+    expect(cronogramaResumenBag.reduce((s, f) => s + f.horasPlan, 0)).toBe(totalEsperado)
+  })
 })
 
 describe('construirDataBag — RACI en grilla (raciPersonas + matrizRaci.roles, plantilla v7)', () => {

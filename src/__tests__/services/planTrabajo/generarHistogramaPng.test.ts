@@ -108,7 +108,7 @@ describe('construirSvgBarras — eje Y y títulos (§13, correcciones de legibil
   })
 })
 
-describe('generarHistogramaHHActividadPng (§13.2 — detalle CON/CMN)', () => {
+describe('generarHistogramaHHActividadPng (§13.3 — detalle CON/CMN)', () => {
   it('devuelve null si no hay hhPorActividadConCmn (proyecto sin EDTs de Construcción/Comisionamiento)', async () => {
     expect(await generarHistogramaHHActividadPng(histogramasFixture)).toBeNull()
   })

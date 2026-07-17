@@ -186,7 +186,7 @@ export async function generarHistogramaHHPng(histogramas: PlanHistogramas): Prom
 }
 
 /**
- * §13.2 — detalle de HH por actividad, SOLO Construcción/Comisionamiento
+ * §13.3 — detalle de HH por actividad, SOLO Construcción/Comisionamiento
  * (ver `calcularHHPorActividadConCmn` en calcularDatos.ts). Es un
  * COMPLEMENTO del histograma de horasHombre de arriba (por EDT/mes), no un
  * total alternativo — el título lo deja explícito para no leerse como

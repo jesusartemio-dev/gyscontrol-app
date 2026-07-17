@@ -198,25 +198,130 @@ describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO real (infor
     expect(fila.valoresPorMes).toEqual([1, 0, 0])
   })
 
-  it('regresión: horasHombre y totalHH NO cambian — siguen siendo la SUMA de horasPlan por EDT (informe §4.2)', () => {
+  it('el "TOTAL HH" no son horas-hombre — informe §13: horasHombre/totalHH/cronogramaResumen usan horasEstimadas × personas del recurso EN VIVO, no edt.horasPlan', () => {
+    // Caso puntual pedido: una tarea de 4h con Cuadrilla 2P (2 personas) aporta 8 HH, no 4.
+    const cuadrilla2p = recursoCuadrilla('rec-2p', 'Cuadrilla 2P', [
+      { recursoMiembroNombre: 'Supervisor', cantidad: 1 },
+      { recursoMiembroNombre: 'Tecnico', cantidad: 1 },
+    ])
+    const construccion = edt({
+      nombre: 'Construccion', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 999, // horasPlan YA NO se usa — valor absurdo a propósito
+      actividades: [{
+        id: 'a1', nombre: 'Elevador', orden: 0,
+        fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'),
+        horasPlan: null, estado: 'pendiente', prioridad: 'media', descripcion: null,
+        tareas: [tarea({ nombre: 'Preparación y Traslado de Material', horasEstimadas: 4, recurso: cuadrilla2p, fechaInicio: new Date('2026-08-01'), fechaFin: new Date('2026-08-02') })],
+      }],
+    })
+    const { data: dataCuadrilla } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
+    expect(dataCuadrilla.histogramas.horasHombre).toEqual([{ etiqueta: 'Construccion', valoresPorMes: [8], total: 8 }])
+
+    // Caso puntual pedido: una tarea de 3h con Andamiero (individual, 1 persona) aporta 3 HH.
+    const andamiero = recursoIndividual('rec-and', 'Andamiero')
+    const seguridad = edt({
+      nombre: 'Seguridad', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 999,
+      actividades: [{
+        id: 'a2', nombre: 'Andamios', orden: 0,
+        fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'),
+        horasPlan: null, estado: 'pendiente', prioridad: 'media', descripcion: null,
+        tareas: [tarea({ nombre: 'Armado de Andamios', horasEstimadas: 3, recurso: andamiero, fechaInicio: new Date('2026-08-01'), fechaFin: new Date('2026-08-02') })],
+      }],
+    })
+    const { data: dataAndamiero } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [seguridad] }])
+    expect(dataAndamiero.histogramas.horasHombre).toEqual([{ etiqueta: 'Seguridad', valoresPorMes: [3], total: 3 }])
+  })
+
+  it('triple igualdad: totalHH === Σ histogramaHH === Σ cronogramaResumen.horasPlan, con el número real (no la duración cruda)', () => {
+    const gestor = recursoIndividual('rec-gestor', 'Gestor')
+    const cuadrilla2p = recursoCuadrilla('rec-2p', 'Cuadrilla 2P', [
+      { recursoMiembroNombre: 'Supervisor', cantidad: 1 },
+      { recursoMiembroNombre: 'Tecnico', cantidad: 1 },
+    ])
+    const andamiero = recursoIndividual('rec-and', 'Andamiero')
+
     const procura = edt({
       nombre: 'Procura', fechaInicioPlan: new Date('2026-07-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 100,
-      actividades: [{ id: 'a1', nombre: 'Compras', orden: 0, fechaInicioPlan: new Date('2026-07-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 100, estado: 'pendiente', prioridad: 'media', descripcion: null, tareas: [] }],
+      actividades: [{
+        id: 'a1', nombre: 'Compras', orden: 0, fechaInicioPlan: new Date('2026-07-01'), fechaFinPlan: new Date('2026-08-31'),
+        horasPlan: null, estado: 'pendiente', prioridad: 'media', descripcion: null,
+        tareas: [tarea({ nombre: 'Gestión de compras', horasEstimadas: 100, recurso: gestor, fechaInicio: new Date('2026-07-01'), fechaFin: new Date('2026-08-31') })],
+      }],
     })
     const construccion = edt({
       nombre: 'Construccion', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-09-30'), horasPlan: 368,
-      actividades: [{ id: 'a2', nombre: 'Montaje', orden: 0, fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-09-30'), horasPlan: 368, estado: 'pendiente', prioridad: 'media', descripcion: null, tareas: [] }],
+      actividades: [{
+        id: 'a2', nombre: 'Montaje', orden: 0, fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-09-30'),
+        horasPlan: null, estado: 'pendiente', prioridad: 'media', descripcion: null,
+        tareas: [
+          tarea({ nombre: 'Preparación y Traslado de Material', horasEstimadas: 4, recurso: cuadrilla2p, fechaInicio: new Date('2026-08-01'), fechaFin: new Date('2026-08-02') }),
+          tarea({ nombre: 'Armado de Andamios', horasEstimadas: 3, recurso: andamiero, fechaInicio: new Date('2026-08-02'), fechaFin: new Date('2026-08-03') }),
+        ],
+      }],
     })
 
     const { data } = calcularHistogramasYCronograma([{ nombre: 'Planificación', edts: [procura, construccion] }])
 
+    // 100 (Gestor, individual) + [4×2 (Cuadrilla 2P) + 3×1 (Andamiero)] = 100 + 11 = 111 — no 100+4+3=107 (duración cruda).
+    const totalEsperado = 111
     const sumaHH = data.histogramas.horasHombre.reduce((s, f) => s + f.total, 0)
-    expect(sumaHH).toBe(468)
-    expect(data.totalHH).toBe(468)
-    expect(calcularTotalHH(data.histogramas)).toBe(468)
-    expect(data.cronogramaResumen.filas.reduce((s, f) => s + f.horasPlan, 0)).toBe(468)
-    // equipoTrabajo queda vacío (sin tareas con recurso) — no rellena nada por default.
-    expect(data.histogramas.equipoTrabajo).toEqual([])
+    expect(sumaHH).toBe(totalEsperado)
+    expect(data.totalHH).toBe(totalEsperado)
+    expect(calcularTotalHH(data.histogramas)).toBe(totalEsperado)
+    expect(data.cronogramaResumen.filas.reduce((s, f) => s + f.horasPlan, 0)).toBe(totalEsperado)
+  })
+
+  it('una tarea con horasEstimadas pero SIN recurso asignado aporta 0 (nunca asume 1 persona) y emite advertencia', () => {
+    const construccion = edt({
+      nombre: 'Construccion', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 0,
+      actividades: [{
+        id: 'a1', nombre: 'Montaje', orden: 0, fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'),
+        horasPlan: null, estado: 'pendiente', prioridad: 'media', descripcion: null,
+        tareas: [tarea({ nombre: 'Tarea huérfana', horasEstimadas: 40, recurso: null, fechaInicio: new Date('2026-08-01'), fechaFin: new Date('2026-08-10') })],
+      }],
+    })
+
+    const { data, advertencias } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
+
+    expect(data.totalHH).toBe(0)
+    expect(data.histogramas.horasHombre).toEqual([{ etiqueta: 'Construccion', valoresPorMes: [0], total: 0 }])
+    expect(advertencias.some(a => a.includes('Tarea huérfana') && a.includes('SIN recurso'))).toBe(true)
+  })
+
+  it('CANARIO — calcularHistogramasYCronograma confía en que `fases` viene de UN SOLO cronograma; si el caller concatena planificacion+ejecucion (mismas fases clonadas), el total se DUPLICA', () => {
+    // Esta función no sabe qué es un "cronograma" — solo suma lo que le pasan. La protección
+    // real contra duplicar 2 cronogramas vive en cargarContexto.ts:129-130
+    // (prisma.proyectoCronograma.findFirst({ where: { proyectoId, tipo: 'planificacion' } }) —
+    // findFirst devuelve UN solo registro, nunca puede fusionar 2 cronogramas). Este test deja
+    // documentado, con un número concreto, qué pasa si esa garantía se rompe — es la trampa real
+    // en la que caí al verificar CJM49 a mano (CJM49 tiene cronograma 'planificacion' Y
+    // 'ejecucion' con las mismas fases/EDTs/tareas clonadas; mi primer query sin filtrar por
+    // proyectoCronogramaId sumó las dos y dio el doble).
+    const cuadrilla2p = recursoCuadrilla('rec-2p', 'Cuadrilla 2P', [
+      { recursoMiembroNombre: 'Supervisor', cantidad: 1 },
+      { recursoMiembroNombre: 'Tecnico', cantidad: 1 },
+    ])
+    const construccion = edt({
+      nombre: 'Construccion', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 0,
+      actividades: [{
+        id: 'a1', nombre: 'Montaje', orden: 0, fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'),
+        horasPlan: null, estado: 'pendiente', prioridad: 'media', descripcion: null,
+        tareas: [tarea({ nombre: 'Preparación y Traslado de Material', horasEstimadas: 4, recurso: cuadrilla2p, fechaInicio: new Date('2026-08-01'), fechaFin: new Date('2026-08-02') })],
+      }],
+    })
+
+    const { data: unSoloCronograma } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
+    expect(unSoloCronograma.totalHH).toBe(8) // correcto: 4h × 2 personas
+
+    // Simula el error: el mismo EDT (mismo id, misma tarea) aparece 2 veces porque el caller
+    // concatenó fases de 2 cronogramas clonados en vez de filtrar por uno solo.
+    const { data: dosCronogramasConcatenados } = calcularHistogramasYCronograma([
+      { nombre: 'Ejecución', edts: [construccion] },
+      { nombre: 'Ejecución (duplicado, simula ejecucion clonada)', edts: [construccion] },
+    ])
+    expect(dosCronogramasConcatenados.totalHH).toBe(16) // el doble — un número inventado, no real
+
+    // Por eso cargarContexto.ts SIEMPRE debe pasar las fases de un único cronograma
+    // (tipo: 'planificacion', vía findFirst) — nunca combinar planificacion + ejecucion.
   })
 })
 
@@ -260,7 +365,7 @@ describe('calcularMatrizRaci — todas las filas comparten largo/orden de asigna
   })
 })
 
-describe('hhPorActividadConCmn — detalle de HH por actividad, SOLO EDTs de Construcción/Comisionamiento (informe §13.2)', () => {
+describe('hhPorActividadConCmn — detalle de HH por actividad, SOLO EDTs de Construcción/Comisionamiento (§13.3)', () => {
   function actividad(overrides: Partial<EdtFixture['actividades'][number]> & { nombre: string; tareas: TareaFixture[] }): EdtFixture['actividades'][number] {
     return {
       id: `act-${overrides.nombre}`,
@@ -306,7 +411,7 @@ describe('hhPorActividadConCmn — detalle de HH por actividad, SOLO EDTs de Con
     })
   })
 
-  it('una cuadrilla reparte las horas de la tarea PROPORCIONAL a la cantidad de cada perfil (nunca la suma completa a cada uno)', () => {
+  it('una cuadrilla reparte HH REAL por cargo — cada cargo se lleva horasEstimadas × su propia cantidad (nunca normalizado)', () => {
     const cuadrilla = recursoCuadrilla('rec-4p', 'Cuadrilla 4P', [
       { recursoMiembroNombre: 'Supervisor', cantidad: 1 },
       { recursoMiembroNombre: 'Tecnico', cantidad: 3 },
@@ -322,8 +427,9 @@ describe('hhPorActividadConCmn — detalle de HH por actividad, SOLO EDTs de Con
     const { data } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [comisionamiento] }])
 
     const series = data.histogramas.hhPorActividadConCmn!.series
-    expect(series.find(s => s.cargo === 'Supervisor')!.valoresPorActividad).toEqual([10]) // 1/4 de 40
-    expect(series.find(s => s.cargo === 'Tecnico')!.valoresPorActividad).toEqual([30]) // 3/4 de 40
+    // 40h duración × 1 Supervisor = 40 HH; 40h duración × 3 Tecnico = 120 HH — suma 160 = 40×4 (Σperfiles).
+    expect(series.find(s => s.cargo === 'Supervisor')!.valoresPorActividad).toEqual([40])
+    expect(series.find(s => s.cargo === 'Tecnico')!.valoresPorActividad).toEqual([120])
   })
 
   it('2 EDTs distintos (CON y CMN) con una actividad del MISMO nombre suman sus horas bajo una sola etiqueta', () => {
@@ -389,7 +495,7 @@ describe('hhPorActividadConCmn — detalle de HH por actividad, SOLO EDTs de Con
       // Ni siquiera "Montaje de bandejas" (que SÍ tenía sus horas completas) se muestra —
       // la compuerta es sobre la sección completa, no actividad por actividad.
       expect(data.histogramas.hhPorActividadConCmn).toEqual({ actividades: [], series: [] })
-      expect(advertencias.some(a => a.includes('13.2') && a.includes('1 de 2') && a.includes('50%'))).toBe(true)
+      expect(advertencias.some(a => a.includes('13.3') && a.includes('1 de 2') && a.includes('50%'))).toBe(true)
     })
 
     it('cobertura 100%: el gráfico se genera normalmente y no hay advertencia de cobertura', () => {
@@ -407,7 +513,7 @@ describe('hhPorActividadConCmn — detalle de HH por actividad, SOLO EDTs de Con
         actividades: ['Montaje de bandejas'],
         series: [{ cargo: 'Tecnico', valoresPorActividad: [40] }],
       })
-      expect(advertencias.some(a => a.includes('13.2'))).toBe(false)
+      expect(advertencias.some(a => a.includes('13.3'))).toBe(false)
     })
 
     it('sin tareas con recurso en EDTs CON/CMN (nada planificado aún): no hay advertencia de cobertura, solo sección vacía', () => {
@@ -419,7 +525,7 @@ describe('hhPorActividadConCmn — detalle de HH por actividad, SOLO EDTs de Con
       const { data, advertencias } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
 
       expect(data.histogramas.hhPorActividadConCmn).toEqual({ actividades: [], series: [] })
-      expect(advertencias.some(a => a.includes('13.2'))).toBe(false)
+      expect(advertencias.some(a => a.includes('13.3'))).toBe(false)
     })
   })
 })
