@@ -754,8 +754,10 @@ export function TreeNodeForm({
                       onChange={(id, recurso) => {
                         setFormData(prev => ({ ...prev, recursoId: id }))
                         if (recurso) {
-                          const totalPersonas = recurso.tipo === 'cuadrilla' && recurso.composiciones?.length
-                            ? recurso.composiciones.reduce((sum, c) => sum + (c.cantidad ?? 1), 0)
+                          // recurso.perfiles (RecursoPerfil) — no recurso.composiciones (RecursoComposicion,
+                          // pool de referencia de costo, no dotación real; ver docs/analisis-composicion-recursos.md).
+                          const totalPersonas = recurso.tipo === 'cuadrilla' && recurso.perfiles?.length
+                            ? recurso.perfiles.reduce((sum, p) => sum + (p.cantidad ?? 1), 0)
                             : 1
                           setRecursoInfo({ tipo: recurso.tipo, totalPersonas })
                           setFormData(prev => ({ ...prev, recursoId: id, personasEstimadas: totalPersonas.toString() }))
