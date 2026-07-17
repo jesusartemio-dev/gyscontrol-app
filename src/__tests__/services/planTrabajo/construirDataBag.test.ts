@@ -406,6 +406,27 @@ describe('construirDataBag — histogramaEquipo (dataBag/export layer)', () => {
     expect(histogramaEquipo.some(f => f.etiqueta === 'Construccion')).toBe(false)
   })
 
+  it('el pico diario de §13.1 (informe "el mes es un balde demasiado grueso") llega intacto al dataBag — construirDataBag no lo re-suma por mes', () => {
+    // Escenario real CJM49: SSOMA individual (04-07 ago) y las cuadrillas (28/31 ago) nunca
+    // coinciden un mismo día — calcularDatos.ts ya calcula el pico diario y entrega [1,2,1]
+    // (jul/ago/sep); esta prueba confirma que construirDataBag no vuelve a sumar por mes.
+    const histogramas: PlanHistogramas = {
+      meses: ['2026-07', '2026-08', '2026-09'],
+      equipoTrabajo: [{ etiqueta: 'SSOMA', valoresPorMes: [1, 2, 1], total: 2 }],
+      horasHombre: [],
+    }
+
+    const plan = planFixture([])
+    ;(plan as unknown as { histogramas: unknown }).histogramas = histogramas as unknown as PlanTrabajo['histogramas']
+
+    const dataBag = construirDataBag({ plan, proyecto: proyectoFixture, organigramaPngBase64: '' })
+    const histogramaEquipo = dataBag.histogramaEquipo as { etiqueta: string; detalleMeses: string; total: number }[]
+    const ssoma = histogramaEquipo.find(f => f.etiqueta === 'SSOMA')!
+
+    expect(ssoma.total).toBe(2) // MÁX., no 1+2+1=4
+    expect(ssoma.detalleMeses).toBe('2026-07: 1 · 2026-08: 2 · 2026-09: 1')
+  })
+
   it('el "TOTAL HH" no son horas-hombre — la triple igualdad (totalHH = Σ histogramaHH = Σ cronogramaResumen) llega intacta hasta el dataBag con el número REAL (recurso en vivo, no duración cruda)', () => {
     // Escenario real (informe): "Preparación y Traslado de Material" 4h × Cuadrilla 2P (2
     // personas) = 8 HH, no 4. calcularDatos.ts ya hace esta cuenta — acá se verifica que

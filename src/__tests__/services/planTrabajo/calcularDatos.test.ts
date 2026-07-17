@@ -163,6 +163,116 @@ describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO real (infor
     expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'Tecnico')!.total).toBe(5)
   })
 
+  describe('pico DIARIO, no mensual (informe "el mes es un balde demasiado grueso")', () => {
+    it('2 recursos con el mismo cargo, activos en DÍAS DISTINTOS del MISMO mes: el mes da 1, no 2 (el bug exacto de este prompt)', () => {
+      // Reproduce SSOMA en CJM49: el SSOMA individual (04-07 ago) y las cuadrillas (28-31 ago)
+      // caen en el mismo mes pero NUNCA coinciden un mismo día.
+      const ssomaIndividual = recursoIndividual('rec-ssoma', 'SSOMA')
+      const cuadrillaConSsoma = recursoCuadrilla('rec-4p', 'Cuadrilla 4P', [{ recursoMiembroNombre: 'SSOMA', cantidad: 1 }])
+
+      const construccion = edt({
+        nombre: 'Construccion', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 10,
+        actividades: [{
+          id: 'a1', nombre: 'Seguridad y montaje', orden: 0,
+          fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'),
+          horasPlan: 10, estado: 'pendiente', prioridad: 'media', descripcion: null,
+          tareas: [
+            tarea({ nombre: 'Elaboración de IPERC', fechaInicio: new Date('2026-08-04'), fechaFin: new Date('2026-08-07'), recurso: ssomaIndividual }),
+            tarea({ nombre: 'Montaje', fechaInicio: new Date('2026-08-28'), fechaFin: new Date('2026-08-31'), recurso: cuadrillaConSsoma }),
+          ],
+        }],
+      })
+
+      const { data } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
+
+      expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'SSOMA')!.valoresPorMes).toEqual([1])
+    })
+
+    it('2 recursos con el mismo cargo, activos el MISMO día: el mes da 2', () => {
+      const ssomaIndividual = recursoIndividual('rec-ssoma', 'SSOMA')
+      const cuadrillaConSsoma = recursoCuadrilla('rec-4p', 'Cuadrilla 4P', [{ recursoMiembroNombre: 'SSOMA', cantidad: 1 }])
+
+      const construccion = edt({
+        nombre: 'Construccion', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 10,
+        actividades: [{
+          id: 'a1', nombre: 'Seguridad y montaje', orden: 0,
+          fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'),
+          horasPlan: 10, estado: 'pendiente', prioridad: 'media', descripcion: null,
+          tareas: [
+            tarea({ nombre: 'Elaboración de IPERC', fechaInicio: new Date('2026-08-04'), fechaFin: new Date('2026-08-28'), recurso: ssomaIndividual }),
+            tarea({ nombre: 'Montaje', fechaInicio: new Date('2026-08-28'), fechaFin: new Date('2026-08-31'), recurso: cuadrillaConSsoma }),
+          ],
+        }],
+      })
+
+      const { data } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
+
+      expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'SSOMA')!.valoresPorMes).toEqual([2])
+    })
+
+    it('el MISMO recurso citado por 5 tareas del MISMO día aporta UNA sola vez', () => {
+      const cuadrilla4P = recursoCuadrilla('rec-4p', 'Cuadrilla 4P', [{ recursoMiembroNombre: 'Tecnico', cantidad: 2 }])
+      const construccion = edt({
+        nombre: 'Construccion', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 10,
+        actividades: [{
+          id: 'a1', nombre: 'Montaje', orden: 0,
+          fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'),
+          horasPlan: 10, estado: 'pendiente', prioridad: 'media', descripcion: null,
+          tareas: Array.from({ length: 5 }, (_, i) =>
+            tarea({ nombre: `Tarea ${i}`, fechaInicio: new Date('2026-08-28'), fechaFin: new Date('2026-08-28'), recurso: cuadrilla4P })
+          ),
+        }],
+      })
+
+      const { data } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
+
+      expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'Tecnico')!.total).toBe(2) // no 10 (5 tareas × 2)
+    })
+
+    it('una tarea cuyo rango cruza meses (28/08 a 02/09) cuenta en LOS DOS meses', () => {
+      const cuadrilla4P = recursoCuadrilla('rec-4p', 'Cuadrilla 4P', [{ recursoMiembroNombre: 'Tecnico', cantidad: 3 }])
+      const construccion = edt({
+        nombre: 'Construccion', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-09-30'), horasPlan: 10,
+        actividades: [{
+          id: 'a1', nombre: 'Montaje', orden: 0,
+          fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-09-30'),
+          horasPlan: 10, estado: 'pendiente', prioridad: 'media', descripcion: null,
+          tareas: [tarea({ nombre: 'Montaje cruzando meses', fechaInicio: new Date('2026-08-28'), fechaFin: new Date('2026-09-02'), recurso: cuadrilla4P })],
+        }],
+      })
+
+      const { data } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
+
+      expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'Tecnico')!.valoresPorMes).toEqual([3, 3])
+    })
+
+    it('REGRESIÓN — el pico diario de equipoTrabajo (§13.1) no altera horasHombre/totalHH/cronogramaResumen (§13.2/§13.3/§14, que son SUMAS de HH, no picos)', () => {
+      const cuadrilla2p = recursoCuadrilla('rec-2p', 'Cuadrilla 2P', [
+        { recursoMiembroNombre: 'Supervisor', cantidad: 1 },
+        { recursoMiembroNombre: 'Tecnico', cantidad: 1 },
+      ])
+      const construccion = edt({
+        nombre: 'Construccion', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 999,
+        actividades: [{
+          id: 'a1', nombre: 'Montaje', orden: 0,
+          fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'),
+          horasPlan: null, estado: 'pendiente', prioridad: 'media', descripcion: null,
+          tareas: [tarea({ nombre: 'Preparación y Traslado de Material', horasEstimadas: 4, recurso: cuadrilla2p, fechaInicio: new Date('2026-08-01'), fechaFin: new Date('2026-08-02') })],
+        }],
+      })
+
+      const { data } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
+
+      // equipoTrabajo (§13.1, pico de personas) — SIN CAMBIOS por este fix: 1 Supervisor, 1 Tecnico.
+      expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'Supervisor')!.total).toBe(1)
+      expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'Tecnico')!.total).toBe(1)
+      // horasHombre/totalHH/cronogramaResumen (§13.2/§13.3/§14, SUMA de HH) — el mismo número de siempre: 4h × 2 personas = 8.
+      expect(data.totalHH).toBe(8)
+      expect(data.histogramas.horasHombre.reduce((s, f) => s + f.total, 0)).toBe(8)
+      expect(data.cronogramaResumen.filas.reduce((s, f) => s + f.horasPlan, 0)).toBe(8)
+    })
+  })
+
   it('una cuadrilla sin perfiles configurados aporta 0 y emite advertencia — nunca inventa una dotación', () => {
     const cuadrillaVacia = recursoCuadrilla('rec-5p', 'Cuadrilla 5P', [])
     const construccion = edt({

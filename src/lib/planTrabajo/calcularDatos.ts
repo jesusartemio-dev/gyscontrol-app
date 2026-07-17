@@ -310,6 +310,22 @@ function mesesEntre(inicio: Date, fin: Date): string[] {
   return meses
 }
 
+function diaKey(d: Date): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+}
+
+/** Días (inclusive) entre dos fechas — usado por `equipoTrabajo` para el pico DIARIO (§13.1). */
+function diasEntre(inicio: Date, fin: Date): string[] {
+  const dias: string[] = []
+  const cursor = new Date(Date.UTC(inicio.getUTCFullYear(), inicio.getUTCMonth(), inicio.getUTCDate()))
+  const limite = new Date(Date.UTC(fin.getUTCFullYear(), fin.getUTCMonth(), fin.getUTCDate()))
+  while (cursor.getTime() <= limite.getTime()) {
+    dias.push(diaKey(cursor))
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  }
+  return dias
+}
+
 /**
  * histogramaHH y cronogramaResumen — una fila por EDT, con el HH REAL de ese
  * EDT (`hhRealDelEdt` = Σ de sus tareas, cada una `horasEstimadas × personas
@@ -414,21 +430,43 @@ export function calcularHistogramasYCronograma(
     )
   }
 
-  // Por mes: recursos DISTINTOS activos ese mes, deduplicados por `recurso.id`
-  // — la MISMA cuadrilla/individual citada por N tareas concurrentes del
-  // mismo mes es la MISMA gente (GYS planifica por recurso, no por tarea: si
-  // hace falta más gente se usa una cuadrilla más grande, nunca varias en
-  // paralelo bajo el mismo recurso — confirmado con datos reales de CJM49).
-  // Recursos DISTINTOS sí se suman entre sí (son crews/roles distintos
-  // coexistiendo ese mes).
-  function recursosDistintosDelMes(mes: string): RecursoDeTarea[] {
-    const porId = new Map<string, RecursoDeTarea>()
-    for (const t of todasLasTareasConFecha) {
-      if (!t.recurso) continue
-      if (!mesesEntre(t.fechaInicio, t.fechaFin).includes(mes)) continue
+  // Pico DIARIO, no mensual (informe "el mes es un balde demasiado grueso"):
+  // dos recursos que nunca coincidieron un mismo día, pero caen en el mismo
+  // mes, NO deben sumarse — eso declara gente simultánea que nunca estuvo.
+  // La dedup por `recurso.id` de antes se mantiene, pero pasa a ser POR DÍA:
+  // el mismo recurso en N tareas del mismo día aporta una sola vez (GYS
+  // planifica por recurso, no por tarea — confirmado con datos reales de
+  // CJM49). Recursos DISTINTOS activos el MISMO día sí se suman entre sí.
+  // `valoresPorMes[cargo][mes]` = MÁXIMO sobre los días de ese mes (nunca la
+  // suma) — la columna se rotula "MÁX." porque es un pico simultáneo, no un
+  // acumulado.
+  const recursosPorDia = new Map<string, Map<string, RecursoDeTarea>>()
+  for (const t of todasLasTareasConFecha) {
+    if (!t.recurso) continue
+    for (const dia of diasEntre(t.fechaInicio, t.fechaFin)) {
+      const porId = recursosPorDia.get(dia) ?? new Map<string, RecursoDeTarea>()
       porId.set(t.recurso.id, t.recurso)
+      recursosPorDia.set(dia, porId)
     }
-    return [...porId.values()]
+  }
+
+  const personasPorCargoPorDia = new Map<string, Map<string, number>>()
+  for (const [dia, recursosDelDia] of recursosPorDia) {
+    const porCargo = new Map<string, number>()
+    for (const recurso of recursosDelDia.values()) {
+      for (const aporte of aportesDeRecurso(recurso)) {
+        porCargo.set(aporte.cargo, (porCargo.get(aporte.cargo) ?? 0) + aporte.cantidad)
+      }
+    }
+    personasPorCargoPorDia.set(dia, porCargo)
+  }
+
+  const diasPorMes = new Map<string, string[]>()
+  for (const dia of personasPorCargoPorDia.keys()) {
+    const mes = dia.slice(0, 7)
+    const arr = diasPorMes.get(mes) ?? []
+    arr.push(dia)
+    diasPorMes.set(mes, arr)
   }
 
   const cargosDistintos = new Set<string>()
@@ -439,13 +477,12 @@ export function calcularHistogramasYCronograma(
 
   const equipoTrabajo = [...cargosDistintos].map(cargo => {
     const valoresPorMes = meses.map(mes => {
-      let suma = 0
-      for (const recurso of recursosDistintosDelMes(mes)) {
-        for (const aporte of aportesDeRecurso(recurso)) {
-          if (aporte.cargo === cargo) suma += aporte.cantidad
-        }
+      const diasDelMes = diasPorMes.get(mes) ?? []
+      let pico = 0
+      for (const dia of diasDelMes) {
+        pico = Math.max(pico, personasPorCargoPorDia.get(dia)?.get(cargo) ?? 0)
       }
-      return suma
+      return pico
     })
     return { etiqueta: cargo, valoresPorMes, total: valoresPorMes.reduce((max, v) => Math.max(max, v), 0) }
   })
