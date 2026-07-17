@@ -396,7 +396,8 @@ export function calcularHistogramasYCronograma(
     return { etiqueta: cargo, valoresPorMes, total: valoresPorMes.reduce((max, v) => Math.max(max, v), 0) }
   })
 
-  const hhPorActividadConCmn = calcularHHPorActividadConCmn(fases)
+  const { data: hhPorActividadConCmn, advertencias: advHHActividad } = calcularHHPorActividadConCmn(fases)
+  advertencias.push(...advHHActividad)
 
   const horasHombre = edtsConFecha.map(e => {
     const mesesEdt = mesesEntre(e.fechaInicioPlan, e.fechaFinPlan)
@@ -468,11 +469,36 @@ function repartirHorasPorCargo(tarea: TareaParaHHActividad): HorasPorCargo[] {
  * horasHombre por EDT/mes de más arriba). Si 2 EDTs distintos tienen una
  * actividad con el MISMO nombre, sus horas se suman bajo esa única etiqueta
  * (mismo criterio de agregación por etiqueta que `equipoTrabajo`).
+ *
+ * COMPUERTA DE COBERTURA (post-mortem del gráfico al 23%): este detalle
+ * depende de `horasEstimadas` a nivel TAREA, un campo que en la práctica se
+ * carga de forma incompleta (mismo agujero de fondo que ya tuvo
+ * `personasEstimadas` — nunca resuelto en origen, solo evitado). Un gráfico
+ * parcial se ve igual de "completo" que uno real — nadie nota que falta un
+ * tercio de las tareas. Por eso, si UNA SOLA tarea con recurso asignado en
+ * un EDT de Construcción/Comisionamiento no tiene `horasEstimadas` cargada,
+ * la sección ENTERA se omite (nunca un gráfico parcial) y se emite una
+ * advertencia de Etapa 1 con la cobertura exacta — "sin dato no se rellena",
+ * aplicado a la sección completa, no actividad por actividad.
  */
 function calcularHHPorActividadConCmn(
   fases: { nombre: string; edts: CronogramaContexto['fases'][number]['edts'] }[]
-): PlanHistogramaHHActividad {
+): ResultadoCalculo<PlanHistogramaHHActividad> {
   const edtsConCmn = fases.flatMap(f => f.edts).filter(e => esEdtDeConstruccionOComisionamiento(e.nombre))
+  const tareasConRecurso: TareaParaHHActividad[] = edtsConCmn.flatMap(e =>
+    e.actividades.flatMap(a => a.tareas.filter(t => t.recurso !== null))
+  )
+  const tareasConHoras = tareasConRecurso.filter(t => t.horasEstimadas !== null)
+
+  if (tareasConRecurso.length > 0 && tareasConHoras.length < tareasConRecurso.length) {
+    const pct = Math.round((tareasConHoras.length / tareasConRecurso.length) * 100)
+    return {
+      data: { actividades: [], series: [] },
+      advertencias: [
+        `Detalle de HH por Actividad (Construcción/Comisionamiento, §13.2) NO se generó: solo ${tareasConHoras.length} de ${tareasConRecurso.length} tareas con recurso asignado (${pct}%) tienen "horas estimadas" cargadas. Completá las horas estimadas de TODAS las tareas de Construcción/Comisionamiento con recurso para habilitar este gráfico — un gráfico parcial se vería igual de completo que uno real.`,
+      ],
+    }
+  }
 
   const horasPorActividadYCargo = new Map<string, Map<string, number>>()
   for (const edt of edtsConCmn) {
@@ -500,7 +526,7 @@ function calcularHHPorActividadConCmn(
     valoresPorActividad: actividades.map(act => Math.round((horasPorActividadYCargo.get(act)!.get(cargo) ?? 0) * 10) / 10),
   }))
 
-  return { actividades, series }
+  return { data: { actividades, series }, advertencias: [] }
 }
 
 /**

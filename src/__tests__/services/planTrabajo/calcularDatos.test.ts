@@ -366,4 +366,60 @@ describe('hhPorActividadConCmn — detalle de HH por actividad, SOLO EDTs de Con
 
     expect(data.histogramas.hhPorActividadConCmn).toEqual({ actividades: [], series: [] })
   })
+
+  describe('compuerta de cobertura — "sin dato no se rellena" (nunca un gráfico parcial, ver corrección posterior al 23%)', () => {
+    it('cobertura PARCIAL (1 de 2 tareas con recurso sin horasEstimadas): la sección ENTERA se omite, no solo la tarea faltante', () => {
+      const construccion = edt({
+        nombre: 'Construcción', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 80,
+        actividades: [
+          actividad({
+            nombre: 'Montaje de bandejas',
+            tareas: [tarea({ horasEstimadas: 40, recurso: recursoIndividual('rec-tec', 'Tecnico'), fechaInicio: new Date('2026-08-01'), fechaFin: new Date('2026-08-10') })],
+          }),
+          actividad({
+            nombre: 'Tendido de cable',
+            // Con recurso asignado pero SIN horasEstimadas cargada — la que dispara la compuerta.
+            tareas: [tarea({ horasEstimadas: null, recurso: recursoIndividual('rec-tec', 'Tecnico'), fechaInicio: new Date('2026-08-11'), fechaFin: new Date('2026-08-20') })],
+          }),
+        ],
+      })
+
+      const { data, advertencias } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
+
+      // Ni siquiera "Montaje de bandejas" (que SÍ tenía sus horas completas) se muestra —
+      // la compuerta es sobre la sección completa, no actividad por actividad.
+      expect(data.histogramas.hhPorActividadConCmn).toEqual({ actividades: [], series: [] })
+      expect(advertencias.some(a => a.includes('13.2') && a.includes('1 de 2') && a.includes('50%'))).toBe(true)
+    })
+
+    it('cobertura 100%: el gráfico se genera normalmente y no hay advertencia de cobertura', () => {
+      const construccion = edt({
+        nombre: 'Construcción', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 40,
+        actividades: [actividad({
+          nombre: 'Montaje de bandejas',
+          tareas: [tarea({ horasEstimadas: 40, recurso: recursoIndividual('rec-tec', 'Tecnico'), fechaInicio: new Date('2026-08-01'), fechaFin: new Date('2026-08-10') })],
+        })],
+      })
+
+      const { data, advertencias } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
+
+      expect(data.histogramas.hhPorActividadConCmn).toEqual({
+        actividades: ['Montaje de bandejas'],
+        series: [{ cargo: 'Tecnico', valoresPorActividad: [40] }],
+      })
+      expect(advertencias.some(a => a.includes('13.2'))).toBe(false)
+    })
+
+    it('sin tareas con recurso en EDTs CON/CMN (nada planificado aún): no hay advertencia de cobertura, solo sección vacía', () => {
+      const construccion = edt({
+        nombre: 'Construcción', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 0,
+        actividades: [actividad({ nombre: 'Montaje', tareas: [] })],
+      })
+
+      const { data, advertencias } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
+
+      expect(data.histogramas.hhPorActividadConCmn).toEqual({ actividades: [], series: [] })
+      expect(advertencias.some(a => a.includes('13.2'))).toBe(false)
+    })
+  })
 })
