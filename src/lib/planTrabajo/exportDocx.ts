@@ -2,6 +2,7 @@ import Docxtemplater from 'docxtemplater'
 import PizZip from 'pizzip'
 import ImageModule from 'docxtemplater-image-module-free'
 import { descargarPlantillaPlanTrabajo } from './descargarPlantilla'
+import { sincronizarTblGridDelDocumento } from './postProcesarTblGrid'
 
 interface RenderInput {
   dataBag: Record<string, unknown>
@@ -109,5 +110,15 @@ export async function renderizarPlanTrabajoDocx({ dataBag }: RenderInput): Promi
     throw new Error(`Error al renderizar plantilla DOCX: ${err.message ?? String(e)}\n${mensajes}`)
   }
 
-  return doc.getZip().generate({ type: 'nodebuffer' }) as Buffer
+  // Post-proceso: docxtemplater no actualiza <w:tblGrid> cuando un loop
+  // {-w:tc} (grilla RACI) duplica celdas — ver postProcesarTblGrid.ts.
+  const zipRenderizado = doc.getZip()
+  const documentXml = zipRenderizado.file('word/document.xml')!.asText()
+  const { xml: documentXmlCorregido, tablasCorregidas } = sincronizarTblGridDelDocumento(documentXml)
+  if (tablasCorregidas.length > 0) {
+    console.log(`[plan-trabajo] tblGrid corregido post-render en ${tablasCorregidas.length} tabla(s) (índices: ${tablasCorregidas.join(', ')})`)
+  }
+  zipRenderizado.file('word/document.xml', documentXmlCorregido)
+
+  return zipRenderizado.generate({ type: 'nodebuffer' }) as Buffer
 }
