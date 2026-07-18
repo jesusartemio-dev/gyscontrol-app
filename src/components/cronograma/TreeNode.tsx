@@ -112,6 +112,12 @@ export function TreeNode({
   // El roll-up GYS-GEN-16 asegura que los nodos summary tengan la suma correcta
   const totalHours = Number(node.data.horasEstimadas) || 0
 
+  // HH real = Work × personas del recurso asignado (nunca personasEstimadas,
+  // que es un snapshot manual casi siempre en 1) — calculado server-side en
+  // la API del árbol con la misma fórmula que usa Plan de Trabajo
+  // (calcularHHRealDeTarea). 0 si la tarea/rama no tiene recurso asignado.
+  const totalHorasHombre = Number(node.data.horasHombre) || 0
+
   // Duración real (días laborables según el calendario del proyecto/empresa,
   // no Lun-Vie a secas) — calculada server-side en la API del árbol, ver
   // `contarDiasLaborables` en `src/lib/utils/calendarioLaboral.ts`.
@@ -222,7 +228,7 @@ export function TreeNode({
         className="grid items-center gap-1"
         style={{
           gridTemplateColumns: [
-            '1fr', '80px', '65px', '120px', '55px', '55px',
+            '1fr', '80px', '65px', '120px', '55px', '55px', '55px',
             ...(showPesoColumn ? ['60px', '60px'] : []),
             ...(showRecursoColumn ? ['100px'] : []),
             ...(showResponsableColumn ? ['100px'] : []),
@@ -345,6 +351,11 @@ export function TreeNode({
         {/* Columna 6: Work (horasEstimadas) */}
         <div className="text-right text-[11px] text-gray-600 font-mono pr-1">
           {totalHours > 0 ? `${totalHours}h` : ''}
+        </div>
+
+        {/* Columna 7: HH real (horasEstimadas × personas del recurso — nunca personasEstimadas) */}
+        <div className="text-right text-[11px] text-gray-700 font-mono pr-1" title="Horas-hombre real: Work × personas del recurso asignado">
+          {totalHorasHombre > 0 ? `${totalHorasHombre}h` : ''}
         </div>
 
         {/* Columna: Peso Global (hh-hombre, normalizado al proyecto) */}

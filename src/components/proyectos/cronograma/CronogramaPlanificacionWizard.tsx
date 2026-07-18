@@ -1652,6 +1652,9 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                     <Badge variant="secondary" className="text-xs shrink-0">
                       {actividad.tareas.filter(t => t.incluida).length}/{actividad.tareas.length} tareas
                     </Badge>
+                    <Badge variant="secondary" className="text-xs shrink-0">
+                      {actividad.tareas.filter(t => t.incluida).reduce((s, t) => s + t.horasEstimadas, 0).toFixed(1)}h
+                    </Badge>
                     {(() => {
                       // Tareas con cantidad real (notaCantidad) que siguen en el
                       // default "1" sin resolver (ni por mapeo determinístico ni
@@ -1714,17 +1717,17 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                     return tareasCatalogo.map(({ tarea, ti }) => (
                       <div
                         key={tarea.catalogoServicioId}
-                        className="flex items-start gap-2 text-xs p-1.5 rounded cursor-pointer hover:bg-muted/50"
-                        onClick={() => toggleTarea(index, ti, !tarea.incluida)}
+                        className="flex items-start gap-2 text-xs p-1.5 rounded"
                       >
                         <Checkbox
                           checked={tarea.incluida}
                           onCheckedChange={checked => toggleTarea(index, ti, checked === true)}
-                          onClick={e => e.stopPropagation()}
                           className="mt-0.5 shrink-0"
                         />
                         <div className="flex-1 min-w-0">
-                          <p className={tarea.incluida ? '' : 'text-muted-foreground'}>{tarea.nombre}</p>
+                          <p className={`truncate ${tarea.incluida ? '' : 'text-muted-foreground'}`} title={tarea.nombre}>
+                            {tarea.nombre}
+                          </p>
                           {tarea.motivoExclusion && (
                             <p className="text-[10px] text-muted-foreground mt-0.5">{tarea.motivoExclusion}</p>
                           )}

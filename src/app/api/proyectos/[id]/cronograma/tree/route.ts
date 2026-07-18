@@ -13,6 +13,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { contarDiasLaborables } from '@/lib/utils/calendarioLaboral'
+import { calcularHHRealDeTarea } from '@/lib/planTrabajo/calcularDatos'
 
 // ✅ GET /api/proyectos/[id]/cronograma/tree - Obtener árbol jerárquico del cronograma
 export async function GET(
@@ -65,6 +66,18 @@ export async function GET(
       return contarDiasLaborables(new Date(fechaInicio), new Date(fechaFin), calendarioLaboral)
     }
 
+    // ✅ HH real = horasEstimadas × personas del recurso (nunca personasEstimadas,
+    // que es un snapshot manual casi siempre en 1 — ver calcularHHRealDeTarea,
+    // misma fuente que usa Plan de Trabajo). "WORK" ya existe (horasEstimadas
+    // crudo, sin multiplicar); esto es la columna "HH" nueva.
+    const hhDeTarea = (tarea: any): number =>
+      calcularHHRealDeTarea({ horasEstimadas: Number(tarea.horasEstimadas) || 0, recurso: tarea.recurso })
+    const hhDeEdt = (edt: any): number => {
+      const tareasDeActividades = (edt.proyectoActividad || []).flatMap((a: any) => a.proyectoTarea || [])
+      const tareasExtras = edt.proyectoTarea || []
+      return [...tareasDeActividades, ...tareasExtras].reduce((s: number, t: any) => s + hhDeTarea(t), 0)
+    }
+
     // ✅ Obtener fases del proyecto según el cronograma especificado
 
     let fases: any[] = []
@@ -111,7 +124,7 @@ export async function GET(
                         select: { id: true, name: true, email: true }
                       },
                       recurso: {
-                        select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true }
+                        select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true, perfiles: { where: { activo: true }, select: { cantidad: true } } }
                       },
                       creadoPor: { select: { id: true, name: true } }
                     },
@@ -125,7 +138,7 @@ export async function GET(
                 where: { proyectoActividadId: null },
                 include: {
                   user: { select: { id: true, name: true, email: true } },
-                  recurso: { select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true } },
+                  recurso: { select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true, perfiles: { where: { activo: true }, select: { cantidad: true } } } },
                   creadoPor: { select: { id: true, name: true } }
                 },
                 orderBy: { orden: 'asc' }
@@ -179,7 +192,7 @@ export async function GET(
                           select: { id: true, name: true, email: true }
                         },
                         recurso: {
-                          select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true }
+                          select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true, perfiles: { where: { activo: true }, select: { cantidad: true } } }
                         }
                       },
                       orderBy: { orden: 'asc' }
@@ -192,7 +205,7 @@ export async function GET(
                   where: { proyectoActividadId: null },
                   include: {
                     user: { select: { id: true, name: true, email: true } },
-                    recurso: { select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true } }
+                    recurso: { select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true, perfiles: { where: { activo: true }, select: { cantidad: true } } } }
                   },
                   orderBy: { orden: 'asc' }
                 }
@@ -224,7 +237,7 @@ export async function GET(
                           select: { id: true, name: true, email: true }
                         },
                         recurso: {
-                          select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true }
+                          select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true, perfiles: { where: { activo: true }, select: { cantidad: true } } }
                         }
                       },
                       orderBy: { orden: 'asc' }
@@ -237,7 +250,7 @@ export async function GET(
                   where: { proyectoActividadId: null },
                   include: {
                     user: { select: { id: true, name: true, email: true } },
-                    recurso: { select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true } }
+                    recurso: { select: { id: true, nombre: true, tipo: true, costoHoraProyecto: true, perfiles: { where: { activo: true }, select: { cantidad: true } } } }
                   },
                   orderBy: { orden: 'asc' }
                 }
@@ -253,6 +266,7 @@ export async function GET(
     // ✅ Construir árbol jerárquico de 5 niveles (Proyecto → Fase → EDT → Actividad → Tarea)
     // Calcular horas totales del proyecto
     let proyectoHorasTotales = 0
+    let proyectoHorasHombre = 0
 
     const faseNodes = fases.map(fase => {
       const faseEdts = fase.proyectoEdt || []
@@ -260,6 +274,8 @@ export async function GET(
       // Calcular horas totales de la fase (suma de horas de todos los EDTs)
       const faseHorasTotales = faseEdts.reduce((sum: number, edt: any) => sum + Number(edt.horasPlan || 0), 0)
       proyectoHorasTotales += faseHorasTotales
+      const faseHorasHombre = faseEdts.reduce((sum: number, edt: any) => sum + hhDeEdt(edt), 0)
+      proyectoHorasHombre += faseHorasHombre
 
       return {
         id: `fase-${fase.id}`,
@@ -277,6 +293,7 @@ export async function GET(
           progreso: fase.porcentajeAvance,
           orden: fase.orden,
           horasEstimadas: faseHorasTotales, // ✅ Agregar horas totales calculadas
+          horasHombre: faseHorasHombre,
           duracionDiasReal: duracionDiasReal(fase.fechaInicioPlan, fase.fechaFinPlan)
         },
         metadata: {
@@ -309,6 +326,7 @@ export async function GET(
               progreso: edt.porcentajeAvance,
               orden: edt.orden,
               horasEstimadas: edt.horasPlan,
+              horasHombre: hhDeEdt(edt),
               responsableId: edt.responsableId,
               responsableNombre: edt.user?.name || null,
               duracionDiasReal: duracionDiasReal(edt.fechaInicioPlan, edt.fechaFinPlan)
@@ -339,6 +357,7 @@ export async function GET(
                   estado: actividad.estado,
                   progreso: actividad.porcentajeAvance,
                   horasEstimadas: actividad.horasPlan,
+                  horasHombre: actividadTareas.reduce((s: number, t: any) => s + hhDeTarea(t), 0),
                   horasReales: actividad.horasReales,
                   prioridad: actividad.prioridad,
                   orden: actividad.orden,
@@ -369,6 +388,7 @@ export async function GET(
                       estado: tarea.estado,
                       progreso: tarea.porcentajeCompletado,
                       horasEstimadas: tarea.horasEstimadas,
+                      horasHombre: hhDeTarea(tarea),
                       horasReales: tarea.horasReales,
                       personasEstimadas: tarea.personasEstimadas || 1,
                       prioridad: tarea.prioridad,
@@ -417,6 +437,7 @@ export async function GET(
                       isExtrasGroup: true,
                       orden: 9999,
                       horasEstimadas: (edt.proyectoTarea || []).reduce((s: number, t: any) => s + Number(t.horasEstimadas || 0), 0),
+                      horasHombre: (edt.proyectoTarea || []).reduce((s: number, t: any) => s + hhDeTarea(t), 0),
                       horasReales: (edt.proyectoTarea || []).reduce((s: number, t: any) => s + Number(t.horasReales || 0), 0),
                       estado: 'en_progreso',
                     },
@@ -443,6 +464,7 @@ export async function GET(
                           estado: tarea.estado,
                           progreso: tarea.porcentajeCompletado,
                           horasEstimadas: tarea.horasEstimadas,
+                          horasHombre: hhDeTarea(tarea),
                           horasReales: tarea.horasReales,
                           personasEstimadas: tarea.personasEstimadas || 1,
                           prioridad: tarea.prioridad,
@@ -578,6 +600,7 @@ export async function GET(
         fechaInicioComercial: proyecto.fechaInicio,
         fechaFinComercial: proyecto.fechaFin,
         horasEstimadas: proyectoHorasTotales,
+        horasHombre: proyectoHorasHombre,
         duracionDiasReal: duracionDiasReal(proyecto.fechaInicio, proyecto.fechaFin)
       },
       metadata: {
