@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { contarDiasLaborables } from '@/lib/utils/calendarioLaboral'
 
 export const dynamic = 'force-dynamic'
 
@@ -106,6 +107,18 @@ export async function GET(
       orderBy: { createdAt: 'asc' }
     })
 
+    // Calendario laboral real (no hay ConfiguracionCalendario a nivel cotización — usar el default activo)
+    const calendarioLaboral = await prisma.calendarioLaboral.findFirst({
+      where: { activo: true },
+      orderBy: { createdAt: 'asc' },
+      include: { diaCalendario: true, excepcionCalendario: true }
+    })
+
+    const duracionDiasReal = (fechaInicio: Date | string | null, fechaFin: Date | string | null): number => {
+      if (!fechaInicio || !fechaFin || !calendarioLaboral) return 0
+      return contarDiasLaborables(new Date(fechaInicio), new Date(fechaFin), calendarioLaboral)
+    }
+
     // Construir árbol jerárquico con fases como raíz
     const tree: any[] = []
 
@@ -133,7 +146,8 @@ export async function GET(
          orden: fase.orden,
          fechaInicioPlan: toNoonUTC(fase.fechaInicioPlan),
          fechaFinPlan: toNoonUTC(fase.fechaFinPlan),
-         horasEstimadas: fase.horasEstimadas
+         horasEstimadas: fase.horasEstimadas,
+         duracionDiasReal: duracionDiasReal(fase.fechaInicioPlan, fase.fechaFinPlan)
        },
        children: [] as any[]
      }
@@ -155,7 +169,8 @@ export async function GET(
           horasEstimadas: edt.horasEstimadas,
           prioridad: edt.prioridad,
           fechaInicioComercial: toNoonUTC(edt.fechaInicioComercial),
-          fechaFinComercial: toNoonUTC(edt.fechaFinComercial)
+          fechaFinComercial: toNoonUTC(edt.fechaFinComercial),
+          duracionDiasReal: duracionDiasReal(edt.fechaInicioComercial, edt.fechaFinComercial)
         },
         children: [] as any[]
       }
@@ -177,7 +192,8 @@ export async function GET(
                prioridad: actividad.prioridad,
                fechaInicioComercial: toNoonUTC(actividad.fechaInicioComercial),
                fechaFinComercial: toNoonUTC(actividad.fechaFinComercial),
-               horasEstimadas: actividad.horasEstimadas
+               horasEstimadas: actividad.horasEstimadas,
+               duracionDiasReal: duracionDiasReal(actividad.fechaInicioComercial, actividad.fechaFinComercial)
              },
              children: actividad.cotizacionTarea?.map((tarea: any) => ({
                id: `tarea-${tarea.id}`,
@@ -193,7 +209,8 @@ export async function GET(
                  descripcion: tarea.descripcion,
                  fechaInicio: toNoonUTC(tarea.fechaInicio),
                  fechaFin: toNoonUTC(tarea.fechaFin),
-                 horasEstimadas: tarea.horasEstimadas
+                 horasEstimadas: tarea.horasEstimadas,
+                 duracionDiasReal: duracionDiasReal(tarea.fechaInicio, tarea.fechaFin)
                },
                children: []
              })) || []
@@ -225,7 +242,8 @@ export async function GET(
             horasEstimadas: edt.horasEstimadas,
             prioridad: edt.prioridad,
             fechaInicioComercial: toNoonUTC(edt.fechaInicioComercial),
-            fechaFinComercial: toNoonUTC(edt.fechaFinComercial)
+            fechaFinComercial: toNoonUTC(edt.fechaFinComercial),
+            duracionDiasReal: duracionDiasReal(edt.fechaInicioComercial, edt.fechaFinComercial)
           },
           children: [] as any[]
         }
@@ -247,7 +265,8 @@ export async function GET(
              prioridad: actividad.prioridad,
              fechaInicioComercial: toNoonUTC(actividad.fechaInicioComercial),
              fechaFinComercial: toNoonUTC(actividad.fechaFinComercial),
-             horasEstimadas: actividad.horasEstimadas
+             horasEstimadas: actividad.horasEstimadas,
+             duracionDiasReal: duracionDiasReal(actividad.fechaInicioComercial, actividad.fechaFinComercial)
            },
            children: actividad.cotizacionTarea?.map((tarea: any) => ({
              id: `tarea-${tarea.id}`,
@@ -263,7 +282,8 @@ export async function GET(
                descripcion: tarea.descripcion,
                fechaInicio: toNoonUTC(tarea.fechaInicio),
                fechaFin: toNoonUTC(tarea.fechaFin),
-               horasEstimadas: tarea.horasEstimadas
+               horasEstimadas: tarea.horasEstimadas,
+               duracionDiasReal: duracionDiasReal(tarea.fechaInicio, tarea.fechaFin)
              },
              children: []
            })) || []

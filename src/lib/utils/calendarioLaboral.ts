@@ -183,6 +183,26 @@ export function ajustarFechaADiaLaborable(fecha: Date, calendario: any): Date {
 }
 
 /**
+ * Cuenta días laborables (inclusive) entre dos fechas según el calendario
+ * real (feriados/excepciones vía `obtenerInfoDiaCalendario`) — a diferencia
+ * de un conteo Lun-Vie hardcodeado, respeta `diaCalendario`/`excepcionCalendario`.
+ */
+export function contarDiasLaborables(fechaInicio: Date, fechaFin: Date, calendario: any): number {
+  let dias = 0
+  const cursor = new Date(fechaInicio)
+  cursor.setHours(0, 0, 0, 0)
+  const limite = new Date(fechaFin)
+  limite.setHours(0, 0, 0, 0)
+
+  while (cursor <= limite) {
+    if (obtenerInfoDiaCalendario(calendario, cursor).esLaborable) dias++
+    cursor.setDate(cursor.getDate() + 1)
+  }
+
+  return dias
+}
+
+/**
  * Calcula horas laborables entre dos fechas
  */
 export function calcularHorasLaborables(fechaInicio: Date, fechaFin: Date, calendario: any): number {

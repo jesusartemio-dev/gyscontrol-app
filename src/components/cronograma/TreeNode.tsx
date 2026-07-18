@@ -112,34 +112,10 @@ export function TreeNode({
   // El roll-up GYS-GEN-16 asegura que los nodos summary tengan la suma correcta
   const totalHours = Number(node.data.horasEstimadas) || 0
 
-  // Calcular Duration (días calendario entre fechaInicio y fechaFin)
-  const calcDurationDays = (): number => {
-    let fechaInicio: string | null = null
-    let fechaFin: string | null = null
-    if (node.type === 'tarea') {
-      fechaInicio = node.data.fechaInicio
-      fechaFin = node.data.fechaFin
-    } else {
-      fechaInicio = node.data.fechaInicioComercial || node.data.fechaInicioPlan
-      fechaFin = node.data.fechaFinComercial || node.data.fechaFinPlan
-    }
-    if (!fechaInicio || !fechaFin) return 0
-    try {
-      const start = new Date(fechaInicio)
-      const end = new Date(fechaFin)
-      if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0
-      // Count business days (Mon-Fri)
-      let days = 0
-      const current = new Date(start)
-      while (current <= end) {
-        const dow = current.getDay()
-        if (dow !== 0 && dow !== 6) days++
-        current.setDate(current.getDate() + 1)
-      }
-      return days
-    } catch { return 0 }
-  }
-  const durationDays = calcDurationDays()
+  // Duración real (días laborables según el calendario del proyecto/empresa,
+  // no Lun-Vie a secas) — calculada server-side en la API del árbol, ver
+  // `contarDiasLaborables` en `src/lib/utils/calendarioLaboral.ts`.
+  const durationDays = Number(node.data.duracionDiasReal) || 0
 
   // Función para calcular el resumen de eliminación
   const getDeleteSummary = () => {

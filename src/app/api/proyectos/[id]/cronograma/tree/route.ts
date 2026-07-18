@@ -12,6 +12,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { contarDiasLaborables } from '@/lib/utils/calendarioLaboral'
 
 // ✅ GET /api/proyectos/[id]/cronograma/tree - Obtener árbol jerárquico del cronograma
 export async function GET(
@@ -44,6 +45,24 @@ export async function GET(
         { error: 'Proyecto no encontrado' },
         { status: 404 }
       )
+    }
+
+    // ✅ Calendario laboral real del proyecto (para DUR — nunca Lun-Vie hardcodeado)
+    const configCalendario = await prisma.configuracionCalendario.findFirst({
+      where: { entidadTipo: 'proyecto', entidadId: id },
+      include: { calendarioLaboral: { include: { diaCalendario: true, excepcionCalendario: true } } }
+    })
+    const calendarioLaboral =
+      configCalendario?.calendarioLaboral ||
+      (await prisma.calendarioLaboral.findFirst({
+        where: { activo: true },
+        orderBy: { createdAt: 'asc' },
+        include: { diaCalendario: true, excepcionCalendario: true }
+      }))
+
+    const duracionDiasReal = (fechaInicio: Date | string | null, fechaFin: Date | string | null): number => {
+      if (!fechaInicio || !fechaFin || !calendarioLaboral) return 0
+      return contarDiasLaborables(new Date(fechaInicio), new Date(fechaFin), calendarioLaboral)
     }
 
     // ✅ Obtener fases del proyecto según el cronograma especificado
@@ -257,7 +276,8 @@ export async function GET(
           estado: fase.estado,
           progreso: fase.porcentajeAvance,
           orden: fase.orden,
-          horasEstimadas: faseHorasTotales // ✅ Agregar horas totales calculadas
+          horasEstimadas: faseHorasTotales, // ✅ Agregar horas totales calculadas
+          duracionDiasReal: duracionDiasReal(fase.fechaInicioPlan, fase.fechaFinPlan)
         },
         metadata: {
           hasChildren: faseEdts.length > 0,
@@ -290,7 +310,8 @@ export async function GET(
               orden: edt.orden,
               horasEstimadas: edt.horasPlan,
               responsableId: edt.responsableId,
-              responsableNombre: edt.user?.name || null
+              responsableNombre: edt.user?.name || null,
+              duracionDiasReal: duracionDiasReal(edt.fechaInicioPlan, edt.fechaFinPlan)
             },
             metadata: {
               hasChildren: edtActividades.length > 0 || edtExtras.length > 0,
@@ -322,7 +343,8 @@ export async function GET(
                   prioridad: actividad.prioridad,
                   orden: actividad.orden,
                   responsableId: actividad.responsableId,
-                  responsableNombre: actividad.user?.name || null
+                  responsableNombre: actividad.user?.name || null,
+                  duracionDiasReal: duracionDiasReal(actividad.fechaInicioPlan, actividad.fechaFinPlan)
                 },
                 metadata: {
                   hasChildren: actividadTareas.length > 0,
@@ -361,7 +383,8 @@ export async function GET(
                       esPropuestaIA: tarea.esPropuestaIA || false,
                       justificacionIA: tarea.justificacionIA || null,
                       creadoPorId: tarea.creadoPorId,
-                      creadoPorNombre: (tarea as any).creadoPor?.name || null
+                      creadoPorNombre: (tarea as any).creadoPor?.name || null,
+                      duracionDiasReal: duracionDiasReal(tarea.fechaInicio, tarea.fechaFin)
                     },
                     metadata: {
                       hasChildren: false,
@@ -432,7 +455,8 @@ export async function GET(
                           recursoTipo: tarea.recurso?.tipo,
                           esExtra: true,
                           creadoPorId: tarea.creadoPorId,
-                          creadoPorNombre: (tarea as any).creadoPor?.name || null
+                          creadoPorNombre: (tarea as any).creadoPor?.name || null,
+                          duracionDiasReal: duracionDiasReal(tarea.fechaInicio, tarea.fechaFin)
                         },
                         metadata: {
                           hasChildren: false,
@@ -554,6 +578,7 @@ export async function GET(
         fechaInicioComercial: proyecto.fechaInicio,
         fechaFinComercial: proyecto.fechaFin,
         horasEstimadas: proyectoHorasTotales,
+        duracionDiasReal: duracionDiasReal(proyecto.fechaInicio, proyecto.fechaFin)
       },
       metadata: {
         hasChildren: faseNodes.length > 0,
