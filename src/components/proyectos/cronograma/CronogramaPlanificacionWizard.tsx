@@ -1652,6 +1652,25 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                     <Badge variant="secondary" className="text-xs shrink-0">
                       {actividad.tareas.filter(t => t.incluida).length}/{actividad.tareas.length} tareas
                     </Badge>
+                    {(() => {
+                      // Tareas con cantidad real (notaCantidad) que siguen en el
+                      // default "1" sin resolver (ni por mapeo determinístico ni
+                      // por IA ni editadas a mano) — la Actividad puede estar
+                      // colapsada, así que sin este badge el usuario nunca se
+                      // entera de que hay algo que revisar sin expandirla.
+                      const pendientes = actividad.tareas.filter(
+                        t => t.incluida && t.notaCantidad && !t.cantidadSugeridaPorIA && t.cantidad === 1
+                      ).length
+                      return pendientes > 0 ? (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] shrink-0 text-amber-600 border-amber-600"
+                          title="Tareas con cantidad real (ej. metros, puntos) todavía en 1 por defecto — revisalas al expandir."
+                        >
+                          {pendientes} cantidad{pendientes > 1 ? 'es' : ''} por revisar
+                        </Badge>
+                      ) : null
+                    })()}
                     {!tieneAlMenosUnaTareaIncluida(actividad.tareas) && (
                       <Badge
                         variant="outline"
