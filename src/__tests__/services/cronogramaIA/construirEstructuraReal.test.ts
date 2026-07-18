@@ -20,6 +20,8 @@ function tarea(id: string, nombre: string, horas: number, orden = 0): TareaPropu
 
 const EDTS_CATALOGO: Map<string, EdtCatalogoInfo> = new Map([
   ['GES', { id: 'edt-ges', nombre: 'GES', descripcionEdt: 'Gestion del Proyecto', faseNombre: 'PLANIFICACION', faseOrden: 1, edtOrden: 0 }],
+  ['PRO', { id: 'edt-pro', nombre: 'PRO', descripcionEdt: 'Procura', faseNombre: 'PLANIFICACION', faseOrden: 1, edtOrden: 1 }],
+  ['SEG', { id: 'edt-seg', nombre: 'SEG', descripcionEdt: 'Seguridad', faseNombre: 'PLANIFICACION', faseOrden: 1, edtOrden: 2 }],
   ['ING', { id: 'edt-ing', nombre: 'ING', descripcionEdt: 'Ingenieria de Detalle', faseNombre: 'INGENIERIA', faseOrden: 2, edtOrden: 0 }],
   ['CON', { id: 'edt-con', nombre: 'CON', descripcionEdt: 'Construccion', faseNombre: 'EJECUCION', faseOrden: 4, edtOrden: 2 }],
   ['CMM', { id: 'edt-cmm', nombre: 'CMM', descripcionEdt: 'Comisionamiento', faseNombre: 'EJECUCION', faseOrden: 4, edtOrden: 3 }],
@@ -265,6 +267,126 @@ describe('construirEstructuraReal', () => {
     expect(t1.recursoId).toBe('recurso-cadista')
     expect(t2.catalogoServicioId).toBe('t2')
     expect(t2.recursoId).toBeNull()
+  })
+})
+
+describe('construirEstructuraReal — PLANIFICACION en paralelo + Ingeniería gatillada por Seguridad', () => {
+  const fechaInicioProyecto = new Date('2026-08-03T00:00:00') // lunes
+
+  it('GES, PRO y SEG (las 3 EDTs de PLANIFICACION) arrancan el MISMO día — nunca encadenadas entre sí', () => {
+    const actividades: ActividadPropuesta[] = [
+      { edtNombre: 'GES', actividadNombre: 'Inicio', tareas: [tarea('t1', 'Kickoff', 40)], origen: 'determinista' },
+      { edtNombre: 'PRO', actividadNombre: 'Compras', tareas: [tarea('t2', 'RFQ', 24)], origen: 'determinista' },
+      { edtNombre: 'SEG', actividadNombre: 'Inducciones', tareas: [tarea('t3', 'Inducción', 8)], origen: 'determinista' },
+    ]
+    const r = construirEstructuraReal({
+      actividades,
+      edtsCatalogo: EDTS_CATALOGO,
+      proyectoId: 'p1',
+      proyectoCronogramaId: 'cron1',
+      fechaInicioProyecto,
+      calendarioLaboral: mockCalendario(),
+      recursoPorServicio: new Map(),
+    })
+
+    const ges = r.edts.find(e => e.nombre === 'Gestion del Proyecto')!
+    const pro = r.edts.find(e => e.nombre === 'Procura')!
+    const seg = r.edts.find(e => e.nombre === 'Seguridad')!
+    expect(ges.fechaInicioPlan.getTime()).toBe(pro.fechaInicioPlan.getTime())
+    expect(pro.fechaInicioPlan.getTime()).toBe(seg.fechaInicioPlan.getTime())
+    // Duraciones distintas (40h=5 días, 24h=3 días, 8h=1 día) -> fines distintos.
+    expect(ges.fechaFinPlan.getTime()).toBeGreaterThan(seg.fechaFinPlan.getTime())
+  })
+
+  it('la fila de la Fase PLANIFICACION usa el fin MÁXIMO entre sus 3 EDTs, no el de la última procesada', () => {
+    // SEG (última en edtOrden) es la más CORTA -> si el código todavía
+    // sobreescribiera fechaFinFase con "la última procesada", la Fase
+    // quedaría con el fin de SEG (corto) en vez del real (GES, largo).
+    const actividades: ActividadPropuesta[] = [
+      { edtNombre: 'GES', actividadNombre: 'Inicio', tareas: [tarea('t1', 'Kickoff', 40)], origen: 'determinista' },
+      { edtNombre: 'PRO', actividadNombre: 'Compras', tareas: [tarea('t2', 'RFQ', 24)], origen: 'determinista' },
+      { edtNombre: 'SEG', actividadNombre: 'Inducciones', tareas: [tarea('t3', 'Inducción', 8)], origen: 'determinista' },
+    ]
+    const r = construirEstructuraReal({
+      actividades,
+      edtsCatalogo: EDTS_CATALOGO,
+      proyectoId: 'p1',
+      proyectoCronogramaId: 'cron1',
+      fechaInicioProyecto,
+      calendarioLaboral: mockCalendario(),
+      recursoPorServicio: new Map(),
+    })
+
+    const ges = r.edts.find(e => e.nombre === 'Gestion del Proyecto')!
+    const fasePlanificacion = r.fases.find(f => f.nombre === 'PLANIFICACION')!
+    expect(fasePlanificacion.fechaFinPlan.getTime()).toBe(ges.fechaFinPlan.getTime())
+  })
+
+  it('INGENIERIA arranca justo después de SEG específicamente, NO después del fin de toda PLANIFICACION (que termina más tarde por GES/PRO)', () => {
+    const actividades: ActividadPropuesta[] = [
+      { edtNombre: 'GES', actividadNombre: 'Inicio', tareas: [tarea('t1', 'Kickoff', 40)], origen: 'determinista' }, // 5 días
+      { edtNombre: 'PRO', actividadNombre: 'Compras', tareas: [tarea('t2', 'RFQ', 24)], origen: 'determinista' }, // 3 días
+      { edtNombre: 'SEG', actividadNombre: 'Inducciones', tareas: [tarea('t3', 'Inducción', 8)], origen: 'determinista' }, // 1 día — el más corto
+      { edtNombre: 'ING', actividadNombre: 'Diseño', tareas: [tarea('t4', 'Diseño', 8)], origen: 'determinista' },
+    ]
+    const r = construirEstructuraReal({
+      actividades,
+      edtsCatalogo: EDTS_CATALOGO,
+      proyectoId: 'p1',
+      proyectoCronogramaId: 'cron1',
+      fechaInicioProyecto,
+      calendarioLaboral: mockCalendario(),
+      recursoPorServicio: new Map(),
+    })
+
+    const ges = r.edts.find(e => e.nombre === 'Gestion del Proyecto')!
+    const seg = r.edts.find(e => e.nombre === 'Seguridad')!
+    const ing = r.edts.find(e => e.nombre === 'Ingenieria de Detalle')!
+
+    // Arranca después de SEG (el gatillo), no después de GES (que termina más tarde).
+    expect(ing.fechaInicioPlan.getTime()).toBeGreaterThan(seg.fechaFinPlan.getTime())
+    expect(ing.fechaInicioPlan.getTime()).toBeLessThan(ges.fechaFinPlan.getTime())
+  })
+
+  it('REGRESIÓN: fases sin gatillo configurado (ej. EJECUCION) siguen estrictamente secuenciales — Construccion arranca después de Comisionamiento del mismo EDT/orden real', () => {
+    const actividades: ActividadPropuesta[] = [
+      { edtNombre: 'CON', actividadNombre: 'Zona A', tareas: [tarea('t1', 'Tendido', 40)], origen: 'ia' },
+      { edtNombre: 'CMM', actividadNombre: 'Comisionamiento', tareas: [tarea('t2', 'Puesta en marcha', 8)], origen: 'determinista' },
+    ]
+    const r = construirEstructuraReal({
+      actividades,
+      edtsCatalogo: EDTS_CATALOGO,
+      proyectoId: 'p1',
+      proyectoCronogramaId: 'cron1',
+      fechaInicioProyecto,
+      calendarioLaboral: mockCalendario(),
+      recursoPorServicio: new Map(),
+    })
+
+    const con = r.edts.find(e => e.nombre === 'Construccion')!
+    const cmm = r.edts.find(e => e.nombre === 'Comisionamiento')!
+    // Secuencial de siempre: CMM arranca DESPUÉS de que CON termina (nunca el mismo día).
+    expect(cmm.fechaInicioPlan.getTime()).toBeGreaterThanOrEqual(con.fechaFinPlan.getTime())
+  })
+
+  it('fallback: si SEG no está incluido en la generación, la fase siguiente igual arranca (cae al fin real de PLANIFICACION, sin reventar)', () => {
+    const actividades: ActividadPropuesta[] = [
+      { edtNombre: 'GES', actividadNombre: 'Inicio', tareas: [tarea('t1', 'Kickoff', 8)], origen: 'determinista' },
+      { edtNombre: 'ING', actividadNombre: 'Diseño', tareas: [tarea('t2', 'Diseño', 8)], origen: 'determinista' },
+    ]
+    const r = construirEstructuraReal({
+      actividades,
+      edtsCatalogo: EDTS_CATALOGO,
+      proyectoId: 'p1',
+      proyectoCronogramaId: 'cron1',
+      fechaInicioProyecto,
+      calendarioLaboral: mockCalendario(),
+      recursoPorServicio: new Map(),
+    })
+
+    const ges = r.edts.find(e => e.nombre === 'Gestion del Proyecto')!
+    const ing = r.edts.find(e => e.nombre === 'Ingenieria de Detalle')!
+    expect(ing.fechaInicioPlan.getTime()).toBeGreaterThanOrEqual(ges.fechaFinPlan.getTime())
   })
 })
 

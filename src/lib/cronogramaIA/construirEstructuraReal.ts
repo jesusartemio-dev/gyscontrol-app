@@ -106,6 +106,20 @@ export interface EstructuraReal {
   edtIdACodigo: Map<string, string>
 }
 
+/** Fase cuyas EDTs corren en PARALELO entre sí (todas arrancan el mismo día
+ * que la Fase) y cuyo propio fin nunca gatilla la fase siguiente — sigue
+ * activa en paralelo con el resto del proyecto (gestión/procura no son un
+ * bloque previo que "se cierra"). Ver EDT_GATILLO_SIGUIENTE_FASE para qué SÍ
+ * gatilla el avance a la siguiente fase. */
+const FASE_PARALELA_CONTINUA = 'PLANIFICACION'
+
+/** Código corto del EDT (catálogo), dentro de FASE_PARALELA_CONTINUA, cuyo
+ * fin gatilla el inicio de la fase siguiente — ej. Ingeniería no arranca sin
+ * que Seguridad (inducciones/permisos) esté lista, no cuando termina TODA
+ * Planificación (que sigue corriendo en paralelo). Si el EDT no está
+ * incluido en esta generación, se cae al fin real de la fase. */
+const EDT_GATILLO_SIGUIENTE_FASE: Record<string, string> = { PLANIFICACION: 'SEG' }
+
 const DURACION_MINIMA_DIAS = 1
 
 function duracionDiasDesdeHoras(horas: number, horasPorDia: number): number {
@@ -168,9 +182,24 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
 
     const faseId = randomUUID()
     const fechaInicioFase = cursorFase
+    // Fase paralela (PLANIFICACION): todas sus EDTs arrancan el mismo día
+    // (fechaInicioFase), nunca encadenadas entre sí — ver FASE_PARALELA_CONTINUA.
+    const esFaseParalela = faseInfo.faseNombre === FASE_PARALELA_CONTINUA
     // Fallback si la Fase no tuviera EDTs (no debería ocurrir en la práctica) —
-    // se sobreescribe abajo con el fin REAL del último EDT ya colocado.
-    let fechaFinFase = calcularFechaFinConCalendario(fechaInicioFase, duracionDiasDesdeHoras(horasFase, horasPorDia) * horasPorDia, calendarioLaboral)
+    // se sobreescribe abajo con el fin REAL del último EDT (secuencial) o el
+    // MÁXIMO entre EDTs (paralela). En paralela el fallback NO puede basarse
+    // en la suma de horas de todas las EDTs (asume secuencial, siempre da un
+    // número mayor a cualquier EDT individual) — ganaría siempre la
+    // comparación de máximo y la fase nunca reflejaría su fin real.
+    let fechaFinFase = esFaseParalela
+      ? fechaInicioFase
+      : calcularFechaFinConCalendario(fechaInicioFase, duracionDiasDesdeHoras(horasFase, horasPorDia) * horasPorDia, calendarioLaboral)
+    const edtGatillo = EDT_GATILLO_SIGUIENTE_FASE[faseInfo.faseNombre]
+    // Fin del EDT gatillo (ej. Seguridad) — si está configurado y presente en
+    // esta generación, determina cuándo puede arrancar la FASE siguiente, en
+    // vez del fin de TODA esta fase (que en una fase paralela puede seguir
+    // corriendo después). Ver el cursorFase más abajo.
+    let fechaGatilloSiguienteFase: Date | null = null
 
     let cursorEdt = fechaInicioFase
     let ordenEdt = 0
@@ -179,7 +208,7 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
       const horasEdt = actsDelEdt.reduce((a2, act) => a2 + act.tareas.reduce((a3, t) => a3 + t.horasEstimadas, 0), 0)
 
       const edtId = randomUUID()
-      const fechaInicioEdt = cursorEdt
+      const fechaInicioEdt = esFaseParalela ? fechaInicioFase : cursorEdt
       // Fallback si el EDT no tuviera actividades (no debería ocurrir en la
       // práctica — agruparYOrdenarPorEstructura no emite EDTs vacíos) — se
       // sobreescribe abajo con el fin REAL de la última actividad.
@@ -271,9 +300,18 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
         updatedAt: new Date(),
         responsableId: null,
       })
-      fechaFinFase = fechaFinEdt
 
-      cursorEdt = avanzarSiguienteInicio(fechaFinEdt, calendarioLaboral)
+      // Secuencial (default): la última EDT procesada define el fin de la
+      // Fase, como siempre. Paralela: el fin de la Fase es el MÁXIMO entre
+      // todas sus EDTs, no el de la última — cada una puede durar distinto.
+      if (esFaseParalela) {
+        if (fechaFinEdt.getTime() > fechaFinFase.getTime()) fechaFinFase = fechaFinEdt
+      } else {
+        fechaFinFase = fechaFinEdt
+      }
+      if (edtGatillo && edtInfo.nombre === edtGatillo) fechaGatilloSiguienteFase = fechaFinEdt
+
+      if (!esFaseParalela) cursorEdt = avanzarSiguienteInicio(fechaFinEdt, calendarioLaboral)
     }
 
     fases.push({
@@ -288,7 +326,14 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
       updatedAt: new Date(),
     })
 
-    cursorFase = avanzarSiguienteInicio(fechaFinFase, calendarioLaboral)
+    // Si esta Fase tiene un EDT gatillo configurado y presente en la
+    // generación (ej. Seguridad dentro de Planificación), la fase siguiente
+    // arranca justo después de ESE EDT, no del fin de toda esta fase — que en
+    // una fase paralela puede seguir corriendo. Sin gatillo configurado (el
+    // caso de todas las demás fases hoy), cae exactamente al comportamiento
+    // de siempre: fin real de la fase.
+    const fechaBaseSiguienteFase = fechaGatilloSiguienteFase ?? fechaFinFase
+    cursorFase = avanzarSiguienteInicio(fechaBaseSiguienteFase, calendarioLaboral)
   }
 
   return { fases, edts, actividades: actividadesFilas, tareas, advertencias, edtIdACodigo }
