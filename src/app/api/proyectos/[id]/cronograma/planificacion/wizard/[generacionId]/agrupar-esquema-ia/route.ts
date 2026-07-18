@@ -6,6 +6,7 @@ import { validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 import { adquirirLockCronogramaIA, liberarLockCronogramaIA } from '@/lib/cronogramaIA/mutex'
 import { generarAsignacionConEsquema } from '@/lib/cronogramaIA/generarAsignacionConEsquema'
+import { sugerirYAplicarCantidades } from '@/lib/cronogramaIA/generarSugerenciasCantidad'
 import { EDTS_ESQUEMA_DOS_ETAPAS } from '@/lib/cronogramaIA/reglasActividades'
 import { resolverAliasParaNombres } from '@/lib/cronogramaIA/aliasActividad'
 import { FAMILIA_SOPORTES_FABRICADOS, NOMBRE_FAMILIA_OFICIAL_PRO } from '@/lib/cronogramaIA/vocabularioFamiliasPro'
@@ -193,10 +194,29 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       alcanceLibre: config.alcanceLibre,
       cotizacion,
       equiposReales,
-      config: { brownfield: config.brownfield, ingenieriaDetalle: config.ingenieriaDetalle },
+      config: {
+        brownfield: config.brownfield,
+        ingenieriaDetalle: config.ingenieriaDetalle,
+        nPets: config.nPets,
+        tableros: config.tableros,
+        plcs: config.plcs,
+        hmiCantidad: config.hmiCantidad,
+      },
       userId: session.user.id,
       proyectoId,
     })
+
+    // Best-effort: sugiere `cantidad` (con IA) solo para servicios con
+    // notaCantidad que el mapeo determinístico no pudo resolver — nunca
+    // bloquea la generación si falla.
+    const sugerenciaCantidad = await sugerirYAplicarCantidades(resultado.actividades, {
+      alcanceLibre: config.alcanceLibre,
+      cotizacion,
+      userId: session.user.id,
+      proyectoId,
+    })
+    resultado.actividades = sugerenciaCantidad.actividades
+    resultado.advertencias.push(...sugerenciaCantidad.advertencias)
 
     const actividadesPrevias = ((generacion.propuestaActividades as unknown as ActividadPropuesta[]) ?? []).filter(a => a.edtNombre !== body.edtNombre)
     const propuestaActividades = [...actividadesPrevias, ...resultado.actividades]

@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { ROLES_CRONOGRAMA } from '@/lib/services/cronogramaPermisos'
 import { configuracionWizardPaso1Schema } from '@/lib/validators/cronogramaIA'
 import { generarActividadesDeterministas, calcularEdtsPendientesIA, type EdtParaGenerar } from '@/lib/cronogramaIA/reglasActividades'
+import { sugerirYAplicarCantidades } from '@/lib/cronogramaIA/generarSugerenciasCantidad'
 import type { CatalogoServicioParaWizard } from '@/types/cronogramaIA'
 
 type Ctx = { params: Promise<{ id: string }> }
@@ -112,7 +113,18 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   })
   const textoTdr = [tdrDoc?.alcanceDetectado, tdrDoc?.resumenTdr].filter(Boolean).join('\n')
 
-  const { actividades, advertencias } = generarActividadesDeterministas(edtsParaGenerar, config, textoTdr)
+  const { actividades: actividadesDeterministas, advertencias } = generarActividadesDeterministas(edtsParaGenerar, config, textoTdr)
+
+  // Best-effort: sugiere `cantidad` (con IA) solo para servicios con
+  // notaCantidad que el mapeo determinístico (ver resolverCantidadDeterminista)
+  // no pudo resolver — nunca bloquea la generación si falla.
+  const { actividades, advertencias: advertenciasCantidad } = await sugerirYAplicarCantidades(actividadesDeterministas, {
+    alcanceLibre: config.alcanceLibre,
+    cotizacion: null,
+    userId,
+    proyectoId,
+  })
+  advertencias.push(...advertenciasCantidad)
 
   const generacion = await prisma.proyectoCronogramaGeneracionIA.create({
     data: {

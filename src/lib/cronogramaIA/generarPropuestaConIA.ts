@@ -23,6 +23,7 @@ import {
   type TareaParaPrompt,
 } from './prompts'
 import type { CatalogoServicioParaWizard, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
+import type { ConfiguracionCantidadDeterminista } from './reglasActividades'
 
 function extraerTexto(response: Anthropic.Message): string {
   return response.content
@@ -41,7 +42,7 @@ interface GenerarPropuestaOpciones {
   contextoInstancias?: ContextoInstanciasParaPrompt | null
   /** Solo relevante para PRO — lista real de ProyectoEquipoCotizadoItem (señal fuerte, ver prompts.ts). */
   equiposReales?: EquipoRealParaPrompt[] | null
-  config: Pick<ConfiguracionWizardPaso1, 'brownfield' | 'ingenieriaDetalle'>
+  config: Pick<ConfiguracionWizardPaso1, 'brownfield' | 'ingenieriaDetalle'> & ConfiguracionCantidadDeterminista
   userId: string
   proyectoId: string
   signal?: AbortSignal

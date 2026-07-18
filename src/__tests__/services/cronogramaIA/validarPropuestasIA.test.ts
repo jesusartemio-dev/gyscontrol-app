@@ -25,7 +25,14 @@ function servicio(overrides: Partial<CatalogoServicioParaWizard> & { id: string;
   }
 }
 
-const config: Pick<ConfiguracionWizardPaso1, 'brownfield' | 'ingenieriaDetalle'> = { brownfield: false, ingenieriaDetalle: false }
+const config: Pick<ConfiguracionWizardPaso1, 'brownfield' | 'ingenieriaDetalle' | 'nPets' | 'tableros' | 'plcs' | 'hmiCantidad'> = {
+  brownfield: false,
+  ingenieriaDetalle: false,
+  nPets: 0,
+  tableros: [],
+  plcs: [],
+  hmiCantidad: 0,
+}
 
 describe('validarPropuestaGrupos', () => {
   const servicios = [

@@ -65,6 +65,36 @@ export function calcularHorasEstimadas(
   return (base + Math.max(0, cantidad - 1) * repetido) * nivelDificultad
 }
 
+export type ConfiguracionCantidadDeterminista = Pick<ConfiguracionWizardPaso1, 'nPets' | 'tableros' | 'plcs' | 'hmiCantidad'>
+
+const REGLAS_CANTIDAD_DETERMINISTA: { patron: RegExp; resolver: (config: ConfiguracionCantidadDeterminista) => number }[] = [
+  { patron: /pets?/i, resolver: c => c.nPets },
+  { patron: /tablero/i, resolver: c => c.tableros.length },
+  { patron: /plc/i, resolver: c => c.plcs.length },
+  { patron: /hmi|pantalla/i, resolver: c => c.hmiCantidad },
+]
+
+/**
+ * Resuelve `cantidad` sin IA cuando `notaCantidad` (parseado de la
+ * descripción del catálogo por `parsearNotaCantidad`, ej. "Cantidad = N° de
+ * PETS") apunta a un campo que el propio Paso 1 ya captura con certeza —
+ * 100% confiable, sin alucinación posible, así que se prueba SIEMPRE antes
+ * de intentar cualquier sugerencia por IA. Devuelve null si `notaCantidad`
+ * no matchea ningún campo conocido (el caller debe caer a la sugerencia por
+ * IA, o al default del catálogo) o si el valor resuelto sería <=0 (cantidad
+ * 0 es un caso de exclusión de alcance, no de "cantidad determinística").
+ */
+export function resolverCantidadDeterminista(
+  notaCantidad: string | null,
+  config: ConfiguracionCantidadDeterminista
+): number | null {
+  if (!notaCantidad) return null
+  const regla = REGLAS_CANTIDAD_DETERMINISTA.find(r => r.patron.test(notaCantidad))
+  if (!regla) return null
+  const valor = regla.resolver(config)
+  return valor > 0 ? valor : null
+}
+
 /** Único punto de decisión sobre si un servicio aplica al proyecto según su filtroAlcance. */
 export function evaluarAlcance(
   filtroAlcance: CatalogoServicioParaWizard['filtroAlcance'],
@@ -85,9 +115,10 @@ export function evaluarAlcance(
 
 export function construirTareaPropuesta(
   servicio: CatalogoServicioParaWizard,
-  config: Pick<ConfiguracionWizardPaso1, 'brownfield' | 'ingenieriaDetalle'>
+  config: Pick<ConfiguracionWizardPaso1, 'brownfield' | 'ingenieriaDetalle'> & ConfiguracionCantidadDeterminista
 ): TareaPropuesta {
-  const cantidad = servicio.cantidad ?? 1
+  const cantidadDeterminista = resolverCantidadDeterminista(servicio.notaCantidad, config)
+  const cantidad = cantidadDeterminista ?? servicio.cantidad ?? 1
   const nivelDificultad = servicio.nivelDificultad ?? 1
   const { incluida, motivoExclusion } = evaluarAlcance(servicio.filtroAlcance, config)
   return {
@@ -101,6 +132,9 @@ export function construirTareaPropuesta(
     incluida,
     motivoExclusion,
     orden: servicio.orden ?? Number.MAX_SAFE_INTEGER,
+    unidadNombre: servicio.unidadNombre,
+    cantidadSugeridaPorIA: cantidadDeterminista !== null,
+    notaCantidad: servicio.notaCantidad,
   }
 }
 

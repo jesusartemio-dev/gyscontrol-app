@@ -64,6 +64,12 @@ export interface TareaPropuesta {
   esPropuestaIA?: boolean
   /** Justificación de 1 línea dada por la IA al proponerla — solo presente si esPropuestaIA es true. */
   justificacion?: string
+  /** Nombre de la unidad de medida del servicio (ej. "Metro", "Punto") — CatalogoServicio.unidadServicio.nombre, para mostrar junto al input de cantidad en el Paso 2. */
+  unidadNombre?: string
+  /** CatalogoServicio.notaCantidad (ej. "metros de cable") — solo para decidir si vale la pena pedirle a la IA una sugerencia de cantidad; nunca se muestra al usuario. */
+  notaCantidad?: string | null
+  /** true si `cantidad` fue resuelta por el mapeo determinístico o sugerida por IA (ver sugerirCantidadesReales) — false/ausente si es el default "1" del catálogo, o si el usuario ya la editó a mano en el Paso 2. Solo para mostrar un badge de aviso, nunca cambia el cálculo. */
+  cantidadSugeridaPorIA?: boolean
 }
 
 export interface ActividadPropuesta {

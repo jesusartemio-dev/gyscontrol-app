@@ -1089,6 +1089,30 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
     )
   }
 
+  /**
+   * Edita la cantidad real de una tarea de CATÁLOGO (ej. metros de cable) y
+   * recalcula horasEstimadas con la misma fórmula del servidor
+   * (calcularHorasEstimadas en reglasActividades.ts) — duplicada acá porque
+   * es 1 línea pura, no vale la pena compartir módulo cliente/servidor solo
+   * por esto. Marca cantidadSugeridaPorIA=false: el usuario ya la revisó.
+   */
+  function actualizarCantidadTarea(actividadIndex: number, tareaIndex: number, nuevaCantidad: number) {
+    setActividades(prev =>
+      prev.map((a, i) => {
+        if (i !== actividadIndex) return a
+        return {
+          ...a,
+          tareas: a.tareas.map((t, ti) => {
+            if (ti !== tareaIndex) return t
+            const cantidad = Math.max(0, nuevaCantidad)
+            const horasEstimadas = (t.horaBase + Math.max(0, cantidad - 1) * t.horaRepetido) * t.nivelDificultad
+            return { ...t, cantidad, horasEstimadas, cantidadSugeridaPorIA: false }
+          }),
+        }
+      })
+    )
+  }
+
   /** Edita nombre/HH estimadas de una tarea propuesta por IA (esPropuestaIA) antes de aceptarla — nunca aplica a tareas de catálogo. */
   function actualizarTareaPropuestaIA(actividadIndex: number, tareaIndex: number, cambios: { nombre?: string; horasEstimadas?: number }) {
     setActividades(prev =>
@@ -1686,6 +1710,25 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                             <p className="text-[10px] text-muted-foreground mt-0.5">{tarea.motivoExclusion}</p>
                           )}
                         </div>
+                        {tarea.notaCantidad && (
+                          <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                            {tarea.cantidadSugeridaPorIA && (
+                              <Badge variant="outline" className="text-[9px] px-1 text-blue-600 border-blue-600 shrink-0">
+                                IA
+                              </Badge>
+                            )}
+                            <Input
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={tarea.cantidad}
+                              onChange={e => actualizarCantidadTarea(index, ti, Number(e.target.value) || 0)}
+                              className="h-6 text-[11px] w-16 px-1"
+                              title={`Cantidad (${tarea.unidadNombre || 'unidad'})`}
+                            />
+                            <span className="text-[10px] text-muted-foreground shrink-0">{tarea.unidadNombre}</span>
+                          </div>
+                        )}
                         <span className="text-muted-foreground shrink-0">{tarea.horasEstimadas.toFixed(1)}h</span>
                         {destinos.length > 0 && (
                           <DropdownMenu>

@@ -759,3 +759,55 @@ export function buildUserPrellenadoPaso1(
     .filter(Boolean)
     .join('\n')
 }
+
+export interface ServicioParaSugerirCantidad {
+  id: string
+  nombre: string
+  /** Ej. "metros de cable", "puntos de instrumentación" — de dónde parte la IA (parseado de la descripción del catálogo). */
+  notaCantidad: string
+  unidadNombre: string
+}
+
+export const SYSTEM_SUGERIR_CANTIDADES = `
+Eres el Ingeniero de Planificación Senior de GYS CONTROL INDUSTRIAL SAC,
+empresa peruana especializada en proyectos electromecánicos, automatización e
+instrumentación industrial.
+
+El catálogo de servicios de la empresa calcula horas-hombre a partir de una
+"cantidad" (ej. metros de cable, puntos de instrumentación) que hoy siempre
+queda en 1 por defecto porque el sistema no la captura en ningún otro lado.
+Vas a sugerir un número real de "cantidad" para cada servicio de la lista,
+usando ÚNICAMENTE la descripción libre de alcance que dio el usuario.
+
+REGLAS ESTRICTAS:
+- Los servicios candidatos YA ESTÁN RESUELTOS por el sistema — vienen con un
+  "id" real del catálogo. NUNCA inventes un id nuevo.
+- Cada servicio trae "notaCantidad" (qué representa su cantidad, ej. "metros
+  de cable") y "unidadNombre" (la unidad real, ej. "Metro") — úsalos para
+  entender qué número buscás.
+- SOLO proponé una cantidad si el texto de alcance da una CIFRA concreta o un
+  cálculo directo a partir de una (ej. "500 metros de bandeja", "12
+  transmisores de presión"). NUNCA estimes a ojo ni uses cifras típicas de la
+  industria — es preferible omitir el servicio (queda en blanco para que el
+  usuario lo complete a mano) antes que inventar un número.
+- Si el texto menciona un rango, usá el valor más conservador (el menor).
+- Devolvé SOLO el JSON, sin markdown ni texto antes o después.
+`.trim()
+
+export function buildUserSugerirCantidades(
+  servicios: ServicioParaSugerirCantidad[],
+  alcanceLibre: string,
+  cotizacion: ContextoCotizacionParaPrompt | null
+): string {
+  return [
+    `DESCRIPCIÓN LIBRE DEL ALCANCE (dada por el usuario en el wizard):\n${alcanceLibre || '(no se proporcionó)'}`,
+    bloqueContextoCotizacion(cotizacion),
+    'SERVICIOS CANDIDATOS (sugerí cantidad SOLO si hay evidencia numérica concreta en el texto, por su "id"):',
+    JSON.stringify(servicios, null, 2),
+    '',
+    'ESQUEMA DE OUTPUT (devolvé EXACTAMENTE este JSON, sin markdown — omití los servicios sin evidencia numérica, no inventes):',
+    '{ "sugerencias": [{ "catalogoServicioId": "string — id copiado del input", "cantidad": number, "justificacion": "string — 1 línea citando la evidencia del texto" }] }',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}

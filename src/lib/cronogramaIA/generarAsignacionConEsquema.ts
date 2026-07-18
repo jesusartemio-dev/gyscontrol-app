@@ -21,6 +21,7 @@ import {
   type TareaParaPrompt,
 } from './prompts'
 import type { CatalogoServicioParaWizard, ConfiguracionWizardPaso1, NombreConAlias } from '@/types/cronogramaIA'
+import type { ConfiguracionCantidadDeterminista } from './reglasActividades'
 
 function extraerTexto(response: Anthropic.Message): string {
   return response.content
@@ -40,7 +41,7 @@ interface GenerarAsignacionOpciones {
   alcanceLibre: string
   cotizacion: ContextoCotizacionParaPrompt | null
   equiposReales?: EquipoRealParaPrompt[] | null
-  config: Pick<ConfiguracionWizardPaso1, 'brownfield' | 'ingenieriaDetalle'>
+  config: Pick<ConfiguracionWizardPaso1, 'brownfield' | 'ingenieriaDetalle'> & ConfiguracionCantidadDeterminista
   userId: string
   proyectoId: string
   signal?: AbortSignal

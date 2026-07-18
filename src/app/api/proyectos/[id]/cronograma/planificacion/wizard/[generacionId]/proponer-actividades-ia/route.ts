@@ -6,6 +6,7 @@ import { validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 import { adquirirLockCronogramaIA, liberarLockCronogramaIA } from '@/lib/cronogramaIA/mutex'
 import { generarPropuestaConIA } from '@/lib/cronogramaIA/generarPropuestaConIA'
+import { sugerirYAplicarCantidades } from '@/lib/cronogramaIA/generarSugerenciasCantidad'
 import { EDTS_AGRUPACION_UN_PASO } from '@/lib/cronogramaIA/reglasActividades'
 import type { ActividadPropuesta, CatalogoServicioParaWizard, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
 import type { ContextoCotizacionParaPrompt, ContextoInstanciasParaPrompt } from '@/lib/cronogramaIA/prompts'
@@ -132,14 +133,21 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
           alcanceLibre: config.alcanceLibre,
           cotizacion: construirContextoCotizacion(),
           contextoInstancias,
-          config: { brownfield: config.brownfield, ingenieriaDetalle: config.ingenieriaDetalle },
+          config: {
+            brownfield: config.brownfield,
+            ingenieriaDetalle: config.ingenieriaDetalle,
+            nPets: config.nPets,
+            tableros: config.tableros,
+            plcs: config.plcs,
+            hmiCantidad: config.hmiCantidad,
+          },
           userId: session.user.id,
           proyectoId,
         })
       })
     )
 
-    const nuevasActividades: ActividadPropuesta[] = []
+    let nuevasActividades: ActividadPropuesta[] = []
     const advertenciasIA: string[] = []
     for (const r of resultados) {
       if (r.status === 'fulfilled') {
@@ -149,6 +157,18 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
         advertenciasIA.push(`Error inesperado generando propuesta de IA: ${r.reason instanceof Error ? r.reason.message : 'desconocido'}`)
       }
     }
+
+    // Best-effort: sugiere `cantidad` (con IA) solo para servicios con
+    // notaCantidad que el mapeo determinístico no pudo resolver — nunca
+    // bloquea la generación si falla.
+    const sugerenciaCantidad = await sugerirYAplicarCantidades(nuevasActividades, {
+      alcanceLibre: config.alcanceLibre,
+      cotizacion: construirContextoCotizacion(),
+      userId: session.user.id,
+      proyectoId,
+    })
+    nuevasActividades = sugerenciaCantidad.actividades
+    advertenciasIA.push(...sugerenciaCantidad.advertencias)
 
     const edtsNombresIA = new Set(edtsIA.map(e => e.nombre))
     const actividadesPrevias = ((generacion.propuestaActividades as unknown as ActividadPropuesta[]) ?? []).filter(

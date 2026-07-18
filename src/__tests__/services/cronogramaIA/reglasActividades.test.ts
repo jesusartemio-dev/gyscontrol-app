@@ -4,6 +4,8 @@ import {
   generarActividadesDeterministas,
   calcularEdtsPendientesIA,
   tieneAlMenosUnaTareaIncluida,
+  resolverCantidadDeterminista,
+  construirTareaPropuesta,
   type EdtParaGenerar,
 } from '@/lib/cronogramaIA/reglasActividades'
 import type { CatalogoServicioParaWizard, ConfiguracionWizardPaso1 } from '@/types/cronogramaIA'
@@ -56,6 +58,65 @@ describe('calcularHorasEstimadas', () => {
 
   it('valores null se tratan como 0', () => {
     expect(calcularHorasEstimadas(null, null, 5, 1)).toBe(0)
+  })
+})
+
+describe('resolverCantidadDeterminista — mapeo notaCantidad -> campo real del Paso 1, sin IA', () => {
+  const cfg = { nPets: 3, tableros: [{ nombre: 'TCO-1' }, { nombre: 'TCO-2' }], plcs: [{ nombre: 'PLC-1' }], hmiCantidad: 2 }
+
+  it('sin notaCantidad, devuelve null (no hay nada que resolver)', () => {
+    expect(resolverCantidadDeterminista(null, cfg)).toBeNull()
+  })
+
+  it('"N° de PETS" resuelve a nPets', () => {
+    expect(resolverCantidadDeterminista('N° de PETS', cfg)).toBe(3)
+  })
+
+  it('"tableros" resuelve a la cantidad de tableros del Paso 1', () => {
+    expect(resolverCantidadDeterminista('cantidad de tableros', cfg)).toBe(2)
+  })
+
+  it('"PLCs" resuelve a la cantidad de PLCs del Paso 1', () => {
+    expect(resolverCantidadDeterminista('N° de PLCs', cfg)).toBe(1)
+  })
+
+  it('"HMI" resuelve a hmiCantidad', () => {
+    expect(resolverCantidadDeterminista('pantallas HMI', cfg)).toBe(2)
+  })
+
+  it('notaCantidad que no matchea ningún campo conocido (ej. "metros de cable") devuelve null — cae a la sugerencia por IA', () => {
+    expect(resolverCantidadDeterminista('metros de cable', cfg)).toBeNull()
+  })
+
+  it('si el campo resuelto sería 0, devuelve null en vez de una cantidad 0 (evita romper la fórmula de horas)', () => {
+    expect(resolverCantidadDeterminista('N° de PETS', { ...cfg, nPets: 0 })).toBeNull()
+  })
+})
+
+describe('construirTareaPropuesta — integra el mapeo determinístico + propaga unidadNombre/notaCantidad para el Paso 2', () => {
+  it('con notaCantidad matcheable, usa el valor determinístico (no el default "1" del catálogo) y marca cantidadSugeridaPorIA', () => {
+    const s = servicio({ id: 's1', nombre: 'Elaboración de PETS', notaCantidad: 'N° de PETS', horaBase: 2, horaRepetido: 1, unidadNombre: 'PET' })
+    const t = construirTareaPropuesta(s, config({ nPets: 4 }))
+    expect(t.cantidad).toBe(4)
+    expect(t.horasEstimadas).toBe(calcularHorasEstimadas(2, 1, 4, 1))
+    expect(t.cantidadSugeridaPorIA).toBe(true)
+    expect(t.unidadNombre).toBe('PET')
+    expect(t.notaCantidad).toBe('N° de PETS')
+  })
+
+  it('sin notaCantidad (servicio normal), usa el default del catálogo y NO marca cantidadSugeridaPorIA', () => {
+    const s = servicio({ id: 's2', nombre: 'Kickoff', cantidad: 1 })
+    const t = construirTareaPropuesta(s, config())
+    expect(t.cantidad).toBe(1)
+    expect(t.cantidadSugeridaPorIA).toBe(false)
+  })
+
+  it('con notaCantidad NO matcheable (ej. metros de cable), cae al default del catálogo sin marcar cantidadSugeridaPorIA (queda para la sugerencia por IA aguas abajo)', () => {
+    const s = servicio({ id: 's3', nombre: 'Tendido de Cables', notaCantidad: 'metros de cable', cantidad: 1 })
+    const t = construirTareaPropuesta(s, config())
+    expect(t.cantidad).toBe(1)
+    expect(t.cantidadSugeridaPorIA).toBe(false)
+    expect(t.notaCantidad).toBe('metros de cable')
   })
 })
 
