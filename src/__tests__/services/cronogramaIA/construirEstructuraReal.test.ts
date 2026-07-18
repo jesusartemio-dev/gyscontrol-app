@@ -178,6 +178,74 @@ describe('construirEstructuraReal', () => {
     expect(cmm.fechaInicioPlan.getTime()).toBeGreaterThanOrEqual(con.fechaFinPlan.getTime())
   })
 
+  it('REGRESIÓN apilamiento: Tareas de una misma Actividad que exceden 1 día NO quedan todas en el mismo día (bug real: CJM49, todo el 28-agosto)', () => {
+    // 3 tareas de 8h c/u (horasPorDia=8) -> cada una consume exactamente 1
+    // día completo. Con el bug viejo (cursorTarea = fechaFinTarea, Date
+    // crudo encadenado) las 3 caían el mismo día porque
+    // calcularFechaFinConCalendario le daba a cada una el presupuesto
+    // COMPLETO del día sin importar la hora de inicio heredada.
+    const actividades: ActividadPropuesta[] = [
+      {
+        edtNombre: 'GES',
+        actividadNombre: 'Secuencial',
+        tareas: [tarea('t1', 'Uno', 8), tarea('t2', 'Dos', 8), tarea('t3', 'Tres', 8)],
+        origen: 'determinista',
+      },
+    ]
+    const r = construirEstructuraReal({
+      actividades,
+      edtsCatalogo: EDTS_CATALOGO,
+      proyectoId: 'p1',
+      proyectoCronogramaId: 'cron1',
+      fechaInicioProyecto,
+      calendarioLaboral: mockCalendario(),
+      recursoPorServicio: new Map(),
+    })
+
+    const [t1, t2, t3] = r.tareas
+    const diaDe = (d: Date) => d.toISOString().slice(0, 10)
+
+    // La fecha de INICIO de la siguiente tarea puede coincidir con el
+    // instante justo donde terminó la anterior (fin de jornada) — lo que
+    // NUNCA debe pasar es que su fecha de FIN quede en el mismo día que la
+    // anterior: eso era exactamente el bug (calcularFechaFinConCalendario
+    // le daba a cada tarea el presupuesto COMPLETO del día sin importar
+    // cuánto ya se había consumido).
+    expect(diaDe(t1.fechaFin)).not.toBe(diaDe(t2.fechaFin))
+    expect(diaDe(t2.fechaFin)).not.toBe(diaDe(t3.fechaFin))
+    expect(t2.fechaInicio.getTime()).toBeGreaterThanOrEqual(t1.fechaFin.getTime())
+    expect(t3.fechaInicio.getTime()).toBeGreaterThanOrEqual(t2.fechaFin.getTime())
+    expect(t2.fechaFin.getTime()).toBeGreaterThan(t1.fechaFin.getTime())
+    expect(t3.fechaFin.getTime()).toBeGreaterThan(t2.fechaFin.getTime())
+
+    // La Actividad y el EDT deben reflejar el fin REAL de la última tarea
+    // (no un agregado independiente que quedaría desalineado con sus hijos).
+    const actividad = r.actividades[0]
+    const edt = r.edts[0]
+    expect(actividad.fechaFinPlan.getTime()).toBe(t3.fechaFin.getTime())
+    expect(edt.fechaFinPlan.getTime()).toBe(actividad.fechaFinPlan.getTime())
+  })
+
+  it('mínimo 1 día por Tarea preservado: 2 tareas cortas (2h y 3h, horasPorDia=8) igual caen en días DISTINTOS, no se empaquetan (duracionDiasDesdeHoras redondea cada una a 1 día completo)', () => {
+    const actividades: ActividadPropuesta[] = [
+      { edtNombre: 'GES', actividadNombre: 'Corta', tareas: [tarea('t1', 'Uno', 2), tarea('t2', 'Dos', 3)], origen: 'determinista' },
+    ]
+    const r = construirEstructuraReal({
+      actividades,
+      edtsCatalogo: EDTS_CATALOGO,
+      proyectoId: 'p1',
+      proyectoCronogramaId: 'cron1',
+      fechaInicioProyecto,
+      calendarioLaboral: mockCalendario(),
+      recursoPorServicio: new Map(),
+    })
+    const [t1, t2] = r.tareas
+    const diaDe = (d: Date) => d.toISOString().slice(0, 10)
+    expect(diaDe(t1.fechaFin)).not.toBe(diaDe(t2.fechaFin))
+    expect(t2.fechaInicio.getTime()).toBeGreaterThanOrEqual(t1.fechaFin.getTime())
+    expect(t2.fechaFin.getTime()).toBeGreaterThan(t1.fechaFin.getTime())
+  })
+
   it('propaga catalogoServicioId siempre, y recursoId solo si el servicio está en recursoPorServicio (nunca revienta con un id no resuelto)', () => {
     const actividades: ActividadPropuesta[] = [
       { edtNombre: 'GES', actividadNombre: 'Inicio', tareas: [tarea('t1', 'Kickoff', 8), tarea('t2', 'RFI', 8)], origen: 'determinista' },

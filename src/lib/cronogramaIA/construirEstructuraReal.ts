@@ -92,6 +92,8 @@ export interface FilaTarea {
   esPropuestaIA?: boolean
   /** Justificación de 1 línea dada por la IA al proponerla — ausente salvo cuando esPropuestaIA es true. */
   justificacionIA?: string | null
+  /** Cantidad real usada para calcular horasEstimadas (ej. 45 metros de cable) — trazabilidad, null si el servicio no maneja cantidad variable. */
+  cantidad?: number | null
 }
 
 export interface EstructuraReal {
@@ -166,19 +168,9 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
 
     const faseId = randomUUID()
     const fechaInicioFase = cursorFase
-    const fechaFinFase = calcularFechaFinConCalendario(fechaInicioFase, duracionDiasDesdeHoras(horasFase, horasPorDia) * horasPorDia, calendarioLaboral)
-
-    fases.push({
-      id: faseId,
-      proyectoId,
-      proyectoCronogramaId,
-      nombre: faseInfo.faseNombre,
-      descripcion: null,
-      orden: faseInfo.faseOrden,
-      fechaInicioPlan: fechaInicioFase,
-      fechaFinPlan: fechaFinFase,
-      updatedAt: new Date(),
-    })
+    // Fallback si la Fase no tuviera EDTs (no debería ocurrir en la práctica) —
+    // se sobreescribe abajo con el fin REAL del último EDT ya colocado.
+    let fechaFinFase = calcularFechaFinConCalendario(fechaInicioFase, duracionDiasDesdeHoras(horasFase, horasPorDia) * horasPorDia, calendarioLaboral)
 
     let cursorEdt = fechaInicioFase
     let ordenEdt = 0
@@ -188,33 +180,34 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
 
       const edtId = randomUUID()
       const fechaInicioEdt = cursorEdt
-      const fechaFinEdt = calcularFechaFinConCalendario(fechaInicioEdt, duracionDiasDesdeHoras(horasEdt, horasPorDia) * horasPorDia, calendarioLaboral)
-
-      edts.push({
-        id: edtId,
-        proyectoId,
-        proyectoCronogramaId,
-        proyectoFaseId: faseId,
-        edtId: edtInfo.id,
-        nombre: edtInfo.descripcionEdt,
-        descripcion: null,
-        orden: ordenEdt++,
-        horasPlan: horasEdt,
-        fechaInicioPlan: fechaInicioEdt,
-        fechaFinPlan: fechaFinEdt,
-        updatedAt: new Date(),
-        responsableId: null,
-      })
+      // Fallback si el EDT no tuviera actividades (no debería ocurrir en la
+      // práctica — agruparYOrdenarPorEstructura no emite EDTs vacíos) — se
+      // sobreescribe abajo con el fin REAL de la última actividad.
+      let fechaFinEdt = calcularFechaFinConCalendario(fechaInicioEdt, duracionDiasDesdeHoras(horasEdt, horasPorDia) * horasPorDia, calendarioLaboral)
       edtIdACodigo.set(edtId, edtInfo.nombre)
 
-      let cursorActividad = fechaInicioEdt
+      // Horas acumuladas (ya redondeadas a días completos) desde el inicio
+      // FIJO del EDT — cada Actividad se ubica en ese acumulado, nunca
+      // encadenando el Date crudo de la Actividad anterior. Encadenar el
+      // Date crudo era el bug: `calcularFechaFinConCalendario` ignora la
+      // hora-del-día de su `fechaInicio` y le da a cada llamada el
+      // presupuesto COMPLETO del día, así que una Actividad que "empezaba"
+      // a las 17:00 del día 1 igual recibía las 9.5h enteras del día 1 —
+      // todo quedaba apilado en el primer día sin importar cuántas
+      // Actividades/Tareas hubiera. Anclar siempre a `fechaInicioEdt` +
+      // acumulado evita eso: cada llamada recorre los días desde el mismo
+      // origen fijo, así que el acumulado sí "gasta" los días ya usados.
+      let horasAcumEdt = 0
       let ordenActividad = 0
 
       for (const actividad of actsDelEdt) {
         const horasActividad = actividad.tareas.reduce((a, t) => a + t.horasEstimadas, 0)
+        const horasActividadRedondeadas = duracionDiasDesdeHoras(horasActividad, horasPorDia) * horasPorDia
         const actividadId = randomUUID()
-        const fechaInicioActividad = cursorActividad
-        const fechaFinActividad = calcularFechaFinConCalendario(fechaInicioActividad, duracionDiasDesdeHoras(horasActividad, horasPorDia) * horasPorDia, calendarioLaboral)
+        const fechaInicioActividad = calcularFechaFinConCalendario(fechaInicioEdt, horasAcumEdt, calendarioLaboral)
+        horasAcumEdt += horasActividadRedondeadas
+        const fechaFinActividad = calcularFechaFinConCalendario(fechaInicioEdt, horasAcumEdt, calendarioLaboral)
+        fechaFinEdt = fechaFinActividad
 
         actividadesFilas.push({
           id: actividadId,
@@ -229,13 +222,18 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
           responsableId: null,
         })
 
-        let cursorTarea = fechaInicioActividad
+        // Mismo mecanismo, un nivel abajo: horas acumuladas desde el inicio
+        // FIJO de la Actividad, nunca encadenando el Date crudo de la Tarea
+        // anterior.
+        let horasAcumActividad = 0
         let ordenTarea = 0
 
         for (const tarea of actividad.tareas) {
+          const horasTareaRedondeadas = duracionDiasDesdeHoras(tarea.horasEstimadas, horasPorDia) * horasPorDia
           const tareaId = randomUUID()
-          const fechaInicioTarea = cursorTarea
-          const fechaFinTarea = calcularFechaFinConCalendario(fechaInicioTarea, duracionDiasDesdeHoras(tarea.horasEstimadas, horasPorDia) * horasPorDia, calendarioLaboral)
+          const fechaInicioTarea = calcularFechaFinConCalendario(fechaInicioActividad, horasAcumActividad, calendarioLaboral)
+          horasAcumActividad += horasTareaRedondeadas
+          const fechaFinTarea = calcularFechaFinConCalendario(fechaInicioActividad, horasAcumActividad, calendarioLaboral)
 
           tareas.push({
             id: tareaId,
@@ -253,16 +251,42 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
             responsableId: null,
             esPropuestaIA: tarea.esPropuestaIA ?? false,
             justificacionIA: tarea.justificacion ?? null,
+            cantidad: tarea.cantidad ?? null,
           })
-
-          cursorTarea = fechaFinTarea
         }
-
-        cursorActividad = fechaFinActividad
       }
+
+      edts.push({
+        id: edtId,
+        proyectoId,
+        proyectoCronogramaId,
+        proyectoFaseId: faseId,
+        edtId: edtInfo.id,
+        nombre: edtInfo.descripcionEdt,
+        descripcion: null,
+        orden: ordenEdt++,
+        horasPlan: horasEdt,
+        fechaInicioPlan: fechaInicioEdt,
+        fechaFinPlan: fechaFinEdt,
+        updatedAt: new Date(),
+        responsableId: null,
+      })
+      fechaFinFase = fechaFinEdt
 
       cursorEdt = avanzarSiguienteInicio(fechaFinEdt, calendarioLaboral)
     }
+
+    fases.push({
+      id: faseId,
+      proyectoId,
+      proyectoCronogramaId,
+      nombre: faseInfo.faseNombre,
+      descripcion: null,
+      orden: faseInfo.faseOrden,
+      fechaInicioPlan: fechaInicioFase,
+      fechaFinPlan: fechaFinFase,
+      updatedAt: new Date(),
+    })
 
     cursorFase = avanzarSiguienteInicio(fechaFinFase, calendarioLaboral)
   }
