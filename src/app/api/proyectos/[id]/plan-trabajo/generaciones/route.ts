@@ -31,6 +31,8 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       webViewLink: true,
       driveFileId: true,
       driveFolderId: true,
+      origen: true,
+      vigente: true,
       generadoEn: true,
       generadoPor: { select: { id: true, name: true, email: true } },
     },

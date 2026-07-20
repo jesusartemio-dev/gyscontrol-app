@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { History, ExternalLink, Download, ChevronDown, FileText, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import {
   DropdownMenu,
@@ -20,6 +21,8 @@ interface Generacion {
   tamanioBytes: number
   webViewLink: string
   driveFileId: string
+  origen: string
+  vigente: boolean
   generadoEn: string
   generadoPor: { id: string; name: string | null; email: string }
 }
@@ -150,7 +153,15 @@ export function HistorialGeneraciones({ proyectoId }: Props) {
                   <li key={gen.id} className="p-4 space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{gen.archivoNombre}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-sm font-medium truncate">{gen.archivoNombre}</p>
+                          {gen.vigente && (
+                            <Badge className="text-[10px] px-1.5 py-0 bg-green-100 text-green-800 hover:bg-green-100 shrink-0">Vigente</Badge>
+                          )}
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+                            {gen.origen === 'IMPORTADO' ? 'Editado y subido' : 'Generado'}
+                          </Badge>
+                        </div>
                         <p className="text-xs text-muted-foreground">
                           {fmtDate(gen.generadoEn)} · {fmtBytes(gen.tamanioBytes)}
                         </p>
@@ -195,12 +206,14 @@ export function HistorialGeneraciones({ proyectoId }: Props) {
                             >
                               {descargandoId === gen.id ? 'Descargando...' : 'Copia exacta de Drive'}
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              disabled={regenerandoId === gen.id}
-                              onClick={() => handleRegenerar(gen)}
-                            >
-                              {regenerandoId === gen.id ? 'Regenerando...' : 'Regenerar desde snapshot'}
-                            </DropdownMenuItem>
+                            {gen.origen !== 'IMPORTADO' && (
+                              <DropdownMenuItem
+                                disabled={regenerandoId === gen.id}
+                                onClick={() => handleRegenerar(gen)}
+                              >
+                                {regenerandoId === gen.id ? 'Regenerando...' : 'Regenerar desde snapshot'}
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>

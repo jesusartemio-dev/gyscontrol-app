@@ -27,6 +27,7 @@ import { BotonExportarDocx } from './BotonExportarDocx'
 import { BotonEliminarPlan } from './BotonEliminarPlan'
 import { HistorialGeneraciones } from './HistorialGeneraciones'
 import { SeccionContainer } from './SeccionContainer'
+import { SubirVersionPlan } from './SubirVersionPlan'
 import { SECCIONES_ETAPA_1, esSeccionEtapa1, etapa1Completa, algunaSeccionEtapa2Completa } from '@/lib/planTrabajo/etapas'
 
 import { ObjetivoView } from './secciones/ObjetivoView'
@@ -506,6 +507,11 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
             disabled={generando}
           />
           <HistorialGeneraciones proyectoId={proyectoId} />
+          <SubirVersionPlan
+            proyectoId={proyectoId}
+            alcanceDetallado={(plan.alcanceDetallado as unknown as PlanAlcanceDetalladoEdt[] | null) ?? []}
+            onVersionSubida={fetchContexto}
+          />
           <Button variant="outline" size="sm" asChild>
             <Link href={`/proyectos/${proyectoId}/plan-trabajo/campo`} target="_blank">
               <Camera size={14} className="mr-2" />

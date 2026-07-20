@@ -5945,8 +5945,9 @@ model PlanTrabajo {
   // Tracking de completitud por sección
   bloquesCompletitud Json?
 
-  generaciones PlanTrabajoGeneracion[]
-  imagenes     PlanTrabajoImagen[]
+  generaciones        PlanTrabajoGeneracion[]
+  imagenes            PlanTrabajoImagen[]
+  imagenesPendientes  PlanTrabajoImagenPendiente[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -5966,14 +5967,48 @@ model PlanTrabajoGeneracion {
   archivoNombre  String
   tamanioBytes   Int
 
+  /// 'GENERADO' (export normal desde la app) | 'IMPORTADO' (Word editado a
+  /// mano por Proyectos, subido de vuelta) — ver PlanTrabajoImagenPendiente
+  /// para las fotos nuevas que trae un IMPORTADO sin clasificar todavía.
+  origen  String  @default("GENERADO")
+  /// true en la fila que representa la versión oficial actual del
+  /// documento — al crear una fila nueva (de cualquier origen) se apaga en
+  /// todas las anteriores del mismo plan.
+  vigente Boolean @default(true)
+
   snapshotData Json
 
   generadoPorId String
   generadoPor   User     @relation(fields: [generadoPorId], references: [id])
   generadoEn    DateTime @default(now())
 
+  imagenesPendientes PlanTrabajoImagenPendiente[]
+
   @@index([planTrabajoId, generadoEn(sort: Desc)])
   @@map("plan_trabajo_generacion")
+}
+
+/// Fotos encontradas en un Word IMPORTADO que no matchearon ningún "Figura
+/// N." existente (ver extraerImagenesDeDocx.ts) — el usuario las agregó a
+/// mano en Word. Quedan acá hasta que alguien las asigne a una Tarea real
+/// (se promueven a PlanTrabajoImagen, origen='IMPORTADA') o las descarte.
+model PlanTrabajoImagenPendiente {
+  id            String   @id @default(cuid())
+  planTrabajoId String
+  planTrabajo   PlanTrabajo @relation(fields: [planTrabajoId], references: [id], onDelete: Cascade)
+  generacionId  String?
+  generacion    PlanTrabajoGeneracion? @relation(fields: [generacionId], references: [id], onDelete: SetNull)
+
+  driveFileId   String
+  nombreArchivo String
+  tipoArchivo   String
+  tamano        Int
+  orden         Int      @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([planTrabajoId])
+  @@map("plan_trabajo_imagen_pendiente")
 }
 
 // ─── Imágenes por EDT/subItem del alcance detallado (Bloque 4, Tarea 2) ─────
