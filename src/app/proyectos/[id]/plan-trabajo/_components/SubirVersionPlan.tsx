@@ -24,6 +24,10 @@ interface OpcionTarea {
   etiqueta: string
 }
 
+// Múltiplo de 256 KiB (requerido por la API de subida resumable de Drive) y
+// bien por debajo del límite de tamaño de request de las funciones serverless.
+const TAMANO_PEDAZO = 3 * 1024 * 1024
+
 function construirOpcionesTarea(alcanceDetallado: PlanAlcanceDetalladoEdt[]): OpcionTarea[] {
   const opciones: OpcionTarea[] = []
   for (const edt of alcanceDetallado) {
@@ -86,23 +90,46 @@ export function SubirVersionPlan({ proyectoId, alcanceDetallado, onVersionSubida
       }
       const { data: sesion } = await resIniciar.json()
 
-      // Paso 2: el navegador sube el archivo DIRECTO a Google Drive.
-      const resDrive = await fetch(sesion.sessionUri, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type || 'application/octet-stream' },
-        body: file,
-      })
-      if (!resDrive.ok) {
-        throw new Error('No se pudo subir el archivo a Drive')
+      // Paso 2: el navegador manda el archivo en pedazos chicos a NUESTRO
+      // servidor, que los reenvía a la sesión resumable de Drive. Subir
+      // directo del navegador a googleapis.com choca con CORS (Drive crea
+      // el archivo pero no deja leer la respuesta), así que este relevo
+      // evita tanto el CORS como el límite de tamaño de request.
+      let driveFileId: string | null = null
+      for (let inicio = 0; inicio < file.size; inicio += TAMANO_PEDAZO) {
+        const fin = Math.min(inicio + TAMANO_PEDAZO, file.size)
+        const pedazo = file.slice(inicio, fin)
+        const resChunk = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/subir-version/chunk`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/octet-stream',
+            'X-Session-Uri': sesion.sessionUri,
+            'X-Range-Start': String(inicio),
+            'X-Range-End': String(fin - 1),
+            'X-Total-Size': String(file.size),
+          },
+          body: pedazo,
+        })
+        if (!resChunk.ok) {
+          const e = await resChunk.json().catch(() => ({}))
+          throw new Error(e.error ?? 'No se pudo subir el archivo a Drive')
+        }
+        const { data } = await resChunk.json()
+        if (data.done) {
+          driveFileId = data.driveFileId
+          break
+        }
       }
-      const driveFile = await resDrive.json()
+      if (!driveFileId) {
+        throw new Error('No se pudo completar la subida a Drive')
+      }
 
       // Paso 3: nuestro servidor descarga de Drive y procesa (JSON chico, sin el archivo).
       const resCompletar = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/subir-version/completar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          driveFileId: driveFile.id,
+          driveFileId,
           archivoNombre: sesion.archivoNombre,
           tamanioBytes: file.size,
         }),
