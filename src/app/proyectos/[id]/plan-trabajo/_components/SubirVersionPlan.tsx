@@ -74,17 +74,44 @@ export function SubirVersionPlan({ proyectoId, alcanceDetallado, onVersionSubida
     }
     setSubiendo(true)
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/subir-version`, {
+      // Paso 1: iniciar sesión resumable — nuestro servidor no recibe el archivo.
+      const resIniciar = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/subir-version/iniciar`, {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name }),
       })
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({}))
-        throw new Error(e.error ?? 'Error al subir la versión')
+      if (!resIniciar.ok) {
+        const e = await resIniciar.json().catch(() => ({}))
+        throw new Error(e.error ?? 'No se pudo iniciar la subida')
       }
-      const { data } = await res.json()
+      const { data: sesion } = await resIniciar.json()
+
+      // Paso 2: el navegador sube el archivo DIRECTO a Google Drive.
+      const resDrive = await fetch(sesion.sessionUri, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file,
+      })
+      if (!resDrive.ok) {
+        throw new Error('No se pudo subir el archivo a Drive')
+      }
+      const driveFile = await resDrive.json()
+
+      // Paso 3: nuestro servidor descarga de Drive y procesa (JSON chico, sin el archivo).
+      const resCompletar = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/subir-version/completar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          driveFileId: driveFile.id,
+          archivoNombre: sesion.archivoNombre,
+          tamanioBytes: file.size,
+        }),
+      })
+      if (!resCompletar.ok) {
+        const e = await resCompletar.json().catch(() => ({}))
+        throw new Error(e.error ?? 'Se subió pero falló al procesar — contactá soporte')
+      }
+      const { data } = await resCompletar.json()
       toast.success(
         data.imagenesNuevasPendientes > 0
           ? `Versión subida. ${data.imagenesNuevasPendientes} foto(s) nueva(s) para revisar.`

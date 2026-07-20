@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { uploadFile } from '@/lib/services/googleDrive'
+import { getFile, getFileContent, uploadFile } from '@/lib/services/googleDrive'
 import { getOrCreatePlanTrabajoFolder } from '@/lib/planTrabajo/getOrCreatePlanTrabajoFolder'
 import { getOrCreateAlcanceImagenesFolder } from '@/lib/planTrabajo/getOrCreateAlcanceImagenesFolder'
 import { redimensionarImagen } from '@/lib/planTrabajo/redimensionarImagen'
@@ -12,18 +12,18 @@ import type { PlanAlcanceDetalladoEdt } from '@/types/planTrabajo'
 
 type Ctx = { params: Promise<{ id: string }> }
 
-const MIME_DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-const MAX_TAMANO_BYTES = 20 * 1024 * 1024
-
 /**
- * POST /api/proyectos/[id]/plan-trabajo/subir-version
- * Sube el .docx que Proyectos editó a mano fuera de la app (corrigió
- * redacción, a veces pegó fotos nuevas) como la nueva versión OFICIAL
- * vigente del Plan de Trabajo. Las fotos que ya estaban en el sistema se
- * reconocen por su caption "Figura N." (ver extraerImagenesDeDocx.ts) y no
- * se duplican; las fotos genuinamente nuevas quedan en
- * PlanTrabajoImagenPendiente para que alguien las asigne a mano a la tarea
- * correcta (ver .../imagenes-pendientes).
+ * POST /api/proyectos/[id]/plan-trabajo/subir-version/completar
+ * Paso 3 de 3. El navegador ya subió el archivo DIRECTO a Drive (ver
+ * subir-version/iniciar); acá solo llega el id del archivo creado — nunca
+ * los bytes, así que no choca con el límite de tamaño de request. Se
+ * valida que el archivo esté en la carpeta esperada, se descarga desde
+ * Drive para extraer imágenes, y se registra como la nueva versión
+ * OFICIAL vigente del Plan de Trabajo. Las fotos que ya estaban en el
+ * sistema se reconocen por su caption "Figura N." (ver
+ * extraerImagenesDeDocx.ts) y no se duplican; las fotos genuinamente
+ * nuevas quedan en PlanTrabajoImagenPendiente para asignarlas a mano
+ * (ver .../imagenes-pendientes).
  */
 export async function POST(req: NextRequest, { params }: Ctx) {
   const session = await getServerSession(authOptions)
@@ -58,36 +58,25 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: 'El Plan de Trabajo no existe para este proyecto' }, { status: 404 })
   }
 
-  let formData: FormData
+  let body: { driveFileId?: string; archivoNombre?: string; tamanioBytes?: number }
   try {
-    formData = await req.formData()
+    body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Body inválido — se espera multipart/form-data' }, { status: 400 })
+    return NextResponse.json({ error: 'Body inválido' }, { status: 400 })
   }
-
-  const file = formData.get('file')
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: 'Falta el archivo ("file")' }, { status: 400 })
+  const { driveFileId, archivoNombre, tamanioBytes } = body
+  if (!driveFileId || !archivoNombre || typeof tamanioBytes !== 'number') {
+    return NextResponse.json({ error: 'Faltan datos del archivo subido' }, { status: 400 })
   }
-  if (!file.name.toLowerCase().endsWith('.docx')) {
-    return NextResponse.json({ error: 'Solo se admiten archivos .docx' }, { status: 400 })
-  }
-  if (file.size > MAX_TAMANO_BYTES) {
-    return NextResponse.json({ error: `El archivo supera el límite de ${MAX_TAMANO_BYTES / 1024 / 1024}MB` }, { status: 400 })
-  }
-
-  const buffer = Buffer.from(await file.arrayBuffer())
 
   const driveFolderId = await getOrCreatePlanTrabajoFolder(proyecto.codigo)
-  const archivoNombre = `PT_${proyecto.codigo}_Rev${planDb.numeroRevision}_editado.docx`
-  const driveFile = await uploadFile({
-    folderId: driveFolderId,
-    fileName: archivoNombre,
-    mimeType: MIME_DOCX,
-    buffer,
-  })
-  if (!driveFile.id || !driveFile.webViewLink) {
-    return NextResponse.json({ error: 'Error subiendo el archivo a Drive' }, { status: 500 })
+
+  const driveFile = await getFile(driveFileId)
+  if (!driveFile.parents?.includes(driveFolderId)) {
+    return NextResponse.json({ error: 'El archivo no corresponde a este proyecto' }, { status: 400 })
+  }
+  if (!driveFile.webViewLink) {
+    return NextResponse.json({ error: 'El archivo subido no tiene link de Drive' }, { status: 500 })
   }
 
   // La fila nueva pasa a ser la vigente — se apaga cualquier otra del mismo plan.
@@ -100,11 +89,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       data: {
         planTrabajoId: planDb.id,
         numeroRevision: planDb.numeroRevision ?? 'A',
-        driveFileId: driveFile.id,
+        driveFileId,
         webViewLink: driveFile.webViewLink,
         driveFolderId,
         archivoNombre,
-        tamanioBytes: buffer.length,
+        tamanioBytes,
         origen: 'IMPORTADO',
         vigente: true,
         snapshotData: { plan: planDb, organigramaPngBase64: '' },
@@ -117,6 +106,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   // caption "Figura N.") — el resto son fotos nuevas, quedan pendientes.
   let imagenesNuevasPendientes = 0
   try {
+    const { data: buffer } = await getFileContent(driveFileId)
     const extraidas = extraerImagenesDeDocx(buffer)
     if (extraidas.length > 0) {
       const imagenesAlcance = await prisma.planTrabajoImagen.findMany({ where: { planTrabajoId: planDb.id } })
@@ -152,12 +142,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           })
           imagenesNuevasPendientes++
         } catch (e) {
-          console.error('[subir-version] Error subiendo una imagen extraída (no bloqueante):', e)
+          console.error('[subir-version/completar] Error subiendo una imagen extraída (no bloqueante):', e)
         }
       }
     }
   } catch (e) {
-    console.error('[subir-version] Error extrayendo imágenes del docx (no bloqueante, la versión ya se subió):', e)
+    console.error('[subir-version/completar] Error extrayendo imágenes del docx (no bloqueante, la versión ya se subió):', e)
   }
 
   return NextResponse.json({ data: { generacion, imagenesNuevasPendientes } }, { status: 201 })

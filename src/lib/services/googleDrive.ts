@@ -5,9 +5,7 @@ const SCOPES = ['https://www.googleapis.com/auth/drive']
 
 let driveClient: drive_v3.Drive | null = null
 
-function getDriveClient(): drive_v3.Drive {
-  if (driveClient) return driveClient
-
+function getAuth(): InstanceType<typeof google.auth.GoogleAuth> {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
   const key = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n')
 
@@ -15,16 +13,61 @@ function getDriveClient(): drive_v3.Drive {
     throw new Error('Google Drive Service Account credentials not configured')
   }
 
-  const auth = new google.auth.GoogleAuth({
+  return new google.auth.GoogleAuth({
     credentials: {
       client_email: email,
       private_key: key,
     },
     scopes: SCOPES,
   })
+}
 
-  driveClient = google.drive({ version: 'v3', auth })
+function getDriveClient(): drive_v3.Drive {
+  if (driveClient) return driveClient
+  driveClient = google.drive({ version: 'v3', auth: getAuth() })
   return driveClient
+}
+
+/**
+ * Inicia una sesión de subida resumable de Drive — para que el NAVEGADOR
+ * suba el archivo pesado directo a Google (bypassea el límite de tamaño de
+ * request de las funciones serverless, ej. Vercel ~4.5MB, que rechazaría un
+ * archivo grande si pasara por nuestro servidor). El servidor solo pide la
+ * sesión (sin el archivo); la URL que Google devuelve ya lleva la
+ * autorización adentro, así que el navegador puede hacer PUT ahí sin
+ * nuestras credenciales. Ver subir-version/iniciar/route.ts.
+ */
+export async function iniciarSesionResumable(options: {
+  folderId: string
+  fileName: string
+  mimeType: string
+}): Promise<{ sessionUri: string }> {
+  const auth = getAuth()
+  const client = await auth.getClient()
+  const { token } = await client.getAccessToken()
+  if (!token) throw new Error('No se pudo obtener un token de acceso para Drive')
+
+  const res = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json; charset=UTF-8',
+        'X-Upload-Content-Type': options.mimeType,
+      },
+      body: JSON.stringify({ name: options.fileName, parents: [options.folderId] }),
+    }
+  )
+
+  if (!res.ok) {
+    const texto = await res.text().catch(() => '')
+    throw new Error(`Drive rechazó iniciar la sesión resumable (${res.status}): ${texto}`)
+  }
+
+  const sessionUri = res.headers.get('location')
+  if (!sessionUri) throw new Error('Google Drive no devolvió una sesión de subida resumable')
+  return { sessionUri }
 }
 
 export function getSharedDriveId(): string {
