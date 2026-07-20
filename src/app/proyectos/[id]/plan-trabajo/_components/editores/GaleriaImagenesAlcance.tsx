@@ -222,7 +222,7 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
   }
 
   return (
-    <div className="space-y-2 border rounded-md p-2 bg-white">
+    <div className="space-y-2 border rounded-md p-2 bg-gray-50/70">
       <div className="flex items-center justify-between gap-1">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
           <ImageIcon size={12} /> Imágenes ({propias.length}/{MAX_IMAGENES})
@@ -280,7 +280,7 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
       {propias.length === 0 ? (
         <p className="text-[11px] text-muted-foreground italic">Sin imágenes adjuntas.</p>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
           {propias.map((img, idx) => {
             const esSugeridaIA = img.origen === 'IA_AUTO'
             return (

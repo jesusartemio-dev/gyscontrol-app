@@ -216,7 +216,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
 
   return (
     <Sheet open onOpenChange={(open) => !open && onCancel()}>
-      <SheetContent side="right" className="sm:max-w-3xl overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-3xl lg:max-w-5xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Editar Alcance Detallado</SheetTitle>
         </SheetHeader>
@@ -435,7 +435,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                             const visibles = conIndice.filter(x => !x.tarea.excluida)
                             const ocultas = conIndice.filter(x => x.tarea.excluida)
                             return (
-                              <div className="space-y-2 pl-2 border-l-2 border-gray-200">
+                              <div className="space-y-2.5 pl-2 border-l-2 border-gray-200">
                                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Tareas</p>
                                 {visibles.map(({ tarea, tareaIdx }, posVisible) => {
                                   const imagenesDeLaTarea = imagenes.filter(
@@ -443,14 +443,14 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                   )
                                   const claveGaleria = `tarea:${tarea.tareaRefId ?? `${edtIdx}-${subIdx}-${tareaIdx}`}`
                                   return (
-                                    <div key={tarea.tareaRefId ?? tareaIdx} className="space-y-1">
-                                      <div className="flex items-start gap-1">
+                                    <div key={tarea.tareaRefId ?? tareaIdx} className="space-y-1.5 border rounded-md p-2.5 bg-white">
+                                      <div className="flex flex-wrap items-start gap-1">
                                         <span className="text-[10px] text-muted-foreground mt-1.5 shrink-0">•</span>
                                         <Textarea
                                           value={tarea.texto}
                                           onChange={e => marcarTextoTareaEditado(edtIdx, subIdx, tareaIdx, e.target.value)}
                                           rows={1}
-                                          className="text-xs resize-none min-h-0 py-1"
+                                          className="text-xs resize-none min-h-0 py-1 flex-1 min-w-[160px]"
                                           placeholder={tarea.nombre}
                                         />
                                         {tarea.textoEditadoManualmente && (
@@ -495,7 +495,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                         </div>
                                       </div>
                                       {item.tipoDetalle === 'detallado' && tarea.tareaRefId && (
-                                        <div className="pl-3">
+                                        <div className="mt-1">
                                           <GaleriaImagenesAlcance
                                             ref={el => { galeriaRefs.current.set(claveGaleria, el) }}
                                             proyectoId={proyectoId}
