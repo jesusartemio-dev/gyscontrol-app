@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { Loader2, BookOpen, Plus, Sparkles, X, AlertTriangle } from 'lucide-react'
+import Link from 'next/link'
+import { Loader2, BookOpen, Plus, Sparkles, X, AlertTriangle, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -505,6 +506,12 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
             disabled={generando}
           />
           <HistorialGeneraciones proyectoId={proyectoId} />
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/proyectos/${proyectoId}/plan-trabajo/campo`} target="_blank">
+              <Camera size={14} className="mr-2" />
+              Modo Campo
+            </Link>
+          </Button>
           <div className="ml-auto">
             <BotonEliminarPlan
               proyectoId={proyectoId}

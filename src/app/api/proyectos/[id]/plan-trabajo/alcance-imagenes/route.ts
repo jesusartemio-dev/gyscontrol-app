@@ -31,7 +31,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
 
   const { role } = session.user
-  const rolesConAccesoTotal = ['admin', 'gerente', 'gestor', 'seguridad', 'comercial']
+  const rolesConAccesoTotal = ['admin', 'gerente', 'gestor', 'seguridad', 'comercial', 'coordinador', 'proyectos']
   const esGestorODirectivo =
     proyecto.gestorId === userId ||
     proyecto.supervisorId === userId ||

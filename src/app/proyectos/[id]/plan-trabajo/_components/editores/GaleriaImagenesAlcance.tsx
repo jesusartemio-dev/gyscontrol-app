@@ -232,21 +232,21 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
             type="button"
             variant="outline"
             size="sm"
-            className="h-6 text-[10px] px-2"
+            className="h-8 text-xs px-2.5"
             disabled={propias.length >= MAX_IMAGENES}
             onClick={() => setPickerAbierto(true)}
           >
-            <LibraryBig size={11} className="mr-1" /> Desde biblioteca
+            <LibraryBig size={14} className="mr-1" /> Desde biblioteca
           </Button>
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="h-6 text-[10px] px-2"
+            className="h-8 text-xs px-2.5"
             disabled={subiendo || propias.length >= MAX_IMAGENES}
             onClick={() => inputRef.current?.click()}
           >
-            {subiendo ? <Loader2 size={11} className="animate-spin mr-1" /> : <Upload size={11} className="mr-1" />}
+            {subiendo ? <Loader2 size={14} className="animate-spin mr-1" /> : <Upload size={14} className="mr-1" />}
             Subir
           </Button>
         </div>
@@ -280,7 +280,7 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
       {propias.length === 0 ? (
         <p className="text-[11px] text-muted-foreground italic">Sin imágenes adjuntas.</p>
       ) : (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {propias.map((img, idx) => {
             const esSugeridaIA = img.origen === 'IA_AUTO'
             return (

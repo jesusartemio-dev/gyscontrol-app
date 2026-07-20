@@ -391,7 +391,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                           img => img.edtRef === (item.edtRefId ?? '') && !img.tareaRef && (img.subItemRef ?? undefined) === sub.actividadRefId
                         )
                         return (
-                        <div key={subIdx} className="space-y-1.5 border rounded p-2 bg-gray-50">
+                        <div key={subIdx} className="space-y-1.5 border border-l-4 border-l-indigo-300 rounded p-2 bg-gray-50">
                           <div className="flex items-center gap-2">
                             {sub.actividadRefId ? (
                               <span className="text-xs flex-1 min-w-0 truncate">
@@ -475,20 +475,20 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                             />
                                           </div>
                                         )}
-                                        <div className="flex shrink-0 mt-1">
-                                          <Button variant="ghost" size="sm" className="h-5 w-5 p-0" disabled={posVisible === 0} onClick={() => moverTarea(edtIdx, subIdx, tareaIdx, -1)}>
-                                            <ChevronUp size={11} />
+                                        <div className="flex shrink-0 mt-0.5">
+                                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={posVisible === 0} onClick={() => moverTarea(edtIdx, subIdx, tareaIdx, -1)}>
+                                            <ChevronUp size={14} />
                                           </Button>
-                                          <Button variant="ghost" size="sm" className="h-5 w-5 p-0" disabled={posVisible === visibles.length - 1} onClick={() => moverTarea(edtIdx, subIdx, tareaIdx, 1)}>
-                                            <ChevronDown size={11} />
+                                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={posVisible === visibles.length - 1} onClick={() => moverTarea(edtIdx, subIdx, tareaIdx, 1)}>
+                                            <ChevronDown size={14} />
                                           </Button>
                                           <DeleteAlertDialog
                                             title="¿Quitar esta tarea del plan?"
                                             description="Se oculta de este documento (viñeta, imágenes y foto sugerida). El cronograma real del proyecto NO se modifica — podés restaurarla luego desde 'tareas ocultas'."
                                             onConfirm={() => excluirTarea(edtIdx, subIdx, tareaIdx)}
                                             trigger={
-                                              <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-red-500">
-                                                <Trash2 size={11} />
+                                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500">
+                                                <Trash2 size={14} />
                                               </Button>
                                             }
                                           />

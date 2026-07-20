@@ -33,7 +33,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   }
 
   const { id: userId, role } = session.user
-  const rolesConAccesoTotal = ['admin', 'gerente', 'gestor', 'seguridad', 'comercial']
+  const rolesConAccesoTotal = ['admin', 'gerente', 'gestor', 'seguridad', 'comercial', 'coordinador', 'proyectos']
   const esGestorODirectivo =
     proyectoBase.gestorId === userId ||
     proyectoBase.supervisorId === userId ||
