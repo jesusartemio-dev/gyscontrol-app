@@ -68,7 +68,10 @@ export function extraerImagenesDeDocx(buffer: Buffer): ImagenExtraidaDeDocx[] {
       const mediaPath = idAMedia.get(embedMatch[1])
       if (!mediaPath) continue
 
-      const mediaFile = zip.file(mediaPath)
+      // El Target del .rels es relativo a word/ (la carpeta de document.xml.rels
+      // es word/_rels/), así que la ruta real en el zip es "word/" + mediaPath —
+      // no el valor crudo del .rels. Fallback al valor crudo por si acaso.
+      const mediaFile = zip.file(`word/${mediaPath}`) ?? zip.file(mediaPath)
       if (!mediaFile) continue
 
       let numeroFigura: number | null = null

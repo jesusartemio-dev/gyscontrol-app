@@ -30,7 +30,9 @@ function construirDocxDePrueba(opciones: {
   zip.file('word/document.xml', documentXml)
   for (const img of opciones.imagenes) {
     const bytesTexto = opciones.mediaBytes?.[img.mediaPath] ?? 'contenido-de-prueba'
-    zip.file(img.mediaPath, bytesTexto)
+    // El Target del .rels ("media/imageN.ext") es relativo a word/ — la ubicación
+    // real en el zip (como la genera Word de verdad) es word/media/imageN.ext.
+    zip.file(`word/${img.mediaPath}`, bytesTexto)
   }
 
   return zip.generate({ type: 'nodebuffer' })
