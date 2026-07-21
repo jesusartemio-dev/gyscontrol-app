@@ -39,6 +39,10 @@ function extraerTextoPlano(parrafoXml: string): string {
  * cambios, comentarios, formato atípico) no debe romper la subida de la
  * versión — como mucho, esas imágenes puntuales quedan con numeroFigura
  * null en vez de matchear, o si el parseo global falla devuelve [].
+ *
+ * Ignora todo lo que aparece desde "13. HISTOGRAMAS" en adelante — ahí
+ * empiezan los gráficos que la propia app genera (histogramas, organigrama,
+ * cronograma de los Anexos), que jamás son fotos de una tarea.
  */
 export function extraerImagenesDeDocx(buffer: Buffer): ImagenExtraidaDeDocx[] {
   try {
@@ -57,10 +61,22 @@ export function extraerImagenesDeDocx(buffer: Buffer): ImagenExtraidaDeDocx[] {
     const docXml = docFile.asText()
     const parrafos = docXml.split('</w:p>')
 
+    // A partir de "HISTOGRAMAS" (encabezado fijo de la plantilla, sección 13)
+    // el resto del documento son gráficos que la app genera sola (histogramas,
+    // organigrama y cronograma en los Anexos) — nunca fotos de una tarea, y
+    // nunca llevan caption "Figura N.", así que sin este corte se cuelan como
+    // "fotos nuevas sin asignar". Match exacto (con o sin el "13." delante)
+    // para no confundirlo con la entrada del índice al inicio del documento,
+    // que trae el número de página pegado (ej. "13.HISTOGRAMAS15"). Si no
+    // aparece (plantilla muy editada), no se corta nada — mismo comportamiento
+    // que antes.
+    const indiceHistogramas = parrafos.findIndex(p => /^(?:\d+\.?\s*)?HISTOGRAMAS$/i.test(extraerTextoPlano(p).trim()))
+    const limite = indiceHistogramas >= 0 ? indiceHistogramas : parrafos.length
+
     const resultado: ImagenExtraidaDeDocx[] = []
     let orden = 0
 
-    for (let i = 0; i < parrafos.length; i++) {
+    for (let i = 0; i < limite; i++) {
       const parrafo = parrafos[i]
       const embedMatch = parrafo.match(/r:embed="(rId\d+)"/)
       if (!embedMatch) continue

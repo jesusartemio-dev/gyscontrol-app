@@ -3,7 +3,7 @@ import { extraerImagenesDeDocx } from '@/lib/planTrabajo/extraerImagenesDeDocx'
 
 /** Arma un .docx mínimo pero real (mismo layout que genera la plantilla real: imagen en un párrafo, "Figura N." en el siguiente) para no depender del archivo de plantilla real en el test. */
 function construirDocxDePrueba(opciones: {
-  imagenes: { rId: string; mediaPath: string; captionSiguiente: string | null }[]
+  imagenes: { rId: string; mediaPath: string; captionSiguiente: string | null; encabezadoAntes?: string }[]
   mediaBytes?: Record<string, string>
 }): Buffer {
   const rels = [
@@ -16,11 +16,12 @@ function construirDocxDePrueba(opciones: {
   ].join('')
 
   const parrafos = opciones.imagenes.flatMap(img => {
+    const parrafoEncabezado = img.encabezadoAntes ? `<w:p><w:r><w:t>${img.encabezadoAntes}</w:t></w:r></w:p>` : ''
     const parrafoImagen = `<w:p><w:r><w:drawing><wp:inline><a:graphic><a:graphicData><pic:pic><pic:blipFill><a:blip r:embed="${img.rId}"/></a:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`
     const parrafoCaption = img.captionSiguiente !== null
       ? `<w:p><w:r><w:t>${img.captionSiguiente}</w:t></w:r></w:p>`
       : ''
-    return [parrafoImagen, parrafoCaption]
+    return [parrafoEncabezado, parrafoImagen, parrafoCaption]
   })
 
   const documentXml = `<?xml version="1.0" encoding="UTF-8"?><w:document>${parrafos.join('')}</w:document>`
@@ -91,6 +92,21 @@ describe('extraerImagenesDeDocx', () => {
     expect(resultado[0].numeroFigura).toBe(1)
     expect(resultado[1].numeroFigura).toBe(2)
     expect(resultado[2].numeroFigura).toBeNull()
+  })
+
+  it('ignora las imágenes desde "13. HISTOGRAMAS" en adelante (histogramas/organigrama/cronograma, nunca fotos de tarea)', () => {
+    const buffer = construirDocxDePrueba({
+      imagenes: [
+        { rId: 'rId5', mediaPath: 'media/image1.png', captionSiguiente: 'Figura 1. Foto real de una tarea.' },
+        { rId: 'rId6', mediaPath: 'media/image2.png', captionSiguiente: null, encabezadoAntes: '13. HISTOGRAMAS' },
+        { rId: 'rId7', mediaPath: 'media/image3.png', captionSiguiente: null },
+      ],
+    })
+
+    const resultado = extraerImagenesDeDocx(buffer)
+
+    expect(resultado).toHaveLength(1)
+    expect(resultado[0].nombreArchivoOriginal).toBe('image1.png')
   })
 
   it('un .docx / buffer completamente inválido no revienta — devuelve lista vacía', () => {
