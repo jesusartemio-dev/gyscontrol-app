@@ -168,18 +168,23 @@ export function HistorialGeneraciones({ proyectoId }: Props) {
                         {gen.generadoPor.name && (
                           <p className="text-xs text-muted-foreground">por {gen.generadoPor.name}</p>
                         )}
+                        {gen.origen === 'IMPORTADO' && (
+                          <p className="text-xs text-muted-foreground">Descargá el archivo (▾) para ver el contenido editado.</p>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs gap-1"
-                          onClick={() => setDetalleId(gen.id)}
-                        >
-                          <FileText size={12} />
-                          Ver
-                        </Button>
+                        {gen.origen !== 'IMPORTADO' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs gap-1"
+                            onClick={() => setDetalleId(gen.id)}
+                          >
+                            <FileText size={12} />
+                            Ver
+                          </Button>
+                        )}
 
                         <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
                           <a
