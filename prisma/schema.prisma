@@ -6005,6 +6005,13 @@ model PlanTrabajoImagenPendiente {
   tamano        Int
   orden         Int      @default(0)
 
+  /// Seteado cuando esta foto ocupa el mismo "Figura N." que una
+  /// PlanTrabajoImagen ya existente PERO sus bytes son distintos — el
+  /// usuario probablemente reemplazó esa foto en Word (no una foto nueva
+  /// sin asignar). Ver completar/route.ts para la comparación de bytes.
+  posibleReemplazoDeId String?
+  posibleReemplazoDe   PlanTrabajoImagen? @relation("ImagenReemplazada", fields: [posibleReemplazoDeId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
 
   @@index([planTrabajoId])
@@ -6046,6 +6053,8 @@ model PlanTrabajoImagen {
   createdAt   DateTime @default(now())
   createdById String?
   createdBy   User?    @relation(fields: [createdById], references: [id])
+
+  pendientesDeReemplazo PlanTrabajoImagenPendiente[] @relation("ImagenReemplazada")
 
   @@index([planTrabajoId, edtRef])
   @@map("plan_trabajo_imagen")

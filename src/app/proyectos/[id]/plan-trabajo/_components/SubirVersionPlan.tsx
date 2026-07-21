@@ -17,6 +17,8 @@ interface Props {
 interface ImagenPendiente {
   id: string
   nombreArchivo: string
+  /** Si está seteado, esta foto ocupa el mismo "Figura N." que esta PlanTrabajoImagen existente pero con bytes distintos — probablemente la reemplaza. */
+  posibleReemplazoDeId: string | null
 }
 
 interface OpcionTarea {
@@ -141,7 +143,7 @@ export function SubirVersionPlan({ proyectoId, alcanceDetallado, onVersionSubida
       const { data } = await resCompletar.json()
       toast.success(
         data.imagenesNuevasPendientes > 0
-          ? `Versión subida. ${data.imagenesNuevasPendientes} foto(s) nueva(s) para revisar.`
+          ? `Versión subida. ${data.imagenesNuevasPendientes} foto(s) para revisar.`
           : 'Versión subida.'
       )
       await cargarPendientes()
@@ -179,6 +181,21 @@ export function SubirVersionPlan({ proyectoId, alcanceDetallado, onVersionSubida
     }
   }
 
+  const handleReemplazar = async (imagenId: string) => {
+    setProcesandoId(imagenId)
+    try {
+      const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/imagenes-pendientes/${imagenId}/reemplazar`, { method: 'POST' })
+      if (!res.ok) throw new Error('Error al reemplazar la foto')
+      setPendientes(prev => prev.filter(p => p.id !== imagenId))
+      toast.success('Foto reemplazada')
+      await onVersionSubida?.()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al reemplazar la foto')
+    } finally {
+      setProcesandoId(null)
+    }
+  }
+
   const handleDescartar = async (imagenId: string) => {
     setProcesandoId(imagenId)
     try {
@@ -205,7 +222,7 @@ export function SubirVersionPlan({ proyectoId, alcanceDetallado, onVersionSubida
         <div className="w-full flex items-center gap-2 border border-amber-200 bg-amber-50 rounded-md px-3 py-1.5 text-xs text-amber-900">
           <ImageUp size={14} className="shrink-0" />
           <span className="flex-1">
-            {pendientes.length} foto{pendientes.length > 1 ? 's' : ''} nueva{pendientes.length > 1 ? 's' : ''} de la versión subida — asignalas a su tarea.
+            {pendientes.length} foto{pendientes.length > 1 ? 's' : ''} de la versión subida para revisar.
           </span>
           <Button variant="outline" size="sm" className="h-6 text-[11px] px-2 shrink-0 bg-white" onClick={() => setRevisionAbierta(true)}>
             Revisar
@@ -216,44 +233,93 @@ export function SubirVersionPlan({ proyectoId, alcanceDetallado, onVersionSubida
       <Dialog open={revisionAbierta} onOpenChange={setRevisionAbierta}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Fotos nuevas — asignar a una tarea</DialogTitle>
+            <DialogTitle>Fotos de la versión subida — revisar</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             {pendientes.map(img => (
-              <div key={img.id} className="flex items-center gap-3 border rounded-md p-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`/api/proyectos/${proyectoId}/plan-trabajo/imagenes-pendientes/${img.id}/contenido`}
-                  alt={img.nombreArchivo}
-                  className="h-16 w-16 object-cover rounded border shrink-0 bg-gray-50"
-                />
-                <select
-                  className="flex-1 h-9 text-xs border rounded-md px-2 min-w-0"
-                  value={seleccion[img.id] ?? ''}
-                  onChange={e => setSeleccion(prev => ({ ...prev, [img.id]: e.target.value }))}
-                >
-                  <option value="">Elegí la tarea...</option>
-                  {opcionesTarea.map(op => (
-                    <option key={op.valor} value={op.valor}>{op.etiqueta}</option>
-                  ))}
-                </select>
-                <Button
-                  size="sm"
-                  className="h-8 px-2 shrink-0"
-                  disabled={procesandoId === img.id}
-                  onClick={() => handleAsignar(img.id)}
-                >
-                  {procesandoId === img.id ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0 text-red-500 shrink-0"
-                  disabled={procesandoId === img.id}
-                  onClick={() => handleDescartar(img.id)}
-                >
-                  <X size={13} />
-                </Button>
+              <div key={img.id} className="border rounded-md p-2 space-y-2">
+                {img.posibleReemplazoDeId ? (
+                  <>
+                    <p className="text-xs text-amber-800">Parece reemplazar una foto existente:</p>
+                    <div className="flex items-center gap-2">
+                      <div className="text-center shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes/${img.posibleReemplazoDeId}/contenido`}
+                          alt="Foto actual"
+                          className="h-16 w-16 object-cover rounded border bg-gray-50"
+                        />
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Actual</p>
+                      </div>
+                      <span className="text-muted-foreground shrink-0">→</span>
+                      <div className="text-center shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`/api/proyectos/${proyectoId}/plan-trabajo/imagenes-pendientes/${img.id}/contenido`}
+                          alt={img.nombreArchivo}
+                          className="h-16 w-16 object-cover rounded border bg-gray-50"
+                        />
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Nueva</p>
+                      </div>
+                      <div className="flex-1 flex flex-col gap-1 min-w-0">
+                        <Button
+                          size="sm"
+                          className="h-8 gap-1"
+                          disabled={procesandoId === img.id}
+                          onClick={() => handleReemplazar(img.id)}
+                        >
+                          {procesandoId === img.id ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                          Reemplazar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-[11px] text-red-500"
+                          disabled={procesandoId === img.id}
+                          onClick={() => handleDescartar(img.id)}
+                        >
+                          No — descartar
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`/api/proyectos/${proyectoId}/plan-trabajo/imagenes-pendientes/${img.id}/contenido`}
+                      alt={img.nombreArchivo}
+                      className="h-16 w-16 object-cover rounded border shrink-0 bg-gray-50"
+                    />
+                    <select
+                      className="flex-1 h-9 text-xs border rounded-md px-2 min-w-0"
+                      value={seleccion[img.id] ?? ''}
+                      onChange={e => setSeleccion(prev => ({ ...prev, [img.id]: e.target.value }))}
+                    >
+                      <option value="">Elegí la tarea...</option>
+                      {opcionesTarea.map(op => (
+                        <option key={op.valor} value={op.valor}>{op.etiqueta}</option>
+                      ))}
+                    </select>
+                    <Button
+                      size="sm"
+                      className="h-8 px-2 shrink-0"
+                      disabled={procesandoId === img.id}
+                      onClick={() => handleAsignar(img.id)}
+                    >
+                      {procesandoId === img.id ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-red-500 shrink-0"
+                      disabled={procesandoId === img.id}
+                      onClick={() => handleDescartar(img.id)}
+                    >
+                      <X size={13} />
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
             {pendientes.length === 0 && (

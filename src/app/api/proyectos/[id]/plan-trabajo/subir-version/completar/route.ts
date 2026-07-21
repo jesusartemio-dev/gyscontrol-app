@@ -13,6 +13,22 @@ import type { PlanAlcanceDetalladoEdt } from '@/types/planTrabajo'
 type Ctx = { params: Promise<{ id: string }> }
 
 /**
+ * El export mete en el docx exactamente los bytes que hoy están en Drive
+ * para esa PlanTrabajoImagen (ver resolverImagenesAlcance.ts) — si el
+ * usuario no tocó la foto en Word, los bytes extraídos son idénticos.
+ * Si no se puede descargar la existente para comparar, mejor tratarla como
+ * distinta (manda a revisión) que arriesgarse a perder un cambio real.
+ */
+async function sonBytesIguales(driveFileId: string, nuevosBytes: Buffer): Promise<boolean> {
+  try {
+    const { data: bytesExistentes } = await getFileContent(driveFileId)
+    return bytesExistentes.equals(nuevosBytes)
+  } catch {
+    return false
+  }
+}
+
+/**
  * POST /api/proyectos/[id]/plan-trabajo/subir-version/completar
  * Paso 3 de 3. El navegador ya subió el archivo DIRECTO a Drive (ver
  * subir-version/iniciar); acá solo llega el id del archivo creado — nunca
@@ -112,12 +128,30 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       const imagenesAlcance = await prisma.planTrabajoImagen.findMany({ where: { planTrabajoId: planDb.id } })
       const alcanceDetallado = (planDb.alcanceDetallado as unknown as PlanAlcanceDetalladoEdt[] | null) ?? []
       const numerosDeFigura = calcularNumerosDeFigura(alcanceDetallado, imagenesAlcance)
-      const figuraYaExiste = new Set(numerosDeFigura.values())
+      const imagenPorId = new Map(imagenesAlcance.map(img => [img.id, img]))
+      const imagenIdPorFigura = new Map<number, string>()
+      for (const [imgId, num] of numerosDeFigura) imagenIdPorFigura.set(num, imgId)
 
       const imagenesFolderId = await getOrCreateAlcanceImagenesFolder(proyecto.codigo)
 
       for (const img of extraidas) {
-        if (img.numeroFigura !== null && figuraYaExiste.has(img.numeroFigura)) continue
+        // La imagen que ya está en el figura N. — si sus bytes son idénticos
+        // a los que ya tenemos en Drive, es la misma foto sin tocar (Word no
+        // re-comprime lo que el usuario no edita) y no hace falta revisarla.
+        // Si difieren, el usuario la reemplazó — se manda a revisión, NUNCA
+        // se descarta en silencio.
+        let posibleReemplazoDeId: string | null = null
+        if (img.numeroFigura !== null) {
+          const imagenExistenteId = imagenIdPorFigura.get(img.numeroFigura)
+          if (imagenExistenteId) {
+            const imagenExistente = imagenPorId.get(imagenExistenteId)
+            const sinCambios = imagenExistente?.driveFileId
+              ? await sonBytesIguales(imagenExistente.driveFileId, img.bytes)
+              : false
+            if (sinCambios) continue
+            posibleReemplazoDeId = imagenExistenteId
+          }
+        }
 
         try {
           const bytesRedimensionados = await redimensionarImagen(img.bytes, img.mimeType)
@@ -138,6 +172,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
               tipoArchivo: img.mimeType,
               tamano: bytesRedimensionados.length,
               orden: img.orden,
+              posibleReemplazoDeId,
             },
           })
           imagenesNuevasPendientes++
