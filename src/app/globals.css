@@ -384,3 +384,15 @@ body {
 }
 .docx-vista th { background: var(--muted); font-weight: 600; }
 .docx-vista a { color: var(--primary); text-decoration: underline; }
+
+/* ── Vista de la versión revisada del IPERC (XLSX→HTML vía SheetJS) ── */
+.xlsx-vista table {
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.xlsx-vista td, .xlsx-vista th {
+  border: 1px solid var(--border);
+  padding: 0.3em 0.6em;
+  text-align: left;
+}

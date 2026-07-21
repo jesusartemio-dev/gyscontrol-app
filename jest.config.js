@@ -97,7 +97,11 @@ const customJestConfig = {
   },
   
   transformIgnorePatterns: [
-    '/node_modules/(?!(.*\\.mjs$|@testing-library|@tanstack))',
+    // htmlparser2/domelementtype/domhandler/domutils (dependencias de
+    // sanitize-html) se publican como ESM puro sin build CJS — sin esta
+    // excepción, Jest revienta con "Cannot use import statement outside a
+    // module" en cualquier test que importe sanitize-html transitivamente.
+    '/node_modules/(?!(.*\\.mjs$|@testing-library|@tanstack|htmlparser2|domelementtype|domhandler|domutils))',
     '^.+\\.module\\.(css|sass|scss)$'
   ],
   
@@ -137,7 +141,10 @@ const customJestConfig = {
             type: 'commonjs'
           }
         }]
-      }
+      },
+      transformIgnorePatterns: [
+        '/node_modules/(?!(.*\\.mjs$|@testing-library|@tanstack|htmlparser2|domelementtype|domhandler|domutils|entities|dom-serializer))'
+      ]
     },
     {
       displayName: 'Unit Tests - Components',

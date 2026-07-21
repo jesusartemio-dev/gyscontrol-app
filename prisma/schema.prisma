@@ -2149,6 +2149,7 @@ model User {
   orgNodos                                 ProyectoOrgNodo[]
   planTrabajoGeneraciones                  PlanTrabajoGeneracion[]
   planTrabajoImagenes                      PlanTrabajoImagen[]
+  ipercVersionesArchivoSubidas              IpercVersionArchivo[]
   catalogoImagenesCreadas                  CatalogoImagen[]
   proyectoCronogramaGeneracionesIA         ProyectoCronogramaGeneracionIA[]
   cronogramaIATareaDecisiones              CronogramaIATareaDecision[]
@@ -6109,8 +6110,9 @@ model Iperc {
 
   estado String @default("borrador") // borrador | revisado | aprobado
 
-  filas        IpercFila[]
-  generaciones IpercGeneracion[]
+  filas          IpercFila[]
+  generaciones   IpercGeneracion[]
+  versionArchivo IpercVersionArchivo[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -6181,6 +6183,37 @@ model IpercGeneracion {
 
   @@index([ipercId, createdAt])
   @@map("iperc_generacion")
+}
+
+/// Versión del archivo IPERC (XLSX) revisada/aprobada a mano fuera de la app y
+/// subida de vuelta como la oficial vigente — análogo a PlanTrabajoGeneracion,
+/// pero SIN nada de IA (eso ya lo cubre IpercGeneracion, que es auditoría de
+/// generación, no un registro de archivo). Se ve en la app vía
+/// version-revisada/route.ts (SheetJS → HTML), sin re-parsear a IpercFila.
+model IpercVersionArchivo {
+  id      String @id @default(cuid())
+  ipercId String
+  iperc   Iperc  @relation(fields: [ipercId], references: [id], onDelete: Cascade)
+
+  driveFileId   String
+  webViewLink   String
+  driveFolderId String?
+  archivoNombre String
+  tamanioBytes  Int
+
+  numeroRevision String
+  /// Siempre 'IMPORTADO' hoy (el único origen es "alguien lo subió a mano") —
+  /// mismo campo que PlanTrabajoGeneracion.origen por si en el futuro se
+  /// registran acá también los exports generados por la app.
+  origen  String  @default("IMPORTADO")
+  vigente Boolean @default(true)
+
+  subidoPorId String
+  subidoPor   User     @relation(fields: [subidoPorId], references: [id])
+  subidoEn    DateTime @default(now())
+
+  @@index([ipercId, subidoEn(sort: Desc)])
+  @@map("iperc_version_archivo")
 }
 
 // ─── MPP (Matriz de EPP por Puesto) ─────────────────────────────────────────

@@ -2,16 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, RefreshCw, Loader2, Info, Trash2, Download } from 'lucide-react'
+import { Plus, RefreshCw, Loader2, Info, Trash2, Download, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { CabeceraIperc } from './CabeceraIperc'
 import { PreRequisitosPanelIperc } from './PreRequisitosPanelIperc'
 import { BotonGenerarIaIperc } from './BotonGenerarIaIperc'
 import { SeleccionEdtsModal } from './SeleccionEdtsModal'
 import { TablaFilasIperc } from './TablaFilasIperc'
 import { EditorFilaSheet } from './EditorFilaSheet'
+import { VersionRevisadaIperc } from './VersionRevisadaIperc'
 import { readSSEStreamIperc } from '@/lib/iperc/sse-consumer'
 import type { IpercContexto, IpercCompleto } from '@/types/iperc'
 import type { IpercFila } from '@/types/iperc'
@@ -50,6 +52,13 @@ export default function IpercClient({ proyectoId }: Props) {
   // Export state
   const [descargando, setDescargando] = useState(false)
 
+  // Versión revisada (subir + ver) state
+  const [subiendoVersion, setSubiendoVersion] = useState(false)
+  const [tieneVersionRevisada, setTieneVersionRevisada] = useState(false)
+  const [vistaIperc, setVistaIperc] = useState<'estructurada' | 'revisada'>('estructurada')
+  const vistaIpercInicializadaRef = useRef(false)
+  const inputVersionRef = useRef<HTMLInputElement>(null)
+
   // ─── Fetch contexto ────────────────────────────────────────────────────────
   const fetchContexto = useCallback(async () => {
     try {
@@ -67,6 +76,27 @@ export default function IpercClient({ proyectoId }: Props) {
   useEffect(() => {
     fetchContexto()
   }, [fetchContexto])
+
+  // Detecta si hay una versión revisada vigente — default automático a esa
+  // pestaña la PRIMERA vez que se detecta una (no forzar de nuevo si el
+  // usuario vuelve manualmente a la vista estructurada).
+  useEffect(() => {
+    if (!contexto?.iperc) return
+    let cancelado = false
+    fetch(`/api/proyectos/${proyectoId}/iperc/version-revisada`)
+      .then(res => (res.ok ? res.json() : { data: null }))
+      .then(({ data }) => {
+        if (cancelado) return
+        const hay = !!data
+        setTieneVersionRevisada(hay)
+        if (!vistaIpercInicializadaRef.current) {
+          if (hay) setVistaIperc('revisada')
+          vistaIpercInicializadaRef.current = true
+        }
+      })
+      .catch(() => {})
+    return () => { cancelado = true }
+  }, [proyectoId, contexto?.iperc?.id])
 
   // ─── Crear IPERC ───────────────────────────────────────────────────────────
   const handleCrearIperc = async () => {
@@ -266,6 +296,37 @@ export default function IpercClient({ proyectoId }: Props) {
     }
   }
 
+  // ─── Subir versión revisada ────────────────────────────────────────────────
+  const handleSubirVersion = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const file = files[0]
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      toast.error('Solo se admiten archivos .xlsx')
+      return
+    }
+    setSubiendoVersion(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch(`/api/proyectos/${proyectoId}/iperc/subir-version`, {
+        method: 'POST',
+        body: formData,
+      })
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}))
+        throw new Error(e.error ?? 'Error al subir la versión')
+      }
+      toast.success('Versión revisada subida')
+      setTieneVersionRevisada(true)
+      setVistaIperc('revisada')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al subir la versión')
+    } finally {
+      setSubiendoVersion(false)
+      if (inputVersionRef.current) inputVersionRef.current.value = ''
+    }
+  }
+
   // ─── Updated cabecera ──────────────────────────────────────────────────────
   const handleIpercUpdated = (iperc: IpercCompleto) => {
     setContexto(prev => prev ? { ...prev, iperc } : prev)
@@ -295,6 +356,53 @@ export default function IpercClient({ proyectoId }: Props) {
 
   const { iperc, preRequisitos, proyecto, iaHabilitada, generacionActiva } = contexto
   const isGenerando = generando || generacionActiva !== null
+
+  const contenidoEstructuradoIperc = iperc && (
+    <>
+      {/* Generando in background (from server) */}
+      {!generando && generacionActiva && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Generación en progreso en segundo plano…
+        </div>
+      )}
+
+      {/* Tabla */}
+      <TablaFilasIperc
+        filas={iperc.filas}
+        onEdit={handleEditarFila}
+        onDelete={handleEliminarFila}
+        onGenerar={handleAbrirModal}
+        onAgregar={handleAgregarFila}
+      />
+
+      {/* Resumen post-generación */}
+      {cobertura && (
+        <Alert className="border-blue-200 bg-blue-50">
+          <Info className="h-4 w-4 text-blue-600" />
+          <AlertTitle className="text-blue-800 text-sm">IPERC generado con IA</AlertTitle>
+          <AlertDescription className="text-blue-700 text-xs space-y-1">
+            <p>
+              <strong>{cobertura.totalFilas} filas</strong> generadas a partir de{' '}
+              <strong>{cobertura.totalTareas} tareas</strong> en{' '}
+              <strong>{cobertura.edtsEvaluados} {cobertura.edtsEvaluados === 1 ? 'EDT' : 'EDTs'}</strong>.
+              {(cobertura.modelosUsados.sonnet > 0 || cobertura.modelosUsados.haiku > 0) && (
+                <> Modelos: {[
+                  cobertura.modelosUsados.sonnet > 0 ? `Sonnet (${cobertura.modelosUsados.sonnet} ${cobertura.modelosUsados.sonnet === 1 ? 'lote' : 'lotes'})` : null,
+                  cobertura.modelosUsados.haiku > 0 ? `Haiku (${cobertura.modelosUsados.haiku} ${cobertura.modelosUsados.haiku === 1 ? 'lote' : 'lotes'})` : null,
+                ].filter(Boolean).join(', ')}.</>
+              )}
+            </p>
+            {cobertura.lotesFallidos > 0 && (
+              <p className="text-amber-600">
+                ⚠ {cobertura.lotesFallidos} {cobertura.lotesFallidos === 1 ? 'lote falló' : 'lotes fallaron'} — algunas tareas no tienen filas. Podés agregarlas manualmente.
+              </p>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+    </>
+  )
 
   return (
     <div className="space-y-4 pb-8">
@@ -395,6 +503,26 @@ export default function IpercClient({ proyectoId }: Props) {
               {descargando ? 'Generando…' : 'Exportar Excel'}
             </Button>
 
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              onClick={() => inputVersionRef.current?.click()}
+              disabled={subiendoVersion}
+            >
+              {subiendoVersion
+                ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                : <Upload className="h-4 w-4 mr-1" />}
+              {subiendoVersion ? 'Subiendo…' : 'Subir versión revisada'}
+            </Button>
+            <input
+              ref={inputVersionRef}
+              type="file"
+              accept=".xlsx"
+              className="hidden"
+              onChange={e => handleSubirVersion(e.target.files)}
+            />
+
             {iperc.filas.length > 0 && (
               <span className="text-xs text-muted-foreground self-center">
                 {iperc.filas.length} {iperc.filas.length === 1 ? 'fila' : 'filas'}
@@ -402,47 +530,21 @@ export default function IpercClient({ proyectoId }: Props) {
             )}
           </div>
 
-          {/* Generando in background (from server) */}
-          {!generando && generacionActiva && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Generación en progreso en segundo plano…
-            </div>
-          )}
-
-          {/* Tabla */}
-          <TablaFilasIperc
-            filas={iperc.filas}
-            onEdit={handleEditarFila}
-            onDelete={handleEliminarFila}
-            onGenerar={handleAbrirModal}
-            onAgregar={handleAgregarFila}
-          />
-
-          {/* Resumen post-generación */}
-          {cobertura && (
-            <Alert className="border-blue-200 bg-blue-50">
-              <Info className="h-4 w-4 text-blue-600" />
-              <AlertTitle className="text-blue-800 text-sm">IPERC generado con IA</AlertTitle>
-              <AlertDescription className="text-blue-700 text-xs space-y-1">
-                <p>
-                  <strong>{cobertura.totalFilas} filas</strong> generadas a partir de{' '}
-                  <strong>{cobertura.totalTareas} tareas</strong> en{' '}
-                  <strong>{cobertura.edtsEvaluados} {cobertura.edtsEvaluados === 1 ? 'EDT' : 'EDTs'}</strong>.
-                  {(cobertura.modelosUsados.sonnet > 0 || cobertura.modelosUsados.haiku > 0) && (
-                    <> Modelos: {[
-                      cobertura.modelosUsados.sonnet > 0 ? `Sonnet (${cobertura.modelosUsados.sonnet} ${cobertura.modelosUsados.sonnet === 1 ? 'lote' : 'lotes'})` : null,
-                      cobertura.modelosUsados.haiku > 0 ? `Haiku (${cobertura.modelosUsados.haiku} ${cobertura.modelosUsados.haiku === 1 ? 'lote' : 'lotes'})` : null,
-                    ].filter(Boolean).join(', ')}.</>
-                  )}
-                </p>
-                {cobertura.lotesFallidos > 0 && (
-                  <p className="text-amber-600">
-                    ⚠ {cobertura.lotesFallidos} {cobertura.lotesFallidos === 1 ? 'lote falló' : 'lotes fallaron'} — algunas tareas no tienen filas. Podés agregarlas manualmente.
-                  </p>
-                )}
-              </AlertDescription>
-            </Alert>
+          {tieneVersionRevisada ? (
+            <Tabs value={vistaIperc} onValueChange={(v) => setVistaIperc(v as 'estructurada' | 'revisada')}>
+              <TabsList>
+                <TabsTrigger value="estructurada">Vista estructurada (app)</TabsTrigger>
+                <TabsTrigger value="revisada">Versión revisada</TabsTrigger>
+              </TabsList>
+              <TabsContent value="estructurada" className="space-y-4 mt-2">
+                {contenidoEstructuradoIperc}
+              </TabsContent>
+              <TabsContent value="revisada" className="mt-2">
+                <VersionRevisadaIperc proyectoId={proyectoId} />
+              </TabsContent>
+            </Tabs>
+          ) : (
+            contenidoEstructuradoIperc
           )}
         </>
       )}
