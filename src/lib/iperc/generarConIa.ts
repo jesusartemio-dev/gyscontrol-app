@@ -10,6 +10,7 @@ import {
   type TareaParaIperc,
 } from '@/lib/iperc/prompts/generarLoteIperc'
 import { validarYParsearLote, type FilaIpercIa } from '@/lib/iperc/validarFilas'
+import { obtenerAlcanceParaContexto } from '@/lib/planTrabajo/obtenerAlcanceParaContexto'
 
 const MAX_FILAS = 200
 const PARALELISMO = 3 // llamadas concurrentes a Anthropic
@@ -171,7 +172,17 @@ ${fases.map(fase => {
   }).filter(Boolean).join('\n\n')}
   `.trim()
 
-  return { iperc, tareasParaIperc, contextoTexto, edtsNombres }
+  // Contexto rico del Plan de Trabajo (V2 revisado si existe, si no el
+  // estructurado) — el cronograma sigue siendo el esqueleto/grano de las
+  // filas; esto solo enriquece la identificación de peligros con el método
+  // real descrito (EPP, herramientas, condiciones). Ver
+  // obtenerAlcanceParaContexto.ts. Nunca bloquea: '' si no hay nada.
+  const alcancePlanTrabajo = await obtenerAlcanceParaContexto(proyectoId)
+  const contextoCompleto = alcancePlanTrabajo
+    ? `${contextoTexto}\n\n## ALCANCE DEL PLAN DE TRABAJO (método de trabajo real)\n${alcancePlanTrabajo}`
+    : contextoTexto
+
+  return { iperc, tareasParaIperc, contextoTexto: contextoCompleto, edtsNombres }
 }
 
 // ─── Resumen ────────────────────────────────────────────────────────────────
