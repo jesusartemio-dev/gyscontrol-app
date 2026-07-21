@@ -33,6 +33,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
       driveFolderId: true,
       origen: true,
       vigente: true,
+      codigoNexa: true,
       generadoEn: true,
       generadoPor: { select: { id: true, name: true, email: true } },
     },

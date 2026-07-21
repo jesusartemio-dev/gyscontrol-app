@@ -13,6 +13,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { VersionRevisadaView } from './VersionRevisadaView'
 
 import type { PlanTrabajoContexto, SeccionRegenerable } from '@/types/planTrabajo'
 import type { PlanTrabajo, PlanTrabajoImagen } from '@prisma/client'
@@ -103,6 +105,8 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
   const [errorGeneracion, setErrorGeneracion] = useState<{ mensaje: string } | null>(null)
   const [confirmandoRegenerar, setConfirmandoRegenerar] = useState(false)
   const [errorAcceso, setErrorAcceso] = useState<string | null>(null)
+  const [vista, setVista] = useState<'estructurada' | 'v2'>('estructurada')
+  const vistaInicializadaRef = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
 
   const fetchContexto = useCallback(async () => {
@@ -123,6 +127,18 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
   }, [proyectoId])
 
   useEffect(() => { fetchContexto() }, [fetchContexto])
+
+  // Default a la pestaña "Versión revisada (V2)" la PRIMERA vez que se detecta
+  // una versión IMPORTADO vigente — solo una vez, para no devolver al usuario
+  // ahí si manualmente volvió a la vista estructurada y algo dispara un refetch.
+  useEffect(() => {
+    if (vistaInicializadaRef.current || !contexto) return
+    const generaciones = (contexto.planTrabajo as { generaciones?: { origen: string; vigente: boolean }[] } | null)?.generaciones ?? []
+    if (generaciones.some(g => g.origen === 'IMPORTADO' && g.vigente)) {
+      setVista('v2')
+    }
+    vistaInicializadaRef.current = true
+  }, [contexto])
 
   const handleCrear = async () => {
     setCreando(true)
@@ -372,11 +388,12 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
     )
   }
 
-  const plan = planTrabajo as PlanTrabajo & { generaciones: unknown[]; imagenes: PlanTrabajoImagen[]; operacionIAEnCurso?: string | null; operacionIAIniciadaEn?: Date | null }
+  const plan = planTrabajo as PlanTrabajo & { generaciones: { id: string; origen: string; vigente: boolean }[]; imagenes: PlanTrabajoImagen[]; operacionIAEnCurso?: string | null; operacionIAIniciadaEn?: Date | null }
   const bloques = (plan.bloquesCompletitud ?? {}) as Record<string, boolean>
   const LOCK_EXPIRY_MS = 10 * 60 * 1000
   const lockAge = plan.operacionIAIniciadaEn ? Date.now() - new Date(plan.operacionIAIniciadaEn).getTime() : Infinity
   const iaOcupada = !!plan.operacionIAEnCurso && lockAge < LOCK_EXPIRY_MS
+  const tieneV2Vigente = plan.generaciones.some(g => g.origen === 'IMPORTADO' && g.vigente)
 
   function minutosTranscurridos(fecha: Date | null | undefined): number {
     if (!fecha) return 0
@@ -385,157 +402,11 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
 
   const seccionesEtapa2Completas = Object.entries(bloques).filter(([k, v]) => v && !esSeccionEtapa1(k as SeccionRegenerable) && k !== 'responsabilidades').length
 
-  return (
-    <div className="space-y-4 p-4">
-      {confirmandoRegenerar && (
-        <Dialog open onOpenChange={() => setConfirmandoRegenerar(false)}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-amber-600">
-                <AlertTriangle size={18} />
-                ¿Redactar todo de nuevo con IA?
-              </DialogTitle>
-              <DialogDescription className="text-sm leading-relaxed pt-1">
-                Ya tenés <strong>{seccionesEtapa2Completas} sección{seccionesEtapa2Completas !== 1 ? 'es' : ''} redactada{seccionesEtapa2Completas !== 1 ? 's' : ''}</strong> con IA.
-                Si redactás todo de nuevo, el contenido existente será sobreescrito.
-                <br /><br />
-                Para actualizar solo una sección usá el botón <span className="font-mono">↻</span> en cada sección individualmente.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setConfirmandoRegenerar(false)}>
-                Cancelar
-              </Button>
-              <Button
-                onClick={iniciarGeneracion}
-                className="bg-amber-600 hover:bg-amber-700 text-white"
-              >
-                Sí, regenerar todo
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {errorGeneracion && (
-        <Dialog open onOpenChange={() => setErrorGeneracion(null)}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-destructive">
-                <AlertTriangle size={18} />
-                Error al generar el Plan de Trabajo
-              </DialogTitle>
-              <DialogDescription className="text-sm leading-relaxed pt-1">
-                {errorGeneracion.mensaje}
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setErrorGeneracion(null)}>
-                Cerrar
-              </Button>
-              <Button
-                onClick={() => { setErrorGeneracion(null); handleGenerar() }}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white"
-              >
-                Reintentar
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      <PreRequisitosPanel prerrequisitos={prerrequisitos} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <CabeceraEditor proyectoId={proyectoId} plan={plan} onUpdated={fetchContexto} />
-        <TogglesPanel proyectoId={proyectoId} plan={plan} onUpdated={fetchContexto} />
-      </div>
-
-      {recienCreado && (
-        <div className="flex items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
-          <Sparkles size={16} className="text-indigo-500 shrink-0" />
-          <span>
-            <strong>¡Plan creado!</strong> Ahora hacé click en <strong>Generar con IA</strong> para rellenar todas las secciones automáticamente.
-          </span>
-          <button onClick={() => setRecienCreado(false)} className="ml-auto text-indigo-300 hover:text-indigo-500 shrink-0">
-            <X size={14} />
-          </button>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <BotonCalcularDatos
-            puedeGenerar={prerrequisitos.puedeGenerar}
-            calculando={calculando}
-            disabled={generando || generandoTodo || !!iaOcupada}
-            destacar={recienCreado}
-            onCalcular={async () => { await handleCalcularDatos() }}
-          />
-          <BotonGenerarIA
-            puedeGenerar={prerrequisitos.puedeGenerar && etapa1Completa(bloques)}
-            iaHabilitada={iaPlanTrabajoHabilitada}
-            generando={generando}
-            iaOcupada={!!iaOcupada || calculando || generandoTodo}
-            mensajeProgreso={mensajeGenerar}
-            progreso={progresoGenerar}
-            onGenerar={handleGenerar}
-            onCancelar={handleCancelar}
-            motivoBloqueo={
-              !etapa1Completa(bloques)
-                ? 'Completá "1. Generar datos" primero.'
-                : 'Completá los prerrequisitos para generar con IA.'
-            }
-          />
-          <Button
-            variant="outline"
-            onClick={handleGenerarTodo}
-            disabled={calculando || generando || generandoTodo || !!iaOcupada || !prerrequisitos.puedeGenerar}
-            className="shrink-0"
-            title="Ejecuta '1. Generar datos' y luego '2. Redactar con IA' en secuencia"
-          >
-            {generandoTodo
-              ? <><Loader2 className="animate-spin mr-2" size={14} />Generando todo...</>
-              : 'Generar todo'}
-          </Button>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <BotonExportarDocx
-            proyectoId={proyectoId}
-            orgNodos={contexto.organigrama}
-            incluirOrganigrama={plan.incluirOrganigrama}
-            disabled={generando}
-          />
-          <HistorialGeneraciones proyectoId={proyectoId} />
-          <SubirVersionPlan
-            proyectoId={proyectoId}
-            alcanceDetallado={(plan.alcanceDetallado as unknown as PlanAlcanceDetalladoEdt[] | null) ?? []}
-            onVersionSubida={fetchContexto}
-          />
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/proyectos/${proyectoId}/plan-trabajo/campo`} target="_blank">
-              <Camera size={14} className="mr-2" />
-              Modo Campo
-            </Link>
-          </Button>
-          <div className="ml-auto">
-            <BotonEliminarPlan
-              proyectoId={proyectoId}
-              onEliminado={() => window.location.reload()}
-              disabled={generando || !!iaOcupada}
-            />
-          </div>
-        </div>
-      </div>
-
-      {iaOcupada && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-xs text-amber-900 flex items-center gap-2">
-          <span className="font-medium">Operación IA en curso:</span>
-          <span>{plan.operacionIAEnCurso}</span>
-          <span className="text-amber-700">· iniciada hace {minutosTranscurridos(plan.operacionIAIniciadaEn)} min</span>
-        </div>
-      )}
-
+  // Editores + secciones — vive en una const para poder mostrarlo tal cual
+  // esté (con Tabs) o no (sin V2 vigente, vista única de siempre) sin
+  // duplicar el JSX.
+  const contenidoEstructurado = (
+    <>
       {/* ─── Editores (se montan solo cuando el usuario los abre) ─── */}
       {editandoSeccion === 'objetivo' && (
         <ObjetivoEditor
@@ -806,6 +677,176 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
           <ReferenciasView plan={plan} />
         </SeccionContainer>
       </div>
+    </>
+  )
+
+  return (
+    <div className="space-y-4 p-4">
+      {confirmandoRegenerar && (
+        <Dialog open onOpenChange={() => setConfirmandoRegenerar(false)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-amber-600">
+                <AlertTriangle size={18} />
+                ¿Redactar todo de nuevo con IA?
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-relaxed pt-1">
+                Ya tenés <strong>{seccionesEtapa2Completas} sección{seccionesEtapa2Completas !== 1 ? 'es' : ''} redactada{seccionesEtapa2Completas !== 1 ? 's' : ''}</strong> con IA.
+                Si redactás todo de nuevo, el contenido existente será sobreescrito.
+                <br /><br />
+                Para actualizar solo una sección usá el botón <span className="font-mono">↻</span> en cada sección individualmente.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setConfirmandoRegenerar(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={iniciarGeneracion}
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                Sí, regenerar todo
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {errorGeneracion && (
+        <Dialog open onOpenChange={() => setErrorGeneracion(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle size={18} />
+                Error al generar el Plan de Trabajo
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-relaxed pt-1">
+                {errorGeneracion.mensaje}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setErrorGeneracion(null)}>
+                Cerrar
+              </Button>
+              <Button
+                onClick={() => { setErrorGeneracion(null); handleGenerar() }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                Reintentar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      <PreRequisitosPanel prerrequisitos={prerrequisitos} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <CabeceraEditor proyectoId={proyectoId} plan={plan} onUpdated={fetchContexto} />
+        <TogglesPanel proyectoId={proyectoId} plan={plan} onUpdated={fetchContexto} />
+      </div>
+
+      {recienCreado && (
+        <div className="flex items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+          <Sparkles size={16} className="text-indigo-500 shrink-0" />
+          <span>
+            <strong>¡Plan creado!</strong> Ahora hacé click en <strong>Generar con IA</strong> para rellenar todas las secciones automáticamente.
+          </span>
+          <button onClick={() => setRecienCreado(false)} className="ml-auto text-indigo-300 hover:text-indigo-500 shrink-0">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <BotonCalcularDatos
+            puedeGenerar={prerrequisitos.puedeGenerar}
+            calculando={calculando}
+            disabled={generando || generandoTodo || !!iaOcupada}
+            destacar={recienCreado}
+            onCalcular={async () => { await handleCalcularDatos() }}
+          />
+          <BotonGenerarIA
+            puedeGenerar={prerrequisitos.puedeGenerar && etapa1Completa(bloques)}
+            iaHabilitada={iaPlanTrabajoHabilitada}
+            generando={generando}
+            iaOcupada={!!iaOcupada || calculando || generandoTodo}
+            mensajeProgreso={mensajeGenerar}
+            progreso={progresoGenerar}
+            onGenerar={handleGenerar}
+            onCancelar={handleCancelar}
+            motivoBloqueo={
+              !etapa1Completa(bloques)
+                ? 'Completá "1. Generar datos" primero.'
+                : 'Completá los prerrequisitos para generar con IA.'
+            }
+          />
+          <Button
+            variant="outline"
+            onClick={handleGenerarTodo}
+            disabled={calculando || generando || generandoTodo || !!iaOcupada || !prerrequisitos.puedeGenerar}
+            className="shrink-0"
+            title="Ejecuta '1. Generar datos' y luego '2. Redactar con IA' en secuencia"
+          >
+            {generandoTodo
+              ? <><Loader2 className="animate-spin mr-2" size={14} />Generando todo...</>
+              : 'Generar todo'}
+          </Button>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <BotonExportarDocx
+            proyectoId={proyectoId}
+            orgNodos={contexto.organigrama}
+            incluirOrganigrama={plan.incluirOrganigrama}
+            disabled={generando}
+          />
+          <HistorialGeneraciones proyectoId={proyectoId} />
+          <SubirVersionPlan
+            proyectoId={proyectoId}
+            alcanceDetallado={(plan.alcanceDetallado as unknown as PlanAlcanceDetalladoEdt[] | null) ?? []}
+            onVersionSubida={fetchContexto}
+          />
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/proyectos/${proyectoId}/plan-trabajo/campo`} target="_blank">
+              <Camera size={14} className="mr-2" />
+              Modo Campo
+            </Link>
+          </Button>
+          <div className="ml-auto">
+            <BotonEliminarPlan
+              proyectoId={proyectoId}
+              onEliminado={() => window.location.reload()}
+              disabled={generando || !!iaOcupada}
+            />
+          </div>
+        </div>
+      </div>
+
+      {iaOcupada && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-xs text-amber-900 flex items-center gap-2">
+          <span className="font-medium">Operación IA en curso:</span>
+          <span>{plan.operacionIAEnCurso}</span>
+          <span className="text-amber-700">· iniciada hace {minutosTranscurridos(plan.operacionIAIniciadaEn)} min</span>
+        </div>
+      )}
+
+      {tieneV2Vigente ? (
+        <Tabs value={vista} onValueChange={(v) => setVista(v as 'estructurada' | 'v2')}>
+          <TabsList>
+            <TabsTrigger value="estructurada">Vista estructurada (app)</TabsTrigger>
+            <TabsTrigger value="v2">Versión revisada (V2)</TabsTrigger>
+          </TabsList>
+          <TabsContent value="estructurada" className="space-y-4 mt-2">
+            {contenidoEstructurado}
+          </TabsContent>
+          <TabsContent value="v2" className="mt-2">
+            <VersionRevisadaView proyectoId={proyectoId} />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        contenidoEstructurado
+      )}
     </div>
   )
 }

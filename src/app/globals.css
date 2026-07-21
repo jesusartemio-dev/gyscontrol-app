@@ -340,3 +340,47 @@ body {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(300%); }
 }
+
+/* ── Vista de la versión revisada del Plan de Trabajo (DOCX→HTML vía mammoth) ── */
+.docx-vista {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--foreground);
+}
+.docx-vista > *:first-child { margin-top: 0; }
+.docx-vista > *:last-child { margin-bottom: 0; }
+.docx-vista p { margin: 0.5em 0; }
+.docx-vista h1, .docx-vista h2, .docx-vista h3, .docx-vista h4 {
+  font-weight: 600;
+  margin-top: 1.4em;
+  margin-bottom: 0.4em;
+}
+.docx-vista h1 { font-size: 1.25em; }
+.docx-vista h2 { font-size: 1.1em; }
+.docx-vista h3, .docx-vista h4 { font-size: 1em; }
+.docx-vista ul, .docx-vista ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+.docx-vista li { margin: 0.25em 0; }
+.docx-vista img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.75em auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.docx-vista table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75em 0;
+  font-size: 0.85em;
+}
+.docx-vista th, .docx-vista td {
+  border: 1px solid var(--border);
+  padding: 0.4em 0.6em;
+  text-align: left;
+}
+.docx-vista th { background: var(--muted); font-weight: 600; }
+.docx-vista a { color: var(--primary); text-decoration: underline; }

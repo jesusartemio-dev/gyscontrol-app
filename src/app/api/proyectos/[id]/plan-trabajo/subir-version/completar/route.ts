@@ -7,6 +7,7 @@ import { getOrCreatePlanTrabajoFolder } from '@/lib/planTrabajo/getOrCreatePlanT
 import { getOrCreateAlcanceImagenesFolder } from '@/lib/planTrabajo/getOrCreateAlcanceImagenesFolder'
 import { redimensionarImagen } from '@/lib/planTrabajo/redimensionarImagen'
 import { extraerImagenesDeDocx } from '@/lib/planTrabajo/extraerImagenesDeDocx'
+import { extraerCodigoNexaDeDocx } from '@/lib/planTrabajo/extraerCodigoNexaDeDocx'
 import { calcularNumerosDeFigura } from '@/lib/planTrabajo/numerosDeFigura'
 import type { PlanAlcanceDetalladoEdt } from '@/types/planTrabajo'
 
@@ -95,6 +96,19 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: 'El archivo subido no tiene link de Drive' }, { status: 500 })
   }
 
+  // Se descarga UNA vez y se reutiliza para el código Nexa y la extracción de
+  // imágenes — si falla, la versión igual se registra (sin código ni fotos),
+  // nunca bloquea la subida.
+  let buffer: Buffer | null = null
+  let codigoNexa: string | null = null
+  try {
+    const descarga = await getFileContent(driveFileId)
+    buffer = descarga.data
+    codigoNexa = extraerCodigoNexaDeDocx(buffer)
+  } catch (e) {
+    console.error('[subir-version/completar] Error descargando el docx de Drive (no bloqueante, se registra sin código Nexa ni fotos):', e)
+  }
+
   // La fila nueva pasa a ser la vigente — se apaga cualquier otra del mismo plan.
   const [, generacion] = await prisma.$transaction([
     prisma.planTrabajoGeneracion.updateMany({
@@ -110,6 +124,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         driveFolderId,
         archivoNombre,
         tamanioBytes,
+        codigoNexa,
         origen: 'IMPORTADO',
         vigente: true,
         snapshotData: { plan: planDb, organigramaPngBase64: '' },
@@ -122,62 +137,63 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   // caption "Figura N.") — el resto son fotos nuevas, quedan pendientes.
   let imagenesNuevasPendientes = 0
   try {
-    const { data: buffer } = await getFileContent(driveFileId)
-    const extraidas = extraerImagenesDeDocx(buffer)
-    if (extraidas.length > 0) {
-      const imagenesAlcance = await prisma.planTrabajoImagen.findMany({ where: { planTrabajoId: planDb.id } })
-      const alcanceDetallado = (planDb.alcanceDetallado as unknown as PlanAlcanceDetalladoEdt[] | null) ?? []
-      const numerosDeFigura = calcularNumerosDeFigura(alcanceDetallado, imagenesAlcance)
-      const imagenPorId = new Map(imagenesAlcance.map(img => [img.id, img]))
-      const imagenIdPorFigura = new Map<number, string>()
-      for (const [imgId, num] of numerosDeFigura) imagenIdPorFigura.set(num, imgId)
+    if (buffer) {
+      const extraidas = extraerImagenesDeDocx(buffer)
+      if (extraidas.length > 0) {
+        const imagenesAlcance = await prisma.planTrabajoImagen.findMany({ where: { planTrabajoId: planDb.id } })
+        const alcanceDetallado = (planDb.alcanceDetallado as unknown as PlanAlcanceDetalladoEdt[] | null) ?? []
+        const numerosDeFigura = calcularNumerosDeFigura(alcanceDetallado, imagenesAlcance)
+        const imagenPorId = new Map(imagenesAlcance.map(img => [img.id, img]))
+        const imagenIdPorFigura = new Map<number, string>()
+        for (const [imgId, num] of numerosDeFigura) imagenIdPorFigura.set(num, imgId)
 
-      const imagenesFolderId = await getOrCreateAlcanceImagenesFolder(proyecto.codigo)
+        const imagenesFolderId = await getOrCreateAlcanceImagenesFolder(proyecto.codigo)
 
-      for (const img of extraidas) {
-        // La imagen que ya está en el figura N. — si sus bytes son idénticos
-        // a los que ya tenemos en Drive, es la misma foto sin tocar (Word no
-        // re-comprime lo que el usuario no edita) y no hace falta revisarla.
-        // Si difieren, el usuario la reemplazó — se manda a revisión, NUNCA
-        // se descarta en silencio.
-        let posibleReemplazoDeId: string | null = null
-        if (img.numeroFigura !== null) {
-          const imagenExistenteId = imagenIdPorFigura.get(img.numeroFigura)
-          if (imagenExistenteId) {
-            const imagenExistente = imagenPorId.get(imagenExistenteId)
-            const sinCambios = imagenExistente?.driveFileId
-              ? await sonBytesIguales(imagenExistente.driveFileId, img.bytes)
-              : false
-            if (sinCambios) continue
-            posibleReemplazoDeId = imagenExistenteId
+        for (const img of extraidas) {
+          // La imagen que ya está en el figura N. — si sus bytes son idénticos
+          // a los que ya tenemos en Drive, es la misma foto sin tocar (Word no
+          // re-comprime lo que el usuario no edita) y no hace falta revisarla.
+          // Si difieren, el usuario la reemplazó — se manda a revisión, NUNCA
+          // se descarta en silencio.
+          let posibleReemplazoDeId: string | null = null
+          if (img.numeroFigura !== null) {
+            const imagenExistenteId = imagenIdPorFigura.get(img.numeroFigura)
+            if (imagenExistenteId) {
+              const imagenExistente = imagenPorId.get(imagenExistenteId)
+              const sinCambios = imagenExistente?.driveFileId
+                ? await sonBytesIguales(imagenExistente.driveFileId, img.bytes)
+                : false
+              if (sinCambios) continue
+              posibleReemplazoDeId = imagenExistenteId
+            }
           }
-        }
 
-        try {
-          const bytesRedimensionados = await redimensionarImagen(img.bytes, img.mimeType)
-          const driveImg = await uploadFile({
-            folderId: imagenesFolderId,
-            fileName: `${Date.now()}_${img.nombreArchivoOriginal}`,
-            mimeType: img.mimeType,
-            buffer: bytesRedimensionados,
-          })
-          if (!driveImg.id) continue
+          try {
+            const bytesRedimensionados = await redimensionarImagen(img.bytes, img.mimeType)
+            const driveImg = await uploadFile({
+              folderId: imagenesFolderId,
+              fileName: `${Date.now()}_${img.nombreArchivoOriginal}`,
+              mimeType: img.mimeType,
+              buffer: bytesRedimensionados,
+            })
+            if (!driveImg.id) continue
 
-          await prisma.planTrabajoImagenPendiente.create({
-            data: {
-              planTrabajoId: planDb.id,
-              generacionId: generacion.id,
-              driveFileId: driveImg.id,
-              nombreArchivo: img.nombreArchivoOriginal,
-              tipoArchivo: img.mimeType,
-              tamano: bytesRedimensionados.length,
-              orden: img.orden,
-              posibleReemplazoDeId,
-            },
-          })
-          imagenesNuevasPendientes++
-        } catch (e) {
-          console.error('[subir-version/completar] Error subiendo una imagen extraída (no bloqueante):', e)
+            await prisma.planTrabajoImagenPendiente.create({
+              data: {
+                planTrabajoId: planDb.id,
+                generacionId: generacion.id,
+                driveFileId: driveImg.id,
+                nombreArchivo: img.nombreArchivoOriginal,
+                tipoArchivo: img.mimeType,
+                tamano: bytesRedimensionados.length,
+                orden: img.orden,
+                posibleReemplazoDeId,
+              },
+            })
+            imagenesNuevasPendientes++
+          } catch (e) {
+            console.error('[subir-version/completar] Error subiendo una imagen extraída (no bloqueante):', e)
+          }
         }
       }
     }

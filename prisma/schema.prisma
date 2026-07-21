@@ -5967,6 +5967,12 @@ model PlanTrabajoGeneracion {
   archivoNombre  String
   tamanioBytes   Int
 
+  /// Código oficial del documento leído del header del .docx (ej.
+  /// "PN-I790126044-3GYS-0370COR0001") — ver extraerCodigoNexaDeDocx.ts. Solo
+  /// se puede leer de un IMPORTADO (viene del Word real subido); null si no
+  /// se encontró o si origen='GENERADO'.
+  codigoNexa String?
+
   /// 'GENERADO' (export normal desde la app) | 'IMPORTADO' (Word editado a
   /// mano por Proyectos, subido de vuelta) — ver PlanTrabajoImagenPendiente
   /// para las fotos nuevas que trae un IMPORTADO sin clasificar todavía.
