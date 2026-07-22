@@ -125,6 +125,8 @@ export async function* regenerarEtapaPets(
       controlesAdministrativos: actividadesEtapa.flatMap((a) => a.controlesAdministrativos),
       eppDisponibles: ctx.mpp?.eppPorCategoria ?? { basico: [], bioseguridad: [], especifico: [] },
       referenciasClienteDisponibles: ctx.iperc.referenciasCliente,
+      alcanceTexto: ctx.plan?.alcanceDetalladoTexto || ctx.plan?.alcanceGeneral || '',
+      mppRevisadoTexto: ctx.mpp?.revisadoTexto || '',
     })
 
     const modelo = getModelForTask('ssoma-document')
@@ -269,6 +271,8 @@ export async function* regenerarPasoPets(
       controlesAdministrativos: actividadesEtapa.flatMap((a) => a.controlesAdministrativos),
       eppDisponibles: ctx.mpp?.eppPorCategoria ?? { basico: [], bioseguridad: [], especifico: [] },
       referenciasClienteDisponibles: ctx.iperc.referenciasCliente,
+      alcanceTexto: ctx.plan?.alcanceDetalladoTexto || ctx.plan?.alcanceGeneral || '',
+      mppRevisadoTexto: ctx.mpp?.revisadoTexto || '',
     })
 
     // Pasos críticos usan Sonnet; el resto usa Haiku (más rápido y barato)

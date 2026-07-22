@@ -11,19 +11,20 @@ const OPCIONES_SANITIZE: sanitizeHtml.IOptions = {
 }
 
 /**
- * Convierte el .xlsx de la versión revisada del IPERC a una tabla HTML
+ * Convierte el .xlsx de una versión revisada (IPERC o MPP) a una tabla HTML
  * sanitizada, lista para `dangerouslySetInnerHTML` — misma idea que
  * mammoth para el Plan de Trabajo, pero acá el artefacto es XLSX: se usa
  * SheetJS (sheet_to_html) en vez de convertir a Word. Prioriza la hoja
- * llamada 'IPERC' (la que arma la plantilla); si no existe, usa la primera.
+ * `hojaPreferida` (la que arma la plantilla — 'IPERC' o 'MATRIZ EPPs'); si no
+ * existe, usa la primera hoja del libro.
  *
  * Defensivo a propósito: cualquier archivo corrupto o sin hojas legibles
  * devuelve null — el caller decide cómo avisar (nunca throw).
  */
-export function convertirXlsxAHtml(buffer: Buffer): string | null {
+export function convertirXlsxAHtml(buffer: Buffer, hojaPreferida = 'IPERC'): string | null {
   try {
     const workbook = XLSX.read(buffer, { type: 'buffer' })
-    const hojaNombre = workbook.SheetNames.includes('IPERC') ? 'IPERC' : workbook.SheetNames[0]
+    const hojaNombre = workbook.SheetNames.includes(hojaPreferida) ? hojaPreferida : workbook.SheetNames[0]
     const hoja = hojaNombre ? workbook.Sheets[hojaNombre] : undefined
     if (!hoja) return null
 

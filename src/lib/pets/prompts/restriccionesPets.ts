@@ -16,6 +16,10 @@ TIPOS DE RESTRICCIONES A INCLUIR (mínimo una por categoría relevante):
 6. Área de trabajo: prohibiciones sobre el espacio físico
 7. Específicas del proyecto: derivadas de los peligros críticos del IPERC
 
+Si se incluye un bloque "IPERC REVISADO" (la matriz ya corregida y aprobada a
+mano por SSOMA), ES LA FUENTE DE VERDAD — basá las restricciones en ESE
+contenido, no en "PELIGROS CRÍTICOS DEL IPERC" (que puede estar desactualizado).
+
 FORMATO DE CADA RESTRICCIÓN:
 - Texto corto, entre 8 y 20 palabras.
 - Inicio con "PROHIBIDO", "NO SE PERMITE", "ESTÁ PROHIBIDO", o redacción imperativa negativa.
@@ -42,6 +46,7 @@ export function buildRestriccionesUserPrompt(params: {
     factorRiesgo: string
   }>
   etapasTitulos: string[]
+  ipercRevisadoTexto?: string
 }): string {
   const peligrosList = params.peligrosCriticos
     .slice(0, 10)
@@ -59,6 +64,9 @@ ${params.etapasTitulos.map((t) => `  - ${t}`).join('\n')}
 
 PELIGROS CRÍTICOS DEL IPERC:
 ${peligrosList || '  (no especificados)'}
+
+IPERC REVISADO (V2 — ES LA FUENTE DE VERDAD si está presente):
+${params.ipercRevisadoTexto || '(no hay una versión revisada subida — usá los peligros críticos de arriba como única fuente)'}
 
 Generá las restricciones generales que aplican a todo el PETS de este proyecto.
 `.trim()

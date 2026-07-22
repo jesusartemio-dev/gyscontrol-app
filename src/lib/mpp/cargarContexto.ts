@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { obtenerIpercParaContexto } from '@/lib/iperc/obtenerIpercParaContexto'
 import { PUESTOS_MPP } from './catalogos/puestos'
 
 interface ResumenPeligrosPorPuesto {
@@ -20,6 +21,8 @@ export interface ContextoMpp {
     resumenPorPuesto: ResumenPeligrosPorPuesto[]
     factoresGlobales: string[]
     peligrosCriticosAltos: string[]
+    /** Matriz IPERC V2 revisada (CSV) si hay una versión subida vigente — ver obtenerIpercParaContexto.ts. '' si no hay. */
+    revisadoTexto: string
   }
   catalogoCount: number
   defaultsActuales: Record<string, string[]>
@@ -110,6 +113,11 @@ export async function cargarContextoMpp(proyectoId: string): Promise<ContextoMpp
     defaultsActuales[epp.nombre] = epp.asignacionesDefault as string[]
   }
 
+  // Matriz IPERC V2 revisada (si existe) — contexto autoritativo adicional;
+  // el esqueleto (peligros por puesto, arriba) sigue viniendo de IpercFila.
+  // Nunca bloquea: '' si no hay nada que ofrecer.
+  const revisadoTexto = await obtenerIpercParaContexto(proyectoId)
+
   return {
     proyecto: {
       id: proyecto.id,
@@ -121,6 +129,7 @@ export async function cargarContextoMpp(proyectoId: string): Promise<ContextoMpp
       resumenPorPuesto,
       factoresGlobales,
       peligrosCriticosAltos: peligrosCriticosUnicos,
+      revisadoTexto,
     },
     catalogoCount: catalogo.length,
     defaultsActuales,

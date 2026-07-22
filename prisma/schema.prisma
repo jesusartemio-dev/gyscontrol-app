@@ -2150,6 +2150,8 @@ model User {
   planTrabajoGeneraciones                  PlanTrabajoGeneracion[]
   planTrabajoImagenes                      PlanTrabajoImagen[]
   ipercVersionesArchivoSubidas              IpercVersionArchivo[]
+  petsVersionesArchivoSubidas               PetsVersionArchivo[]
+  mppVersionesArchivoSubidas                MppVersionArchivo[]
   catalogoImagenesCreadas                  CatalogoImagen[]
   proyectoCronogramaGeneracionesIA         ProyectoCronogramaGeneracionIA[]
   cronogramaIATareaDecisiones              CronogramaIATareaDecision[]
@@ -6255,13 +6257,42 @@ model Mpp {
 
   estado String @default("borrador") // borrador | revisado | aprobado
 
-  items        MppItem[]
-  generaciones MppGeneracion[]
+  items          MppItem[]
+  generaciones   MppGeneracion[]
+  versionArchivo MppVersionArchivo[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("mpp")
+}
+
+/// Versión del archivo MPP (XLSX) revisada/aprobada a mano fuera de la app y
+/// subida de vuelta como la oficial vigente — análogo a IpercVersionArchivo,
+/// sin nada de IA. Se ve en la app vía version-revisada/route.ts (SheetJS →
+/// HTML, hoja 'MATRIZ EPPs', igual criterio que el IPERC).
+model MppVersionArchivo {
+  id    String @id @default(cuid())
+  mppId String
+  mpp   Mpp    @relation(fields: [mppId], references: [id], onDelete: Cascade)
+
+  driveFileId   String
+  webViewLink   String
+  driveFolderId String?
+  archivoNombre String
+  tamanioBytes  Int
+
+  numeroRevision String
+  /// Siempre 'IMPORTADO' hoy — mismo campo que IpercVersionArchivo.origen.
+  origen  String  @default("IMPORTADO")
+  vigente Boolean @default(true)
+
+  subidoPorId String
+  subidoPor   User     @relation(fields: [subidoPorId], references: [id])
+  subidoEn    DateTime @default(now())
+
+  @@index([mppId, subidoEn(sort: Desc)])
+  @@map("mpp_version_archivo")
 }
 
 model MppItem {
@@ -6337,8 +6368,38 @@ model Pets {
 
   estado String? @default("borrador")
 
+  versionArchivo PetsVersionArchivo[]
+
   @@index([proyectoId])
   @@map("pets")
+}
+
+/// Versión del archivo PETS (DOCX) revisada/aprobada a mano fuera de la app y
+/// subida de vuelta como la oficial vigente — análogo a IpercVersionArchivo,
+/// sin nada de IA. Se ve en la app vía version-revisada/route.ts (mammoth →
+/// HTML, igual que el Plan de Trabajo — acá el artefacto es DOCX, no XLSX).
+model PetsVersionArchivo {
+  id     String @id @default(cuid())
+  petsId String
+  pets   Pets   @relation(fields: [petsId], references: [id], onDelete: Cascade)
+
+  driveFileId   String
+  webViewLink   String
+  driveFolderId String?
+  archivoNombre String
+  tamanioBytes  Int
+
+  numeroRevision String
+  /// Siempre 'IMPORTADO' hoy — mismo campo que IpercVersionArchivo.origen.
+  origen  String  @default("IMPORTADO")
+  vigente Boolean @default(true)
+
+  subidoPorId String
+  subidoPor   User     @relation(fields: [subidoPorId], references: [id])
+  subidoEn    DateTime @default(now())
+
+  @@index([petsId, subidoEn(sort: Desc)])
+  @@map("pets_version_archivo")
 }
 
 // ============================================================

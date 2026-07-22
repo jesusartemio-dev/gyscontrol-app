@@ -192,9 +192,10 @@ async function generarIndice(
 
   const userPrompt = buildIndiceUserPrompt({
     proyectoNombre: ctx.proyecto.nombre,
-    alcance: ctx.plan?.alcanceGeneral ?? '',
+    alcance: ctx.plan?.alcanceDetalladoTexto || ctx.plan?.alcanceGeneral || '',
     actividadesIperc,
     puestosDisponibles,
+    ipercRevisadoTexto: ctx.iperc?.revisadoTexto || '',
   })
 
   const resp = await (anthropic.messages.create as any)({
@@ -254,6 +255,8 @@ async function generarEtapa(
     controlesAdministrativos: actividadesRelevantes.flatMap(a => a.controlesAdministrativos),
     eppDisponibles: ctx.mpp?.eppPorCategoria ?? { basico: [], bioseguridad: [], especifico: [] },
     referenciasClienteDisponibles: ctx.iperc?.referenciasCliente ?? [],
+    alcanceTexto: ctx.plan?.alcanceDetalladoTexto || ctx.plan?.alcanceGeneral || '',
+    mppRevisadoTexto: ctx.mpp?.revisadoTexto || '',
   })
 
   const resp = await (anthropic.messages.create as any)({
@@ -368,9 +371,10 @@ async function generarRestricciones(
 
   const userPrompt = buildRestriccionesUserPrompt({
     proyectoNombre: ctx.proyecto.nombre,
-    alcance: ctx.plan?.alcanceGeneral ?? '',
+    alcance: ctx.plan?.alcanceDetalladoTexto || ctx.plan?.alcanceGeneral || '',
     peligrosCriticos,
     etapasTitulos,
+    ipercRevisadoTexto: ctx.iperc?.revisadoTexto || '',
   })
 
   const resp = await (anthropic.messages.create as any)({

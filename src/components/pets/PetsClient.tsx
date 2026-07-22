@@ -1,15 +1,17 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { Loader2, Plus, Brain, Download, RefreshCw, Pencil, Check } from 'lucide-react'
+import { Loader2, Plus, Brain, Download, RefreshCw, Pencil, Check, Upload } from 'lucide-react'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { petsContenidoSchema } from '@/lib/validators/pets'
 import type { PetsContenido } from '@/lib/validators/pets'
 import { PetsViewer } from './PetsViewer'
 import { PetsGenerator } from './PetsGenerator'
 import { PetsEditorPanel } from './PetsEditorPanel'
 import { PasoEditorModal } from './PasoEditorModal'
+import { VersionRevisadaPets } from './VersionRevisadaPets'
 import { useRegenerarPetsSSE } from './useRegenerarPetsSSE'
 
 interface PetsRecord {
@@ -40,6 +42,13 @@ export function PetsClient({ proyectoId }: Props) {
   } | null>(null)
   const [agregarPasoEn, setAgregarPasoEn] = useState<number | null>(null)
 
+  // Versión revisada (subir + ver) state
+  const [subiendoVersion, setSubiendoVersion] = useState(false)
+  const [tieneVersionRevisada, setTieneVersionRevisada] = useState(false)
+  const [vistaPets, setVistaPets] = useState<'estructurada' | 'revisada'>('estructurada')
+  const vistaInicializadaRef = useRef(false)
+  const inputVersionRef = useRef<HTMLInputElement>(null)
+
   const { estado: estadoRegen, regenerarEtapa, regenerarPaso } = useRegenerarPetsSSE(proyectoId)
 
   const cargarPets = useCallback(async () => {
@@ -67,6 +76,27 @@ export function PetsClient({ proyectoId }: Props) {
   useEffect(() => {
     cargarPets()
   }, [cargarPets])
+
+  // Detecta si hay una versión revisada vigente — default automático a esa
+  // pestaña la PRIMERA vez que se detecta una (no forzar de nuevo si el
+  // usuario vuelve manualmente a la vista estructurada).
+  useEffect(() => {
+    if (!pets) return
+    let cancelado = false
+    fetch(`/api/proyectos/${proyectoId}/pets/version-revisada`)
+      .then(res => (res.ok ? res.json() : { data: null }))
+      .then(({ data }) => {
+        if (cancelado) return
+        const hay = !!data
+        setTieneVersionRevisada(hay)
+        if (!vistaInicializadaRef.current) {
+          if (hay) setVistaPets('revisada')
+          vistaInicializadaRef.current = true
+        }
+      })
+      .catch(() => {})
+    return () => { cancelado = true }
+  }, [proyectoId, pets?.id])
 
   const crearPets = async () => {
     setLoadingCreate(true)
@@ -106,6 +136,36 @@ export function PetsClient({ proyectoId }: Props) {
       toast.error(e instanceof Error ? e.message : 'Error al exportar DOCX')
     } finally {
       setMode('idle')
+    }
+  }
+
+  const handleSubirVersion = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const file = files[0]
+    if (!file.name.toLowerCase().endsWith('.docx')) {
+      toast.error('Solo se admiten archivos .docx')
+      return
+    }
+    setSubiendoVersion(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch(`/api/proyectos/${proyectoId}/pets/subir-version`, {
+        method: 'POST',
+        body: formData,
+      })
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}))
+        throw new Error(e.error ?? 'Error al subir la versión')
+      }
+      toast.success('Versión revisada subida')
+      setTieneVersionRevisada(true)
+      setVistaPets('revisada')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al subir la versión')
+    } finally {
+      setSubiendoVersion(false)
+      if (inputVersionRef.current) inputVersionRef.current.value = ''
     }
   }
 
@@ -197,6 +257,29 @@ export function PetsClient({ proyectoId }: Props) {
 
   const regenActivo = estadoRegen.activo
 
+  // Editor o viewer — vive en una const para no duplicar el JSX entre la
+  // vista con pestañas (cuando hay una versión revisada vigente) y sin ellas.
+  const contenidoEstructuradoPets = modoEdicion ? (
+    <PetsEditorPanel
+      contenido={contenido}
+      onGuardar={guardarContenido}
+      onEditarPaso={(eIdx, pIdx) => {
+        if (regenActivo) return
+        setPasoEditando({ etapaIdx: eIdx, pasoIdx: pIdx })
+      }}
+      onAgregarPaso={(eIdx) => {
+        if (regenActivo) return
+        setAgregarPasoEn(eIdx)
+      }}
+      saving={saving}
+      estadoRegen={estadoRegen}
+      onRegenerarEtapa={(etapaIdx) => regenerarEtapa(etapaIdx, cargarPets)}
+      onRegenerarPaso={(etapaIdx, pasoIdx) => regenerarPaso(etapaIdx, pasoIdx, cargarPets)}
+    />
+  ) : (
+    <PetsViewer contenido={contenido} />
+  )
+
   // Has contenido — show viewer or editor + actions
   return (
     <div className="space-y-4">
@@ -249,28 +332,44 @@ export function PetsClient({ proyectoId }: Props) {
             )}
             Exportar DOCX
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => inputVersionRef.current?.click()}
+            disabled={subiendoVersion}
+          >
+            {subiendoVersion ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <Upload className="h-4 w-4 mr-1.5" />
+            )}
+            {subiendoVersion ? 'Subiendo…' : 'Subir versión revisada'}
+          </Button>
+          <input
+            ref={inputVersionRef}
+            type="file"
+            accept=".docx"
+            className="hidden"
+            onChange={e => handleSubirVersion(e.target.files)}
+          />
         </div>
       </div>
 
-      {modoEdicion ? (
-        <PetsEditorPanel
-          contenido={contenido}
-          onGuardar={guardarContenido}
-          onEditarPaso={(eIdx, pIdx) => {
-            if (regenActivo) return
-            setPasoEditando({ etapaIdx: eIdx, pasoIdx: pIdx })
-          }}
-          onAgregarPaso={(eIdx) => {
-            if (regenActivo) return
-            setAgregarPasoEn(eIdx)
-          }}
-          saving={saving}
-          estadoRegen={estadoRegen}
-          onRegenerarEtapa={(etapaIdx) => regenerarEtapa(etapaIdx, cargarPets)}
-          onRegenerarPaso={(etapaIdx, pasoIdx) => regenerarPaso(etapaIdx, pasoIdx, cargarPets)}
-        />
+      {tieneVersionRevisada ? (
+        <Tabs value={vistaPets} onValueChange={(v) => setVistaPets(v as 'estructurada' | 'revisada')}>
+          <TabsList>
+            <TabsTrigger value="estructurada">Vista estructurada (app)</TabsTrigger>
+            <TabsTrigger value="revisada">Versión revisada</TabsTrigger>
+          </TabsList>
+          <TabsContent value="estructurada" className="mt-2">
+            {contenidoEstructuradoPets}
+          </TabsContent>
+          <TabsContent value="revisada" className="mt-2">
+            <VersionRevisadaPets proyectoId={proyectoId} />
+          </TabsContent>
+        </Tabs>
       ) : (
-        <PetsViewer contenido={contenido} />
+        contenidoEstructuradoPets
       )}
 
       {pasoEditando && (

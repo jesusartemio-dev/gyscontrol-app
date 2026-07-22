@@ -27,6 +27,12 @@ REGLAS:
   alcance del proyecto.
 - Los pasos deben cubrir TODOS los peligros críticos identificados en el IPERC.
 - Los roles "quien" deben venir de la lista de puestos del proyecto (no inventes).
+- Si se incluye un bloque "IPERC REVISADO" (la matriz ya corregida y aprobada
+  a mano por SSOMA), ES LA FUENTE DE VERDAD sobre peligros/controles — basá tu
+  análisis en ESE contenido, no en "ACTIVIDADES DEL IPERC (agrupadas)" (que
+  puede estar desactualizado). La lista agrupada solo te sirve para no
+  olvidarte de cubrir ninguna actividad — la estructura/cobertura viene de ahí,
+  el contenido de peligros viene del revisado cuando está presente.
 
 OUTPUT: JSON puro, sin markdown, sin comentarios, con este shape exacto:
 
@@ -50,6 +56,7 @@ export function buildIndiceUserPrompt(params: {
   alcance: string
   actividadesIperc: Array<{ actividadKey: string; tareas: string[]; puestos: string[] }>
   puestosDisponibles: string[]
+  ipercRevisadoTexto?: string
 }): string {
   return `
 PROYECTO: ${params.proyectoNombre}
@@ -64,6 +71,9 @@ ${params.actividadesIperc
       `- ${a.actividadKey}\n  Tareas: ${a.tareas.join('; ')}\n  Puestos: ${a.puestos.join(', ')}`
   )
   .join('\n')}
+
+IPERC REVISADO (V2 — ES LA FUENTE DE VERDAD si está presente; la lista de arriba solo da la cobertura de actividades):
+${params.ipercRevisadoTexto || '(no hay una versión revisada subida — usá la lista agrupada de arriba como única fuente)'}
 
 PUESTOS DISPONIBLES EN EL PROYECTO:
 ${params.puestosDisponibles.map((p) => `- ${p}`).join('\n') || '- Supervisor de Proyecto\n- Ing. de Seguridad'}

@@ -43,6 +43,12 @@ ${contexto.iperc.resumenPorPuesto
   .join('\n')}
 
 ═══════════════════════════════════════════════════════════════════
+IPERC REVISADO (V2 — esta es LA FUENTE DE VERDAD si está presente)
+═══════════════════════════════════════════════════════════════════
+
+${contexto.iperc.revisadoTexto || '(no hay una versión revisada subida — usá el resumen por puesto de arriba como única fuente)'}
+
+═══════════════════════════════════════════════════════════════════
 ASIGNACIONES DEFAULT DEL CATÁLOGO MPP (${contexto.catalogoCount} EPPs estándar GYS)
 ═══════════════════════════════════════════════════════════════════
 
@@ -59,6 +65,12 @@ TU TAREA
 
 Analizá si las asignaciones por defecto son adecuadas para los peligros reales.
 Propone solo los AJUSTES NECESARIOS (no repitas asignaciones que ya están bien).
+
+Si está presente el "IPERC REVISADO (V2)": es la fuente de verdad — fue
+corregido y aprobado a mano por SSOMA. Basá tu análisis en ESE contenido, no
+en el resumen por puesto (que puede estar desactualizado si el IPERC cambió
+después de generarse). El resumen por puesto solo te sirve de estructura/
+referencia si no hay V2.
 
 Criterios:
 - Si hay peligro ELÉCTRICO de severidad ≥3 → asegurate de que los puestos

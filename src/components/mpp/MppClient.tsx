@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Download, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Download, Loader2, Plus, RefreshCw, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { CabeceraMpp } from './CabeceraMpp'
 import { BotonGenerarIaMpp } from './BotonGenerarIaMpp'
 import { PreRequisitosPanelMpp } from './PreRequisitosPanelMpp'
 import { TablaAsignacionesMpp } from './TablaAsignacionesMpp'
+import { VersionRevisadaMpp } from './VersionRevisadaMpp'
 import { useProyectoContext } from '@/app/proyectos/[id]/ProyectoContext'
 
 type Evaluador = { nombre: string; cargo: string }
@@ -75,6 +77,13 @@ export default function MppClient({ proyectoId }: Props) {
   const abortRef = useRef<AbortController | null>(null)
   const [descargando, setDescargando] = useState(false)
 
+  // Versión revisada (subir + ver) state
+  const [subiendoVersion, setSubiendoVersion] = useState(false)
+  const [tieneVersionRevisada, setTieneVersionRevisada] = useState(false)
+  const [vistaMpp, setVistaMpp] = useState<'estructurada' | 'revisada'>('estructurada')
+  const vistaInicializadaRef = useRef(false)
+  const inputVersionRef = useRef<HTMLInputElement>(null)
+
   const preRequisitosOk = Boolean(contexto?.ipercExiste && contexto?.ipercTieneFilas)
 
   const fetchAll = useCallback(async () => {
@@ -99,6 +108,27 @@ export default function MppClient({ proyectoId }: Props) {
   useEffect(() => {
     fetchAll()
   }, [fetchAll])
+
+  // Detecta si hay una versión revisada vigente — default automático a esa
+  // pestaña la PRIMERA vez que se detecta una (no forzar de nuevo si el
+  // usuario vuelve manualmente a la vista estructurada).
+  useEffect(() => {
+    if (!mpp) return
+    let cancelado = false
+    fetch(`/api/proyectos/${proyectoId}/mpp/version-revisada`)
+      .then(res => (res.ok ? res.json() : { data: null }))
+      .then(({ data }) => {
+        if (cancelado) return
+        const hay = !!data
+        setTieneVersionRevisada(hay)
+        if (!vistaInicializadaRef.current) {
+          if (hay) setVistaMpp('revisada')
+          vistaInicializadaRef.current = true
+        }
+      })
+      .catch(() => {})
+    return () => { cancelado = true }
+  }, [proyectoId, mpp?.id])
 
   const handleCrearMpp = async () => {
     if (!proyecto) return
@@ -262,6 +292,36 @@ export default function MppClient({ proyectoId }: Props) {
     }
   }
 
+  const handleSubirVersion = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const file = files[0]
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      toast.error('Solo se admiten archivos .xlsx')
+      return
+    }
+    setSubiendoVersion(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch(`/api/proyectos/${proyectoId}/mpp/subir-version`, {
+        method: 'POST',
+        body: formData,
+      })
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}))
+        throw new Error(e.error ?? 'Error al subir la versión')
+      }
+      toast.success('Versión revisada subida')
+      setTieneVersionRevisada(true)
+      setVistaMpp('revisada')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Error al subir la versión')
+    } finally {
+      setSubiendoVersion(false)
+      if (inputVersionRef.current) inputVersionRef.current.value = ''
+    }
+  }
+
   const handleItemsChange = (newItems: MppItem[]) => {
     setMpp(prev => prev ? { ...prev, items: newItems } : prev)
   }
@@ -291,6 +351,15 @@ export default function MppClient({ proyectoId }: Props) {
       </div>
     )
   }
+
+  const tablaAsignaciones = mpp && (
+    <TablaAsignacionesMpp
+      proyectoId={proyectoId}
+      items={mpp.items}
+      disabled={generando}
+      onItemsChange={handleItemsChange}
+    />
+  )
 
   return (
     <div className="space-y-4 pb-8">
@@ -366,14 +435,43 @@ export default function MppClient({ proyectoId }: Props) {
                 : <Download className="h-4 w-4 mr-1" />}
               {descargando ? 'Generando Excel…' : 'Exportar Excel'}
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              onClick={() => inputVersionRef.current?.click()}
+              disabled={subiendoVersion}
+            >
+              {subiendoVersion
+                ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                : <Upload className="h-4 w-4 mr-1" />}
+              {subiendoVersion ? 'Subiendo…' : 'Subir versión revisada'}
+            </Button>
+            <input
+              ref={inputVersionRef}
+              type="file"
+              accept=".xlsx"
+              className="hidden"
+              onChange={e => handleSubirVersion(e.target.files)}
+            />
           </div>
 
-          <TablaAsignacionesMpp
-            proyectoId={proyectoId}
-            items={mpp.items}
-            disabled={generando}
-            onItemsChange={handleItemsChange}
-          />
+          {tieneVersionRevisada ? (
+            <Tabs value={vistaMpp} onValueChange={(v) => setVistaMpp(v as 'estructurada' | 'revisada')}>
+              <TabsList>
+                <TabsTrigger value="estructurada">Vista estructurada (app)</TabsTrigger>
+                <TabsTrigger value="revisada">Versión revisada</TabsTrigger>
+              </TabsList>
+              <TabsContent value="estructurada" className="mt-2">
+                {tablaAsignaciones}
+              </TabsContent>
+              <TabsContent value="revisada" className="mt-2">
+                <VersionRevisadaMpp proyectoId={proyectoId} />
+              </TabsContent>
+            </Tabs>
+          ) : (
+            tablaAsignaciones
+          )}
         </>
       )}
     </div>

@@ -35,6 +35,15 @@ REGLAS DE REDACCIÓN:
 - Los EPPs deben mencionarse cuando el paso los requiera específicamente.
 - Las referencias al cliente (códigos como XX-YY-ZZZ) deben usar tipo "referencia".
 - NO inventar códigos de documentos que no estén en las referencias disponibles.
+- Si se incluye "MÉTODO DE TRABAJO (Plan de Trabajo revisado)": es la
+  descripción REAL de cómo se ejecuta el trabajo (equipos, certificaciones,
+  condiciones de seguridad ya usadas en campo) — usala para redactar un "cómo"
+  fiel al método real, no genérico. Mencioná explícitamente los equipos/
+  certificaciones que nombre (ej. "andamio certificado de 2 cuerpos", "soldadura
+  SMAW") cuando correspondan al paso.
+- Si se incluye "MPP REVISADA (V2)": ES LA FUENTE DE VERDAD sobre qué EPP usar
+  por puesto — priorizala sobre "EPP DISPONIBLES" (que puede estar
+  desactualizado) al decidir qué EPP mencionar en cada paso.
 
 CAMPO "quien": mantener exactamente los roles dados en el input (no modificar).
 
@@ -70,6 +79,8 @@ export function buildRellenarEtapaUserPrompt(params: {
     especifico: string[]
   }
   referenciasClienteDisponibles: Array<{ codigo: string; descripcion: string }>
+  alcanceTexto?: string
+  mppRevisadoTexto?: string
 }): string {
   const pasosList = params.pasos
     .map((p, i) => `  ${i + 1}. ${p.que}\n     Quién: ${p.quien.join(', ')}`)
@@ -104,6 +115,9 @@ ETAPA ${params.etapaLetra}: ${params.etapaTitulo}
 PASOS A DESARROLLAR:
 ${pasosList}
 
+MÉTODO DE TRABAJO (Plan de Trabajo revisado):
+${params.alcanceTexto || '(no especificado)'}
+
 PELIGROS RELEVANTES DEL IPERC:
 ${peligrosList || '  (sin peligros específicos identificados)'}
 
@@ -115,6 +129,9 @@ ${params.controlesAdministrativos.slice(0, 8).map((c) => `  • ${c}`).join('\n'
 
 EPP DISPONIBLES:
 ${eppList || '  (no especificado)'}
+
+MPP REVISADA (V2 — ES LA FUENTE DE VERDAD de EPP si está presente):
+${params.mppRevisadoTexto || '(no hay una versión revisada subida — usá el EPP DISPONIBLES de arriba como única fuente)'}
 
 REFERENCIAS DE DOCUMENTOS DEL CLIENTE:
 ${refList || '  (ninguna)'}

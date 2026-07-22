@@ -1,5 +1,8 @@
 import { normalizeStr } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
+import { obtenerAlcanceParaContexto } from '@/lib/planTrabajo/obtenerAlcanceParaContexto'
+import { obtenerIpercParaContexto } from '@/lib/iperc/obtenerIpercParaContexto'
+import { obtenerMppParaContexto } from '@/lib/mpp/obtenerMppParaContexto'
 import type { IpercFila, Pets } from '@prisma/client'
 
 // ─── Tipos exportados ────────────────────────────────────────────────────────
@@ -36,11 +39,15 @@ export type ContextoPets = {
   plan: {
     objetivo: string | null
     alcanceGeneral: string | null
+    /** Alcance rico del Plan de Trabajo — V2 revisado si existe, si no el `alcanceDetallado` estructurado. Ver obtenerAlcanceParaContexto.ts. '' si no hay nada. */
+    alcanceDetalladoTexto: string
   } | null
   iperc: {
     codigoDocumento: string
     actividadesAgrupadas: ActividadIpercAgrupada[]
     referenciasCliente: ReferenciaCliente[]
+    /** Matriz IPERC V2 revisada (CSV) si hay una versión subida vigente — ver obtenerIpercParaContexto.ts. '' si no hay. */
+    revisadoTexto: string
   } | null
   mpp: {
     codigoDocumento: string
@@ -50,6 +57,8 @@ export type ContextoPets = {
       especifico: string[]
     }
     puestos: string[]
+    /** MPP V2 revisada (CSV) si hay una versión subida vigente — ver obtenerMppParaContexto.ts. '' si no hay. */
+    revisadoTexto: string
   } | null
 }
 
@@ -187,7 +196,7 @@ function categorizarEpp(item: MppItemForCategoria): 'basico' | 'bioseguridad' | 
 // ─── Función principal ────────────────────────────────────────────────────────
 
 export async function cargarContextoPets(proyectoId: string): Promise<ContextoPets | null> {
-  const [proyecto, pets, plan, iperc, mpp] = await Promise.all([
+  const [proyecto, pets, plan, iperc, mpp, alcanceDetalladoTexto, ipercRevisadoTexto, mppRevisadoTexto] = await Promise.all([
     prisma.proyecto.findUnique({
       where: { id: proyectoId },
       select: {
@@ -219,6 +228,13 @@ export async function cargarContextoPets(proyectoId: string): Promise<ContextoPe
         },
       },
     }),
+    // Alcance rico del Plan de Trabajo (V2 revisado si existe), matriz IPERC
+    // V2 revisada y MPP V2 revisada (si existen) — contexto autoritativo
+    // adicional; el esqueleto (qué cubrir) sigue viniendo de iperc.filas/
+    // mpp.items arriba. Nunca bloquean: devuelven '' si no hay nada.
+    obtenerAlcanceParaContexto(proyectoId),
+    obtenerIpercParaContexto(proyectoId),
+    obtenerMppParaContexto(proyectoId),
   ])
 
   if (!proyecto || !pets) return null
@@ -228,6 +244,7 @@ export async function cargarContextoPets(proyectoId: string): Promise<ContextoPe
         codigoDocumento: iperc.codigoDocumento,
         actividadesAgrupadas: agruparPorActividad(iperc.filas),
         referenciasCliente: extraerReferenciasCliente(iperc.filas),
+        revisadoTexto: ipercRevisadoTexto,
       }
     : null
 
@@ -258,6 +275,7 @@ export async function cargarContextoPets(proyectoId: string): Promise<ContextoPe
           codigoDocumento: mpp.codigoDocumento,
           eppPorCategoria: categorias,
           puestos: Array.from(puestosSet),
+          revisadoTexto: mppRevisadoTexto,
         }
       })()
     : null
@@ -271,7 +289,7 @@ export async function cargarContextoPets(proyectoId: string): Promise<ContextoPe
       cliente: proyecto.cliente,
     },
     pets,
-    plan: plan ? { objetivo: plan.objetivo, alcanceGeneral: plan.alcanceGeneral } : null,
+    plan: plan ? { objetivo: plan.objetivo, alcanceGeneral: plan.alcanceGeneral, alcanceDetalladoTexto } : null,
     iperc: ipercCtx,
     mpp: mppCtx,
   }

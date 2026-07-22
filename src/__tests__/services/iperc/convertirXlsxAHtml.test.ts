@@ -58,6 +58,26 @@ describe('convertirXlsxAHtml', () => {
     expect(html).not.toMatch(/id="sjs-/)
   })
 
+  it('acepta un nombre de hoja preferida distinto (ej. "MATRIZ EPPs" para la MPP)', () => {
+    const buffer = construirXlsxDePrueba({
+      IPERC: [['no debería aparecer']],
+      'MATRIZ EPPs': [['EPP básico', 'Soldador']],
+    })
+
+    const html = convertirXlsxAHtml(buffer, 'MATRIZ EPPs')
+
+    expect(html).toContain('EPP básico')
+    expect(html).not.toContain('no debería aparecer')
+  })
+
+  it('con hoja preferida que no existe, usa la primera hoja del libro (mismo fallback de siempre)', () => {
+    const buffer = construirXlsxDePrueba({ Resumen: [['contenido de la primera hoja']] })
+
+    const html = convertirXlsxAHtml(buffer, 'MATRIZ EPPs')
+
+    expect(html).toContain('contenido de la primera hoja')
+  })
+
   it('un .xlsx corrupto (firma ZIP inválida) no revienta — devuelve null', () => {
     // SheetJS es muy tolerante con texto plano (lo trata como CSV de una
     // celda) — para forzar un error real hace falta imitar un ZIP corrupto.
