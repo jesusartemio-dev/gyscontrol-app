@@ -1,5 +1,4 @@
 import type { ContextoMpp } from '../cargarContexto'
-import { PUESTOS_MPP } from '../catalogos/puestos'
 
 export interface AjusteMpp {
   eppNombre: string
@@ -10,8 +9,9 @@ export interface AjusteMpp {
 
 export function construirPromptAjustes(contexto: ContextoMpp): string {
   return `Sos un experto en seguridad industrial de GYS Control Industrial SAC (Perú).
-Tu tarea es analizar los peligros reales de un proyecto y proponer AJUSTES al MPP
-(Matriz de EPP por Puesto) basándote en los peligros del IPERC.
+Tu tarea es analizar los peligros reales de un proyecto y ASIGNAR el EPP adecuado
+a cada puesto de trabajo del proyecto (Matriz de EPP por Puesto), en base a los
+peligros del IPERC.
 
 ═══════════════════════════════════════════════════════════════════
 DATOS DEL PROYECTO
@@ -49,22 +49,23 @@ IPERC REVISADO (V2 — esta es LA FUENTE DE VERDAD si está presente)
 ${contexto.iperc.revisadoTexto || '(no hay una versión revisada subida — usá el resumen por puesto de arriba como única fuente)'}
 
 ═══════════════════════════════════════════════════════════════════
-ASIGNACIONES DEFAULT DEL CATÁLOGO MPP (${contexto.catalogoCount} EPPs estándar GYS)
+CATÁLOGO DE EPP DISPONIBLES (${contexto.catalogoCount} items)
 ═══════════════════════════════════════════════════════════════════
 
-Este es el MPP base que se aplica por defecto. Analizá si conviene
-AGREGAR o QUITAR EPPs específicos según los peligros reales del proyecto.
+La matriz está VACÍA — no hay asignaciones previas. Elegí, para cada EPP que
+corresponda, a qué puesto(s) asignarlo según los peligros reales del proyecto.
 
-${Object.entries(contexto.defaultsActuales)
-  .map(([epp, puestos]) => `  ${epp}: ${puestos.join(', ')}`)
+${contexto.catalogoEpp
+  .map((e) => `  ${e.nombre} — riesgo: ${e.riesgo} — parte del cuerpo: ${e.parteCuerpo}`)
   .join('\n')}
 
 ═══════════════════════════════════════════════════════════════════
 TU TAREA
 ═══════════════════════════════════════════════════════════════════
 
-Analizá si las asignaciones por defecto son adecuadas para los peligros reales.
-Propone solo los AJUSTES NECESARIOS (no repitas asignaciones que ya están bien).
+Asigná el EPP adecuado a cada uno de los puestos del proyecto según los
+peligros del IPERC. Partís de una matriz vacía: cada asignación que propongas
+es una acción "agregar" (no hay nada que "quitar" todavía).
 
 Si está presente el "IPERC REVISADO (V2)": es la fuente de verdad — fue
 corregido y aprobado a mano por SSOMA. Basá tu análisis en ESE contenido, no
@@ -80,6 +81,8 @@ Criterios:
 - Si hay SOLDADURA → careta de soldar, mandil, mangas y escarpines de cuero.
 - Si hay POLVO/MATERIAL PARTICULADO → respiradores con filtros P100.
 - Si hay RUIDO intenso → orejeras de copa además de tapones.
+- Los EPPs básicos (casco, lentes claros, calzado de seguridad, chaleco) van
+  para TODOS los puestos que estén expuestos a trabajo de campo.
 
 RESPONDÉ EN FORMATO JSON ESTRICTO (sin texto antes ni después):
 
@@ -87,22 +90,24 @@ RESPONDÉ EN FORMATO JSON ESTRICTO (sin texto antes ni después):
   "ajustes": [
     {
       "eppNombre": "Careta de soldar automática",
-      "puesto": "Soldador",
+      "puesto": "${contexto.puestos[0] ?? 'Residente'}",
       "accion": "agregar",
       "razon": "Aparece tarea de soldadura en el IPERC con severidad 3"
     }
   ],
-  "resumen": "Breve descripción de los ajustes propuestos"
+  "resumen": "Breve descripción de las asignaciones propuestas"
 }
 
 REGLAS CRÍTICAS:
 - Los nombres de EPPs DEBEN coincidir EXACTAMENTE con los del catálogo de arriba (case sensitive).
-- Los puestos DEBEN ser EXACTAMENTE uno de estos 10 puestos estándar GYS (sin variaciones):
-${PUESTOS_MPP.map((p) => `  "${p}"`).join('\n')}
-- NO uses puestos del IPERC si no están en la lista de 10 de arriba. Si un puesto del IPERC
-  como "Almacenero" o "Conductor" no está en los 10, mapéalo al más cercano o ignoralo.
-- Genera entre 0 y 30 ajustes. Si no hay nada que cambiar, devolvé "ajustes": [].
-- Sé conservador: solo ajustes claramente justificados por el IPERC.
+- Los puestos DEBEN ser EXACTAMENTE uno de los siguientes cargos del proyecto (sin variaciones):
+${contexto.puestos.map((p) => `  "${p}"`).join('\n')}
+- NO uses puestos del IPERC que no estén en la lista de arriba. Si un puesto del IPERC
+  no está en la lista, mapéalo al cargo más cercano de la lista, o ignoralo.
+- "accion" va a ser casi siempre "agregar" (la matriz parte vacía).
+- Genera todas las asignaciones necesarias — no hay límite artificial, pero sé preciso:
+  solo EPP claramente justificado por los peligros del proyecto para ese puesto.
+- Sé conservador: solo asignaciones claramente justificadas por el IPERC.
 - "razon" en una sola frase corta, en español.
 `
 }

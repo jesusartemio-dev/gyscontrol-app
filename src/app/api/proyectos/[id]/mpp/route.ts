@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { mppCabeceraSchema, mppPatchSchema } from '@/lib/validators/mpp'
 import { validarPreRequisitosMpp } from '@/lib/mpp/validarPreRequisitos'
+import { obtenerPuestosDelOrganigrama } from '@/lib/mpp/obtenerPuestosDelOrganigrama'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -53,7 +54,9 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 // POST /api/proyectos/[id]/mpp
-// Crea el MPP y pre-popula MppItems desde el catálogo con asignaciones default
+// Crea el MPP: columnas (puestos) desde el organigrama del proyecto,
+// MppItems pre-populados desde el catálogo con asignaciones VACÍAS —
+// se llenan luego con "Generar con IA" o a mano.
 export async function POST(req: NextRequest, { params }: Ctx) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
@@ -90,22 +93,22 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     orderBy: { orden: 'asc' },
   })
 
+  const puestos = await obtenerPuestosDelOrganigrama(proyectoId)
+
   const mpp = await prisma.mpp.create({
     data: {
       proyectoId,
       ...rest,
       area: rest.area ?? proyecto?.nombre ?? '',
+      puestos,
       ...(fechaElaboracion !== undefined && { fechaElaboracion }),
       ...(fechaActualizacion !== undefined && { fechaActualizacion }),
       items: {
-        create: catalogos.map((cat) => {
-          const puestos = cat.asignacionesDefault as string[]
-          const asignaciones: Record<string, boolean> = {}
-          for (const puesto of puestos) {
-            asignaciones[puesto] = true
-          }
-          return { mppEppCatalogoId: cat.id, asignaciones, orden: cat.orden }
-        }),
+        create: catalogos.map((cat) => ({
+          mppEppCatalogoId: cat.id,
+          asignaciones: {},
+          orden: cat.orden,
+        })),
       },
     },
     include: {

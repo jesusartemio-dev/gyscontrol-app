@@ -6257,6 +6257,13 @@ model Mpp {
 
   estado String @default("borrador") // borrador | revisado | aprobado
 
+  /// Snapshot de los puestos (columnas) al crear/regenerar, derivados del
+  /// organigrama del proyecto (SSOMA + subárbol de Residente) — ver
+  /// obtenerPuestosDelOrganigrama.ts. Congela las columnas para que las keys
+  /// de MppItem.asignaciones no se desalineen si el organigrama cambia
+  /// después. Vacío (MPPs pre-migración) => fallback a PUESTOS_MPP.
+  puestos String[] @default([])
+
   items          MppItem[]
   generaciones   MppGeneracion[]
   versionArchivo MppVersionArchivo[]

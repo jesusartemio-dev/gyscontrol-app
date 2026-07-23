@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { obtenerIpercParaContexto } from '@/lib/iperc/obtenerIpercParaContexto'
-import { PUESTOS_MPP } from './catalogos/puestos'
+import { obtenerPuestosDelOrganigrama } from './obtenerPuestosDelOrganigrama'
 
 interface ResumenPeligrosPorPuesto {
   puesto: string
@@ -25,7 +25,9 @@ export interface ContextoMpp {
     revisadoTexto: string
   }
   catalogoCount: number
-  defaultsActuales: Record<string, string[]>
+  catalogoEpp: Array<{ nombre: string; riesgo: string; parteCuerpo: string }>
+  /** Columnas (cargos) derivadas del organigrama del proyecto — ver obtenerPuestosDelOrganigrama.ts. */
+  puestos: string[]
 }
 
 export async function cargarContextoMpp(proyectoId: string): Promise<ContextoMpp> {
@@ -50,6 +52,8 @@ export async function cargarContextoMpp(proyectoId: string): Promise<ContextoMpp
   if (!proyecto) throw new Error('Proyecto no encontrado')
   if (!proyecto.iperc) throw new Error('Proyecto sin IPERC')
 
+  const puestos = await obtenerPuestosDelOrganigrama(proyectoId)
+
   const filas = proyecto.iperc.filas
 
   const porPuesto = new Map<string, {
@@ -73,9 +77,9 @@ export async function cargarContextoMpp(proyectoId: string): Promise<ContextoMpp
 
   const resumenPorPuesto: ResumenPeligrosPorPuesto[] = []
   for (const [puestoOriginal, data] of porPuesto.entries()) {
-    // Match fuzzy con puestos estándar del catálogo
+    // Match fuzzy con los puestos reales del organigrama (columnas de la MPP)
     const puestoNormalizado =
-      PUESTOS_MPP.find(
+      puestos.find(
         (p) =>
           p.toLowerCase() === puestoOriginal.toLowerCase() ||
           puestoOriginal.toLowerCase().includes(p.toLowerCase().split(' ')[0])
@@ -108,10 +112,11 @@ export async function cargarContextoMpp(proyectoId: string): Promise<ContextoMpp
     where: { activo: true },
     orderBy: { orden: 'asc' },
   })
-  const defaultsActuales: Record<string, string[]> = {}
-  for (const epp of catalogo) {
-    defaultsActuales[epp.nombre] = epp.asignacionesDefault as string[]
-  }
+  const catalogoEpp = catalogo.map((epp) => ({
+    nombre: epp.nombre,
+    riesgo: epp.riesgo,
+    parteCuerpo: epp.parteCuerpo,
+  }))
 
   // Matriz IPERC V2 revisada (si existe) — contexto autoritativo adicional;
   // el esqueleto (peligros por puesto, arriba) sigue viniendo de IpercFila.
@@ -132,6 +137,7 @@ export async function cargarContextoMpp(proyectoId: string): Promise<ContextoMpp
       revisadoTexto,
     },
     catalogoCount: catalogo.length,
-    defaultsActuales,
+    catalogoEpp,
+    puestos,
   }
 }

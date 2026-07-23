@@ -12,6 +12,7 @@ import { PreRequisitosPanelMpp } from './PreRequisitosPanelMpp'
 import { TablaAsignacionesMpp } from './TablaAsignacionesMpp'
 import { VersionRevisadaMpp } from './VersionRevisadaMpp'
 import { useProyectoContext } from '@/app/proyectos/[id]/ProyectoContext'
+import { resolverPuestosMpp } from '@/lib/mpp/catalogos/puestos'
 
 type Evaluador = { nombre: string; cargo: string }
 
@@ -48,6 +49,7 @@ interface Mpp {
   evaluadores: Evaluador[]
   observaciones: string
   estado: 'borrador' | 'revisado' | 'aprobado'
+  puestos: string[]
   items: MppItem[]
 }
 
@@ -146,7 +148,7 @@ export default function MppClient({ proyectoId }: Props) {
       const { mpp: nuevoMpp } = await res.json()
       setMpp(nuevoMpp)
       setContexto(prev => prev ? { ...prev, mppExiste: true } : prev)
-      toast.success('MPP creado con asignaciones por defecto')
+      toast.success('MPP creado. Usá "Generar con IA" para asignar el EPP por puesto.')
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Error al crear MPP')
     }
@@ -356,6 +358,7 @@ export default function MppClient({ proyectoId }: Props) {
     <TablaAsignacionesMpp
       proyectoId={proyectoId}
       items={mpp.items}
+      puestos={resolverPuestosMpp(mpp.puestos)}
       disabled={generando}
       onItemsChange={handleItemsChange}
     />
@@ -405,7 +408,7 @@ export default function MppClient({ proyectoId }: Props) {
           <p className="text-sm text-muted-foreground">No hay MPP creado para este proyecto.</p>
           <Button onClick={handleCrearMpp} size="sm">
             <Plus className="h-4 w-4 mr-2" />
-            Crear MPP (asignaciones por defecto)
+            Crear MPP
           </Button>
         </div>
       )}

@@ -8,18 +8,13 @@ import json
 SHEET_NAME = 'MATRIZ EPPs'
 DATA_START_ROW = 9
 
-PUESTOS_COLS = {
-    'Ing. Supervisor de Proyecto': 8,
-    'Ingeniero de seguridad': 9,
-    'Ing. Programador': 10,
-    'Técnico instrumentista': 11,
-    'Técnico Electrónico': 12,
-    'Sup. De Andamio': 13,
-    'Técnico Andamiero': 14,
-    'Operador de manlift': 15,
-    'Soldador': 16,
-    'Técnico Auxiliar': 17,
-}
+# Encabezados de puesto: fila 8, columnas H-Q (8-17), individuales (no
+# combinadas). La plantilla trae hasta 10 slots — proyectos con más puestos
+# se capan a 10 (ver do_POST). Las columnas sobrantes se blanquean.
+FILA_HEADER_PUESTOS = 8
+COL_PUESTOS_INICIO = 8
+COL_PUESTOS_FIN = 17
+MAX_PUESTOS = COL_PUESTOS_FIN - COL_PUESTOS_INICIO + 1
 
 COL_NUMERO = 2
 COL_NOMBRE = 3
@@ -41,7 +36,26 @@ def reemplazar_placeholders(ws, cabecera: dict):
                 cell.value = nueva
 
 
-def escribir_filas_mpp(ws, items: list):
+def escribir_encabezados_puestos(ws, puestos: list) -> list:
+    """Escribe los cargos del proyecto en la fila 8 (H8:Q8), capado a
+    MAX_PUESTOS. openpyxl solo cambia el .value de la celda — preserva el
+    estilo/rotación ya dibujados en la plantilla. Blanquea las columnas
+    sobrantes (proyectos con menos de 10 puestos). Devuelve la lista
+    [(puesto, columna), ...] efectivamente escrita."""
+    puestos_capados = puestos[:MAX_PUESTOS]
+    columnas = []
+    for i in range(MAX_PUESTOS):
+        col = COL_PUESTOS_INICIO + i
+        if i < len(puestos_capados):
+            ws.cell(FILA_HEADER_PUESTOS, col).value = puestos_capados[i]
+            columnas.append((puestos_capados[i], col))
+        else:
+            ws.cell(FILA_HEADER_PUESTOS, col).value = None
+    return columnas
+
+
+def escribir_filas_mpp(ws, items: list, columnas_puestos: list):
+    columnas_usadas = {col for _, col in columnas_puestos}
     for i, item in enumerate(items):
         r = DATA_START_ROW + i
 
@@ -53,10 +67,11 @@ def escribir_filas_mpp(ws, items: list):
         # Columna 4 (EVIDENCIA) NO se toca — imágenes EPP están ahí
 
         asignaciones = item.get('asignaciones', {})
-        for puesto, col in PUESTOS_COLS.items():
-            if asignaciones.get(puesto) is True:
-                ws.cell(r, col).value = 'X'
-            else:
+        for puesto, col in columnas_puestos:
+            ws.cell(r, col).value = 'X' if asignaciones.get(puesto) is True else None
+        # Blanquear columnas de puestos sobrantes (proyectos con < 10 puestos)
+        for col in range(COL_PUESTOS_INICIO, COL_PUESTOS_FIN + 1):
+            if col not in columnas_usadas:
                 ws.cell(r, col).value = None
 
 
@@ -91,11 +106,19 @@ class handler(BaseHTTPRequestHandler):
             data_bag = json.loads(data_bag_raw.decode('utf-8'))
             cabecera = data_bag.get('cabecera', {})
             items = data_bag.get('items', [])
+            puestos = data_bag.get('puestos', [])
+
+            if len(puestos) > MAX_PUESTOS:
+                print(
+                    f'[mpp.render-xlsx] {len(puestos)} puestos recibidos, '
+                    f'capando a {MAX_PUESTOS} (límite de la plantilla)'
+                )
 
             wb = load_workbook(BytesIO(plantilla_bytes))
             ws = wb[SHEET_NAME]
             reemplazar_placeholders(ws, cabecera)
-            escribir_filas_mpp(ws, items)
+            columnas_puestos = escribir_encabezados_puestos(ws, puestos)
+            escribir_filas_mpp(ws, items, columnas_puestos)
 
             output = BytesIO()
             wb.save(output)

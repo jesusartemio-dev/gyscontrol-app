@@ -1,3 +1,5 @@
+import { resolverPuestosMpp } from './catalogos/puestos'
+
 interface MppEppCatalogo {
   nombre: string
   riesgo: string
@@ -19,6 +21,7 @@ interface MppConItems {
   fechaElaboracion: Date
   fechaActualizacion: Date
   evaluadores: unknown
+  puestos: string[]
   items: MppItemConCatalogo[]
 }
 
@@ -59,6 +62,7 @@ export function construirDataBagMpp(mpp: MppConItems, proyecto: ProyectoInfo) {
       evaluador4: evaluadores[3] ? formatearEvaluador(evaluadores[3]) : '',
       evaluador5: evaluadores[4] ? formatearEvaluador(evaluadores[4]) : '',
     },
+    puestos: resolverPuestosMpp(mpp.puestos),
     items: [...mpp.items]
       .sort((a, b) => a.orden - b.orden)
       .map(it => {

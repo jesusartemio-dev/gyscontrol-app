@@ -2,7 +2,6 @@ import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '@/lib/prisma'
 import { cargarContextoMpp } from './cargarContexto'
 import { construirPromptAjustes, type AjusteMpp } from './prompts/generarAjustesMpp'
-import { PUESTOS_MPP } from './catalogos/puestos'
 import { trackUsage } from '@/lib/agente/usageTracker'
 
 const MODEL_HAIKU = 'claude-haiku-4-5-20251001'
@@ -79,6 +78,12 @@ export async function* generarMppConIa(
     throw error
   }
 
+  if (aiResponse.stop_reason === 'max_tokens') {
+    const mensaje = 'Respuesta IA truncada por exceder el límite de tokens. Reintentá la generación.'
+    yield { type: 'error_ia', mensaje }
+    throw new Error(mensaje)
+  }
+
   const promptTokens = aiResponse.usage.input_tokens
   const outputTokens = aiResponse.usage.output_tokens
 
@@ -113,8 +118,8 @@ export async function* generarMppConIa(
 
   const ajustesPropuestos: AjusteMpp[] = parsed.ajustes ?? []
 
-  // Filtrar ajustes con puestos no estándar antes de aplicarlos
-  const puestosValidos = new Set<string>(PUESTOS_MPP)
+  // Filtrar ajustes con puestos que no son columnas de este proyecto
+  const puestosValidos = new Set<string>(contexto.puestos)
   const ajustesValidos = ajustesPropuestos.filter((ajuste) => {
     if (!puestosValidos.has(ajuste.puesto)) {
       console.warn(`[mpp ia] Puesto inválido "${ajuste.puesto}" en ajuste, ignorado`)
@@ -164,24 +169,18 @@ export async function* generarMppConIa(
         evaluadores: (mppPrevio?.evaluadores as object) ?? EVALUADORES_DEFAULT,
         observaciones: mppPrevio?.observaciones ?? '',
         estado: 'borrador',
+        puestos: contexto.puestos,
       },
     })
 
     for (const epp of catalogo) {
-      const defaults = epp.asignacionesDefault as string[]
-
-      // Inicializar las 10 keys fijas (false por defecto)
+      // Inicializar todas las columnas de este proyecto en false — la matriz
+      // parte vacía, la IA asigna desde cero (no hay defaults del catálogo).
       const asignaciones: Record<string, boolean> = {}
-      for (const puesto of PUESTOS_MPP) {
+      for (const puesto of contexto.puestos) {
         asignaciones[puesto] = false
       }
-      // Activar los defaults válidos
-      for (const puesto of defaults) {
-        if (puestosValidos.has(puesto)) {
-          asignaciones[puesto] = true
-        }
-      }
-      // Aplicar ajustes IA ya filtrados (solo puestos estándar)
+      // Aplicar ajustes IA ya filtrados (solo puestos de este proyecto)
       for (const ajuste of ajustesValidos) {
         if (ajuste.eppNombre === epp.nombre && nombresEppValidos.has(ajuste.eppNombre)) {
           asignaciones[ajuste.puesto] = ajuste.accion === 'agregar'

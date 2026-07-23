@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { PUESTOS_MPP } from '@/lib/mpp/catalogos/puestos'
 
 interface MppEppCatalogo {
   id: string
@@ -30,6 +29,7 @@ interface MppItem {
 interface Props {
   proyectoId: string
   items: MppItem[]
+  puestos: string[]
   disabled?: boolean
   onItemsChange: (items: MppItem[]) => void
 }
@@ -50,7 +50,7 @@ const PARTES_CUERPO = [
   'ACCESORIO',
 ]
 
-export function TablaAsignacionesMpp({ proyectoId, items, disabled, onItemsChange }: Props) {
+export function TablaAsignacionesMpp({ proyectoId, items, puestos, disabled, onItemsChange }: Props) {
   const [filtroParte, setFiltroParte] = useState('Todos')
   const [loadingCell, setLoadingCell] = useState<string | null>(null)
 
@@ -112,12 +112,12 @@ export function TablaAsignacionesMpp({ proyectoId, items, disabled, onItemsChang
 
       <p className="text-xs text-muted-foreground">
         {itemsFiltrados.length} EPPs{filtroParte !== 'Todos' ? ` · ${filtroParte}` : ''}
-        {' · '}{PUESTOS_MPP.length} puestos
+        {' · '}{puestos.length} puestos
       </p>
 
       {/* Tabla */}
       <div className="overflow-x-auto border rounded-lg">
-        <table className="text-xs border-collapse" style={{ minWidth: 920 }}>
+        <table className="text-xs border-collapse" style={{ minWidth: 300 + puestos.length * 44 }}>
           <thead>
             <tr className="bg-gray-50">
               <th className="sticky left-0 z-20 bg-gray-50 border-b border-r px-3 py-2 text-left font-semibold text-gray-700 w-[220px] min-w-[220px]">
@@ -126,7 +126,7 @@ export function TablaAsignacionesMpp({ proyectoId, items, disabled, onItemsChang
               <th className="border-b border-r px-2 py-2 text-left font-semibold text-gray-600 w-[80px] min-w-[80px] text-[11px]">
                 Parte
               </th>
-              {PUESTOS_MPP.map(puesto => (
+              {puestos.map(puesto => (
                 <th
                   key={puesto}
                   className="border-b border-r"
@@ -177,7 +177,7 @@ export function TablaAsignacionesMpp({ proyectoId, items, disabled, onItemsChang
                     <span className="text-[10px] text-muted-foreground leading-tight">{epp.parteCuerpo}</span>
                   </td>
                   {/* Checkboxes */}
-                  {PUESTOS_MPP.map(puesto => {
+                  {puestos.map(puesto => {
                     const checked = Boolean(item.asignaciones[puesto])
                     const cellKey = `${item.id}-${puesto}`
                     const isLoading = loadingCell === cellKey
