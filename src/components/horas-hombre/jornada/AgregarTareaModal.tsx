@@ -182,15 +182,30 @@ export function AgregarTareaModal({
   // Persiste el EDT elegido en la jornada de inmediato (no depende de llegar a
   // enviar una tarea): así, si el usuario tiene que elegirlo manualmente porque
   // la auto-selección falló, queda guardado igual.
+  // El backend solo permite fijar el EDT una vez (rechaza si la jornada ya
+  // tiene uno) — si esto falla, la selección local queda desincronizada del
+  // EDT realmente guardado, así que hay que revertirla y avisar en vez de
+  // dejar que el usuario siga eligiendo tareas de un EDT que nunca se va a
+  // guardar.
   const persistirEdt = async (edtId: string) => {
     try {
-      await fetch(`/api/horas-hombre/jornada/${jornadaId}`, {
+      const response = await fetch(`/api/horas-hombre/jornada/${jornadaId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ proyectoEdtId: edtId })
       })
+      if (!response.ok) {
+        const data = await response.json().catch(() => null)
+        setEdtLocal('')
+        toast({
+          variant: 'destructive',
+          title: 'No se pudo fijar el EDT',
+          description: data?.error || 'Esta jornada ya tiene un EDT asignado distinto.'
+        })
+      }
     } catch (error) {
       console.error('Error guardando EDT en la jornada:', error)
+      setEdtLocal('')
     }
   }
 
@@ -223,8 +238,13 @@ export function AgregarTareaModal({
         return
       }
       // Preseleccionar el EDT de Construcción ("CON…") si existe, como el manual.
+      // Solo se marca en el formulario (sin persistir todavía): la jornada solo
+      // admite fijar el EDT una vez, así que persistir esta suposición antes de
+      // que el usuario confirme le impediría luego elegir un EDT distinto (p.
+      // ej. CMM) — toda tarea que envíe sería rechazada por no coincidir con el
+      // EDT ya guardado.
       const con = unicos.find((e) => e.edt?.nombre?.toUpperCase().startsWith('CON'))
-      if (con) seleccionarEdtLocal(con.id)
+      if (con) setEdtLocal(con.id)
     } catch (error) {
       console.error('Error cargando EDTs:', error)
       setErrorEdts('No se pudo cargar la lista de EDT. Intenta recargar la página.')
