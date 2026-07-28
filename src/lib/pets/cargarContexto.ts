@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { obtenerAlcanceParaContexto } from '@/lib/planTrabajo/obtenerAlcanceParaContexto'
 import { obtenerIpercParaContexto } from '@/lib/iperc/obtenerIpercParaContexto'
 import { obtenerMppParaContexto } from '@/lib/mpp/obtenerMppParaContexto'
+import { resolverPuestosMpp } from '@/lib/mpp/catalogos/puestos'
 import type { IpercFila, Pets } from '@prisma/client'
 
 // ─── Tipos exportados ────────────────────────────────────────────────────────
@@ -183,7 +184,6 @@ function extraerReferenciasCliente(filas: IpercFila[]): ReferenciaCliente[] {
 
 interface MppItemForCategoria {
   mppEppCatalogo: { nombre: string } | null
-  asignaciones: unknown
 }
 
 function categorizarEpp(item: MppItemForCategoria): 'basico' | 'bioseguridad' | 'especifico' {
@@ -222,6 +222,7 @@ export async function cargarContextoPets(proyectoId: string): Promise<ContextoPe
       where: { proyectoId },
       select: {
         codigoDocumento: true,
+        puestos: true,
         items: {
           include: { mppEppCatalogo: { select: { nombre: true } } },
           orderBy: { orden: 'asc' },
@@ -255,7 +256,6 @@ export async function cargarContextoPets(proyectoId: string): Promise<ContextoPe
           bioseguridad: [] as string[],
           especifico: [] as string[],
         }
-        const puestosSet = new Set<string>()
 
         for (const item of mpp.items) {
           const cat = categorizarEpp(item)
@@ -263,18 +263,17 @@ export async function cargarContextoPets(proyectoId: string): Promise<ContextoPe
           if (nombre && !categorias[cat].includes(nombre)) {
             categorias[cat].push(nombre)
           }
-          const asig = item.asignaciones as Record<string, boolean> | null
-          if (asig) {
-            for (const [puesto, activo] of Object.entries(asig)) {
-              if (activo) puestosSet.add(puesto)
-            }
-          }
         }
 
         return {
           codigoDocumento: mpp.codigoDocumento,
           eppPorCategoria: categorias,
-          puestos: Array.from(puestosSet),
+          // Columnas reales de la MPP (derivadas del organigrama al crear/
+          // regenerar) — NO "puestos con algún EPP marcado", que dejaba vacío
+          // este campo en MPPs recién creadas (matriz vacía hasta "Generar
+          // con IA") y hacía que el PETS cayera al puestoTrabajo libre del
+          // IPERC en vez del organigrama real.
+          puestos: resolverPuestosMpp(mpp.puestos),
           revisadoTexto: mppRevisadoTexto,
         }
       })()
