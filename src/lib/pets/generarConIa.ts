@@ -23,6 +23,7 @@ import {
   buildRestriccionesUserPrompt,
 } from './prompts/restriccionesPets'
 import type { PetsContenido, BloqueComo } from '@/lib/validators/pets'
+import { PLACEHOLDER_GENERANDO, PLACEHOLDER_PENDIENTE, PLACEHOLDER_FALLIDA } from './placeholders'
 
 // ─── Tipos internos ──────────────────────────────────────────────────────────
 
@@ -123,7 +124,7 @@ function buildContenidoParcial(
   restricciones: Array<{ texto: string }>,
   personal: Array<{ rol: string }>
 ): PetsContenido {
-  const PLACEHOLDER: BloqueComo[] = [{ tipo: 'parrafo', texto: '(generando...)' }]
+  const PLACEHOLDER = PLACEHOLDER_GENERANDO
 
   return {
     personal,
@@ -281,9 +282,7 @@ async function generarEtapa(
   const text = resp.content[0]?.type === 'text' ? resp.content[0].text : ''
   const parsed = parseJsonSafe<{ pasos: PasoContenido[] }>(text)
 
-  const FALLBACK_COMO: BloqueComo[] = [
-    { tipo: 'parrafo', texto: '(contenido pendiente de generación)' },
-  ]
+  const FALLBACK_COMO = PLACEHOLDER_PENDIENTE
 
   const pasos: PasoContenido[] = etapa.pasos.map((pasoIdx, i) => {
     const parsedPaso = parsed?.pasos?.[i]
@@ -310,15 +309,16 @@ async function procesarEtapas(
   push: PushFn,
   onEtapaCompletada?: (idx: number, contenido: EtapaContenido) => void
 ): Promise<EtapaContenido[]> {
-  const sem = new Semaphore(3)
+  // 6 en vez de 3: con hasta 9 etapas posibles, 3 en vuelo obligaba a ~3
+  // rondas secuenciales y arriesgaba superar el maxDuration=300s de la ruta
+  // (así se cortó CJM49). Con 6, quedan a lo sumo 2 rondas.
+  const sem = new Semaphore(6)
   const actividadesPorEtapa = repartirActividades(
     etapas.map(e => e.titulo),
     ctx.iperc?.actividadesAgrupadas ?? []
   )
 
-  const FALLBACK_COMO: BloqueComo[] = [
-    { tipo: 'parrafo', texto: '(generación fallida — completar manualmente)' },
-  ]
+  const FALLBACK_COMO = PLACEHOLDER_FALLIDA
 
   const tasks = etapas.map((etapa, idx) => {
     const letra = String.fromCharCode(65 + idx)

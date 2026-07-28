@@ -11,6 +11,7 @@ import {
 } from './prompts/rellenarEtapaPets'
 import { petsContenidoSchema } from '@/lib/validators/pets'
 import type { BloqueComo } from '@/lib/validators/pets'
+import { PLACEHOLDER_PENDIENTE } from './placeholders'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -170,7 +171,7 @@ export async function* regenerarEtapaPets(
     const nuevoContenido = structuredClone(parsed.data)
     const etapaTarget = nuevoContenido.procedimiento.etapas[etapaIndex]
 
-    const FALLBACK_COMO: BloqueComo[] = [{ tipo: 'parrafo', texto: '(contenido pendiente de generación)' }]
+    const FALLBACK_COMO = PLACEHOLDER_PENDIENTE
 
     etapaTarget.pasos = etapaActual.pasos.map((pasoOriginal, idx) => {
       const matchPorQue = respuesta.pasos!.find(

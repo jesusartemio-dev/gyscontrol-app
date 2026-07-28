@@ -1,6 +1,11 @@
 import { prisma } from '@/lib/prisma'
 
-const MAX_DURACION_MS = 10 * 60 * 1000
+// Alineado al maxDuration=300s de las rutas de generación/regeneración —
+// un lock más viejo que eso es de una función que Vercel ya mató (murió sin
+// llegar al finally que libera el lock), no una generación real en curso.
+// Antes era 10 min; eso dejaba al usuario esperando el doble de lo necesario
+// para poder reintentar tras un corte.
+const MAX_DURACION_MS = 6 * 60 * 1000
 
 export interface LockResult {
   ok: boolean

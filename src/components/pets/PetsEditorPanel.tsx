@@ -34,9 +34,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { GripVertical, Trash2, Plus, Edit2, Loader2, Sparkles } from 'lucide-react'
+import { GripVertical, Trash2, Plus, Edit2, Loader2, Sparkles, AlertTriangle } from 'lucide-react'
 import type { PetsContenido } from '@/lib/validators/pets'
 import type { EstadoRegenerar } from './useRegenerarPetsSSE'
+import { esComoPlaceholder, etapaTienePasosIncompletos } from '@/lib/pets/placeholders'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -174,7 +175,14 @@ function SortablePaso({
         <GripVertical className="h-3.5 w-3.5" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm truncate">{paso.que}</p>
+        <p className="text-sm truncate flex items-center gap-1">
+          {esComoPlaceholder(paso.como) && (
+            <span title="Incompleto — regenerar">
+              <AlertTriangle className="h-3 w-3 text-amber-500 flex-shrink-0" />
+            </span>
+          )}
+          <span className="truncate">{paso.que}</span>
+        </p>
         <p className="text-xs text-gray-400 truncate">
           {paso.quien.map((q) => q.rol).join(', ')}
         </p>
@@ -331,6 +339,16 @@ function SortableEtapa({
           {letra}
         </Badge>
         <span className="text-sm font-medium flex-1 truncate">{etapa.titulo}</span>
+        {etapaTienePasosIncompletos(etapa) && (
+          <Badge
+            variant="outline"
+            className="h-5 px-1.5 text-xs flex-shrink-0 border-amber-400 text-amber-600 gap-1"
+            title="Esta etapa tiene pasos incompletos — regenerá con el botón ✨"
+          >
+            <AlertTriangle className="h-3 w-3" />
+            Incompleta
+          </Badge>
+        )}
         <div className="flex gap-0.5 flex-shrink-0">
           <Button
             type="button"

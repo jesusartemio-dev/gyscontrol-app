@@ -3,10 +3,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { Loader2, Plus, Brain, Download, RefreshCw, Pencil, Check, Upload } from 'lucide-react'
+import { Loader2, Plus, Brain, Download, RefreshCw, Pencil, Check, Upload, AlertTriangle } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { petsContenidoSchema } from '@/lib/validators/pets'
 import type { PetsContenido } from '@/lib/validators/pets'
+import { contarEtapasIncompletas } from '@/lib/pets/placeholders'
 import { PetsViewer } from './PetsViewer'
 import { PetsGenerator } from './PetsGenerator'
 import { PetsEditorPanel } from './PetsEditorPanel'
@@ -256,6 +258,7 @@ export function PetsClient({ proyectoId }: Props) {
   }
 
   const regenActivo = estadoRegen.activo
+  const etapasIncompletas = contarEtapasIncompletas(contenido)
 
   // Editor o viewer — vive en una const para no duplicar el JSX entre la
   // vista con pestañas (cuando hay una versión revisada vigente) y sin ellas.
@@ -354,6 +357,27 @@ export function PetsClient({ proyectoId }: Props) {
           />
         </div>
       </div>
+
+      {etapasIncompletas > 0 && mode === 'idle' && !regenActivo && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>
+            {etapasIncompletas} {etapasIncompletas === 1 ? 'etapa quedó' : 'etapas quedaron'} sin generar completamente
+          </AlertTitle>
+          <AlertDescription className="flex items-center justify-between gap-2 flex-wrap">
+            <span>
+              Una generación anterior no terminó (posible corte por tiempo). Entrá a "Editar" y usá el botón
+              de regenerar (✨) en cada etapa marcada como incompleta.
+            </span>
+            {!modoEdicion && (
+              <Button size="sm" variant="outline" onClick={() => setModoEdicion(true)}>
+                <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                Ir a editar
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {tieneVersionRevisada ? (
         <Tabs value={vistaPets} onValueChange={(v) => setVistaPets(v as 'estructurada' | 'revisada')}>
