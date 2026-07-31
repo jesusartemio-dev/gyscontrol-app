@@ -238,20 +238,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
     }
 
-    // proyectoEdtId: solo si la jornada aún no tiene uno asignado (evita que se
-    // reasigne un EDT ya usado por tareas ya agregadas), y validando que el EDT
-    // pertenezca al mismo proyecto de la jornada.
+    // proyectoEdtId: se puede fijar o cambiar libremente mientras la jornada
+    // siga en 'iniciado' (ya validado arriba) — validando que el EDT nuevo
+    // pertenezca al mismo proyecto de la jornada. Las tareas ya agregadas
+    // quedan igual (apuntan a su ProyectoTarea, no al EDT de la jornada);
+    // cambiar el EDT solo afecta qué EDT se usa para las tareas que se
+    // agreguen de aquí en adelante.
     if (body.proyectoEdtId !== undefined) {
-      const jornadaConEdt = await prisma.registroHorasCampo.findUnique({
-        where: { id: jornadaId },
-        select: { proyectoEdtId: true }
-      })
-      if (jornadaConEdt?.proyectoEdtId) {
-        return NextResponse.json(
-          { error: 'Esta jornada ya tiene un EDT asignado' },
-          { status: 400 }
-        )
-      }
       if (body.proyectoEdtId) {
         const edt = await prisma.proyectoEdt.findUnique({
           where: { id: body.proyectoEdtId },

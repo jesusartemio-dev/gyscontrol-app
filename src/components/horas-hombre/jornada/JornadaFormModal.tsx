@@ -153,7 +153,7 @@ export function JornadaFormModal({
   }, [open])
 
   useEffect(() => {
-    if (!isEditing && proyectoId) {
+    if (proyectoId) {
       cargarEdts()
     } else if (!isEditing) {
       setEdts([])
@@ -190,11 +190,16 @@ export function JornadaFormModal({
           return true
         })
         setEdts(edtsUnicos)
-        const conEdt = edtsUnicos.find((e: EdtProyecto) =>
-          e.edt?.nombre?.toUpperCase().startsWith('CON')
-        )
-        if (conEdt) {
-          setProyectoEdtId(conEdt.id)
+        // Al editar, respetar el EDT que ya tenía la jornada (o lo que el
+        // usuario haya elegido) — el autoseleccionado "CON" solo aplica al
+        // crear una jornada nueva.
+        if (!isEditing) {
+          const conEdt = edtsUnicos.find((e: EdtProyecto) =>
+            e.edt?.nombre?.toUpperCase().startsWith('CON')
+          )
+          if (conEdt) {
+            setProyectoEdtId(conEdt.id)
+          }
         }
       }
     } catch (error) {
@@ -296,7 +301,8 @@ export function JornadaFormModal({
           body: JSON.stringify({
             objetivosDia: objetivosDia.trim(),
             personalPlanificado,
-            fechaTrabajo
+            fechaTrabajo,
+            proyectoEdtId: proyectoEdtId || null
           })
         })
 
@@ -412,12 +418,25 @@ export function JornadaFormModal({
                 <Building className="h-3.5 w-3.5 text-gray-400" />
                 <span className="font-medium">{jornada.proyecto.codigo}</span>
               </span>
-              {jornada.proyectoEdt && (
-                <span className="flex items-center gap-1.5 text-sm text-gray-600">
-                  <FolderOpen className="h-3.5 w-3.5 text-gray-400" />
-                  {jornada.proyectoEdt.edt?.nombre ? `${jornada.proyectoEdt.edt.nombre} - ${jornada.proyectoEdt.nombre}` : jornada.proyectoEdt.nombre}
-                </span>
-              )}
+              <div className="flex items-center gap-1.5">
+                <FolderOpen className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                <Select
+                  value={proyectoEdtId}
+                  onValueChange={setProyectoEdtId}
+                  disabled={edts.length === 0}
+                >
+                  <SelectTrigger className="h-7 text-sm w-auto min-w-[160px] max-w-[260px] border-none bg-transparent shadow-none px-1.5 hover:bg-gray-100">
+                    <SelectValue placeholder={edts.length === 0 ? 'Sin cronograma' : 'Seleccionar EDT'} />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="max-h-[250px]">
+                    {edts.map(e => (
+                      <SelectItem key={e.id} value={e.id}>
+                        {e.edt?.nombre ? `${e.edt.nombre} - ${e.nombre}` : e.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex items-center gap-1.5 ml-auto">
                 <Calendar className="h-3.5 w-3.5 text-gray-400" />
                 <Input
