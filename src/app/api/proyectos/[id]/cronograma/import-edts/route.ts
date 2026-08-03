@@ -14,6 +14,7 @@ import { fechasEdtDefault } from '@/lib/services/cronogramaFechasDefault'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { normalizeStr } from '@/lib/utils'
 
 // ✅ GET /api/proyectos/[id]/cronograma/import-edts - Obtener EDTs disponibles para importar
 export async function GET(
@@ -97,9 +98,16 @@ export async function GET(
       if (!faseProyecto) {
         edtsDisponibles = []
       } else {
-        // Filtrar por nombre de fase en lugar de ID
+        // Filtrar por nombre de fase en lugar de ID. Comparación normalizada
+        // (sin tildes/mayúsculas, por inclusión) porque el nombre de la fase
+        // del proyecto rara vez coincide byte a byte con el de FaseDefault del
+        // catálogo — ej. "EJECUCIÓN" (con tilde) o "4. EJECUCIÓN" (con
+        // numeración) vs "EJECUCION" en el catálogo. Con comparación exacta
+        // esto excluía TODOS los EDTs y el modal quedaba siempre en 0.
+        const faseProyectoNorm = normalizeStr(faseProyecto.nombre)
         edtsDisponibles = edtsDisponibles.filter(edt => {
-          return edt.faseDefault?.nombre === faseProyecto.nombre
+          const faseDefaultNorm = normalizeStr(edt.faseDefault?.nombre)
+          return !!faseDefaultNorm && faseProyectoNorm.includes(faseDefaultNorm)
         })
       }
     }
