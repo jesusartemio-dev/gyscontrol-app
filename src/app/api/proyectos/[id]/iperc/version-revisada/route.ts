@@ -80,6 +80,9 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
         webViewLink: version.webViewLink,
       },
     },
-    { headers: { 'Cache-Control': 'private, max-age=3600' } }
+    // no-store: la vigente puede cambiar en cualquier momento (nueva subida) y
+    // el navegador no tiene forma de saber que quedó vieja — sin esto, servía
+    // la respuesta de una subida anterior hasta por 1h después de una nueva.
+    { headers: { 'Cache-Control': 'private, no-store' } }
   )
 }
