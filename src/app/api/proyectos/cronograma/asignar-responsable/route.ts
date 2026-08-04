@@ -53,22 +53,20 @@ export async function PUT(request: NextRequest) {
         break
 
       case 'tarea':
+        // Mismo motivo que en el GET: resolver vía proyectoEdt (siempre presente),
+        // no vía proyectoActividad (opcional — tareas extra sin actividad).
         elemento = await prisma.proyectoTarea.findUnique({
           where: { id },
           include: {
             user: {
               select: { id: true, name: true }
             },
-            proyectoActividad: {
-              include: {
-                proyectoEdt: {
-                  select: { proyectoId: true }
-                }
-              }
+            proyectoEdt: {
+              select: { proyectoId: true }
             }
           }
         })
-        proyectoId = elemento?.proyectoActividad?.proyectoEdt?.proyectoId || ''
+        proyectoId = elemento?.proyectoEdt?.proyectoId || ''
         break
     }
 
@@ -235,19 +233,19 @@ export async function GET(request: NextRequest) {
         break
 
       case 'tarea':
+        // proyectoEdtId es obligatorio y directo en ProyectoTarea; proyectoActividadId
+        // es opcional (tareas "extra" colgadas del EDT sin actividad, ej. esExtra=true,
+        // no tienen proyectoActividad). Resolver siempre vía proyectoEdt, no vía
+        // actividad, para no fallar con "Proyecto no encontrado" en esos casos.
         const tarea = await prisma.proyectoTarea.findUnique({
           where: { id },
           include: {
-            proyectoActividad: {
-              include: {
-                proyectoEdt: {
-                  select: { proyectoId: true }
-                }
-              }
+            proyectoEdt: {
+              select: { proyectoId: true }
             }
           }
         })
-        proyectoId = tarea?.proyectoActividad?.proyectoEdt?.proyectoId || ''
+        proyectoId = tarea?.proyectoEdt?.proyectoId || ''
         break
 
       default:
