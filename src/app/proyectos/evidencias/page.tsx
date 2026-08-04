@@ -207,9 +207,9 @@ function hoyISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function hace7DiasISO() {
+function hace1MesISO() {
   const d = new Date()
-  d.setDate(d.getDate() - 6)
+  d.setMonth(d.getMonth() - 1)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
@@ -227,6 +227,7 @@ function EvidenciasAvanceListaContenido() {
   const searchParams = useSearchParams()
   const { data: session } = useSession()
   const esAdmin = session?.user?.role === 'admin'
+  const isBypass = ['admin', 'gerente', 'gestor'].includes(session?.user?.role ?? '')
 
   // Deep-link params soportados: proyectoId, fechaDesde, fechaHasta, estado
   const proyectoIdParam = searchParams.get('proyectoId') ?? ''
@@ -235,7 +236,7 @@ function EvidenciasAvanceListaContenido() {
   const estadoParam = searchParams.get('estado')
 
   const [filtroProyecto, setFiltroProyecto] = useState(proyectoIdParam)
-  const [filtroFechaDesde, setFiltroFechaDesde] = useState(fechaDesdeParam || hace7DiasISO())
+  const [filtroFechaDesde, setFiltroFechaDesde] = useState(fechaDesdeParam || hace1MesISO())
   const [filtroFechaHasta, setFiltroFechaHasta] = useState(fechaHastaParam || hoyISO())
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'abierta' | 'cerrada'>(
     estadoParam === 'abierta' || estadoParam === 'cerrada' ? estadoParam : 'todos',
@@ -252,6 +253,7 @@ function EvidenciasAvanceListaContenido() {
   const [dialogAbrir, setDialogAbrir] = useState(false)
   const [jornadaSel, setJornadaSel] = useState<JornadaActiva | null>(null)
   const [confirmEliminar, setConfirmEliminar] = useState<string | null>(null)
+  const [confirmCerrar, setConfirmCerrar] = useState<string | null>(null)
 
   const proyectosQuery = useQuery<ProyectoOpt[]>({
     queryKey: ['proyectos', 'lista-min'],
@@ -259,11 +261,13 @@ function EvidenciasAvanceListaContenido() {
       const res = await fetch('/api/proyecto', { credentials: 'include' })
       if (!res.ok) throw new Error('Error al cargar proyectos')
       const data = await res.json()
-      return (data as Array<{ id: string; codigo: string; nombre: string }>).map((p) => ({
-        id: p.id,
-        codigo: p.codigo,
-        nombre: p.nombre,
-      }))
+      return (data as Array<{ id: string; codigo: string; nombre: string; esInterno?: boolean }>)
+        .filter((p) => !p.esInterno)
+        .map((p) => ({
+          id: p.id,
+          codigo: p.codigo,
+          nombre: p.nombre,
+        }))
     },
     staleTime: 5 * 60 * 1000,
   })
@@ -328,6 +332,27 @@ function EvidenciasAvanceListaContenido() {
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Error al eliminar'),
   })
 
+  const cerrarMutation = useMutation({
+    mutationFn: async (evidenciaId: string) => {
+      const res = await fetch(`/api/proyectos/evidencias/${evidenciaId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ estado: 'cerrada' }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error ?? 'No se pudo cerrar la evidencia')
+      }
+    },
+    onSuccess: () => {
+      toast.success('Evidencia cerrada')
+      queryClient.invalidateQueries({ queryKey: ['proyectos', 'evidencias'] })
+      setConfirmCerrar(null)
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Error al cerrar'),
+  })
+
   const evidencias = evidenciasQuery.data ?? []
 
   return (
@@ -364,7 +389,7 @@ function EvidenciasAvanceListaContenido() {
               value={filtroProyecto || 'todos'}
               onValueChange={(v) => setFiltroProyecto(v === 'todos' ? '' : v)}
             >
-              <SelectTrigger id="f-proyecto" className="h-9">
+              <SelectTrigger id="f-proyecto" className="h-9 w-full">
                 <SelectValue placeholder="Todos" />
               </SelectTrigger>
               <SelectContent>
@@ -405,7 +430,7 @@ function EvidenciasAvanceListaContenido() {
               value={filtroEstado}
               onValueChange={(v) => setFiltroEstado(v as typeof filtroEstado)}
             >
-              <SelectTrigger id="f-estado" className="h-9">
+              <SelectTrigger id="f-estado" className="h-9 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -437,6 +462,7 @@ function EvidenciasAvanceListaContenido() {
         <div className="space-y-2">
           {evidencias.map((ev) => {
             const isExpanded = expandedIds.has(ev.id)
+            const puedeCerrar = ev.estado === 'abierta' && (isBypass || ev.creadoPor.id === session?.user?.id)
             return (
               <div
                 key={ev.id}
@@ -540,16 +566,28 @@ function EvidenciasAvanceListaContenido() {
                   <RegistrosEvidencia evidenciaId={ev.id} jornada={ev.jornada} />
                 )}
 
-                {esAdmin && (
-                  <div className="px-4 pb-2 flex justify-end border-t border-gray-100 pt-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => setConfirmEliminar(ev.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar
-                    </Button>
+                {(puedeCerrar || esAdmin) && (
+                  <div className="px-4 pb-2 flex justify-end gap-2 border-t border-gray-100 pt-2">
+                    {puedeCerrar && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                        onClick={() => setConfirmCerrar(ev.id)}
+                      >
+                        <Lock className="h-3.5 w-3.5 mr-1" /> Cerrar evidencia
+                      </Button>
+                    )}
+                    {esAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => setConfirmEliminar(ev.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -557,6 +595,38 @@ function EvidenciasAvanceListaContenido() {
           })}
         </div>
       )}
+
+      {/* ── AlertDialog: Confirmar cerrar ─────────────────── */}
+      <AlertDialog
+        open={confirmCerrar !== null}
+        onOpenChange={(open) => !open && setConfirmCerrar(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cerrar la evidencia?</AlertDialogTitle>
+            <AlertDialogDescription>
+              No se podrán agregar, editar ni eliminar más registros. Solo admin, gerente o gestor podrán reabrirla.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cerrarMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                if (confirmCerrar) cerrarMutation.mutate(confirmCerrar)
+              }}
+              disabled={cerrarMutation.isPending}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {cerrarMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Cerrando…</>
+              ) : (
+                'Cerrar evidencia'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── AlertDialog: Confirmar eliminar ─────────────── */}
       <AlertDialog
