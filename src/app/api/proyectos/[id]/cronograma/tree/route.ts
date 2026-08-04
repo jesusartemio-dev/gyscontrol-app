@@ -70,12 +70,18 @@ export async function GET(
     // que es un snapshot manual casi siempre en 1 — ver calcularHHRealDeTarea,
     // misma fuente que usa Plan de Trabajo). "WORK" ya existe (horasEstimadas
     // crudo, sin multiplicar); esto es la columna "HH" nueva.
+    // Redondea a 1 decimal — sumar muchas horas con decimales (0.1 + 0.2
+    // style) o convertir Decimal de Prisma con Number() deja artefactos de
+    // punto flotante tipo 26.599999999999998. Se aplica tanto al leaf
+    // (hhDeTarea) como a cada suma agregada hacia arriba en el árbol, porque
+    // el error puede reaparecer al sumar varios valores ya redondeados.
+    const round1 = (n: number): number => Math.round(n * 10) / 10
     const hhDeTarea = (tarea: any): number =>
-      calcularHHRealDeTarea({ horasEstimadas: Number(tarea.horasEstimadas) || 0, recurso: tarea.recurso })
+      round1(calcularHHRealDeTarea({ horasEstimadas: Number(tarea.horasEstimadas) || 0, recurso: tarea.recurso }))
     const hhDeEdt = (edt: any): number => {
       const tareasDeActividades = (edt.proyectoActividad || []).flatMap((a: any) => a.proyectoTarea || [])
       const tareasExtras = edt.proyectoTarea || []
-      return [...tareasDeActividades, ...tareasExtras].reduce((s: number, t: any) => s + hhDeTarea(t), 0)
+      return round1([...tareasDeActividades, ...tareasExtras].reduce((s: number, t: any) => s + hhDeTarea(t), 0))
     }
 
     // ✅ Obtener fases del proyecto según el cronograma especificado
@@ -272,9 +278,9 @@ export async function GET(
       const faseEdts = fase.proyectoEdt || []
 
       // Calcular horas totales de la fase (suma de horas de todos los EDTs)
-      const faseHorasTotales = faseEdts.reduce((sum: number, edt: any) => sum + Number(edt.horasPlan || 0), 0)
+      const faseHorasTotales = round1(faseEdts.reduce((sum: number, edt: any) => sum + Number(edt.horasPlan || 0), 0))
       proyectoHorasTotales += faseHorasTotales
-      const faseHorasHombre = faseEdts.reduce((sum: number, edt: any) => sum + hhDeEdt(edt), 0)
+      const faseHorasHombre = round1(faseEdts.reduce((sum: number, edt: any) => sum + hhDeEdt(edt), 0))
       proyectoHorasHombre += faseHorasHombre
 
       return {
@@ -357,7 +363,7 @@ export async function GET(
                   estado: actividad.estado,
                   progreso: actividad.porcentajeAvance,
                   horasEstimadas: actividad.horasPlan,
-                  horasHombre: actividadTareas.reduce((s: number, t: any) => s + hhDeTarea(t), 0),
+                  horasHombre: round1(actividadTareas.reduce((s: number, t: any) => s + hhDeTarea(t), 0)),
                   horasReales: actividad.horasReales,
                   prioridad: actividad.prioridad,
                   orden: actividad.orden,
@@ -436,9 +442,9 @@ export async function GET(
                     data: {
                       isExtrasGroup: true,
                       orden: 9999,
-                      horasEstimadas: (edt.proyectoTarea || []).reduce((s: number, t: any) => s + Number(t.horasEstimadas || 0), 0),
-                      horasHombre: (edt.proyectoTarea || []).reduce((s: number, t: any) => s + hhDeTarea(t), 0),
-                      horasReales: (edt.proyectoTarea || []).reduce((s: number, t: any) => s + Number(t.horasReales || 0), 0),
+                      horasEstimadas: round1((edt.proyectoTarea || []).reduce((s: number, t: any) => s + Number(t.horasEstimadas || 0), 0)),
+                      horasHombre: round1((edt.proyectoTarea || []).reduce((s: number, t: any) => s + hhDeTarea(t), 0)),
+                      horasReales: round1((edt.proyectoTarea || []).reduce((s: number, t: any) => s + Number(t.horasReales || 0), 0)),
                       estado: 'en_progreso',
                     },
                     metadata: {
@@ -599,8 +605,8 @@ export async function GET(
       data: {
         fechaInicioComercial: proyecto.fechaInicio,
         fechaFinComercial: proyecto.fechaFin,
-        horasEstimadas: proyectoHorasTotales,
-        horasHombre: proyectoHorasHombre,
+        horasEstimadas: round1(proyectoHorasTotales),
+        horasHombre: round1(proyectoHorasHombre),
         duracionDiasReal: duracionDiasReal(proyecto.fechaInicio, proyecto.fechaFin)
       },
       metadata: {

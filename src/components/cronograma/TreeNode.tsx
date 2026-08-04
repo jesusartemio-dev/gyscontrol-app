@@ -42,6 +42,15 @@ interface TreeNodeProps {
   rowIndex?: number
 }
 
+// Redondea a 1 decimal y quita el ".0" sobrante — evita mostrar artefactos de
+// punto flotante como "26.599999999999998h" cuando se suman muchas horas con
+// decimales (0.1 + 0.2 style). El valor ya debería venir redondeado desde la
+// API del árbol, esto es una segunda capa de defensa en el render.
+const formatHoras = (n: number): string => {
+  const rounded = Math.round(n * 10) / 10
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
+}
+
 const NODE_CONFIG: Record<string, { icon: string; color: string; canAdd: NodeType[]; label: string }> = {
   proyecto: {
     icon: '📁',
@@ -352,12 +361,12 @@ export function TreeNode({
 
         {/* Columna 6: Work (horasEstimadas) */}
         <div className="text-right text-[11px] text-gray-600 font-mono pr-1">
-          {totalHours > 0 ? `${totalHours}h` : ''}
+          {totalHours > 0 ? `${formatHoras(totalHours)}h` : ''}
         </div>
 
         {/* Columna 7: HH real (horasEstimadas × personas del recurso — nunca personasEstimadas) */}
         <div className="text-right text-[11px] text-gray-700 font-mono pr-1" title="Horas-hombre real: Work × personas del recurso asignado">
-          {totalHorasHombre > 0 ? `${totalHorasHombre}h` : ''}
+          {totalHorasHombre > 0 ? `${formatHoras(totalHorasHombre)}h` : ''}
         </div>
 
         {/* Columna: Peso Global (hh-hombre, normalizado al proyecto) */}
