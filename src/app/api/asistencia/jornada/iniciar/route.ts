@@ -72,13 +72,19 @@ export async function POST(req: Request) {
             updatedAt: new Date(),
           },
         })
-        // Evidencia automática
+        // Evidencias automáticas (seguridad + avance técnico)
         await tx.evidenciaSeguridad.create({
           data: {
             registroHorasCampoId: rhc.id,
             creadoPorId: session.user.id,
             estado: 'abierta',
             updatedAt: new Date(),
+          },
+        })
+        await tx.evidenciaAvance.create({
+          data: {
+            registroHorasCampoId: rhc.id,
+            creadoPorId: session.user.id,
           },
         })
         return [rhc]
@@ -110,13 +116,19 @@ export async function POST(req: Request) {
       })
       registroHorasCampoId = rhc.id
 
-      // Crear evidencia de seguridad automáticamente
+      // Crear evidencias automáticamente (seguridad + avance técnico)
       await tx.evidenciaSeguridad.create({
         data: {
           registroHorasCampoId: rhc.id,
           creadoPorId: session.user.id,
           estado: 'abierta',
           updatedAt: new Date(),
+        },
+      })
+      await tx.evidenciaAvance.create({
+        data: {
+          registroHorasCampoId: rhc.id,
+          creadoPorId: session.user.id,
         },
       })
     }
