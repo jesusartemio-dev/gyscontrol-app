@@ -58,25 +58,33 @@ import { SelectorJornada, type JornadaActiva } from '@/components/proyectos/evid
 import { TIPO_REGISTRO_AVANCE_LABELS, type TipoRegistroAvance } from '@/lib/validators/registroAvance'
 import { cn } from '@/lib/utils'
 
-interface EvidenciaResumen {
+interface JornadaResumen {
+  id: string
+  fechaTrabajo: string
+  estado: string
+  ubicacion: string | null
+  proyecto: { id: string; codigo: string; nombre: string }
+  supervisor: { id: string; name: string | null }
+}
+
+interface EvidenciaEmbebida {
   id: string
   estado: 'abierta' | 'cerrada'
   observaciones: string | null
   fechaCierre: string | null
   createdAt: string
   updatedAt: string
-  jornada: {
-    id: string
-    fechaTrabajo: string
-    estado: string
-    ubicacion: string | null
-    proyecto: { id: string; codigo: string; nombre: string }
-    supervisor: { id: string; name: string | null }
-  }
   creadoPor: { id: string; name: string | null }
   registrosCount: number
   fotosCount: number
   tipoCount: Partial<Record<TipoRegistroAvance, number>>
+}
+
+// Una entrada por jornada del rango: con evidencia (igual que antes) o sin
+// ella todavía ("posible evidencia" — jornada real sin cuaderno abierto).
+interface JornadaConEvidencia {
+  jornada: JornadaResumen
+  evidencia: EvidenciaEmbebida | null
 }
 
 interface ProyectoOpt {
@@ -116,7 +124,7 @@ function RegistrosEvidencia({
   jornada,
 }: {
   evidenciaId: string
-  jornada: EvidenciaResumen['jornada']
+  jornada: JornadaResumen
 }) {
   const { data, isLoading } = useQuery<RegistroListaItem[]>({
     queryKey: ['proyectos', 'registros-ev', jornada.id],
@@ -281,10 +289,14 @@ function EvidenciasAvanceListaContenido() {
     return sp.toString()
   }, [filtroProyecto, filtroFechaDesde, filtroFechaHasta, filtroEstado])
 
-  const evidenciasQuery = useQuery<EvidenciaResumen[]>({
-    queryKey: ['proyectos', 'evidencias', queryString],
+  // Vista día a día: incluye jornadas sin evidencia todavía ("posibles
+  // evidencias"), no solo las EvidenciaAvance ya creadas. Query key anidada
+  // bajo 'evidencias' para que las invalidaciones existentes (creadas desde
+  // el detalle al guardar/cerrar/reabrir) sigan refrescando esta lista.
+  const evidenciasQuery = useQuery<JornadaConEvidencia[]>({
+    queryKey: ['proyectos', 'evidencias', 'rango', queryString],
     queryFn: async () => {
-      const url = `/api/proyectos/evidencias${queryString ? `?${queryString}` : ''}`
+      const url = `/api/proyectos/evidencias/rango${queryString ? `?${queryString}` : ''}`
       const res = await fetch(url, { credentials: 'include' })
       if (!res.ok) throw new Error('Error al cargar evidencias')
       return res.json()
@@ -456,11 +468,57 @@ function EvidenciasAvanceListaContenido() {
         </div>
       ) : evidencias.length === 0 ? (
         <div className="py-16 text-center text-sm text-muted-foreground">
-          No hay evidencias en el rango seleccionado.
+          No hay jornadas en el rango seleccionado.
         </div>
       ) : (
         <div className="space-y-2">
-          {evidencias.map((ev) => {
+          {evidencias.map((item) => {
+            const { jornada, evidencia: ev } = item
+
+            // Jornada sin evidencia todavía — "posible evidencia": fila liviana con acceso directo a crearla.
+            if (!ev) {
+              const creandoEsta = abrirEvidenciaMutation.isPending && abrirEvidenciaMutation.variables === jornada.id
+              return (
+                <div
+                  key={jornada.id}
+                  className="border border-dashed border-gray-200 rounded-lg bg-gray-50/60 px-4 py-3 flex items-center gap-3"
+                >
+                  <HardHat className="h-4 w-4 text-gray-400 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-gray-600">{jornada.proyecto.nombre}</span>
+                      <span className="text-[10px] font-mono text-muted-foreground bg-gray-200 px-1.5 py-0.5 rounded shrink-0">
+                        {jornada.proyecto.codigo}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 flex-wrap mt-1 text-[11px] text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <CalendarDays className="h-3 w-3" />
+                        {formatFecha(jornada.fechaTrabajo)}
+                      </span>
+                      {jornada.supervisor.name && (
+                        <span className="flex items-center gap-1">
+                          <Users className="h-3 w-3" /> {jornada.supervisor.name}
+                        </span>
+                      )}
+                      <span className="text-amber-600">Sin evidencia</span>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 border-orange-300 text-orange-700 hover:bg-orange-50 shrink-0"
+                    disabled={creandoEsta}
+                    onClick={() => abrirEvidenciaMutation.mutate(jornada.id)}
+                  >
+                    {creandoEsta
+                      ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Abriendo…</>
+                      : <><Plus className="h-3.5 w-3.5 mr-1" /> Crear evidencia</>}
+                  </Button>
+                </div>
+              )
+            }
+
             const isExpanded = expandedIds.has(ev.id)
             const puedeCerrar = ev.estado === 'abierta' && (isBypass || ev.creadoPor.id === session?.user?.id)
             return (
@@ -476,20 +534,20 @@ function EvidenciasAvanceListaContenido() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-semibold leading-tight">
-                            {ev.jornada.proyecto.nombre}
+                            {jornada.proyecto.nombre}
                           </span>
                           <span className="text-[10px] font-mono text-muted-foreground bg-gray-200 px-1.5 py-0.5 rounded shrink-0">
-                            {ev.jornada.proyecto.codigo}
+                            {jornada.proyecto.codigo}
                           </span>
                         </div>
                         <div className="flex items-center gap-3 flex-wrap mt-1">
                           <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
                             <CalendarDays className="h-3 w-3" />
-                            {formatFecha(ev.jornada.fechaTrabajo)}
+                            {formatFecha(jornada.fechaTrabajo)}
                           </span>
-                          {ev.jornada.supervisor.name && (
+                          {jornada.supervisor.name && (
                             <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                              <Users className="h-3 w-3" /> {ev.jornada.supervisor.name}
+                              <Users className="h-3 w-3" /> {jornada.supervisor.name}
                             </span>
                           )}
                         </div>
@@ -563,7 +621,7 @@ function EvidenciasAvanceListaContenido() {
 
                 {/* ── Registros expandibles ── */}
                 {isExpanded && (
-                  <RegistrosEvidencia evidenciaId={ev.id} jornada={ev.jornada} />
+                  <RegistrosEvidencia evidenciaId={ev.id} jornada={jornada} />
                 )}
 
                 {(puedeCerrar || esAdmin) && (
