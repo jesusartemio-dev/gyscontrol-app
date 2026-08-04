@@ -369,26 +369,29 @@ function EvidenciasAvanceListaContenido() {
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 max-w-5xl">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         <Link href="/proyectos">
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" className="shrink-0">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <div className="flex-1">
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <ClipboardCheck className="h-5 w-5 text-orange-600" />
-            Evidencias técnicas
+        <div className="flex-1 min-w-0">
+          <h1 className="text-lg sm:text-xl font-bold flex items-center gap-2">
+            <ClipboardCheck className="h-5 w-5 text-orange-600 shrink-0" />
+            <span className="truncate">Evidencias técnicas</span>
           </h1>
-          <p className="text-sm text-muted-foreground">
+          {/* Subtítulo solo en desktop: en celular robaba una línea entera sin aportar. */}
+          <p className="hidden sm:block text-sm text-muted-foreground">
             Una evidencia por jornada de campo · agrupa el avance técnico del día
           </p>
         </div>
         <Button
-          className="bg-orange-600 hover:bg-orange-700"
+          className="bg-orange-600 hover:bg-orange-700 shrink-0"
           onClick={() => setDialogAbrir(true)}
         >
-          <Plus className="h-4 w-4 mr-1" /> Nueva evidencia
+          <Plus className="h-4 w-4 sm:mr-1" />
+          <span className="hidden sm:inline">Nueva evidencia</span>
+          <span className="sr-only sm:hidden">Nueva evidencia</span>
         </Button>
       </div>
 
@@ -604,15 +607,17 @@ function EvidenciasAvanceListaContenido() {
                     </div>
                   )}
 
-                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground pt-1 border-t border-gray-100">
+                  <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-[11px] text-muted-foreground pt-1 border-t border-gray-100">
                     <span>{ev.registrosCount} registros</span>
                     <span className="flex items-center gap-1">
                       <ImageIcon className="h-3 w-3" /> {ev.fotosCount} fotos
                     </span>
-                    <span>Abierta por {ev.creadoPor.name ?? '—'}</span>
+                    <span className="truncate max-w-[45%] sm:max-w-none">
+                      Abierta por {ev.creadoPor.name ?? '—'}
+                    </span>
                     <Link
                       href={`/proyectos/evidencias/${ev.id}`}
-                      className="ml-auto flex items-center gap-1 text-orange-600 hover:text-orange-700 font-medium"
+                      className="ml-auto flex items-center gap-1 text-orange-600 hover:text-orange-700 font-medium shrink-0 py-1"
                     >
                       Abrir cuaderno <ExternalLink className="h-3 w-3" />
                     </Link>

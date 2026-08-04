@@ -7,6 +7,8 @@ import { puedeEscribirEvidencia } from '@/lib/services/evidenciaAvance'
 import { ROLES_PERMITIDOS } from '@/lib/auth/rolesEvidenciaProyecto'
 
 const MAX_TAMANO_BYTES = 15 * 1024 * 1024 // 15MB
+/** Debe coincidir con MAX_FOTOS_REGISTRO en la página de la evidencia. */
+const MAX_FOTOS_REGISTRO = 10
 
 async function getOrCreateRegistroFolder(registroId: string): Promise<string> {
   const registro = await prisma.registroAvance.findUnique({
@@ -97,6 +99,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'La imagen excede 15MB' }, { status: 400 })
     }
 
+    const yaTiene = await prisma.registroAvanceFoto.count({ where: { registroAvanceId: id } })
+    if (yaTiene >= MAX_FOTOS_REGISTRO) {
+      return NextResponse.json(
+        { error: `Máximo ${MAX_FOTOS_REGISTRO} fotos por registro` },
+        { status: 400 },
+      )
+    }
+
     const folderId = await getOrCreateRegistroFolder(id)
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
@@ -107,12 +117,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       buffer,
     })
 
-    const ultima = await prisma.registroAvanceFoto.findFirst({
-      where: { registroAvanceId: id },
-      orderBy: { orden: 'desc' },
-      select: { orden: true },
-    })
-    const nuevoOrden = (ultima?.orden ?? -1) + 1
+    // El cliente puede fijar el orden explícitamente. Es necesario cuando sube
+    // varias fotos en paralelo: calcularlo acá con un findFirst haría que las
+    // subidas simultáneas leyeran el mismo máximo y quedaran todas con el
+    // mismo `orden`, perdiendo el orden en que el usuario las eligió.
+    const ordenRaw = formData.get('orden')
+    const ordenCliente = typeof ordenRaw === 'string' && ordenRaw.trim() !== ''
+      ? Number(ordenRaw)
+      : null
+
+    let nuevoOrden: number
+    if (ordenCliente != null && Number.isInteger(ordenCliente) && ordenCliente >= 0) {
+      nuevoOrden = ordenCliente
+    } else {
+      const ultima = await prisma.registroAvanceFoto.findFirst({
+        where: { registroAvanceId: id },
+        orderBy: { orden: 'desc' },
+        select: { orden: true },
+      })
+      nuevoOrden = (ultima?.orden ?? -1) + 1
+    }
 
     const foto = await prisma.registroAvanceFoto.create({
       data: {

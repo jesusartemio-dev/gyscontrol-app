@@ -25,6 +25,7 @@ import {
   User,
   Users,
   Wrench,
+  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -150,6 +151,12 @@ const TIPO_BORDER_L: Record<TipoRegistroAvance, string> = {
 
 const SIN_TAREA = '__none__'
 
+/** Fotos por registro. Las imágenes se comprimen en el cliente antes de subir. */
+const MAX_FOTOS_REGISTRO = 10
+
+/** Subidas simultáneas a Drive: suficiente para acelerar sin saturar el 4G de campo. */
+const CONCURRENCIA_SUBIDA = 3
+
 const formatFechaLarga = (s: string) =>
   new Date(s).toLocaleDateString('es-PE', {
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
@@ -158,9 +165,10 @@ const formatFechaLarga = (s: string) =>
 const formatHora = (s: string) =>
   new Date(s).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
 
-async function subirFoto(registroId: string, file: File) {
+async function subirFoto(registroId: string, file: File, orden: number) {
   const fd = new FormData()
   fd.append('file', file)
+  fd.append('orden', String(orden))
   const res = await fetch(`/api/proyectos/registros-evidencia/${registroId}/fotos`, {
     method: 'POST', body: fd, credentials: 'include',
   })
@@ -169,6 +177,32 @@ async function subirFoto(registroId: string, file: File) {
     throw new Error(data.error ?? 'Error al subir foto')
   }
   return res.json()
+}
+
+/**
+ * Sube las fotos en tandas paralelas. Antes se subían una por una en un for
+ * secuencial: con 8 fotos y 4G de obra eso era casi un minuto sin ninguna
+ * señal en pantalla. Devuelve cuántas fallaron.
+ */
+async function subirFotos(
+  registroId: string,
+  files: File[],
+  ordenBase: number,
+  onProgreso: (hechas: number) => void,
+): Promise<number> {
+  let hechas = 0
+  let fallos = 0
+  for (let i = 0; i < files.length; i += CONCURRENCIA_SUBIDA) {
+    const tanda = files.slice(i, i + CONCURRENCIA_SUBIDA)
+    await Promise.all(
+      tanda.map(async (file, j) => {
+        try { await subirFoto(registroId, file, ordenBase + i + j) }
+        catch { fallos++ }
+        finally { onProgreso(++hechas) }
+      }),
+    )
+  }
+  return fallos
 }
 
 // ─── Page ────────────────────────────────────────────────────────────────────
@@ -189,6 +223,7 @@ export default function EvidenciaAvancePage({
   const [editandoRegistro, setEditandoRegistro] = useState<RegistroLista | null>(null)
   const [fotosExistentes, setFotosExistentes] = useState<FotoLista[]>([])
   const [fotos, setFotos] = useState<FotoLocal[]>([])
+  const [progresoFotos, setProgresoFotos] = useState<{ hechas: number; total: number } | null>(null)
   const [toggledSections, setToggledSections] = useState<Set<TipoRegistroAvance>>(new Set())
 
   const query = useQuery<EvidenciaDetalle>({
@@ -299,13 +334,25 @@ export default function EvidenciaAvancePage({
         toast.success('Registro agregado')
       }
 
-      let fallos = 0
-      for (const foto of fotos) {
-        try { await subirFoto(registroId, foto.file) }
-        catch { fallos++ }
-      }
-      if (fallos > 0) {
-        toast.warning(`${fallos} foto${fallos > 1 ? 's' : ''} no se pudo subir.`)
+      if (fotos.length > 0) {
+        // Append al final: si se borró una foto intermedia, `length` no sirve
+        // como base porque los `orden` restantes tienen huecos.
+        const ordenBase = fotosExistentes.length > 0
+          ? Math.max(...fotosExistentes.map((f) => f.orden)) + 1
+          : 0
+        setProgresoFotos({ hechas: 0, total: fotos.length })
+        const fallos = await subirFotos(
+          registroId,
+          fotos.map((f) => f.file),
+          ordenBase,
+          (hechas) => setProgresoFotos({ hechas, total: fotos.length }),
+        )
+        setProgresoFotos(null)
+        if (fallos > 0) {
+          toast.warning(`${fallos} de ${fotos.length} foto${fotos.length > 1 ? 's' : ''} no se pudo subir.`)
+        } else {
+          toast.success(`${fotos.length} foto${fotos.length > 1 ? 's subidas' : ' subida'}`)
+        }
       }
 
       queryClient.invalidateQueries({ queryKey: ['proyectos', 'evidencia', id] })
@@ -322,10 +369,13 @@ export default function EvidenciaAvancePage({
         observaciones: null,
       })
       setFotos([])
+      setFotosExistentes([])
       setEditandoRegistro(null)
       setModalAbierto(false)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Error al guardar registro')
+    } finally {
+      setProgresoFotos(null)
     }
   }
 
@@ -419,7 +469,11 @@ export default function EvidenciaAvancePage({
   const totalTrabajadores = new Set(
     ev.jornada.tareas.flatMap((t) => t.miembros.map((m) => m.usuarioId)),
   ).size
-  const enviando = form.formState.isSubmitting || crearMutation.isPending || editarMutation.isPending
+  const enviando =
+    form.formState.isSubmitting
+    || crearMutation.isPending
+    || editarMutation.isPending
+    || progresoFotos !== null
 
   // Todas las tareas de la jornada (cronograma + extras) para el select del modal
   const tareasJornada = ev.jornada.tareas
@@ -452,6 +506,7 @@ export default function EvidenciaAvancePage({
       observaciones: null,
     })
     setFotos([])
+    setFotosExistentes([])
     setEditandoRegistro(null)
     setModalAbierto(true)
   }
@@ -477,6 +532,14 @@ export default function EvidenciaAvancePage({
     setFotosExistentes(r.fotos)
     setEditandoRegistro(r)
     setModalAbierto(true)
+  }
+
+  const cerrarModal = () => {
+    if (enviando) return
+    setModalAbierto(false)
+    setEditandoRegistro(null)
+    setFotosExistentes([])
+    setFotos([])
   }
 
   const seccionesConRegistros = SECCIONES_REPORTE.filter((t) =>
@@ -651,24 +714,31 @@ export default function EvidenciaAvancePage({
                       ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                       : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     )}
-                  <Badge className={cn('text-[10px] border shrink-0', TIPO_COLOR[tipoSec])}>
+                  <Badge className={cn('text-[10px] border min-w-0 truncate', TIPO_COLOR[tipoSec])}>
                     {TIPO_REGISTRO_AVANCE_LABELS[tipoSec]}
                   </Badge>
-                  <span className="text-[11px] text-muted-foreground truncate">
+                  {/* Texto completo solo desde sm: en un celular de 360px el
+                      badge + "N registros" + el botón Agregar no entran. */}
+                  <span className="hidden sm:inline text-[11px] text-muted-foreground truncate">
                     {tieneRegistros
                       ? `${registrosTipo.length} registro${registrosTipo.length > 1 ? 's' : ''}`
                       : 'sin registros'}
                   </span>
+                  {tieneRegistros && (
+                    <span className="sm:hidden text-[11px] text-muted-foreground shrink-0">
+                      ×{registrosTipo.length}
+                    </span>
+                  )}
                 </button>
                 {puedeEscribir && (
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="h-7 px-2 text-xs shrink-0"
+                    className="h-9 px-2 text-xs shrink-0 text-orange-700 hover:bg-orange-50"
                     onClick={() => openModal(tipoSec)}
                   >
-                    <Plus className="h-3 w-3 mr-0.5" /> Agregar
+                    <Plus className="h-3.5 w-3.5 mr-0.5" /> Agregar
                   </Button>
                 )}
               </div>
@@ -753,20 +823,20 @@ export default function EvidenciaAvancePage({
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-orange-700 hover:bg-orange-50"
+                                className="h-9 w-9 text-muted-foreground hover:text-orange-700 hover:bg-orange-50"
                                 onClick={() => openEditModal(r)}
                                 aria-label="Editar"
                               >
-                                <Pencil className="h-3.5 w-3.5" />
+                                <Pencil className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                className="h-9 w-9 text-red-500 hover:text-red-700 hover:bg-red-50"
                                 onClick={() => setConfirmEliminarRegistro(r.id)}
                                 aria-label="Eliminar"
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           )}
@@ -808,161 +878,202 @@ export default function EvidenciaAvancePage({
       </div>
 
       {/* ── Modal: agregar/editar registro ────────────────────── */}
-      <Dialog open={modalAbierto} onOpenChange={(open) => { if (!enviando) { setModalAbierto(open); if (!open) { setEditandoRegistro(null); setFotosExistentes([]) } } }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+      <Dialog open={modalAbierto} onOpenChange={(open) => { if (!open) cerrarModal() }}>
+        {/* Layout de columna con cuerpo scrolleable y pie fijo: en celular el
+            formulario es más alto que la pantalla y con el scroll en todo el
+            diálogo el botón Guardar quedaba fuera de vista. */}
+        <DialogContent className="sm:max-w-lg max-h-[92vh] p-0 gap-0 flex flex-col">
+          <DialogHeader className="shrink-0 border-b px-4 py-3">
+            <DialogTitle className="flex items-center gap-2 flex-wrap text-base pr-6">
               {editandoRegistro
-                ? <Pencil className="h-4 w-4 text-orange-600" />
-                : <Plus className="h-4 w-4 text-orange-600" />}
+                ? <Pencil className="h-4 w-4 text-orange-600 shrink-0" />
+                : <Plus className="h-4 w-4 text-orange-600 shrink-0" />}
               {editandoRegistro ? 'Editar registro' : 'Agregar registro'}
-              <Badge className={cn('text-[10px] border ml-1', TIPO_COLOR[tipo])}>
+              <Badge className={cn('text-[10px] border', TIPO_COLOR[tipo])}>
                 {TIPO_REGISTRO_AVANCE_LABELS[tipo]}
               </Badge>
             </DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 pt-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="descripcion-modal" className="text-sm">Descripción</Label>
-              <Textarea
-                id="descripcion-modal"
-                placeholder="Qué se ejecutó, dónde, alcance…"
-                rows={3}
-                disabled={enviando}
-                {...form.register('descripcion')}
-              />
-              {form.formState.errors.descripcion && (
-                <p className="text-xs text-red-600">{form.formState.errors.descripcion.message}</p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3">
               <div className="space-y-1.5">
-                <Label htmlFor="disciplina-modal" className="text-sm">Disciplina (opcional)</Label>
-                <Input
-                  id="disciplina-modal"
-                  placeholder="Ej. Mecánica, Eléctrica…"
+                <Label htmlFor="descripcion-modal" className="text-sm">Descripción</Label>
+                <Textarea
+                  id="descripcion-modal"
+                  placeholder="Qué se ejecutó, dónde, alcance…"
+                  rows={3}
                   disabled={enviando}
-                  {...form.register('disciplina', {
+                  {...form.register('descripcion')}
+                />
+                {form.formState.errors.descripcion && (
+                  <p className="text-xs text-red-600">{form.formState.errors.descripcion.message}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="disciplina-modal" className="text-sm">Disciplina (opcional)</Label>
+                  <Input
+                    id="disciplina-modal"
+                    placeholder="Ej. Mecánica, Eléctrica…"
+                    disabled={enviando}
+                    {...form.register('disciplina', {
+                      setValueAs: (v) => (typeof v === 'string' && v.trim() === '' ? null : v),
+                    })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="porcentaje-modal" className="text-sm">% Avance (opcional)</Label>
+                  <Input
+                    id="porcentaje-modal"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={100}
+                    step={1}
+                    placeholder="0–100"
+                    disabled={enviando}
+                    {...form.register('porcentajeAvance', {
+                      setValueAs: (v) => (v === '' || v == null ? null : Number(v)),
+                    })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="tarea-modal" className="text-sm">Tarea de la jornada (opcional)</Label>
+                <Select
+                  value={jornadaTareaSel ?? SIN_TAREA}
+                  onValueChange={(v) => {
+                    if (v === SIN_TAREA) {
+                      form.setValue('registroHorasCampoTareaId', null, { shouldDirty: true })
+                      form.setValue('proyectoTareaId', null, { shouldDirty: true })
+                    } else {
+                      const t = tareasJornada.find((t) => t.id === v)
+                      form.setValue('registroHorasCampoTareaId', v, { shouldDirty: true })
+                      form.setValue('proyectoTareaId', t?.proyectoTarea?.id ?? null, { shouldDirty: true })
+                    }
+                  }}
+                  disabled={enviando}
+                >
+                  <SelectTrigger id="tarea-modal">
+                    <SelectValue placeholder="Sin tarea" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={SIN_TAREA}>Sin tarea</SelectItem>
+                    {tareasJornada.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.proyectoTarea?.nombre ?? t.nombreTareaExtra ?? 'Tarea extra'}
+                        {!t.proyectoTarea && ' (Extra)'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="obs-modal" className="text-sm">Observaciones (opcional)</Label>
+                <Textarea
+                  id="obs-modal"
+                  placeholder="Notas adicionales"
+                  rows={2}
+                  disabled={enviando}
+                  {...form.register('observaciones', {
                     setValueAs: (v) => (typeof v === 'string' && v.trim() === '' ? null : v),
                   })}
                 />
               </div>
+
               <div className="space-y-1.5">
-                <Label htmlFor="porcentaje-modal" className="text-sm">% Avance (opcional)</Label>
-                <Input
-                  id="porcentaje-modal"
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  max={100}
-                  step={1}
-                  placeholder="0–100"
-                  disabled={enviando}
-                  {...form.register('porcentajeAvance', {
-                    setValueAs: (v) => (v === '' || v == null ? null : Number(v)),
-                  })}
-                />
+                <Label className="text-sm">
+                  Fotos
+                  <span className="ml-1 font-normal text-xs text-muted-foreground">
+                    (hasta {MAX_FOTOS_REGISTRO})
+                  </span>
+                </Label>
+
+                {/* Fotos existentes (solo en modo edición) */}
+                {editandoRegistro && fotosExistentes.length > 0 && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {fotosExistentes.map((f) => (
+                      <div key={f.id} className="relative aspect-square rounded-md overflow-hidden border border-gray-200 bg-muted">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`/api/proyectos/registros-evidencia/fotos/${f.id}/contenido`}
+                          alt={f.nombreArchivo}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                        {/* Sin `opacity-0 group-hover`: en táctil no hay hover y la
+                            X quedaba invisible/inalcanzable desde el celular. */}
+                        <button
+                          type="button"
+                          disabled={eliminarFotoMutation.isPending || enviando}
+                          onClick={() => eliminarFotoMutation.mutate({ registroId: editandoRegistro.id, fotoId: f.id })}
+                          className="absolute top-0.5 right-0.5 h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center transition-colors hover:bg-red-600 active:bg-red-600 disabled:opacity-50"
+                          aria-label="Eliminar foto"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Subir fotos nuevas */}
+                {fotosExistentes.length < MAX_FOTOS_REGISTRO ? (
+                  <FotosUploader
+                    fotos={fotos}
+                    onChange={setFotos}
+                    max={MAX_FOTOS_REGISTRO - fotosExistentes.length}
+                    disabled={enviando}
+                  />
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Ya tiene {MAX_FOTOS_REGISTRO} fotos. Elimina una para agregar otra.
+                  </p>
+                )}
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="tarea-modal" className="text-sm">Tarea de la jornada (opcional)</Label>
-              <Select
-                value={jornadaTareaSel ?? SIN_TAREA}
-                onValueChange={(v) => {
-                  if (v === SIN_TAREA) {
-                    form.setValue('registroHorasCampoTareaId', null, { shouldDirty: true })
-                    form.setValue('proyectoTareaId', null, { shouldDirty: true })
-                  } else {
-                    const t = tareasJornada.find((t) => t.id === v)
-                    form.setValue('registroHorasCampoTareaId', v, { shouldDirty: true })
-                    form.setValue('proyectoTareaId', t?.proyectoTarea?.id ?? null, { shouldDirty: true })
-                  }
-                }}
-                disabled={enviando}
-              >
-                <SelectTrigger id="tarea-modal">
-                  <SelectValue placeholder="Sin tarea" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={SIN_TAREA}>Sin tarea</SelectItem>
-                  {tareasJornada.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.proyectoTarea?.nombre ?? t.nombreTareaExtra ?? 'Tarea extra'}
-                      {!t.proyectoTarea && ' (Extra)'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="obs-modal" className="text-sm">Observaciones (opcional)</Label>
-              <Textarea
-                id="obs-modal"
-                placeholder="Notas adicionales"
-                rows={2}
-                disabled={enviando}
-                {...form.register('observaciones', {
-                  setValueAs: (v) => (typeof v === 'string' && v.trim() === '' ? null : v),
-                })}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-sm">Fotos</Label>
-
-              {/* Fotos existentes (solo en modo edición) */}
-              {editandoRegistro && fotosExistentes.length > 0 && (
-                <div className="flex gap-2 flex-wrap">
-                  {fotosExistentes.map((f) => (
-                    <div key={f.id} className="relative h-20 w-20 rounded-md overflow-hidden border border-gray-200 bg-muted group">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`/api/proyectos/registros-evidencia/fotos/${f.id}/contenido`}
-                        alt={f.nombreArchivo}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                      <button
-                        type="button"
-                        disabled={eliminarFotoMutation.isPending}
-                        onClick={() => eliminarFotoMutation.mutate({ registroId: editandoRegistro.id, fotoId: f.id })}
-                        className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                        aria-label="Eliminar foto"
-                      >
-                        <span className="text-[11px] font-bold leading-none">✕</span>
-                      </button>
-                    </div>
-                  ))}
+            <div className="shrink-0 border-t bg-background px-4 py-3 space-y-2">
+              {progresoFotos && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <ImageIcon className="h-3 w-3" /> Subiendo fotos…
+                    </span>
+                    <span>{progresoFotos.hechas} / {progresoFotos.total}</span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full bg-orange-500 transition-all duration-300"
+                      style={{ width: `${(progresoFotos.hechas / progresoFotos.total) * 100}%` }}
+                    />
+                  </div>
                 </div>
               )}
-
-              {/* Subir fotos nuevas */}
-              {fotosExistentes.length < 3 && (
-                <FotosUploader
-                  fotos={fotos}
-                  onChange={setFotos}
-                  max={3 - fotosExistentes.length}
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 sm:flex-none h-11 sm:h-9"
                   disabled={enviando}
-                />
-              )}
-              {editandoRegistro && fotosExistentes.length >= 3 && (
-                <p className="text-xs text-muted-foreground">Ya tiene 3 fotos. Elimina una para agregar otra.</p>
-              )}
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" disabled={enviando} onClick={() => setModalAbierto(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={enviando} className="bg-orange-600 hover:bg-orange-700">
-                {enviando
-                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Guardando…</>
-                  : <><Save className="h-4 w-4 mr-2" /> Guardar</>}
-              </Button>
+                  onClick={cerrarModal}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={enviando}
+                  className="flex-1 sm:flex-none h-11 sm:h-9 bg-orange-600 hover:bg-orange-700"
+                >
+                  {enviando
+                    ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Guardando…</>
+                    : <><Save className="h-4 w-4 mr-2" /> Guardar</>}
+                </Button>
+              </div>
             </div>
           </form>
         </DialogContent>
