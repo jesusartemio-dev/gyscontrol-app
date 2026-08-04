@@ -63,24 +63,43 @@ export async function GET(req: NextRequest) {
       }),
       prisma.registroHorasCampo.findMany({
         where: { proyectoId, fechaTrabajo: { gte: rangoInicio, lte: rangoFin } },
-        select: { id: true, fechaTrabajo: true, evidenciaAvance: { select: { id: true } } },
+        select: {
+          id: true,
+          fechaTrabajo: true,
+          supervisor: { select: { name: true } },
+          evidenciaAvance: { select: { id: true } },
+        },
+        orderBy: { fechaTrabajo: 'asc' },
       }),
     ])
 
     const reportesPorSemana = new Map(reportes.map((r) => [r.semanaIso, r]))
 
-    const actividadPorSemana = new Map<string, { jornadas: number; evidencias: number }>()
+    interface JornadaDetalle {
+      id: string
+      fecha: string
+      supervisorNombre: string | null
+      tieneEvidencia: boolean
+      evidenciaId: string | null
+    }
+    const actividadPorSemana = new Map<string, { jornadas: JornadaDetalle[]; evidencias: number }>()
     for (const j of jornadas) {
       const semanaIso = formatearSemanaIso(j.fechaTrabajo)
-      const actual = actividadPorSemana.get(semanaIso) ?? { jornadas: 0, evidencias: 0 }
-      actual.jornadas += 1
+      const actual = actividadPorSemana.get(semanaIso) ?? { jornadas: [], evidencias: 0 }
+      actual.jornadas.push({
+        id: j.id,
+        fecha: j.fechaTrabajo.toISOString(),
+        supervisorNombre: j.supervisor?.name ?? null,
+        tieneEvidencia: !!j.evidenciaAvance,
+        evidenciaId: j.evidenciaAvance?.id ?? null,
+      })
       if (j.evidenciaAvance) actual.evidencias += 1
       actividadPorSemana.set(semanaIso, actual)
     }
 
     let resultado = semanas.map((semanaIso) => {
       const reporte = reportesPorSemana.get(semanaIso) ?? null
-      const actividad = actividadPorSemana.get(semanaIso) ?? { jornadas: 0, evidencias: 0 }
+      const actividad = actividadPorSemana.get(semanaIso) ?? { jornadas: [], evidencias: 0 }
       const { fechaInicio, fechaFin } = rangoSemanaIso(semanaIso)
       return {
         semanaIso,
@@ -96,8 +115,9 @@ export async function GET(req: NextRequest) {
               aprobador: reporte.aprobador,
             }
           : null,
-        jornadasCount: actividad.jornadas,
+        jornadasCount: actividad.jornadas.length,
         evidenciasCount: actividad.evidencias,
+        jornadas: actividad.jornadas,
       }
     })
 

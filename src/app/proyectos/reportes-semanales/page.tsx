@@ -5,7 +5,10 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
-import { CalendarDays, ExternalLink, FileBarChart, Loader2, Plus, Trash2, User, CalendarClock } from 'lucide-react'
+import {
+  CalendarDays, ExternalLink, FileBarChart, Loader2, Plus, Trash2, User, CalendarClock,
+  ChevronDown, CheckCircle2, XCircle,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -54,6 +57,14 @@ interface ReporteEnSemana {
   aprobador: { id: string; name: string | null } | null
 }
 
+interface JornadaDetalle {
+  id: string
+  fecha: string
+  supervisorNombre: string | null
+  tieneEvidencia: boolean
+  evidenciaId: string | null
+}
+
 interface SemanaRango {
   semanaIso: string
   weekStart: string
@@ -61,6 +72,7 @@ interface SemanaRango {
   reporte: ReporteEnSemana | null
   jornadasCount: number
   evidenciasCount: number
+  jornadas: JornadaDetalle[]
 }
 
 function hoyISO() {
@@ -76,6 +88,9 @@ function hace1MesISO() {
 
 const formatFechaCorta = (iso: string) =>
   new Date(iso).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', timeZone: 'UTC' })
+
+const formatFechaDia = (iso: string) =>
+  new Date(iso).toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'UTC' })
 
 const ESTADO_COLOR: Record<ReporteListItem['estado'], string> = {
   borrador: 'bg-gray-100 text-gray-700 border-gray-200',
@@ -103,6 +118,13 @@ export default function ReportesAvanceListaPage() {
   const [nuevoProyectoId, setNuevoProyectoId] = useState('')
   const [nuevaSemana, setNuevaSemana] = useState(() => formatearSemanaIso(new Date()))
   const [confirmEliminar, setConfirmEliminar] = useState<string | null>(null)
+  const [semanasExpandidas, setSemanasExpandidas] = useState<Set<string>>(new Set())
+  const toggleSemanaExpandida = (semanaIso: string) =>
+    setSemanasExpandidas((prev) => {
+      const next = new Set(prev)
+      next.has(semanaIso) ? next.delete(semanaIso) : next.add(semanaIso)
+      return next
+    })
 
   // Proyectos para los selects
   const queryProyectos = useQuery<ProyectoMin[]>({
@@ -355,78 +377,116 @@ export default function ReportesAvanceListaPage() {
         <div className="space-y-2">
           {semanasRango.map((s) => {
             const creandoEstaSemana = crearMutation.isPending && crearMutation.variables?.semanaIso === s.semanaIso
+            const expandida = semanasExpandidas.has(s.semanaIso)
             return (
               <Card
                 key={s.semanaIso}
                 className={cn(
-                  'p-3 flex items-center gap-3',
+                  'overflow-hidden',
                   !s.reporte && s.jornadasCount === 0 && 'bg-gray-50/70 border-dashed',
                 )}
               >
-                <div className="w-24 shrink-0 text-xs">
-                  <div className="font-semibold">{formatFechaCorta(s.weekStart)}–{formatFechaCorta(s.weekEnd)}</div>
-                  <div className="text-muted-foreground">{s.semanaIso}</div>
-                </div>
+                <div className="p-3 flex items-center gap-3">
+                  <div className="w-24 shrink-0 text-xs">
+                    <div className="font-semibold">{formatFechaCorta(s.weekStart)}–{formatFechaCorta(s.weekEnd)}</div>
+                    <div className="text-muted-foreground">{s.semanaIso}</div>
+                  </div>
 
-                {s.reporte ? (
-                  <>
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge className={cn('text-[10px] border', ESTADO_COLOR[s.reporte.estado])}>
-                          {ESTADO_REPORTE_AVANCE_LABELS[s.reporte.estado]}
-                        </Badge>
-                        {s.reporte.numero != null && (
-                          <span className="text-[11px] text-muted-foreground">N° {String(s.reporte.numero).padStart(4, '0')}</span>
+                  {s.reporte ? (
+                    <>
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge className={cn('text-[10px] border', ESTADO_COLOR[s.reporte.estado])}>
+                            {ESTADO_REPORTE_AVANCE_LABELS[s.reporte.estado]}
+                          </Badge>
+                          {s.reporte.numero != null && (
+                            <span className="text-[11px] text-muted-foreground">N° {String(s.reporte.numero).padStart(4, '0')}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 flex-wrap text-[11px] text-muted-foreground">
+                          <span className="flex items-center gap-1"><User className="h-3 w-3" /> {s.reporte.autor.name ?? '—'}</span>
+                          {s.reporte.aprobador && <span>Aprob.: {s.reporte.aprobador.name ?? '—'}</span>}
+                          <span>Creado {formatFecha(s.reporte.createdAt)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Link href={`/proyectos/reportes-semanales/${s.reporte.id}`}>
+                          <Button variant="outline" size="sm" className="h-8">
+                            Abrir <ExternalLink className="h-3.5 w-3.5 ml-1" />
+                          </Button>
+                        </Link>
+                        {isBypass && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => setConfirmEliminar(s.reporte!.id)}
+                            aria-label="Eliminar"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         )}
                       </div>
-                      <div className="flex items-center gap-3 flex-wrap text-[11px] text-muted-foreground">
-                        <span className="flex items-center gap-1"><User className="h-3 w-3" /> {s.reporte.autor.name ?? '—'}</span>
-                        {s.reporte.aprobador && <span>Aprob.: {s.reporte.aprobador.name ?? '—'}</span>}
-                        <span>Creado {formatFecha(s.reporte.createdAt)}</span>
+                    </>
+                  ) : s.jornadasCount > 0 ? (
+                    <>
+                      <div className="flex-1 min-w-0 flex items-center gap-2 text-xs text-amber-700">
+                        <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          Sin reporte — {s.jornadasCount} jornada{s.jornadasCount !== 1 && 's'}
+                          {s.evidenciasCount > 0 && ` (${s.evidenciasCount} con evidencia)`} esta semana
+                        </span>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Link href={`/proyectos/reportes-semanales/${s.reporte.id}`}>
-                        <Button variant="outline" size="sm" className="h-8">
-                          Abrir <ExternalLink className="h-3.5 w-3.5 ml-1" />
-                        </Button>
-                      </Link>
-                      {isBypass && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => setConfirmEliminar(s.reporte!.id)}
-                          aria-label="Eliminar"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  </>
-                ) : s.jornadasCount > 0 ? (
-                  <>
-                    <div className="flex-1 min-w-0 flex items-center gap-2 text-xs text-amber-700">
-                      <CalendarClock className="h-3.5 w-3.5 shrink-0" />
-                      <span>
-                        Sin reporte — {s.jornadasCount} jornada{s.jornadasCount !== 1 && 's'}
-                        {s.evidenciasCount > 0 && ` (${s.evidenciasCount} con evidencia)`} esta semana
-                      </span>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 border-orange-300 text-orange-700 hover:bg-orange-50 shrink-0"
-                      disabled={creandoEstaSemana}
-                      onClick={() => crearMutation.mutate({ proyectoId: filtroProyectoId, semanaIso: s.semanaIso })}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 border-orange-300 text-orange-700 hover:bg-orange-50 shrink-0"
+                        disabled={creandoEstaSemana}
+                        onClick={() => crearMutation.mutate({ proyectoId: filtroProyectoId, semanaIso: s.semanaIso })}
+                      >
+                        {creandoEstaSemana
+                          ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Creando…</>
+                          : <><Plus className="h-3.5 w-3.5 mr-1" /> Crear reporte</>}
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="flex-1 text-xs text-muted-foreground">Sin avance esta semana</div>
+                  )}
+
+                  {s.jornadasCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => toggleSemanaExpandida(s.semanaIso)}
+                      className="h-6 w-6 flex items-center justify-center rounded hover:bg-gray-100 transition-colors shrink-0"
+                      title={expandida ? 'Ocultar jornadas' : 'Ver jornadas y evidencia'}
+                      aria-label={expandida ? 'Ocultar jornadas' : 'Ver jornadas y evidencia'}
                     >
-                      {creandoEstaSemana
-                        ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Creando…</>
-                        : <><Plus className="h-3.5 w-3.5 mr-1" /> Crear reporte</>}
-                    </Button>
-                  </>
-                ) : (
-                  <div className="flex-1 text-xs text-muted-foreground">Sin avance esta semana</div>
+                      <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform duration-200', expandida && 'rotate-180')} />
+                    </button>
+                  )}
+                </div>
+
+                {expandida && s.jornadas.length > 0 && (
+                  <div className="border-t border-gray-100 divide-y divide-gray-50">
+                    {s.jornadas.map((j) => (
+                      <div key={j.id} className="flex items-center gap-3 px-3 py-1.5 text-xs">
+                        <span className="w-28 shrink-0 capitalize">{formatFechaDia(j.fecha)}</span>
+                        <span className="flex-1 min-w-0 truncate text-muted-foreground">{j.supervisorNombre ?? '—'}</span>
+                        {j.tieneEvidencia ? (
+                          <Link
+                            href={`/proyectos/evidencias/${j.evidenciaId}`}
+                            className="flex items-center gap-1 text-green-700 hover:text-green-800 shrink-0"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Con evidencia
+                          </Link>
+                        ) : (
+                          <span className="flex items-center gap-1 text-gray-400 shrink-0">
+                            <XCircle className="h-3.5 w-3.5" /> Sin evidencia
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </Card>
             )
