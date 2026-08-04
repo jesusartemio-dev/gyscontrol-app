@@ -15,7 +15,7 @@ export const EVIDENCIA_AVANCE_INCLUDE = {
         select: {
           id: true,
           nombreTareaExtra: true,
-          proyectoTarea: { select: { id: true, nombre: true } },
+          proyectoTarea: { select: { id: true, nombre: true, porcentajeCompletado: true } },
           miembros: {
             select: {
               usuarioId: true,

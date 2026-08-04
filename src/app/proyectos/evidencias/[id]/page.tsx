@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useState } from 'react'
+import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
@@ -102,7 +102,7 @@ interface RegistroLista {
 interface JornadaTarea {
   id: string
   nombreTareaExtra: string | null
-  proyectoTarea: { id: string; nombre: string } | null
+  proyectoTarea: { id: string; nombre: string; porcentajeCompletado: number } | null
   miembros: Array<{
     usuarioId: string
     horas: number
@@ -251,6 +251,20 @@ export default function EvidenciaAvancePage({
 
   const tipo = form.watch('tipo')
   const jornadaTareaSel = form.watch('registroHorasCampoTareaId')
+
+  // Si la tarea elegida tiene avance real del cronograma, el % del registro se
+  // toma de ahí (solo lectura) en vez de escribirse a mano — evita tener dos
+  // números de avance desconectados para lo mismo. Tareas extra (sin
+  // proyectoTarea) no tienen avance real, así que caen al input manual.
+  const tareaSeleccionada = query.data?.jornada.tareas.find((t) => t.id === jornadaTareaSel) ?? null
+  const tareaRealPct = tareaSeleccionada?.proyectoTarea?.porcentajeCompletado ?? null
+
+  useEffect(() => {
+    if (tareaRealPct != null) {
+      form.setValue('porcentajeAvance', tareaRealPct, { shouldDirty: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jornadaTareaSel, tareaRealPct])
 
   // ── Mutations ──────────────────────────────────────────────────────────────
 
@@ -911,36 +925,6 @@ export default function EvidenciaAvancePage({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="disciplina-modal" className="text-sm">Disciplina (opcional)</Label>
-                  <Input
-                    id="disciplina-modal"
-                    placeholder="Ej. Mecánica, Eléctrica…"
-                    disabled={enviando}
-                    {...form.register('disciplina', {
-                      setValueAs: (v) => (typeof v === 'string' && v.trim() === '' ? null : v),
-                    })}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="porcentaje-modal" className="text-sm">% Avance (opcional)</Label>
-                  <Input
-                    id="porcentaje-modal"
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    max={100}
-                    step={1}
-                    placeholder="0–100"
-                    disabled={enviando}
-                    {...form.register('porcentajeAvance', {
-                      setValueAs: (v) => (v === '' || v == null ? null : Number(v)),
-                    })}
-                  />
-                </div>
-              </div>
-
               <div className="space-y-1.5">
                 <Label htmlFor="tarea-modal" className="text-sm">Tarea de la jornada (opcional)</Label>
                 <Select
@@ -949,6 +933,7 @@ export default function EvidenciaAvancePage({
                     if (v === SIN_TAREA) {
                       form.setValue('registroHorasCampoTareaId', null, { shouldDirty: true })
                       form.setValue('proyectoTareaId', null, { shouldDirty: true })
+                      form.setValue('porcentajeAvance', null, { shouldDirty: true })
                     } else {
                       const t = tareasJornada.find((t) => t.id === v)
                       form.setValue('registroHorasCampoTareaId', v, { shouldDirty: true })
@@ -970,6 +955,31 @@ export default function EvidenciaAvancePage({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="porcentaje-modal" className="text-sm">% Avance</Label>
+                {tareaRealPct != null ? (
+                  <div className="h-9 flex items-center gap-1.5 px-3 rounded-md border bg-muted/40 text-sm">
+                    <Gauge className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="font-medium">{tareaRealPct}%</span>
+                    <span className="text-xs text-muted-foreground">— avance real de la tarea</span>
+                  </div>
+                ) : (
+                  <Input
+                    id="porcentaje-modal"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={100}
+                    step={1}
+                    placeholder="0–100 (opcional)"
+                    disabled={enviando}
+                    {...form.register('porcentajeAvance', {
+                      setValueAs: (v) => (v === '' || v == null ? null : Number(v)),
+                    })}
+                  />
+                )}
               </div>
 
               <div className="space-y-1.5">
