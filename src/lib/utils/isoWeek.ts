@@ -29,3 +29,19 @@ export function rangoSemanaIso(semana: string): { fechaInicio: Date; fechaFin: D
   const fechaFin = new Date(Date.UTC(sunday.getFullYear(), sunday.getMonth(), sunday.getDate(), 23, 59, 59, 999))
   return { fechaInicio, fechaFin }
 }
+
+/**
+ * Lista de semanas ISO ("YYYY-Www") entre dos fechas, inclusive, en orden
+ * ascendente — una entrada por cada semana que toque el rango [desde, hasta].
+ */
+export function semanasEnRango(desde: Date, hasta: Date): string[] {
+  if (desde > hasta) return []
+  const semanas: string[] = []
+  let cursor = startOfISOWeek(desde)
+  const fin = startOfISOWeek(hasta)
+  while (cursor <= fin) {
+    semanas.push(formatearSemanaIso(cursor))
+    cursor = addWeeks(cursor, 1)
+  }
+  return semanas
+}

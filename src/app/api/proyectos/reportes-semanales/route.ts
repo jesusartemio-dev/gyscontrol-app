@@ -18,6 +18,8 @@ export async function GET(req: NextRequest) {
     const proyectoId = searchParams.get('proyectoId')
     const semanaIso = searchParams.get('semanaIso')
     const estadoParam = searchParams.get('estado')
+    const fechaDesdeParam = searchParams.get('fechaDesde')
+    const fechaHastaParam = searchParams.get('fechaHasta')
 
     const where: Prisma.ReporteSemanalAvanceWhereInput = {}
     if (proyectoId) where.proyectoId = proyectoId
@@ -25,6 +27,15 @@ export async function GET(req: NextRequest) {
     if (estadoParam) {
       const parsed = estadoReporteAvanceEnum.safeParse(estadoParam)
       if (parsed.success) where.estado = parsed.data
+    }
+    // Rango de fechas (solape con [fechaInicio, fechaFin] del reporte) — usado
+    // por la vista "Todos los proyectos", que no puede armar la tabla semana a
+    // semana por proyecto (eso requiere un proyectoId específico, ver /rango).
+    if (!semanaIso && fechaDesdeParam) {
+      where.fechaFin = { gte: new Date(`${fechaDesdeParam}T00:00:00Z`) }
+    }
+    if (!semanaIso && fechaHastaParam) {
+      where.fechaInicio = { lte: new Date(`${fechaHastaParam}T23:59:59Z`) }
     }
 
     const reportes = await prisma.reporteSemanalAvance.findMany({
