@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { FileText, ExternalLink, Loader2 } from 'lucide-react'
+import { FileText, ExternalLink, Loader2, FolderOpen } from 'lucide-react'
 
 interface VersionRevisadaData {
   html: string
@@ -10,6 +10,7 @@ interface VersionRevisadaData {
   numeroRevision: string
   generadoEn: string
   webViewLink: string
+  driveFolderId: string | null
 }
 
 interface Props {
@@ -93,6 +94,17 @@ export function VersionRevisadaView({ proyectoId }: Props) {
           <ExternalLink size={12} />
           Abrir en Drive
         </a>
+        {data.driveFolderId && (
+          <a
+            href={`https://drive.google.com/drive/folders/${data.driveFolderId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0"
+          >
+            <FolderOpen size={12} />
+            Abrir carpeta
+          </a>
+        )}
       </div>
 
       <div className="overflow-x-auto border rounded-md p-4 bg-white">

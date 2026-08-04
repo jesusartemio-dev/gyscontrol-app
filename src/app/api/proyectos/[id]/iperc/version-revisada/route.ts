@@ -78,6 +78,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
         archivoNombre: version.archivoNombre,
         subidoEn: version.subidoEn,
         webViewLink: version.webViewLink,
+        driveFolderId: version.driveFolderId,
       },
     },
     // no-store: la vigente puede cambiar en cualquier momento (nueva subida) y

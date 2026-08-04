@@ -76,6 +76,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     select: {
       id: true,
       driveFileId: true,
+      driveFolderId: true,
       archivoNombre: true,
       numeroRevision: true,
       codigoNexa: true,
@@ -107,6 +108,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
         numeroRevision: generacion.numeroRevision,
         generadoEn: generacion.generadoEn,
         webViewLink: generacion.webViewLink,
+        driveFolderId: generacion.driveFolderId,
       },
     },
     // no-store: la vigente puede cambiar en cualquier momento (nueva subida) y
