@@ -26,6 +26,7 @@ import { ImportEdtModal } from '../../cronograma/ImportEdtModal'
 import { ImportTareasModal } from '../../cronograma/ImportTareasModal'
 import { AsignarResponsable } from './AsignarResponsable'
 import { AsignarRecurso } from './AsignarRecurso'
+import { MoverActividadEdtModal } from './MoverActividadEdtModal'
 import { CronogramaTreeViewProps, TreeNode as TreeNodeType, NodeType } from '../../cronograma/types'
 import type { EdtImportSelection } from '../../cronograma/ImportEdtModal'
 import { useProyectoCronogramaTree } from './hooks/useProyectoCronogramaTree'
@@ -344,6 +345,19 @@ export function ProyectoCronogramaTreeView({
   const [showImportTareasModal, setShowImportTareasModal] = useState(false)
   const [importTareasData, setImportTareasData] = useState<any[]>([])
   const [currentActividadNombre, setCurrentActividadNombre] = useState('')
+
+  // Estado para modal de mover actividad a otro EDT
+  const [moverEdtModal, setMoverEdtModal] = useState<{
+    open: boolean
+    actividadId: string
+    actividadNombre: string
+    edtActualNombre: string
+  }>({
+    open: false,
+    actividadId: '',
+    actividadNombre: '',
+    edtActualNombre: ''
+  })
 
   const handleAddChild = (parentId: string, childType: NodeType) => {
     setFormContext({
@@ -731,6 +745,21 @@ export function ProyectoCronogramaTreeView({
     }
   }
 
+  const handleAbrirMoverEdt = (nodeId: string) => {
+    const node = state.nodes.get(nodeId)
+    if (!node || node.type !== 'actividad') return
+
+    const actividadId = nodeId.replace('actividad-', '')
+    const parentNode = node.parentId ? state.nodes.get(node.parentId) : null
+
+    setMoverEdtModal({
+      open: true,
+      actividadId,
+      actividadNombre: node.nombre,
+      edtActualNombre: parentNode?.nombre || 'EDT actual'
+    })
+  }
+
   const handleDeleteCronograma = async () => {
     if (!selectedCronograma) return
 
@@ -796,6 +825,7 @@ export function ProyectoCronogramaTreeView({
                     onDelete={isReadOnly || node.type === 'proyecto' ? undefined : () => actions.deleteNode(nodeId)}
                     onDuplicate={!isReadOnly && node.type === 'tarea' ? () => handleDuplicateTarea(nodeId) : undefined}
                     onDuplicarActividad={!isReadOnly && node.type === 'actividad' ? () => handleDuplicarActividad(nodeId) : undefined}
+                    onMoverEdt={!isReadOnly && node.type === 'actividad' ? () => handleAbrirMoverEdt(nodeId) : undefined}
                     onAjustarPosicion={
                       !isReadOnly && (node.type === 'tarea' || node.type === 'actividad')
                         ? (pos) => handleAjustarPosicion(nodeId, pos)
@@ -1167,6 +1197,20 @@ export function ProyectoCronogramaTreeView({
           recursoActual={recursoModal.recursoActual}
           onAsignacionExitosa={async () => {
             setRecursoModal(prev => ({ ...prev, open: false }))
+            await actions.loadTree([...state.expandedNodes])
+            onRefresh?.()
+          }}
+        />
+
+        {/* Modal de mover actividad a otro EDT */}
+        <MoverActividadEdtModal
+          open={moverEdtModal.open}
+          onOpenChange={(open) => setMoverEdtModal(prev => ({ ...prev, open }))}
+          proyectoId={proyectoId}
+          actividadId={moverEdtModal.actividadId}
+          actividadNombre={moverEdtModal.actividadNombre}
+          edtActualNombre={moverEdtModal.edtActualNombre}
+          onSuccess={async () => {
             await actions.loadTree([...state.expandedNodes])
             onRefresh?.()
           }}

@@ -6,7 +6,7 @@
 // ===================================================
 
 import React from 'react'
-import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine, ArrowRightLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -34,6 +34,7 @@ interface TreeNodeProps {
   onAssignRecurso?: () => void
   onDuplicate?: () => void
   onDuplicarActividad?: () => void
+  onMoverEdt?: () => void
   onAjustarPosicion?: (posicion: 'inicio_padre' | 'despues_ultimo') => void
   dragListeners?: Record<string, Function>
   dragAttributes?: Record<string, any>
@@ -94,6 +95,7 @@ export function TreeNode({
   onAssignRecurso,
   onDuplicate,
   onDuplicarActividad,
+  onMoverEdt,
   onAjustarPosicion,
   dragListeners,
   dragAttributes,
@@ -581,6 +583,17 @@ export function TreeNode({
                 >
                   <Copy className="h-4 w-4 mr-2" />
                   Duplicar Actividad (con tareas)
+                </DropdownMenuItem>
+              )}
+
+              {/* Mover a otro EDT - solo actividades */}
+              {!readOnly && node.type === 'actividad' && onMoverEdt && (
+                <DropdownMenuItem
+                  onClick={() => { setDropdownOpen(false); onMoverEdt() }}
+                  className="text-blue-600"
+                >
+                  <ArrowRightLeft className="h-4 w-4 mr-2" />
+                  Mover a otro EDT
                 </DropdownMenuItem>
               )}
 
