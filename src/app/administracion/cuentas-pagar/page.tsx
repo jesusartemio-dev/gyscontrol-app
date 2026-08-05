@@ -191,6 +191,11 @@ export default function CuentasPagarPage() {
   const [pagoBancoId, setPagoBancoId] = useState('none')
   const [pagoObs, setPagoObs] = useState('')
   const [conDetraccion, setConDetraccion] = useState(false)
+  // false = detracción + neto en el mismo pago (comportamiento histórico);
+  // true = solo se está depositando la detracción, el neto se paga después
+  // por separado (factura a crédito, o detracción pagada en la fecha límite
+  // SUNAT sin que el neto esté listo todavía).
+  const [soloDetraccion, setSoloDetraccion] = useState(false)
   const [detraccionPorcentaje, setDetraccionPorcentaje] = useState('12')
   const [detraccionCodigo, setDetraccionCodigo] = useState('')
   const [detraccionFechaPago, setDetraccionFechaPago] = useState('')
@@ -681,6 +686,8 @@ export default function CuentasPagarPage() {
     setPagoOperacion('')
     setPagoBancoId('none')
     setPagoObs('')
+    setConDetraccion(false)
+    setSoloDetraccion(false)
     setShowPagoDialog(true)
   }
 
@@ -710,7 +717,8 @@ export default function CuentasPagarPage() {
           numeroOperacion: pagoOperacion || null,
           cuentaBancariaId: pagoBancoId === 'none' ? null : pagoBancoId,
           observaciones: pagoObs || null,
-          conDetraccion,
+          conDetraccion: conDetraccion && !soloDetraccion,
+          soloDetraccion: conDetraccion && soloDetraccion,
           detraccionPorcentaje: conDetraccion ? parseFloat(detraccionPorcentaje) : undefined,
           detraccionCodigo: conDetraccion ? detraccionCodigo || undefined : undefined,
           detraccionFechaPago: conDetraccion ? detraccionFechaPago || undefined : undefined,
@@ -1461,42 +1469,49 @@ export default function CuentasPagarPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Monto * (máx: {pagoCuenta ? formatCurrency(pagoCuenta.saldoPendiente, pagoCuenta.moneda) : ''})</Label>
+              <Label>
+                {soloDetraccion ? 'Monto de la detracción *' : 'Monto *'}
+                {' '}(máx: {pagoCuenta ? formatCurrency(pagoCuenta.saldoPendiente, pagoCuenta.moneda) : ''})
+              </Label>
               <Input type="number" step="0.01" value={pagoMonto} onChange={e => setPagoMonto(e.target.value)} max={pagoCuenta?.saldoPendiente} />
             </div>
             <div>
               <Label>Fecha de Pago *</Label>
               <Input type="date" value={pagoFecha} onChange={e => setPagoFecha(e.target.value)} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Medio de Pago</Label>
-                <Select value={pagoMedio} onValueChange={setPagoMedio}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="transferencia">Transferencia</SelectItem>
-                    <SelectItem value="cheque">Cheque</SelectItem>
-                    <SelectItem value="efectivo">Efectivo</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>N° Operación</Label>
-                <Input placeholder="Número de operación" value={pagoOperacion} onChange={e => setPagoOperacion(e.target.value)} />
-              </div>
-            </div>
-            <div>
-              <Label>Cuenta Bancaria</Label>
-              <Select value={pagoBancoId} onValueChange={setPagoBancoId}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin especificar</SelectItem>
-                  {cuentasBancarias.map(b => (
-                    <SelectItem key={b.id} value={b.id}>{b.nombreBanco} - {b.numeroCuenta}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {!soloDetraccion && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Medio de Pago</Label>
+                    <Select value={pagoMedio} onValueChange={setPagoMedio}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="transferencia">Transferencia</SelectItem>
+                        <SelectItem value="cheque">Cheque</SelectItem>
+                        <SelectItem value="efectivo">Efectivo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>N° Operación</Label>
+                    <Input placeholder="Número de operación" value={pagoOperacion} onChange={e => setPagoOperacion(e.target.value)} />
+                  </div>
+                </div>
+                <div>
+                  <Label>Cuenta Bancaria</Label>
+                  <Select value={pagoBancoId} onValueChange={setPagoBancoId}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar cuenta" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin especificar</SelectItem>
+                      {cuentasBancarias.map(b => (
+                        <SelectItem key={b.id} value={b.id}>{b.nombreBanco} - {b.numeroCuenta}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
             <div>
               <Label>Observaciones</Label>
               <Input placeholder="Observaciones del pago" value={pagoObs} onChange={e => setPagoObs(e.target.value)} />
@@ -1504,11 +1519,35 @@ export default function CuentasPagarPage() {
 
             {/* Detracción */}
             <div className="flex items-center space-x-2 pt-2 border-t">
-              <Checkbox id="conDetraccionP" checked={conDetraccion} onCheckedChange={(v) => setConDetraccion(!!v)} />
+              <Checkbox
+                id="conDetraccionP"
+                checked={conDetraccion}
+                onCheckedChange={(v) => { setConDetraccion(!!v); if (!v) setSoloDetraccion(false) }}
+              />
               <Label htmlFor="conDetraccionP" className="text-sm font-medium cursor-pointer">¿Incluye detracción?</Label>
             </div>
             {conDetraccion && (
               <div className="space-y-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-start space-x-2">
+                  <Checkbox
+                    id="soloDetraccionP"
+                    checked={soloDetraccion}
+                    onCheckedChange={(v) => {
+                      setSoloDetraccion(!!v)
+                      // Prellenar con la detracción pendiente calculada — el
+                      // usuario la ajusta si el depósito real fue distinto.
+                      if (v && pagoCuenta) {
+                        setPagoMonto(detraccionPendiente(pagoCuenta).toFixed(2))
+                      } else if (!v && pagoCuenta) {
+                        setPagoMonto(pagoCuenta.saldoPendiente.toFixed(2))
+                      }
+                    }}
+                  />
+                  <Label htmlFor="soloDetraccionP" className="text-xs cursor-pointer leading-tight">
+                    Es SOLO el pago de la detracción — el neto de la factura se paga después, por separado
+                    (ej. factura a crédito, o detracción depositada en la fecha límite SUNAT)
+                  </Label>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs">Porcentaje detracción (%)</Label>
@@ -1539,21 +1578,42 @@ export default function CuentasPagarPage() {
                   <Label className="text-xs">N° Constancia depósito BN</Label>
                   <Input placeholder="Ej: 00123456789" value={numeroConstanciaBN} onChange={e => setNumeroConstanciaBN(e.target.value)} />
                 </div>
-                {pagoMonto && detraccionPorcentaje && (
-                  <div className="text-xs space-y-1 pt-2 border-t border-amber-300">
-                    <div className="flex justify-between">
-                      <span>Monto total:</span>
-                      <span className="font-mono">{pagoCuenta ? formatCurrency(parseFloat(pagoMonto), pagoCuenta.moneda) : pagoMonto}</span>
+                {soloDetraccion ? (
+                  pagoMonto && pagoCuenta && (
+                    <div className="text-xs space-y-1 pt-2 border-t border-amber-300">
+                      <div className="flex justify-between font-bold">
+                        <span>Se registra como pago de detracción:</span>
+                        <span className="font-mono">{formatCurrency(parseFloat(pagoMonto), pagoCuenta.moneda)}</span>
+                      </div>
+                      <div className="flex justify-between text-amber-700">
+                        <span>Detracción pendiente después de este pago:</span>
+                        <span className="font-mono">
+                          {formatCurrency(Math.max(0, Math.round((detraccionPendiente(pagoCuenta) - parseFloat(pagoMonto)) * 100) / 100), pagoCuenta.moneda)}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground pt-1">
+                        El neto de la factura queda pendiente — registralo como un pago normal (sin marcar
+                        "¿Incluye detracción?") cuando se pague.
+                      </p>
                     </div>
-                    <div className="flex justify-between text-amber-700">
-                      <span>Detracción ({detraccionPorcentaje}%):</span>
-                      <span className="font-mono">{pagoCuenta ? formatCurrency(Math.round(parseFloat(pagoMonto) * parseFloat(detraccionPorcentaje) / 100 * 100) / 100, pagoCuenta.moneda) : ''}</span>
+                  )
+                ) : (
+                  pagoMonto && detraccionPorcentaje && (
+                    <div className="text-xs space-y-1 pt-2 border-t border-amber-300">
+                      <div className="flex justify-between">
+                        <span>Monto total:</span>
+                        <span className="font-mono">{pagoCuenta ? formatCurrency(parseFloat(pagoMonto), pagoCuenta.moneda) : pagoMonto}</span>
+                      </div>
+                      <div className="flex justify-between text-amber-700">
+                        <span>Detracción ({detraccionPorcentaje}%):</span>
+                        <span className="font-mono">{pagoCuenta ? formatCurrency(Math.round(parseFloat(pagoMonto) * parseFloat(detraccionPorcentaje) / 100 * 100) / 100, pagoCuenta.moneda) : ''}</span>
+                      </div>
+                      <div className="flex justify-between font-bold">
+                        <span>Neto a pagar:</span>
+                        <span className="font-mono">{pagoCuenta ? formatCurrency(Math.round((parseFloat(pagoMonto) - parseFloat(pagoMonto) * parseFloat(detraccionPorcentaje) / 100) * 100) / 100, pagoCuenta.moneda) : ''}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between font-bold">
-                      <span>Neto a pagar:</span>
-                      <span className="font-mono">{pagoCuenta ? formatCurrency(Math.round((parseFloat(pagoMonto) - parseFloat(pagoMonto) * parseFloat(detraccionPorcentaje) / 100) * 100) / 100, pagoCuenta.moneda) : ''}</span>
-                    </div>
-                  </div>
+                  )
                 )}
               </div>
             )}
@@ -1562,7 +1622,7 @@ export default function CuentasPagarPage() {
             <Button variant="outline" onClick={() => setShowPagoDialog(false)}>Cancelar</Button>
             <Button onClick={handlePago} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {conDetraccion ? 'Registrar con Detracción' : 'Registrar Pago'}
+              {soloDetraccion ? 'Registrar Detracción' : conDetraccion ? 'Registrar con Detracción' : 'Registrar Pago'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -18,7 +18,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { id: cuentaPorPagarId } = await params
     const body = await req.json()
     const { monto, fechaPago, medioPago, numeroOperacion, cuentaBancariaId, observaciones,
-      conDetraccion, detraccionPorcentaje, detraccionCodigo, detraccionFechaPago, cuentaBNId, numeroConstanciaBN } = body
+      conDetraccion, soloDetraccion, detraccionPorcentaje, detraccionCodigo, detraccionFechaPago, cuentaBNId, numeroConstanciaBN } = body
 
     if (!monto || !fechaPago) {
       return NextResponse.json({ error: 'monto y fechaPago son requeridos' }, { status: 400 })
@@ -34,7 +34,34 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     let pagos: any[]
 
-    if (conDetraccion && detraccionPorcentaje > 0) {
+    if (soloDetraccion) {
+      // Solo se depositó la detracción — el neto de la factura se paga
+      // después, por separado (factura a crédito, o detracción pagada en la
+      // fecha límite SUNAT sin que el neto esté listo todavía). `monto` acá
+      // ES el monto de la detracción, no un total a repartir.
+      const pago = await prisma.pagoPagar.create({
+        data: {
+          cuentaPorPagarId,
+          cuentaBancariaId: cuentaBNId || null,
+          monto,
+          fechaPago: detraccionFechaPago ? new Date(detraccionFechaPago) : new Date(fechaPago),
+          medioPago: 'detraccion',
+          numeroOperacion: numeroOperacion || null,
+          observaciones: observaciones || `Detracción ${detraccionPorcentaje ?? ''}%${detraccionCodigo ? ` (${detraccionCodigo})` : ''}`.trim(),
+          esDetraccion: true,
+          detraccionPorcentaje: detraccionPorcentaje || null,
+          detraccionCodigo: detraccionCodigo || null,
+          detraccionMonto: monto,
+          detraccionFechaPago: detraccionFechaPago ? new Date(detraccionFechaPago) : null,
+          numeroConstanciaBN: numeroConstanciaBN || null,
+          updatedAt: new Date(),
+        },
+        include: {
+          cuentaBancaria: { select: { id: true, nombreBanco: true, numeroCuenta: true } },
+        },
+      })
+      pagos = [pago]
+    } else if (conDetraccion && detraccionPorcentaje > 0) {
       // Split: detracción + neto
       const detraccionMonto = Math.round(monto * detraccionPorcentaje / 100 * 100) / 100
       const montoNeto = Math.round((monto - detraccionMonto) * 100) / 100
