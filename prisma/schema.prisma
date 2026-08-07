@@ -4579,6 +4579,8 @@ model OrdenCompraItem {
   catalogoEpp      CatalogoEPP?      @relation(fields: [catalogoEppId], references: [id])
 
   recepcionesPendientes RecepcionPendiente[]
+  /// Líneas de factura que cubren este ítem (una OC se puede facturar por partes).
+  facturasItems         CuentaPorPagarItem[]
 
   @@index([ordenCompraId])
   @@map("orden_compra_item")
@@ -4753,6 +4755,8 @@ model CuentaPorPagar {
   pedidoEquipoItem PedidoEquipoItem? @relation(fields: [pedidoEquipoItemId], references: [id])
   pagos            PagoPagar[]
   adjuntos         CxPAdjunto[]
+  /// Ítems de la OC que cubre esta factura (facturación parcial de una OC).
+  itemsFacturados  CuentaPorPagarItem[]
 
   @@index([proveedorId, estado])
   @@index([proyectoId, estado])
@@ -4785,6 +4789,32 @@ model PagoPagar {
   @@index([cuentaPorPagarId])
   @@index([fechaPago])
   @@map("pago_pagar")
+}
+
+/// Detalle de qué ítems de la OC cubre una factura (CuentaPorPagar).
+/// Permite facturar una OC por partes: cada factura parcial deja registrado
+/// qué ítems y qué cantidad cubrió, para saber después qué falta facturar.
+/// Sin updatedAt a propósito — se escribe una vez junto con la factura, igual
+/// que CxPAdjunto.
+model CuentaPorPagarItem {
+  id                String @id @default(cuid())
+  cuentaPorPagarId  String
+  ordenCompraItemId String
+
+  /// Cantidad del ítem cubierta por ESTA factura. Normalmente es el ítem
+  /// completo, pero admite parciales (se pidieron 100, se facturan 60).
+  cantidad Float
+  /// Monto atribuido a este ítem dentro de la factura.
+  monto    Float
+
+  createdAt DateTime @default(now())
+
+  cuentaPorPagar  CuentaPorPagar  @relation(fields: [cuentaPorPagarId], references: [id], onDelete: Cascade)
+  ordenCompraItem OrdenCompraItem @relation(fields: [ordenCompraItemId], references: [id])
+
+  @@index([cuentaPorPagarId])
+  @@index([ordenCompraItemId])
+  @@map("cuenta_por_pagar_item")
 }
 
 model CxPAdjunto {

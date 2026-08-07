@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Combobox } from '@/components/ui/combobox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -66,6 +67,28 @@ interface OrdenCompra {
   proveedor?: { id: string; nombre: string; ruc?: string | null }
   proyecto?: { id: string; codigo: string; nombre: string } | null
   centroCosto?: { id: string; nombre: string } | null
+}
+
+/** Ítem de una OC con lo recibido por Logística y lo ya facturado. */
+interface ItemFacturable {
+  id: string
+  codigo: string
+  descripcion: string
+  unidad: string
+  cantidad: number
+  cantidadRecibida: number
+  cantidadFacturada: number
+  cantidadPendiente: number
+  precioNetoUnitario: number
+  costoTotal: number
+  montoFacturado: number
+  totalmenteFacturado: boolean
+}
+
+interface ResumenFacturacionOc {
+  totalOc: number
+  totalFacturado: number
+  saldoPorFacturar: number
 }
 
 interface CuentaPorPagar {
@@ -180,6 +203,14 @@ export default function CuentasPagarPage() {
     numeroCheque: '',
     numeroLetra: '',
   })
+
+  // Ítems de la OC vinculada — permite facturar solo lo entregado
+  // (facturación parcial). Se cargan al elegir una OC en el formulario.
+  const [itemsOc, setItemsOc] = useState<ItemFacturable[]>([])
+  const [resumenOc, setResumenOc] = useState<ResumenFacturacionOc | null>(null)
+  const [cargandoItemsOc, setCargandoItemsOc] = useState(false)
+  /** itemId -> cantidad a facturar en ESTA factura (ausente = no seleccionado) */
+  const [itemsSeleccionados, setItemsSeleccionados] = useState<Record<string, string>>({})
 
   // Pago dialog
   const [showPagoDialog, setShowPagoDialog] = useState(false)
@@ -298,12 +329,25 @@ export default function CuentasPagarPage() {
     }
   }, [items])
 
-  // OCs confirmadas/completadas sin CxP vinculada
+  // OCs con algo pendiente de facturar. Incluye 'parcial' (recepción
+  // incompleta): el proveedor factura lo que ya entregó, sin esperar a que
+  // la OC llegue al 100%. Una OC deja de listarse recién cuando lo facturado
+  // cubre su total — antes desaparecía apenas tenía UNA factura, lo que
+  // ocultaba las OCs facturadas por partes.
   const ocsSinFactura = useMemo(() => {
-    const ocIdsConCxP = new Set(items.filter(i => i.ordenCompraId && i.estado !== 'anulada').map(i => i.ordenCompraId))
-    return ordenesCompra.filter(oc =>
-      ['confirmada', 'completada'].includes(oc.estado) && !ocIdsConCxP.has(oc.id)
-    )
+    const facturadoPorOc = new Map<string, number>()
+    for (const cxp of items) {
+      if (!cxp.ordenCompraId || cxp.estado === 'anulada') continue
+      facturadoPorOc.set(cxp.ordenCompraId, (facturadoPorOc.get(cxp.ordenCompraId) ?? 0) + cxp.monto)
+    }
+    return ordenesCompra
+      .filter(oc => ['confirmada', 'parcial', 'completada'].includes(oc.estado))
+      .map(oc => {
+        const facturado = facturadoPorOc.get(oc.id) ?? 0
+        return { ...oc, montoFacturado: facturado, saldoPorFacturar: Math.round((oc.total - facturado) * 100) / 100 }
+      })
+      // Tolerancia de 1 centavo para no listar OCs cuadradas por redondeo
+      .filter(oc => oc.saldoPorFacturar > 0.01)
   }, [items, ordenesCompra])
 
   const filtered = useMemo(() => {
@@ -375,7 +419,55 @@ export default function CuentasPagarPage() {
       numeroLetra: '',
     })
     setCreateErrors(new Set())
+    setItemsOc([])
+    setResumenOc(null)
+    setItemsSeleccionados({})
   }
+
+  /**
+   * Carga los ítems de la OC con lo que Logística marcó como recibido y lo que
+   * facturas anteriores ya cubrieron. Preselecciona lo que falta facturar de
+   * cada ítem — que es el caso normal (el proveedor factura lo entregado).
+   */
+  const cargarItemsOc = async (ordenCompraId: string) => {
+    if (!ordenCompraId) {
+      setItemsOc([])
+      setResumenOc(null)
+      setItemsSeleccionados({})
+      return
+    }
+    setCargandoItemsOc(true)
+    try {
+      const res = await fetch(`/api/orden-compra/${ordenCompraId}/items-facturables`)
+      if (!res.ok) throw new Error('No se pudieron cargar los ítems de la OC')
+      const data = await res.json()
+      const items: ItemFacturable[] = data.items ?? []
+      setItemsOc(items)
+      setResumenOc(data.resumen ?? null)
+      const preseleccion: Record<string, string> = {}
+      for (const it of items) {
+        if (it.cantidadPendiente > 0) preseleccion[it.id] = String(it.cantidadPendiente)
+      }
+      setItemsSeleccionados(preseleccion)
+    } catch (e: any) {
+      toast.error(e.message || 'Error al cargar los ítems de la OC')
+      setItemsOc([])
+      setResumenOc(null)
+      setItemsSeleccionados({})
+    } finally {
+      setCargandoItemsOc(false)
+    }
+  }
+
+  /** Monto que suman los ítems seleccionados (con su cantidad editada). */
+  const montoItemsSeleccionados = useMemo(() => {
+    let total = 0
+    for (const it of itemsOc) {
+      const cant = parseFloat(itemsSeleccionados[it.id] ?? '')
+      if (!isNaN(cant) && cant > 0) total += cant * it.precioNetoUnitario
+    }
+    return Math.round(total * 100) / 100
+  }, [itemsOc, itemsSeleccionados])
 
   const updateCreateField = <K extends keyof typeof createForm>(field: K, value: (typeof createForm)[K]) => {
     setCreateForm(f => ({ ...f, [field]: value }))
@@ -451,6 +543,15 @@ export default function CuentasPagarPage() {
       toast.error('La fecha de vencimiento debe ser posterior a la de emisión')
       return
     }
+    // Advertencia (no bloqueo, decidido con Administración): puede haber
+    // ajustes legítimos que hagan que lo facturado supere el total de la OC.
+    if (resumenOc && monto > resumenOc.saldoPorFacturar + 0.01) {
+      const exceso = Math.round((monto - resumenOc.saldoPorFacturar) * 100) / 100
+      toast(
+        `Atención: con esta factura lo facturado supera el total de la OC en ${formatCurrency(exceso, createForm.moneda)}.`,
+        { icon: '⚠️', duration: 6000 }
+      )
+    }
     setCreateErrors(new Set())
     setSaving(true)
     try {
@@ -476,6 +577,23 @@ export default function CuentasPagarPage() {
           observaciones: createForm.observaciones || null,
           numeroCheque: createForm.numeroCheque || null,
           numeroLetra: createForm.numeroLetra || null,
+          // Detalle de qué ítems de la OC cubre esta factura — deja rastro
+          // de lo ya facturado para las siguientes facturas parciales.
+          items: createForm.ordenCompraId
+            ? itemsOc
+                .filter(it => {
+                  const c = parseFloat(itemsSeleccionados[it.id] ?? '')
+                  return !isNaN(c) && c > 0
+                })
+                .map(it => {
+                  const cantidad = parseFloat(itemsSeleccionados[it.id])
+                  return {
+                    ordenCompraItemId: it.id,
+                    cantidad,
+                    monto: Math.round(cantidad * it.precioNetoUnitario * 100) / 100,
+                  }
+                })
+            : [],
         }),
       })
       if (!res.ok) {
@@ -846,7 +964,7 @@ export default function CuentasPagarPage() {
               <div className="flex items-center gap-2">
                 <Package className="h-4 w-4 text-orange-600" />
                 <span className="font-medium text-orange-800 text-sm">
-                  {ocsSinFactura.length} OC{ocsSinFactura.length > 1 ? 's' : ''} sin factura registrada
+                  {ocsSinFactura.length} OC{ocsSinFactura.length > 1 ? 's' : ''} pendiente{ocsSinFactura.length > 1 ? 's' : ''} de facturar
                 </span>
                 <Badge className="bg-orange-200 text-orange-800 text-xs">{ocsSinFactura.length}</Badge>
               </div>
@@ -861,9 +979,23 @@ export default function CuentasPagarPage() {
                       <span className="font-mono font-medium text-xs shrink-0">{oc.numero}</span>
                       <span className="text-muted-foreground truncate max-w-[180px]">{oc.proveedor?.nombre}</span>
                       {oc.proyecto && <Badge variant="outline" className="text-xs shrink-0">{oc.proyecto.codigo}</Badge>}
+                      {oc.estado === 'parcial' && (
+                        <Badge variant="outline" className="text-[10px] shrink-0 border-amber-400 text-amber-700">
+                          Recepción parcial
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="font-mono text-xs font-medium">{formatCurrency(oc.total, oc.moneda)}</span>
+                      <div className="text-right leading-tight">
+                        <div className="font-mono text-xs font-medium">
+                          {formatCurrency(oc.saldoPorFacturar, oc.moneda)}
+                        </div>
+                        {oc.montoFacturado > 0 && (
+                          <div className="text-[10px] text-muted-foreground">
+                            facturado {formatCurrency(oc.montoFacturado, oc.moneda)} de {formatCurrency(oc.total, oc.moneda)}
+                          </div>
+                        )}
+                      </div>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -877,7 +1009,8 @@ export default function CuentasPagarPage() {
                             ...f,
                             ordenCompraId: oc.id,
                             proveedorId: oc.proveedorId,
-                            monto: oc.total.toFixed(2),
+                            // Propone lo que falta facturar, no el total de la OC
+                            monto: oc.saldoPorFacturar.toFixed(2),
                             moneda: oc.moneda,
                             proyectoId: oc.proyectoId || '',
                             condicionPago: cond,
@@ -886,6 +1019,7 @@ export default function CuentasPagarPage() {
                             descripcion: `OC ${oc.numero}`,
                             fechaVencimiento: calcularFechaVencimiento(fechaRec, cond, diasStr),
                           }))
+                          cargarItemsOc(oc.id)
                           setShowCreateDialog(true)
                         }}
                       >
@@ -1181,7 +1315,15 @@ export default function CuentasPagarPage() {
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-1 text-sm">
                   <div className="flex items-center justify-between">
                     <p className="font-medium text-blue-800">Datos de la OC (referencia)</p>
-                    <Button variant="ghost" size="sm" className="h-6 text-[10px] text-blue-600" onClick={() => setCreateForm(f => ({ ...f, ordenCompraId: '', diasCredito: '' }))}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-[10px] text-blue-600"
+                      onClick={() => {
+                        setCreateForm(f => ({ ...f, ordenCompraId: '', diasCredito: '' }))
+                        cargarItemsOc('')
+                      }}
+                    >
                       Desvincular OC
                     </Button>
                   </div>
@@ -1196,6 +1338,17 @@ export default function CuentasPagarPage() {
                     </>}
                     <span className="text-muted-foreground">Moneda:</span>
                     <span className="font-medium">{oc.moneda}</span>
+                    {resumenOc && (
+                      <>
+                        <span className="text-muted-foreground">Facturado de la OC:</span>
+                        <span className="font-medium">
+                          {formatCurrency(resumenOc.totalFacturado, oc.moneda)} de {formatCurrency(resumenOc.totalOc, oc.moneda)}
+                          {resumenOc.saldoPorFacturar > 0.01 && (
+                            <span className="text-amber-700"> · falta {formatCurrency(resumenOc.saldoPorFacturar, oc.moneda)}</span>
+                          )}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               )
@@ -1203,39 +1356,40 @@ export default function CuentasPagarPage() {
               <>
                 <div>
                   <Label>Orden de Compra (opcional)</Label>
-                  <Select value="none" onValueChange={v => {
-                    const ocId = v === 'none' ? '' : v
-                    if (ocId) {
+                  {/* Combobox y no Select: permite pegar el número de OC y
+                      filtrar, en vez de recorrer una lista larga a mano. */}
+                  <Combobox
+                    options={ordenesCompra.map(oc => ({
+                      value: oc.id,
+                      label: `${oc.numero} — ${oc.proveedor?.nombre || 'Proveedor'} — ${formatCurrency(oc.total, oc.moneda)}`,
+                      description: oc.estado === 'parcial' ? 'Recepción parcial' : undefined,
+                    }))}
+                    value={createForm.ordenCompraId || undefined}
+                    placeholder="Sin OC"
+                    searchPlaceholder="Pegar o escribir el N° de OC..."
+                    emptyMessage="No se encontró ninguna OC con ese número."
+                    onValueChange={ocId => {
+                      if (!ocId) return
                       const oc = ordenesCompra.find(o => o.id === ocId)
-                      if (oc) {
-                        const diasStr = oc.diasCredito ? String(oc.diasCredito) : ''
-                        const cond = ['contado', 'credito', 'adelanto'].includes(oc.condicionPago || '') ? (oc.condicionPago || 'contado') : 'contado'
-                        setCreateForm(f => ({
-                          ...f,
-                          ordenCompraId: ocId,
-                          proveedorId: oc.proveedorId,
-                          monto: oc.total.toFixed(2),
-                          moneda: oc.moneda,
-                          proyectoId: oc.proyectoId || '',
-                          condicionPago: cond,
-                          formaPago: (oc as any).formaPago || '',
-                          diasCredito: diasStr,
-                          descripcion: f.descripcion || `OC ${oc.numero}`,
-                          fechaVencimiento: calcularFechaVencimiento(f.fechaRecepcion, cond, diasStr),
-                        }))
-                      }
-                    }
-                  }}>
-                    <SelectTrigger><SelectValue placeholder="Sin OC" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sin OC</SelectItem>
-                      {ordenesCompra.map(oc => (
-                        <SelectItem key={oc.id} value={oc.id}>
-                          {oc.numero} — {oc.proveedor?.nombre || 'Proveedor'} — {formatCurrency(oc.total, oc.moneda)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                      if (!oc) return
+                      const diasStr = oc.diasCredito ? String(oc.diasCredito) : ''
+                      const cond = ['contado', 'credito', 'adelanto'].includes(oc.condicionPago || '') ? (oc.condicionPago || 'contado') : 'contado'
+                      setCreateForm(f => ({
+                        ...f,
+                        ordenCompraId: ocId,
+                        proveedorId: oc.proveedorId,
+                        monto: oc.total.toFixed(2),
+                        moneda: oc.moneda,
+                        proyectoId: oc.proyectoId || '',
+                        condicionPago: cond,
+                        formaPago: (oc as any).formaPago || '',
+                        diasCredito: diasStr,
+                        descripcion: f.descripcion || `OC ${oc.numero}`,
+                        fechaVencimiento: calcularFechaVencimiento(f.fechaRecepcion, cond, diasStr),
+                      }))
+                      cargarItemsOc(ocId)
+                    }}
+                  />
                 </div>
                 <div>
                   <Label>Proveedor <span className="text-red-500">*</span></Label>
@@ -1264,6 +1418,94 @@ export default function CuentasPagarPage() {
                 </div>
               </>
             )}
+
+            {/* Ítems de la OC — permite facturar solo lo que el proveedor
+                entregó, sin esperar a que la OC llegue al 100%. */}
+            {createForm.ordenCompraId && (
+              <div className="border rounded-lg">
+                <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/40">
+                  <p className="text-sm font-medium">Ítems a facturar</p>
+                  {cargandoItemsOc && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                </div>
+                {cargandoItemsOc ? (
+                  <p className="text-xs text-muted-foreground px-3 py-3">Cargando ítems de la OC...</p>
+                ) : itemsOc.length === 0 ? (
+                  <p className="text-xs text-muted-foreground px-3 py-3">Esta OC no tiene ítems registrados.</p>
+                ) : (
+                  <>
+                    <div className="max-h-56 overflow-y-auto divide-y">
+                      {itemsOc.map(item => {
+                        const seleccionado = itemsSeleccionados[item.id] !== undefined
+                        const sinPendiente = item.cantidadPendiente <= 0
+                        return (
+                          <div key={item.id} className={`flex items-start gap-2 px-3 py-2 ${sinPendiente ? 'opacity-60' : ''}`}>
+                            <Checkbox
+                              className="mt-0.5"
+                              checked={seleccionado}
+                              onCheckedChange={v => {
+                                setItemsSeleccionados(prev => {
+                                  const next = { ...prev }
+                                  if (v) next[item.id] = String(item.cantidadPendiente > 0 ? item.cantidadPendiente : item.cantidad)
+                                  else delete next[item.id]
+                                  return next
+                                })
+                              }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium truncate" title={item.descripcion}>
+                                <span className="font-mono text-muted-foreground">{item.codigo}</span> · {item.descripcion}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">
+                                Pedido {item.cantidad} · Recibido {item.cantidadRecibida}
+                                {item.cantidadFacturada > 0 && ` · Ya facturado ${item.cantidadFacturada}`}
+                                {' '}{item.unidad}
+                                {sinPendiente && <span className="text-green-700"> · sin saldo por facturar</span>}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min={0}
+                                className="h-7 w-20 text-xs"
+                                disabled={!seleccionado}
+                                value={itemsSeleccionados[item.id] ?? ''}
+                                onChange={e =>
+                                  setItemsSeleccionados(prev => ({ ...prev, [item.id]: e.target.value }))
+                                }
+                              />
+                              <span className="text-[11px] font-mono w-20 text-right">
+                                {formatCurrency(
+                                  Math.round((parseFloat(itemsSeleccionados[item.id] ?? '0') || 0) * item.precioNetoUnitario * 100) / 100,
+                                  createForm.moneda
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="flex items-center justify-between px-3 py-2 border-t bg-muted/20 text-xs">
+                      <span className="text-muted-foreground">Suma de ítems seleccionados</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-medium">{formatCurrency(montoItemsSeleccionados, createForm.moneda)}</span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-6 text-[11px]"
+                          disabled={montoItemsSeleccionados <= 0}
+                          onClick={() => updateCreateField('monto', montoItemsSeleccionados.toFixed(2))}
+                        >
+                          Usar como monto
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             <div>
               <Label>Tipo de Documento</Label>
               <Select value={createForm.tipoDocumento} onValueChange={v => updateCreateField('tipoDocumento', v)}>

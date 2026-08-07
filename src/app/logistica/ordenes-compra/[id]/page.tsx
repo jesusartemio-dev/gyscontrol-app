@@ -646,7 +646,8 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     return fecha.toISOString().split('T')[0]
   }
 
-  const abrirModalFactura = () => {
+  /** `montoSugerido` = lo que falta facturar de la OC (soporta facturas parciales). */
+  const abrirModalFactura = (montoSugerido?: number) => {
     if (!oc) return
     const condicionLegit = ['contado', 'credito', 'adelanto'].includes(oc.condicionPago) ? oc.condicionPago : 'contado'
     const diasNum = oc.diasCredito
@@ -656,7 +657,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     const fechaRec = new Date().toISOString().split('T')[0]
     setFacturaForm({
       numeroFactura: '',
-      monto: oc.total.toFixed(2),
+      monto: (montoSugerido != null && montoSugerido > 0 ? montoSugerido : oc.total).toFixed(2),
       moneda: oc.moneda,
       fechaRecepcion: fechaRec,
       fechaVencimiento: calcularFechaVencimientoFromForm(fechaRec, condicionLegit, dCredito, dCreditoCustom),
@@ -1226,64 +1227,88 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
         </CardContent>
       </Card>
 
-      {/* Facturación */}
+      {/* Facturación — una OC se puede facturar por partes (el proveedor
+          factura lo que ya entregó), así que se listan TODAS las facturas y
+          se muestra cuánto del total de la OC lleva facturado. */}
       {['confirmada', 'parcial', 'completada'].includes(oc.estado) && (() => {
-        const cxps = (oc as any).cuentasPorPagar || []
-        const cxp = cxps[0]
+        const cxps = ((oc as any).cuentasPorPagar || []) as Array<{
+          id: string; numeroFactura: string | null; monto: number; moneda: string
+          saldoPendiente: number; estado: string; fechaVencimiento: string
+        }>
+        const totalFacturado = cxps.reduce((s, c) => s + (c.monto || 0), 0)
+        const saldoPorFacturar = Math.round((oc.total - totalFacturado) * 100) / 100
+        const faltaFacturar = saldoPorFacturar > 0.01
+        const puedeRegistrarFactura = ['admin', 'gerente', 'administracion'].includes(userRole)
 
-        if (cxp) {
-          return (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <CreditCard className="h-4 w-4" />
-                  Facturación
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm space-y-2">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span className="font-medium">Factura registrada</span>
+        return (
+          <Card className={cxps.length === 0 ? 'border-amber-200' : undefined}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                Facturación
+                {cxps.length > 1 && (
+                  <Badge variant="outline" className="text-[10px]">{cxps.length} facturas</Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm space-y-3">
+              {cxps.length === 0 ? (
+                <div className="flex items-center gap-2 text-amber-700">
+                  <AlertTriangle className="h-4 w-4" />
+                  Esta OC no tiene factura registrada.
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>N° Factura: <strong>{cxp.numeroFactura || '—'}</strong></div>
-                  <div>Monto: <strong>{formatCurrency(cxp.monto, cxp.moneda)}</strong></div>
-                  <div className="flex items-center gap-1">Estado: <Badge className={getEstadoCxPColor(cxp.estado)}>{cxp.estado}</Badge></div>
-                  <div>Vencimiento: <strong>{formatDate(cxp.fechaVencimiento)}</strong></div>
-                  <div>Saldo pendiente: <strong>{formatCurrency(cxp.saldoPendiente, cxp.moneda)}</strong></div>
-                </div>
-                <Link href="/administracion/cuentas-pagar" className="text-xs text-blue-600 hover:underline inline-block mt-1">
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    {cxps.map(cxp => (
+                      <div key={cxp.id} className="border rounded-md px-3 py-2">
+                        <div className="flex items-center gap-2 mb-1">
+                          <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                          <span className="font-medium text-xs">{cxp.numeroFactura || 'Sin N° de factura'}</span>
+                          <Badge className={`${getEstadoCxPColor(cxp.estado)} text-[10px]`}>{cxp.estado}</Badge>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div>Monto: <strong>{formatCurrency(cxp.monto, cxp.moneda)}</strong></div>
+                          <div>Vence: <strong>{formatDate(cxp.fechaVencimiento)}</strong></div>
+                          <div>Saldo: <strong>{formatCurrency(cxp.saldoPendiente, cxp.moneda)}</strong></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between text-xs border-t pt-2">
+                    <span className="text-muted-foreground">Facturado de la OC</span>
+                    <span className="font-mono">
+                      <strong>{formatCurrency(totalFacturado, oc.moneda)}</strong> de {formatCurrency(oc.total, oc.moneda)}
+                      {faltaFacturar && (
+                        <span className="text-amber-700"> · falta {formatCurrency(saldoPorFacturar, oc.moneda)}</span>
+                      )}
+                    </span>
+                  </div>
+                </>
+              )}
+
+              <div className="flex items-center justify-between gap-2">
+                <Link href="/administracion/cuentas-pagar" className="text-xs text-blue-600 hover:underline">
                   Ver en CxP →
                 </Link>
-              </CardContent>
-            </Card>
-          )
-        }
-
-        if (!['confirmada', 'completada'].includes(oc.estado)) return null
-        const puedeRegistrarFactura = ['admin', 'gerente', 'administracion'].includes(userRole)
-        return (
-          <Card className="border-amber-200">
-            <CardContent className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-amber-700">
-                <AlertTriangle className="h-4 w-4" />
-                Esta OC no tiene factura registrada.
+                {faltaFacturar && (
+                  <Button
+                    size="sm"
+                    disabled={!puedeRegistrarFactura}
+                    variant={puedeRegistrarFactura ? 'default' : 'secondary'}
+                    onClick={() => {
+                      if (!puedeRegistrarFactura) {
+                        toast.error('Solo Administración puede registrar facturas')
+                        return
+                      }
+                      abrirModalFactura(saldoPorFacturar)
+                    }}
+                    title={!puedeRegistrarFactura ? 'Solo Administración puede registrar facturas' : undefined}
+                  >
+                    {cxps.length === 0 ? 'Registrar factura' : 'Registrar otra factura'}
+                  </Button>
+                )}
               </div>
-              <Button
-                size="sm"
-                disabled={!puedeRegistrarFactura}
-                variant={puedeRegistrarFactura ? 'default' : 'secondary'}
-                onClick={() => {
-                  if (!puedeRegistrarFactura) {
-                    toast.error('Solo Administración puede registrar facturas')
-                    return
-                  }
-                  abrirModalFactura()
-                }}
-                title={!puedeRegistrarFactura ? 'Solo Administración puede registrar facturas' : undefined}
-              >
-                Registrar factura
-              </Button>
             </CardContent>
           </Card>
         )

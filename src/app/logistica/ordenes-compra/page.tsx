@@ -268,15 +268,31 @@ export default function OrdenesCompraPage() {
                     </TableCell>
                     <TableCell>
                       {(() => {
-                        const cxp = (oc as any).cuentasPorPagar?.[0]
-                        if (!cxp) return <span className="text-[10px] text-gray-400">Sin factura</span>
-                        if (cxp.numeroFactura) return (
+                        const cxps = ((oc as any).cuentasPorPagar ?? []) as Array<{ numeroFactura: string | null; estado: string; monto: number }>
+                        if (cxps.length === 0) return <span className="text-[10px] text-gray-400">Sin factura</span>
+
+                        // Una OC se factura por partes: mostrar cuánto se lleva
+                        // facturado, no solo que exista una factura.
+                        const facturado = cxps.reduce((s, c) => s + (c.monto || 0), 0)
+                        const completa = facturado >= (oc.total || 0) - 0.01
+                        const todasPagadas = cxps.every(c => c.estado === 'pagada')
+
+                        if (!completa) return (
                           <div>
-                            <Badge className="text-[10px] bg-green-100 text-green-700">{cxp.estado === 'pagada' ? 'Pagada' : 'Facturada'}</Badge>
-                            <div className="text-[10px] font-mono text-muted-foreground mt-0.5 truncate max-w-[100px]">{cxp.numeroFactura}</div>
+                            <Badge className="text-[10px] bg-amber-100 text-amber-700">Facturada en parte</Badge>
+                            <div className="text-[10px] font-mono text-muted-foreground mt-0.5">
+                              {formatCurrency(facturado, oc.moneda)} de {formatCurrency(oc.total, oc.moneda)}
+                            </div>
                           </div>
                         )
-                        return <Badge className="text-[10px] bg-yellow-100 text-yellow-700">CxP sin factura</Badge>
+                        return (
+                          <div>
+                            <Badge className="text-[10px] bg-green-100 text-green-700">{todasPagadas ? 'Pagada' : 'Facturada'}</Badge>
+                            <div className="text-[10px] font-mono text-muted-foreground mt-0.5 truncate max-w-[100px]">
+                              {cxps.length > 1 ? `${cxps.length} facturas` : (cxps[0].numeroFactura || 'Sin N°')}
+                            </div>
+                          </div>
+                        )
                       })()}
                     </TableCell>
                     <TableCell className="text-center text-sm">{oc.items?.length || 0}</TableCell>

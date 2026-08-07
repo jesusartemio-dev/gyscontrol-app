@@ -34,14 +34,17 @@ const includeRelations = {
   items: {
     orderBy: { createdAt: 'asc' as const },
   },
+  // Sin `take`: una OC se puede facturar por partes (el proveedor factura lo
+  // que ya entregó), así que el listado necesita todas para saber cuánto se
+  // facturó del total — no solo si existe al menos una factura.
   cuentasPorPagar: {
     where: { estado: { not: 'anulada' as const } },
     select: {
       id: true,
       numeroFactura: true,
       estado: true,
+      monto: true,
     },
-    take: 1,
     orderBy: { createdAt: 'desc' as const },
   },
 }
