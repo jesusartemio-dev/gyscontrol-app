@@ -1,6 +1,6 @@
 import { withAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
-import { ROUTE_TO_SECTION, DEFAULT_ROLE_SECTIONS, type RoleKey } from '@/lib/config/sections'
+import { ROUTE_TO_SECTION, DEFAULT_ROLE_SECTIONS, RUTAS_MULTISECCION, type RoleKey } from '@/lib/config/sections'
 
 // Mapeo de prefijos de ruta a sectionKey (ordenado por longitud descendente para match correcto)
 const ROUTE_PREFIXES = Object.entries(ROUTE_TO_SECTION)
@@ -29,6 +29,22 @@ const protectedRoutes = withAuth(
     // Páginas con restricción de rol específica (más granular que secciones)
     if (path.startsWith('/admin/uso-ia') && role !== 'admin') {
       return NextResponse.redirect(new URL('/denied', req.url))
+    }
+
+    // Secciones efectivas del usuario (BD si existe, si no el default del rol)
+    const seccionesUsuario = sectionAccess && sectionAccess.length > 0
+      ? sectionAccess
+      : (DEFAULT_ROLE_SECTIONS[(role || 'colaborador') as RoleKey] || [])
+
+    // Rutas compartidas entre secciones (ej. Órdenes de Compra: la usan
+    // Logística y Administración). Se evalúan primero porque son más
+    // específicas que el prefijo general de la sección.
+    const rutaCompartida = RUTAS_MULTISECCION.find(r => path.startsWith(r.prefix))
+    if (rutaCompartida) {
+      if (!rutaCompartida.sections.some(s => seccionesUsuario.includes(s))) {
+        return NextResponse.redirect(new URL('/denied', req.url))
+      }
+      return NextResponse.next()
     }
 
     // Verificar acceso a sección por ruta

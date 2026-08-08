@@ -386,7 +386,10 @@ export default function Sidebar() {
         { href: '/gestion/valorizaciones', label: 'Valorizaciones', icon: FileSpreadsheet },
         { href: '/administracion/facturacion', label: 'Facturación', icon: FileSpreadsheet },
         { href: '/administracion/cuentas-cobrar', label: 'Cuentas por Cobrar', icon: ArrowDownCircle },
-        { href: '/logistica/ordenes-compra', label: 'Órdenes de Compra', icon: FileText },
+        // Administración necesita las OCs para registrar las facturas del
+        // proveedor. Solo para ese rol: admin/gerente ya la ven en Logística
+        // y se duplicaría el link. Acceso habilitado en RUTAS_MULTISECCION.
+        { href: '/logistica/ordenes-compra', label: 'Órdenes de Compra', icon: FileText, roles: ['administracion'] as any },
         { href: '/administracion/cuentas-pagar', label: 'Cuentas por Pagar', icon: ArrowUpCircle },
         { href: '/administracion/compras-mes', label: 'Compras del Mes', icon: ShoppingCart },
         { href: '/administracion/cuentas-bancarias', label: 'Cuentas Bancarias', icon: Landmark },

@@ -89,3 +89,16 @@ export const ROUTE_TO_SECTION: Record<string, SectionKey> = {
   '/catalogo': 'configuracion',
   '/admin': 'configuracion',
 }
+
+/**
+ * Rutas que viven dentro de una sección pero que otra sección también
+ * necesita. Se resuelven ANTES que ROUTE_TO_SECTION: basta con tener
+ * cualquiera de las secciones listadas.
+ *
+ * Órdenes de Compra: Administración necesita verlas para registrar las
+ * facturas del proveedor contra su OC, pero no debe entrar al resto de
+ * Logística (pedidos, almacén, proveedores).
+ */
+export const RUTAS_MULTISECCION: Array<{ prefix: string; sections: string[] }> = [
+  { prefix: '/logistica/ordenes-compra', sections: ['logistica', 'administracion'] },
+]
