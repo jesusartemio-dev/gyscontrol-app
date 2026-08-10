@@ -34,6 +34,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         id: true,
         numero: true,
         moneda: true,
+        subtotal: true,
+        igv: true,
         total: true,
         estado: true,
         items: {
@@ -62,6 +64,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     let totalFacturado = 0
 
+    // OrdenCompraItem.costoTotal está SIN IGV (su suma da oc.subtotal), pero
+    // oc.total y las facturas del proveedor SÍ lo incluyen. Sin este factor,
+    // el monto propuesto quedaría ~18% corto y lo facturado nunca cuadraría
+    // contra el total de la OC.
+    const factorIgv = oc.subtotal > 0 ? oc.total / oc.subtotal : 1
+
     const items = oc.items.map(item => {
       const cantidadFacturada = item.facturasItems.reduce((s, f) => s + f.cantidad, 0)
       const montoFacturado = item.facturasItems.reduce((s, f) => s + f.monto, 0)
@@ -83,6 +91,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         cantidadPendiente,
         precioUnitario: item.precioUnitario,
         precioNetoUnitario: redondear(precioNetoUnitario),
+        /** Precio unitario con IGV — es el que se usa para armar el monto de
+         *  la factura, porque la del proveedor viene con impuesto incluido. */
+        precioUnitarioConIgv: Math.round(precioNetoUnitario * factorIgv * 100) / 100,
         costoTotal: item.costoTotal,
         montoFacturado: redondear(montoFacturado),
         /** Ya se facturó todo lo que se recibió de este ítem. */
@@ -101,6 +112,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       items,
       resumen: {
         totalOc: oc.total,
+        subtotalOc: oc.subtotal,
+        igvOc: oc.igv,
+        factorIgv: Math.round(factorIgv * 10000) / 10000,
         totalFacturado: redondear(totalFacturado),
         saldoPorFacturar: redondear(oc.total - totalFacturado),
       },

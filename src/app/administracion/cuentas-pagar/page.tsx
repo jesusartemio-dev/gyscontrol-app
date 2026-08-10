@@ -80,6 +80,8 @@ interface ItemFacturable {
   cantidadFacturada: number
   cantidadPendiente: number
   precioNetoUnitario: number
+  /** Con IGV — es el que se usa para el monto de la factura. */
+  precioUnitarioConIgv: number
   costoTotal: number
   montoFacturado: number
   totalmenteFacturado: boolean
@@ -87,6 +89,9 @@ interface ItemFacturable {
 
 interface ResumenFacturacionOc {
   totalOc: number
+  subtotalOc: number
+  igvOc: number
+  factorIgv: number
   totalFacturado: number
   saldoPorFacturar: number
 }
@@ -459,14 +464,25 @@ export default function CuentasPagarPage() {
     }
   }
 
-  /** Monto que suman los ítems seleccionados (con su cantidad editada). */
+  /**
+   * Monto de los ítems seleccionados. `conIgv` es el que va como monto de la
+   * factura: los ítems de la OC están sin IGV pero la factura del proveedor
+   * (y el total de la OC contra el que se controla) sí lo incluyen.
+   */
   const montoItemsSeleccionados = useMemo(() => {
-    let total = 0
+    let neto = 0
+    let conIgv = 0
     for (const it of itemsOc) {
       const cant = parseFloat(itemsSeleccionados[it.id] ?? '')
-      if (!isNaN(cant) && cant > 0) total += cant * it.precioNetoUnitario
+      if (!isNaN(cant) && cant > 0) {
+        neto += cant * it.precioNetoUnitario
+        conIgv += cant * it.precioUnitarioConIgv
+      }
     }
-    return Math.round(total * 100) / 100
+    return {
+      neto: Math.round(neto * 100) / 100,
+      conIgv: Math.round(conIgv * 100) / 100,
+    }
   }, [itemsOc, itemsSeleccionados])
 
   const updateCreateField = <K extends keyof typeof createForm>(field: K, value: (typeof createForm)[K]) => {
@@ -545,7 +561,11 @@ export default function CuentasPagarPage() {
     }
     // Advertencia (no bloqueo, decidido con Administración): puede haber
     // ajustes legítimos que hagan que lo facturado supere el total de la OC.
-    if (resumenOc && monto > resumenOc.saldoPorFacturar + 0.01) {
+    // Tolerancia de 1 unidad de moneda: el precio unitario con IGV se redondea
+    // por ítem, así que una OC de muchas líneas puede diferir unos céntimos del
+    // total sin que eso sea un exceso real que valga la pena avisar.
+    const TOLERANCIA_REDONDEO = 1
+    if (resumenOc && monto > resumenOc.saldoPorFacturar + TOLERANCIA_REDONDEO) {
       const exceso = Math.round((monto - resumenOc.saldoPorFacturar) * 100) / 100
       toast(
         `Atención: con esta factura lo facturado supera el total de la OC en ${formatCurrency(exceso, createForm.moneda)}.`,
@@ -590,7 +610,9 @@ export default function CuentasPagarPage() {
                   return {
                     ordenCompraItemId: it.id,
                     cantidad,
-                    monto: Math.round(cantidad * it.precioNetoUnitario * 100) / 100,
+                    // Con IGV, para que la suma de las líneas cuadre con el
+                    // monto de la factura y con el total de la OC.
+                    monto: Math.round(cantidad * it.precioUnitarioConIgv * 100) / 100,
                   }
                 })
             : [],
@@ -1474,9 +1496,9 @@ export default function CuentasPagarPage() {
                                   setItemsSeleccionados(prev => ({ ...prev, [item.id]: e.target.value }))
                                 }
                               />
-                              <span className="text-[11px] font-mono w-20 text-right">
+                              <span className="text-[11px] font-mono w-24 text-right">
                                 {formatCurrency(
-                                  Math.round((parseFloat(itemsSeleccionados[item.id] ?? '0') || 0) * item.precioNetoUnitario * 100) / 100,
+                                  Math.round((parseFloat(itemsSeleccionados[item.id] ?? '0') || 0) * item.precioUnitarioConIgv * 100) / 100,
                                   createForm.moneda
                                 )}
                               </span>
@@ -1486,16 +1508,21 @@ export default function CuentasPagarPage() {
                       })}
                     </div>
                     <div className="flex items-center justify-between px-3 py-2 border-t bg-muted/20 text-xs">
-                      <span className="text-muted-foreground">Suma de ítems seleccionados</span>
+                      <div>
+                        <span className="text-muted-foreground">Suma de ítems seleccionados</span>
+                        <div className="text-[10px] text-muted-foreground">
+                          Neto {formatCurrency(montoItemsSeleccionados.neto, createForm.moneda)} + IGV
+                        </div>
+                      </div>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono font-medium">{formatCurrency(montoItemsSeleccionados, createForm.moneda)}</span>
+                        <span className="font-mono font-medium">{formatCurrency(montoItemsSeleccionados.conIgv, createForm.moneda)}</span>
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           className="h-6 text-[11px]"
-                          disabled={montoItemsSeleccionados <= 0}
-                          onClick={() => updateCreateField('monto', montoItemsSeleccionados.toFixed(2))}
+                          disabled={montoItemsSeleccionados.conIgv <= 0}
+                          onClick={() => updateCreateField('monto', montoItemsSeleccionados.conIgv.toFixed(2))}
                         >
                           Usar como monto
                         </Button>
