@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { calcularTotalesOC } from '@/lib/utils/ocTotales'
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -20,7 +21,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const item = await prisma.ordenCompraItem.findUnique({
       where: { id },
       include: {
-        ordenCompra: { select: { id: true, estado: true, moneda: true } },
+        ordenCompra: { select: { id: true, estado: true, moneda: true, aplicaIgv: true } },
       },
     })
 
@@ -88,9 +89,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         where: { ordenCompraId: item.ordenCompra.id },
       })
 
-      const subtotal = allItems.reduce((sum, i) => sum + i.costoTotal, 0)
-      const igv = subtotal * 0.18
-      const total = subtotal + igv
+      const subtotalRaw = allItems.reduce((sum, i) => sum + i.costoTotal, 0)
+      const { subtotal, igv, total } = calcularTotalesOC(subtotalRaw, item.ordenCompra.aplicaIgv)
 
       await tx.ordenCompra.update({
         where: { id: item.ordenCompra.id },
@@ -122,7 +122,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const item = await prisma.ordenCompraItem.findUnique({
       where: { id },
       include: {
-        ordenCompra: { select: { id: true, estado: true, moneda: true } },
+        ordenCompra: { select: { id: true, estado: true, moneda: true, aplicaIgv: true } },
       },
     })
 
@@ -143,9 +143,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
         where: { ordenCompraId: item.ordenCompra.id },
       })
 
-      const subtotal = remainingItems.reduce((sum, i) => sum + i.costoTotal, 0)
-      const igv = subtotal * 0.18
-      const total = subtotal + igv
+      const subtotalRaw = remainingItems.reduce((sum, i) => sum + i.costoTotal, 0)
+      const { subtotal, igv, total } = calcularTotalesOC(subtotalRaw, item.ordenCompra.aplicaIgv)
 
       await tx.ordenCompra.update({
         where: { id: item.ordenCompra.id },

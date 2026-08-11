@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { crearNotificacion } from '@/lib/utils/notificaciones'
+import { calcularTotalesOC } from '@/lib/utils/ocTotales'
 
 async function generarNumeroOC(client: any = prisma): Promise<string> {
   const now = new Date()
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Sin permisos para generar órdenes de compra' }, { status: 403 })
     }
 
-    const { pedidoId, itemIds, moneda = 'USD', condicionPago = 'contado', observaciones, fechaEntregaEstimada, fechasEntregaPorProveedor, usarPrecioCotizacion = false } = await req.json()
+    const { pedidoId, itemIds, moneda = 'USD', aplicaIgv = true, condicionPago = 'contado', observaciones, fechaEntregaEstimada, fechasEntregaPorProveedor, usarPrecioCotizacion = false } = await req.json()
 
     if (!pedidoId) {
       return NextResponse.json({ error: 'pedidoId es requerido' }, { status: 400 })
@@ -186,9 +187,8 @@ export async function POST(req: Request) {
           }
         })
 
-        const subtotal = ocItems.reduce((sum, i) => sum + i.costoTotal, 0)
-        const igv = subtotal * 0.18
-        const total = subtotal + igv
+        const subtotalRaw = ocItems.reduce((sum, i) => sum + i.costoTotal, 0)
+        const { subtotal, igv, total } = calcularTotalesOC(subtotalRaw, aplicaIgv)
 
         // Usar fecha por proveedor si disponible, fallback a fecha global
         const fechaProveedor = fechasEntregaPorProveedor?.[proveedorId] || fechaEntregaEstimada
@@ -210,6 +210,7 @@ export async function POST(req: Request) {
             tiempoEntrega: condCot?.tiempoEntrega || null,
             contactoEntrega: condCot?.contactoEntrega || null,
             moneda: condCot?.moneda || moneda,
+            aplicaIgv,
             subtotal,
             igv,
             total,

@@ -1512,6 +1512,7 @@ export interface OrdenCompraPayload {
   requiereRecepcion?: boolean
   condicionPago?: string
   moneda?: string
+  aplicaIgv?: boolean
   lugarEntrega?: string
   tiempoEntrega?: string
   contactoEntrega?: string
@@ -1524,6 +1525,7 @@ export interface OrdenCompraUpdatePayload {
   requiereRecepcion?: boolean
   condicionPago?: string
   moneda?: string
+  aplicaIgv?: boolean
   lugarEntrega?: string | null
   tiempoEntrega?: string | null
   contactoEntrega?: string | null

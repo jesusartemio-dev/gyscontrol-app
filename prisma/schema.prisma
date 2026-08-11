@@ -4524,6 +4524,7 @@ model OrdenCompra {
   formaPago            String? // 'transferencia' | 'factura' | 'cheque' | 'letra' | 'factura_negociable' | 'otro'
   diasCredito          Int?
   moneda               String            @default("PEN")
+  aplicaIgv            Boolean           @default(true)
   subtotal             Float             @default(0)
   igv                  Float             @default(0)
   total                Float             @default(0)

@@ -5,6 +5,7 @@
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
+import { calcularTotalesOC } from '@/lib/utils/ocTotales'
 
 // Estados que BLOQUEAN el cambio de cotización
 const ESTADOS_BLOQUEANTES = ['aprobada', 'enviada', 'confirmada', 'parcial']
@@ -17,6 +18,7 @@ export interface OCVinculada {
   ocEstado: string
   ocProveedorId: string
   ocMoneda: string
+  ocAplicaIgv: boolean
   items: { id: string; cantidad: number }[]
 }
 
@@ -45,7 +47,7 @@ export async function checkOCVinculada(
     where: { OR: orConditions },
     include: {
       ordenCompra: {
-        select: { id: true, numero: true, estado: true, proveedorId: true, moneda: true }
+        select: { id: true, numero: true, estado: true, proveedorId: true, moneda: true, aplicaIgv: true }
       }
     }
   })
@@ -73,6 +75,7 @@ export async function checkOCVinculada(
       ocEstado: oc.estado,
       ocProveedorId: oc.proveedorId,
       ocMoneda: oc.moneda,
+      ocAplicaIgv: oc.aplicaIgv,
       items,
     }
 
@@ -104,7 +107,7 @@ export function clasificarOC(oc: OCVinculada | null): 'bloqueada' | 'editable' |
 
 /**
  * Actualiza los items y totales de una OC en borrador cuando cambia el precio.
- * Recalcula subtotal, igv (18% PEN / 0% USD), total.
+ * Recalcula subtotal, igv (según oc.aplicaIgv), total.
  * Retorna si hubo cambio de proveedor (para warning).
  */
 export async function actualizarOCBorrador(
@@ -133,9 +136,8 @@ export async function actualizarOCBorrador(
     select: { costoTotal: true }
   })
 
-  const subtotal = todosItems.reduce((sum: number, i: any) => sum + (i.costoTotal || 0), 0)
-  const igv = oc.ocMoneda === 'PEN' ? subtotal * 0.18 : 0
-  const total = subtotal + igv
+  const subtotalRaw = todosItems.reduce((sum: number, i: any) => sum + (i.costoTotal || 0), 0)
+  const { subtotal, igv, total } = calcularTotalesOC(subtotalRaw, oc.ocAplicaIgv)
 
   await db.ordenCompra.update({
     where: { id: oc.ocId },

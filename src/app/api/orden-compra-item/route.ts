@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { calcularTotalesOC } from '@/lib/utils/ocTotales'
 
 /**
  * POST /api/orden-compra-item
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
 
     const oc = await prisma.ordenCompra.findUnique({
       where: { id: ordenCompraId },
-      select: { id: true, estado: true, moneda: true, proveedorId: true },
+      select: { id: true, estado: true, moneda: true, proveedorId: true, aplicaIgv: true },
     })
 
     if (!oc) {
@@ -76,9 +77,8 @@ export async function POST(req: Request) {
         where: { ordenCompraId },
       })
 
-      const subtotal = allItems.reduce((sum, i) => sum + i.costoTotal, 0)
-      const igv = subtotal * 0.18
-      const total = subtotal + igv
+      const subtotalRaw = allItems.reduce((sum, i) => sum + i.costoTotal, 0)
+      const { subtotal, igv, total } = calcularTotalesOC(subtotalRaw, oc.aplicaIgv)
 
       await tx.ordenCompra.update({
         where: { id: ordenCompraId },

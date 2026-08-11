@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { calcularTotalesOC } from '@/lib/utils/ocTotales'
 
 async function generarNumeroOC(): Promise<string> {
   const now = new Date()
@@ -176,9 +177,9 @@ export async function POST(req: Request) {
       }
     })
 
-    const subtotal = items.reduce((sum: number, i: any) => sum + i.costoTotal, 0)
-    const igv = subtotal * 0.18
-    const total = subtotal + igv
+    const subtotalRaw = items.reduce((sum: number, i: any) => sum + i.costoTotal, 0)
+    const aplicaIgv = payload.aplicaIgv ?? true
+    const { subtotal, igv, total } = calcularTotalesOC(subtotalRaw, aplicaIgv)
 
     // Derivar pedidoEquipoId de los items: si todos los items con pedidoEquipoItemId
     // apuntan al mismo PedidoEquipo, vincular la OC a ese pedido. Si vienen de varios
@@ -215,6 +216,7 @@ export async function POST(req: Request) {
         formaPago: payload.formaPago || null,
         diasCredito: payload.diasCredito ? Number(payload.diasCredito) : null,
         moneda: payload.moneda || 'PEN',
+        aplicaIgv,
         subtotal,
         igv,
         total,

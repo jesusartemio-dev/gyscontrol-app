@@ -182,6 +182,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
     diasCredito: '',
     diasCreditoCustom: '',
     moneda: 'PEN',
+    aplicaIgv: true,
     lugarEntrega: '',
     tiempoEntrega: '',
     contactoEntrega: '',
@@ -354,6 +355,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
       diasCredito: isPreset ? String(diasNum) : (diasNum ? 'otro' : ''),
       diasCreditoCustom: isPreset ? '' : (diasNum ? String(diasNum) : ''),
       moneda: oc.moneda,
+      aplicaIgv: oc.aplicaIgv,
       lugarEntrega: oc.lugarEntrega || '',
       tiempoEntrega: oc.tiempoEntrega || '',
       contactoEntrega: oc.contactoEntrega || '',
@@ -399,6 +401,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           body: JSON.stringify({
             ...payloadBase,
             moneda: headerForm.moneda,
+            aplicaIgv: headerForm.aplicaIgv,
             requiereRecepcion: headerForm.requiereRecepcion,
           }),
         })
@@ -942,7 +945,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           {/* Montos — compacto a la derecha */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs md:justify-end">
             <span className="text-muted-foreground">Subtotal: <span className="font-mono text-foreground">{formatCurrency(oc.subtotal, oc.moneda)}</span></span>
-            <span className="text-muted-foreground">IGV: <span className="font-mono text-foreground">{formatCurrency(oc.igv, oc.moneda)}</span></span>
+            <span className="text-muted-foreground">IGV{oc.aplicaIgv ? '' : ' (no aplica)'}: <span className="font-mono text-foreground">{formatCurrency(oc.igv, oc.moneda)}</span></span>
             <span className="font-semibold">Total: <span className="font-mono">{formatCurrency(oc.total, oc.moneda)}</span></span>
             <span className="text-muted-foreground border-l pl-4">{formatPago(oc.condicionPago, (oc as any).formaPago, oc.diasCredito)} · {oc.moneda}</span>
             {oc.centroCosto && <span className="text-muted-foreground">CC: {oc.centroCosto.nombre}</span>}
@@ -1994,6 +1997,26 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                     {headerForm.requiereRecepcion
                       ? 'Se registrará la recepción de materiales o entregables antes de completar la OC.'
                       : 'Para servicios sin entregable físico (transporte, alquiler, etc.). La OC se completa directamente al confirmar.'}
+                  </p>
+                </div>
+              </div>
+            )}
+            {esBorrador && (
+              <div className="flex items-start gap-3 p-3 rounded-md border bg-muted/30">
+                <Switch
+                  id="headerAplicaIgv"
+                  checked={headerForm.aplicaIgv}
+                  onCheckedChange={v => setHeaderForm(f => ({ ...f, aplicaIgv: v }))}
+                />
+                <div className="space-y-0.5">
+                  <Label htmlFor="headerAplicaIgv" className="text-sm font-medium cursor-pointer">
+                    Aplica IGV (18%)
+                  </Label>
+                  <p className="text-xs text-muted-foreground flex items-start gap-1">
+                    <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    {headerForm.aplicaIgv
+                      ? 'El total incluye 18% de IGV sobre el subtotal.'
+                      : 'Sin IGV. Úsalo para compras al extranjero (importaciones) u otros casos exonerados.'}
                   </p>
                 </div>
               </div>

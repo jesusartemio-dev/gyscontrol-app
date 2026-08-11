@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { calcularTotalesOC } from '@/lib/utils/ocTotales'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'administracion']
 
@@ -40,6 +41,7 @@ interface ImportOrden {
   centroCostoId: string | null
   categoriaCosto: string
   moneda: string
+  aplicaIgv?: boolean
   condicionPago: string
   lugarEntrega: string | null
   observaciones: string | null
@@ -102,9 +104,9 @@ export async function POST(req: Request) {
           }
         })
 
-        const subtotal = items.reduce((sum, it) => sum + it.costoTotal, 0)
-        const igv = subtotal * 0.18
-        const total = subtotal + igv
+        const subtotalRaw = items.reduce((sum, it) => sum + it.costoTotal, 0)
+        const aplicaIgv = oc.aplicaIgv ?? true
+        const { subtotal, igv, total } = calcularTotalesOC(subtotalRaw, aplicaIgv)
 
         await prisma.ordenCompra.create({
           data: {
@@ -116,6 +118,7 @@ export async function POST(req: Request) {
             solicitanteId: session.user.id,
             condicionPago: oc.condicionPago || 'contado',
             moneda: oc.moneda || 'PEN',
+            aplicaIgv,
             subtotal,
             igv,
             total,

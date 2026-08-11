@@ -84,6 +84,7 @@ function NuevaOrdenCompraContent() {
   const [diasCredito, setDiasCredito] = useState('')
   const [diasCreditoCustom, setDiasCreditoCustom] = useState('')
   const [moneda, setMoneda] = useState('PEN')
+  const [aplicaIgv, setAplicaIgv] = useState(true)
   const [lugarEntrega, setLugarEntrega] = useState('')
   const [tiempoEntrega, setTiempoEntrega] = useState('')
   const [contactoEntrega, setContactoEntrega] = useState('')
@@ -263,7 +264,7 @@ function NuevaOrdenCompraContent() {
   }
 
   const subtotal = items.reduce((sum, item) => sum + (item.cantidad * item.precioUnitario), 0)
-  const igv = subtotal * 0.18
+  const igv = aplicaIgv ? subtotal * 0.18 : 0
   const total = subtotal + igv
 
   const formatCurrency = (amount: number) =>
@@ -547,6 +548,7 @@ function NuevaOrdenCompraContent() {
         formaPago: formaPago || undefined,
         diasCredito: getDiasCreditoNum() ?? undefined,
         moneda,
+        aplicaIgv,
         lugarEntrega: lugarEntrega || undefined,
         tiempoEntrega: tiempoEntrega || undefined,
         contactoEntrega: contactoEntrega || undefined,
@@ -783,6 +785,24 @@ function NuevaOrdenCompraContent() {
               </p>
             </div>
           </div>
+          <div className="mt-3 flex items-start gap-3 p-3 rounded-md border bg-muted/30">
+            <Switch
+              id="aplicaIgv"
+              checked={aplicaIgv}
+              onCheckedChange={setAplicaIgv}
+            />
+            <div className="space-y-0.5">
+              <Label htmlFor="aplicaIgv" className="text-sm font-medium cursor-pointer">
+                Aplica IGV (18%)
+              </Label>
+              <p className="text-xs text-muted-foreground flex items-start gap-1">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                {aplicaIgv
+                  ? 'El total incluye 18% de IGV sobre el subtotal.'
+                  : 'Sin IGV. Úsalo para compras al extranjero (importaciones) u otros casos exonerados.'}
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -884,7 +904,7 @@ function NuevaOrdenCompraContent() {
             <span className="font-mono">{formatCurrency(subtotal)}</span>
           </div>
           <div className="flex justify-between gap-8">
-            <span className="text-muted-foreground">IGV (18%):</span>
+            <span className="text-muted-foreground">IGV {aplicaIgv ? '(18%)' : '(no aplica)'}:</span>
             <span className="font-mono">{formatCurrency(igv)}</span>
           </div>
           <div className="flex justify-between gap-8 font-bold text-base">

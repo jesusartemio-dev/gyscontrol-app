@@ -2958,6 +2958,7 @@ export interface OrdenCompra {
   formaPago?: string | null  // 'transferencia' | 'factura' | 'cheque' | 'letra' | 'factura_negociable' | 'otro'
   diasCredito?: number | null
   moneda: string
+  aplicaIgv: boolean
   subtotal: number
   igv: number
   total: number

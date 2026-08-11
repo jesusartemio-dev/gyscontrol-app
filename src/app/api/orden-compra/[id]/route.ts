@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { canDelete } from '@/lib/utils/deleteValidation'
+import { calcularTotalesOC } from '@/lib/utils/ocTotales'
 
 const includeRelations = {
   proveedor: true,
@@ -89,6 +90,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (payload.formaPago !== undefined) updateData.formaPago = payload.formaPago || null
     if (payload.diasCredito !== undefined) updateData.diasCredito = payload.diasCredito ? Number(payload.diasCredito) : null
     if (payload.moneda !== undefined) updateData.moneda = payload.moneda
+    if (payload.aplicaIgv !== undefined) updateData.aplicaIgv = payload.aplicaIgv
+    const aplicaIgvFinal = payload.aplicaIgv !== undefined ? payload.aplicaIgv : existing.aplicaIgv
     if (payload.lugarEntrega !== undefined) updateData.lugarEntrega = payload.lugarEntrega
     if (payload.tiempoEntrega !== undefined) updateData.tiempoEntrega = payload.tiempoEntrega
     if (payload.contactoEntrega !== undefined) updateData.contactoEntrega = payload.contactoEntrega
@@ -121,12 +124,15 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
       await prisma.ordenCompraItem.createMany({ data: newItems })
 
-      const subtotal = newItems.reduce((sum: number, i: any) => sum + i.costoTotal, 0)
-      const moneda = payload.moneda || existing.moneda
-      const igv = subtotal * 0.18
+      const subtotalRaw = newItems.reduce((sum: number, i: any) => sum + i.costoTotal, 0)
+      const { subtotal, igv, total } = calcularTotalesOC(subtotalRaw, aplicaIgvFinal)
       updateData.subtotal = subtotal
       updateData.igv = igv
-      updateData.total = subtotal + igv
+      updateData.total = total
+    } else if (payload.aplicaIgv !== undefined) {
+      const { igv, total } = calcularTotalesOC(existing.subtotal, aplicaIgvFinal)
+      updateData.igv = igv
+      updateData.total = total
     }
 
     const data = await prisma.ordenCompra.update({
