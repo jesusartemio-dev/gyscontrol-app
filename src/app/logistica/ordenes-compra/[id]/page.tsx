@@ -1236,7 +1236,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
       {['confirmada', 'parcial', 'completada'].includes(oc.estado) && (() => {
         const cxps = ((oc as any).cuentasPorPagar || []) as Array<{
           id: string; numeroFactura: string | null; monto: number; moneda: string
-          saldoPendiente: number; estado: string; fechaVencimiento: string
+          saldoPendiente: number; estado: string; fechaVencimiento: string; esAdelanto?: boolean
         }>
         const totalFacturado = cxps.reduce((s, c) => s + (c.monto || 0), 0)
         const saldoPorFacturar = Math.round((oc.total - totalFacturado) * 100) / 100
@@ -1269,6 +1269,9 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                           <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
                           <span className="font-medium text-xs">{cxp.numeroFactura || 'Sin N° de factura'}</span>
                           <Badge className={`${getEstadoCxPColor(cxp.estado)} text-[10px]`}>{cxp.estado}</Badge>
+                          {cxp.esAdelanto && (
+                            <Badge variant="outline" className="text-[10px] border-blue-400 text-blue-700">Anticipo</Badge>
+                          )}
                         </div>
                         <div className="grid grid-cols-3 gap-2 text-xs">
                           <div>Monto: <strong>{formatCurrency(cxp.monto, cxp.moneda)}</strong></div>

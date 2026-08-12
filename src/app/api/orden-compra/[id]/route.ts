@@ -39,6 +39,7 @@ const includeRelations = {
       estado: true,
       fechaVencimiento: true,
       fechaRecepcion: true,
+      esAdelanto: true,
     },
     orderBy: { createdAt: 'desc' as const },
   },

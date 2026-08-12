@@ -85,6 +85,9 @@ interface ItemFacturable {
   costoTotal: number
   montoFacturado: number
   totalmenteFacturado: boolean
+  /** Anticipo ya pagado sobre este ítem, todavía no restado en ninguna
+   *  factura final. 0 si nunca hubo anticipo o ya se aplicó todo. */
+  anticipoPendienteDeAplicar: number
 }
 
 interface ResumenFacturacionOc {
@@ -216,6 +219,13 @@ export default function CuentasPagarPage() {
   const [cargandoItemsOc, setCargandoItemsOc] = useState(false)
   /** itemId -> cantidad a facturar en ESTA factura (ausente = no seleccionado) */
   const [itemsSeleccionados, setItemsSeleccionados] = useState<Record<string, string>>({})
+  // Esta factura ES un anticipo del proveedor (se paga antes de recibir el
+  // ítem) — no cuenta como cantidad recibida, y queda disponible para
+  // restarse de la factura final (ver aplicarAnticipo más abajo).
+  const [esAdelanto, setEsAdelanto] = useState(false)
+  /** itemId -> restar en esta factura el anticipo ya pagado sobre ese ítem
+   *  (solo aplica en facturas que NO son anticipo). */
+  const [aplicarAnticipo, setAplicarAnticipo] = useState<Record<string, boolean>>({})
 
   // Pago dialog
   const [showPagoDialog, setShowPagoDialog] = useState(false)
@@ -427,6 +437,8 @@ export default function CuentasPagarPage() {
     setItemsOc([])
     setResumenOc(null)
     setItemsSeleccionados({})
+    setEsAdelanto(false)
+    setAplicarAnticipo({})
   }
 
   /**
@@ -439,6 +451,7 @@ export default function CuentasPagarPage() {
       setItemsOc([])
       setResumenOc(null)
       setItemsSeleccionados({})
+      setAplicarAnticipo({})
       return
     }
     setCargandoItemsOc(true)
@@ -454,11 +467,13 @@ export default function CuentasPagarPage() {
         if (it.cantidadPendiente > 0) preseleccion[it.id] = String(it.cantidadPendiente)
       }
       setItemsSeleccionados(preseleccion)
+      setAplicarAnticipo({})
     } catch (e: any) {
       toast.error(e.message || 'Error al cargar los ítems de la OC')
       setItemsOc([])
       setResumenOc(null)
       setItemsSeleccionados({})
+      setAplicarAnticipo({})
     } finally {
       setCargandoItemsOc(false)
     }
@@ -467,7 +482,8 @@ export default function CuentasPagarPage() {
   /**
    * Monto de los ítems seleccionados. `conIgv` es el que va como monto de la
    * factura: los ítems de la OC están sin IGV pero la factura del proveedor
-   * (y el total de la OC contra el que se controla) sí lo incluyen.
+   * (y el total de la OC contra el que se controla) sí lo incluyen. Resta
+   * los anticipos que se marcaron para aplicar en esta factura.
    */
   const montoItemsSeleccionados = useMemo(() => {
     let neto = 0
@@ -477,6 +493,9 @@ export default function CuentasPagarPage() {
       if (!isNaN(cant) && cant > 0) {
         neto += cant * it.precioNetoUnitario
         conIgv += cant * it.precioUnitarioConIgv
+      }
+      if (!esAdelanto && aplicarAnticipo[it.id] && it.anticipoPendienteDeAplicar > 0) {
+        conIgv -= it.anticipoPendienteDeAplicar
       }
     }
     return {
@@ -597,24 +616,40 @@ export default function CuentasPagarPage() {
           observaciones: createForm.observaciones || null,
           numeroCheque: createForm.numeroCheque || null,
           numeroLetra: createForm.numeroLetra || null,
+          // Es un anticipo del proveedor (se paga antes de recibir el ítem) —
+          // no cuenta como cantidad recibida (ver items-facturables).
+          esAdelanto,
           // Detalle de qué ítems de la OC cubre esta factura — deja rastro
           // de lo ya facturado para las siguientes facturas parciales.
+          // Incluye, si corresponde, la línea negativa que resta el anticipo
+          // ya pagado sobre un ítem (mismo patrón que usaban con Odoo).
           items: createForm.ordenCompraId
-            ? itemsOc
-                .filter(it => {
-                  const c = parseFloat(itemsSeleccionados[it.id] ?? '')
-                  return !isNaN(c) && c > 0
-                })
-                .map(it => {
-                  const cantidad = parseFloat(itemsSeleccionados[it.id])
-                  return {
-                    ordenCompraItemId: it.id,
-                    cantidad,
-                    // Con IGV, para que la suma de las líneas cuadre con el
-                    // monto de la factura y con el total de la OC.
-                    monto: Math.round(cantidad * it.precioUnitarioConIgv * 100) / 100,
-                  }
-                })
+            ? [
+                ...itemsOc
+                  .filter(it => {
+                    const c = parseFloat(itemsSeleccionados[it.id] ?? '')
+                    return !isNaN(c) && c > 0
+                  })
+                  .map(it => {
+                    const cantidad = parseFloat(itemsSeleccionados[it.id])
+                    return {
+                      ordenCompraItemId: it.id,
+                      cantidad,
+                      // Con IGV, para que la suma de las líneas cuadre con el
+                      // monto de la factura y con el total de la OC.
+                      monto: Math.round(cantidad * it.precioUnitarioConIgv * 100) / 100,
+                    }
+                  }),
+                ...(esAdelanto
+                  ? []
+                  : itemsOc
+                      .filter(it => aplicarAnticipo[it.id] && it.anticipoPendienteDeAplicar > 0)
+                      .map(it => ({
+                        ordenCompraItemId: it.id,
+                        cantidad: null,
+                        monto: -it.anticipoPendienteDeAplicar,
+                      }))),
+              ]
             : [],
         }),
       })
@@ -1441,12 +1476,32 @@ export default function CuentasPagarPage() {
               </>
             )}
 
+            {/* Es anticipo: la factura se paga ANTES de que llegue el ítem
+                (equipos de importación). No cuenta como cantidad recibida —
+                queda pendiente de restarse en la factura final. */}
+            {createForm.ordenCompraId && (
+              <div className="flex items-start gap-2 px-1">
+                <Checkbox
+                  id="esAdelantoP"
+                  className="mt-0.5"
+                  checked={esAdelanto}
+                  onCheckedChange={v => setEsAdelanto(!!v)}
+                />
+                <Label htmlFor="esAdelantoP" className="text-xs cursor-pointer leading-tight">
+                  Es un anticipo del proveedor — se paga antes de recibir el ítem (equipos de importación).
+                  No cuenta como entrega; al llegar la factura final se puede restar acá.
+                </Label>
+              </div>
+            )}
+
             {/* Ítems de la OC — permite facturar solo lo que el proveedor
                 entregó, sin esperar a que la OC llegue al 100%. */}
             {createForm.ordenCompraId && (
               <div className="border rounded-lg">
                 <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/40">
-                  <p className="text-sm font-medium">Ítems a facturar</p>
+                  <p className="text-sm font-medium">
+                    {esAdelanto ? 'Ítems que cubre el anticipo (opcional)' : 'Ítems a facturar'}
+                  </p>
                   {cargandoItemsOc && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
                 </div>
                 {cargandoItemsOc ? (
@@ -1459,50 +1514,80 @@ export default function CuentasPagarPage() {
                       {itemsOc.map(item => {
                         const seleccionado = itemsSeleccionados[item.id] !== undefined
                         const sinPendiente = item.cantidadPendiente <= 0
+                        // En modo anticipo, un ítem sin nada recibido es el caso
+                        // normal (se paga antes de que llegue) — no lo atenuamos.
+                        const atenuar = sinPendiente && !esAdelanto
+                        const anticipoAplicable = !esAdelanto && item.anticipoPendienteDeAplicar > 0
                         return (
-                          <div key={item.id} className={`flex items-start gap-2 px-3 py-2 ${sinPendiente ? 'opacity-60' : ''}`}>
-                            <Checkbox
-                              className="mt-0.5"
-                              checked={seleccionado}
-                              onCheckedChange={v => {
-                                setItemsSeleccionados(prev => {
-                                  const next = { ...prev }
-                                  if (v) next[item.id] = String(item.cantidadPendiente > 0 ? item.cantidadPendiente : item.cantidad)
-                                  else delete next[item.id]
-                                  return next
-                                })
-                              }}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium truncate" title={item.descripcion}>
-                                <span className="font-mono text-muted-foreground">{item.codigo}</span> · {item.descripcion}
-                              </p>
-                              <p className="text-[11px] text-muted-foreground">
-                                Pedido {item.cantidad} · Recibido {item.cantidadRecibida}
-                                {item.cantidadFacturada > 0 && ` · Ya facturado ${item.cantidadFacturada}`}
-                                {' '}{item.unidad}
-                                {sinPendiente && <span className="text-green-700"> · sin saldo por facturar</span>}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min={0}
-                                className="h-7 w-20 text-xs"
-                                disabled={!seleccionado}
-                                value={itemsSeleccionados[item.id] ?? ''}
-                                onChange={e =>
-                                  setItemsSeleccionados(prev => ({ ...prev, [item.id]: e.target.value }))
-                                }
+                          <div key={item.id} className={`px-3 py-2 ${atenuar ? 'opacity-60' : ''}`}>
+                            <div className="flex items-start gap-2">
+                              <Checkbox
+                                className="mt-0.5"
+                                checked={seleccionado}
+                                onCheckedChange={v => {
+                                  setItemsSeleccionados(prev => {
+                                    const next = { ...prev }
+                                    if (v) {
+                                      // En modo anticipo no hay una cantidad
+                                      // "correcta" por defecto (suele ser un %
+                                      // del ítem, no la cantidad completa) —
+                                      // se deja en blanco para que la tipeen.
+                                      next[item.id] = esAdelanto
+                                        ? ''
+                                        : String(item.cantidadPendiente > 0 ? item.cantidadPendiente : item.cantidad)
+                                    } else {
+                                      delete next[item.id]
+                                    }
+                                    return next
+                                  })
+                                }}
                               />
-                              <span className="text-[11px] font-mono w-24 text-right">
-                                {formatCurrency(
-                                  Math.round((parseFloat(itemsSeleccionados[item.id] ?? '0') || 0) * item.precioUnitarioConIgv * 100) / 100,
-                                  createForm.moneda
-                                )}
-                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium truncate" title={item.descripcion}>
+                                  <span className="font-mono text-muted-foreground">{item.codigo}</span> · {item.descripcion}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Pedido {item.cantidad} · Recibido {item.cantidadRecibida}
+                                  {item.cantidadFacturada > 0 && ` · Ya facturado ${item.cantidadFacturada}`}
+                                  {' '}{item.unidad}
+                                  {sinPendiente && !esAdelanto && <span className="text-green-700"> · sin saldo por facturar</span>}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min={0}
+                                  className="h-7 w-20 text-xs"
+                                  placeholder={esAdelanto ? 'cant.' : undefined}
+                                  disabled={!seleccionado}
+                                  value={itemsSeleccionados[item.id] ?? ''}
+                                  onChange={e =>
+                                    setItemsSeleccionados(prev => ({ ...prev, [item.id]: e.target.value }))
+                                  }
+                                />
+                                <span className="text-[11px] font-mono w-24 text-right">
+                                  {formatCurrency(
+                                    Math.round((parseFloat(itemsSeleccionados[item.id] ?? '0') || 0) * item.precioUnitarioConIgv * 100) / 100,
+                                    createForm.moneda
+                                  )}
+                                </span>
+                              </div>
                             </div>
+                            {anticipoAplicable && (
+                              <div className="flex items-center gap-2 mt-1.5 ml-6 pl-1 border-l-2 border-amber-300">
+                                <Checkbox
+                                  id={`anticipo-${item.id}`}
+                                  checked={!!aplicarAnticipo[item.id]}
+                                  onCheckedChange={v =>
+                                    setAplicarAnticipo(prev => ({ ...prev, [item.id]: !!v }))
+                                  }
+                                />
+                                <Label htmlFor={`anticipo-${item.id}`} className="text-[11px] text-amber-700 cursor-pointer">
+                                  Restar anticipo ya pagado: {formatCurrency(item.anticipoPendienteDeAplicar, createForm.moneda)}
+                                </Label>
+                              </div>
+                            )}
                           </div>
                         )
                       })}

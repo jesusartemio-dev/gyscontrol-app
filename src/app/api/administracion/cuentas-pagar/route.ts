@@ -25,6 +25,7 @@ const includeRelations = {
       monto: true,
       ordenCompraItem: { select: { id: true, codigo: true, descripcion: true, unidad: true } },
     },
+    orderBy: { createdAt: 'asc' as const },
   },
   pagos: {
     include: { cuentaBancaria: { select: { id: true, nombreBanco: true, numeroCuenta: true } } },
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
       tipoOrigen, tipoDocumento, numeroFactura, descripcion, monto, moneda, tipoCambio,
       fechaRecepcion, fechaVencimiento, condicionPago, formaPago, diasCredito,
       detraccionPorcentaje, guardarDetraccionDefault, observaciones,
-      numeroCheque, numeroLetra, items,
+      numeroCheque, numeroLetra, items, esAdelanto,
     } = body
 
     if (!proveedorId || !monto || !fechaRecepcion || !fechaVencimiento) {
@@ -95,19 +96,33 @@ export async function POST(req: Request) {
     const detraccion = detraccionPorcentaje != null && detraccionPorcentaje !== ''
       ? Number(detraccionPorcentaje)
       : null
+    const esAdelantoBool = !!esAdelanto
 
     // Detalle de qué ítems de la OC cubre esta factura (facturación parcial).
     // Opcional: las facturas que no vienen de una OC no lo envían.
-    type ItemFacturado = { ordenCompraItemId: string; cantidad: number; monto: number }
+    //
+    // cantidad es null en dos casos que no son "unidades recibidas":
+    //   - Líneas de anticipo (se paga antes de que llegue el ítem).
+    //   - Líneas negativas dentro de una factura NO-anticipo: el descuento
+    //     del anticipo ya pagado sobre ese ítem (ver items-facturables).
+    type ItemFacturado = { ordenCompraItemId: string; cantidad: number | null; monto: number }
     const itemsFacturados: ItemFacturado[] = Array.isArray(items)
       ? items
-          .filter((it: any) => it?.ordenCompraItemId && Number(it.cantidad) > 0)
-          .map((it: any) => ({
-            ordenCompraItemId: String(it.ordenCompraItemId),
-            cantidad: Number(it.cantidad),
-            monto: Number(it.monto) || 0,
-          }))
+          .filter((it: any) => it?.ordenCompraItemId && Number(it.monto) !== 0)
+          .map((it: any) => {
+            const monto = Number(it.monto) || 0
+            const cantidadRaw = it.cantidad != null ? Number(it.cantidad) : null
+            const cantidad = monto < 0 || !cantidadRaw || cantidadRaw <= 0 ? null : cantidadRaw
+            return { ordenCompraItemId: String(it.ordenCompraItemId), cantidad, monto }
+          })
       : []
+
+    if (esAdelantoBool && itemsFacturados.some(i => i.monto < 0)) {
+      return NextResponse.json(
+        { error: 'Una factura de anticipo no puede tener líneas negativas' },
+        { status: 400 }
+      )
+    }
 
     if (itemsFacturados.length > 0) {
       if (!ordenCompraId) {
@@ -153,6 +168,7 @@ export async function POST(req: Request) {
         observaciones: observaciones || null,
         numeroCheque: numeroCheque || null,
         numeroLetra: numeroLetra || null,
+        esAdelanto: esAdelantoBool,
         updatedAt: new Date(),
         ...(itemsFacturados.length > 0 && {
           itemsFacturados: { create: itemsFacturados },

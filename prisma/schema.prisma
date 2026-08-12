@@ -4746,6 +4746,12 @@ model CuentaPorPagar {
   numeroLetra          String?
   tipoDocumento        String            @default("factura") // 'factura' | 'nota_credito'
   registroContador     String? // '1ro' | '2do' | '3ro' | null
+  /// Factura real del proveedor que es un anticipo (no corresponde a
+  /// cantidad recibida — se paga antes de que llegue el ítem). Cuando llega
+  /// la factura final de esos mismos ítems, se resta con una línea en
+  /// negativo dentro de ESA factura (ver CuentaPorPagarItem.monto negativo),
+  /// nunca modificando esta. Ver project_facturacion_parcial_oc.md.
+  esAdelanto           Boolean           @default(false)
   createdAt            DateTime          @default(now())
   updatedAt            DateTime
 
@@ -4804,8 +4810,12 @@ model CuentaPorPagarItem {
 
   /// Cantidad del ítem cubierta por ESTA factura. Normalmente es el ítem
   /// completo, pero admite parciales (se pidieron 100, se facturan 60).
-  cantidad Float
-  /// Monto atribuido a este ítem dentro de la factura.
+  /// Null en líneas sin cantidad física real: anticipos (se paga antes de
+  /// recibir) y su descuento (línea negativa dentro de la factura final que
+  /// resta el anticipo ya pagado) — ninguna de las dos es "cantidad recibida".
+  cantidad Float?
+  /// Monto atribuido a este ítem dentro de la factura. Negativo cuando es el
+  /// descuento de un anticipo ya pagado (dentro de una factura NO-anticipo).
   monto    Float
 
   createdAt DateTime @default(now())

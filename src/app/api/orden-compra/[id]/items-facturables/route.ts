@@ -14,7 +14,15 @@ const ROLES_ALLOWED = ['admin', 'gerente', 'administracion']
  *
  * `cantidadRecibida` la registra Logística en la recepción por ítem
  * (ver orden-compra/[id]/recepcion). `cantidadFacturada` sale de las líneas
- * CuentaPorPagarItem de facturas no anuladas.
+ * CuentaPorPagarItem de facturas de ENTREGA (no anticipo) no anuladas.
+ *
+ * Anticipos: un anticipo se paga ANTES de que llegue el ítem, así que no
+ * cuenta como "cantidad facturada" contra lo recibido — es dinero aparte.
+ * Cuando llega la factura final del mismo ítem, esa factura (que NO es
+ * anticipo) puede traer una línea en negativo que resta el anticipo ya
+ * pagado — así lo hacía Administración en el sistema anterior (Odoo).
+ * `anticipoPendienteDeAplicar` es lo que todavía no se restó en ninguna
+ * factura final.
  */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -51,7 +59,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
             costoTotal: true,
             facturasItems: {
               where: { cuentaPorPagar: { estado: { not: 'anulada' } } },
-              select: { cantidad: true, monto: true },
+              select: { cantidad: true, monto: true, cuentaPorPagar: { select: { esAdelanto: true } } },
             },
           },
         },
@@ -71,9 +79,24 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const factorIgv = oc.subtotal > 0 ? oc.total / oc.subtotal : 1
 
     const items = oc.items.map(item => {
-      const cantidadFacturada = item.facturasItems.reduce((s, f) => s + f.cantidad, 0)
+      const lineasEntrega = item.facturasItems.filter(f => !f.cuentaPorPagar.esAdelanto)
+      const lineasAnticipo = item.facturasItems.filter(f => f.cuentaPorPagar.esAdelanto)
+
+      // Solo las líneas de ENTREGA tienen cantidad real — un anticipo no
+      // corresponde a unidades recibidas, y su descuento (línea negativa
+      // dentro de la factura final) tampoco.
+      const cantidadFacturada = lineasEntrega.reduce((s, f) => s + (f.cantidad ?? 0), 0)
       const montoFacturado = item.facturasItems.reduce((s, f) => s + f.monto, 0)
       totalFacturado += montoFacturado
+
+      const montoAnticipoRecibido = lineasAnticipo.reduce((s, f) => s + f.monto, 0)
+      const montoAnticipoAplicado = lineasEntrega
+        .filter(f => f.monto < 0)
+        .reduce((s, f) => s + -f.monto, 0)
+      const anticipoPendienteDeAplicar = Math.max(
+        0,
+        redondear(montoAnticipoRecibido - montoAnticipoAplicado)
+      )
 
       // Lo facturable es lo recibido que todavía no se facturó. El precio
       // unitario ya viene neto de descuento vía costoTotal/cantidad.
@@ -98,6 +121,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         montoFacturado: redondear(montoFacturado),
         /** Ya se facturó todo lo que se recibió de este ítem. */
         totalmenteFacturado: cantidadPendiente <= 0,
+        /** Anticipo ya pagado sobre este ítem, sin restar todavía en ninguna
+         *  factura final. 0 si nunca hubo anticipo o ya se aplicó todo. */
+        anticipoPendienteDeAplicar: redondear(anticipoPendienteDeAplicar),
       }
     })
 
