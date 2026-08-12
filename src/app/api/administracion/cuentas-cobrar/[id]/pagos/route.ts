@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { recalcularCuentaPorCobrar } from '@/lib/services/pagoCobro'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'administracion']
 
@@ -117,42 +118,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const pagos = await prisma.$transaction(creates)
 
-    // Recalcular saldo de la cuenta
-    const totalPagado = await prisma.pagoCobro.aggregate({
-      where: { cuentaPorCobrarId },
-      _sum: { monto: true },
-    })
-
-    const montoPagado = totalPagado._sum.monto || 0
-    const saldoPendiente = round2(cuenta.monto - montoPagado)
-
-    const nuevoEstado: typeof cuenta.estado = saldoPendiente <= 0 ? 'pagada'
-      : montoPagado > 0 ? 'parcial'
-      : cuenta.estado
-
-    const cuentaActualizada = await prisma.cuentaPorCobrar.update({
-      where: { id: cuentaPorCobrarId },
-      data: {
-        montoPagado: round2(montoPagado),
-        saldoPendiente: Math.max(0, saldoPendiente),
-        estado: nuevoEstado,
-        updatedAt: new Date(),
-      },
-    })
-
-    // Auto-sync: si CxC queda pagada y tiene valorización vinculada, marcarla como pagada también
-    if (nuevoEstado === 'pagada' && cuentaActualizada.valorizacionId) {
-      const val = await prisma.valorizacion.findUnique({
-        where: { id: cuentaActualizada.valorizacionId },
-        select: { id: true, estado: true, proyectoId: true },
-      })
-      if (val && val.estado === 'facturada') {
-        await prisma.valorizacion.update({
-          where: { id: val.id },
-          data: { estado: 'pagada', updatedAt: new Date() },
-        })
-      }
-    }
+    // Recalcular saldo/estado de la cuenta (y sincronizar su Valorizacion si queda pagada)
+    await recalcularCuentaPorCobrar(cuentaPorCobrarId)
 
     return NextResponse.json(pagos.length === 1 ? pagos[0] : pagos, { status: 201 })
   } catch (error) {

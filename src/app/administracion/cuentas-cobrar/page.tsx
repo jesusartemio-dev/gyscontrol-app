@@ -994,9 +994,17 @@ export default function CuentasCobrarPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/administracion/cuentas-cobrar/${item.id}`}>Ver →</Link>
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          {(item.estado === 'pendiente' || item.estado === 'parcial' || item.estado === 'vencida') && (
+                            <Button variant="outline" size="sm" onClick={() => openPago(item)}>
+                              <ArrowDownCircle className="h-3 w-3 mr-1" />
+                              Pago
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link href={`/administracion/cuentas-cobrar/${item.id}`}>Ver →</Link>
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )
