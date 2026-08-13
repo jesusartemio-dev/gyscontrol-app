@@ -2383,6 +2383,9 @@ model CobroValorizacion {
   confirmacionCliente    String? // 'pendiente' | 'confirmado' | 'en_disputa'
   fechaVencimientoPago   DateTime?
   observaciones          String?
+  // Ciclo de vida (factoring): en_negociacion -> desembolsada -> confirmada | letra_cambio
+  estado                 EstadoCobroValorizacion @default(en_negociacion)
+  fechaConfirmacion      DateTime? // cuándo el cliente confirmó a la financiera y se liberó el excedente
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
@@ -4165,6 +4168,17 @@ enum EstadoValorizacion {
   facturada
   pagada
   anulada
+}
+
+// Ciclo de vida de una operación de cobro (factoring o directo) sobre una Valorizacion.
+// en_negociacion -> desembolsada -> confirmada (cierre bueno, excedente liberado)
+//                                -> letra_cambio (cierre malo: cliente no pagó, la
+//                                   cobranza volvió a GYS vía letra de cambio)
+enum EstadoCobroValorizacion {
+  en_negociacion
+  desembolsada
+  confirmada
+  letra_cambio
 }
 
 enum EstadoCuentaCobrar {
