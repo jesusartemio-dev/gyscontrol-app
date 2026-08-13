@@ -52,6 +52,8 @@ interface CobroValorizacion {
   confirmacionCliente: string | null
   fechaVencimientoPago: string | null
   observaciones: string | null
+  estado: string
+  fechaConfirmacion: string | null
   abonos: AbonoValorizacion[]
 }
 
@@ -203,6 +205,11 @@ export default function CxCDetallePage() {
   const [cobroFechaVencPago, setCobroFechaVencPago]     = useState('')
   const [cobroObs, setCobroObs]                         = useState('')
   const [savingCobro, setSavingCobro]                   = useState(false)
+
+  // Confirmación del cliente (factoring): libera el excedente retenido
+  const [showConfirmarFactoring, setShowConfirmarFactoring] = useState(false)
+  const [fechaConfirmarFactoring, setFechaConfirmarFactoring] = useState(new Date().toISOString().split('T')[0])
+  const [savingConfirmarFactoring, setSavingConfirmarFactoring] = useState(false)
 
   // Abonos
   const [showAbonoForm, setShowAbonoForm]   = useState(false)
@@ -385,6 +392,26 @@ export default function CxCDetallePage() {
       toast.error(e.message || 'Error al guardar cobro')
     } finally {
       setSavingCobro(false)
+    }
+  }
+
+  const handleConfirmarFactoring = async () => {
+    if (!cxc?.valorizacion || !fechaConfirmarFactoring) return
+    setSavingConfirmarFactoring(true)
+    try {
+      const res = await fetch(
+        `/api/proyectos/${cxc.valorizacion.proyectoId}/valorizaciones/${cxc.valorizacion.id}/cobro/confirmar`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fechaConfirmacion: fechaConfirmarFactoring }) }
+      )
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
+      toast.success('Cliente confirmado — excedente liberado y aplicado a la CxC')
+      setShowConfirmarFactoring(false)
+      load()
+    } catch (e: any) {
+      toast.error(e.message || 'Error al confirmar')
+    } finally {
+      setSavingConfirmarFactoring(false)
     }
   }
 
@@ -658,11 +685,31 @@ export default function CxCDetallePage() {
                     <Building2 className="h-4 w-4 text-muted-foreground" />
                     Factoring / Cobro con Financiera
                     {cobro && <Badge variant="outline" className="text-xs">{cobro.tipo === 'factoring' ? 'Factoring' : 'Directo'}</Badge>}
+                    {cobro?.tipo === 'factoring' && (
+                      <Badge className={`text-xs ${
+                        cobro.estado === 'confirmada' ? 'bg-green-100 text-green-700'
+                        : cobro.estado === 'desembolsada' ? 'bg-blue-100 text-blue-700'
+                        : cobro.estado === 'letra_cambio' ? 'bg-red-100 text-red-700'
+                        : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {cobro.estado === 'en_negociacion' ? 'En negociación'
+                          : cobro.estado === 'desembolsada' ? 'Desembolsada — excedente pendiente'
+                          : cobro.estado === 'confirmada' ? 'Confirmada'
+                          : 'Letra de cambio'}
+                      </Badge>
+                    )}
                   </CardTitle>
-                  <Button variant="outline" size="sm" onClick={() => setShowCobroForm(v => !v)}>
-                    {showCobroForm ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
-                    {cobro ? 'Editar' : 'Registrar'}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    {cobro?.tipo === 'factoring' && cobro.estado === 'desembolsada' && (
+                      <Button size="sm" onClick={() => setShowConfirmarFactoring(true)}>
+                        Confirmar cliente
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => setShowCobroForm(v => !v)}>
+                      {showCobroForm ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
+                      {cobro ? 'Editar' : 'Registrar'}
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -678,6 +725,7 @@ export default function CxCDetallePage() {
                       {labelRow('Monto a Desembolsar', cobro.montoADesembolsar != null ? formatCurrency(cobro.montoADesembolsar, cxc.moneda) : null)}
                       {labelRow('Adelanto Banpro', cobro.adelantoBanpro != null ? formatCurrency(cobro.adelantoBanpro, cxc.moneda) : null)}
                       {labelRow('Saldo a Girar', cobro.saldoAGirar != null ? formatCurrency(cobro.saldoAGirar, cxc.moneda) : null)}
+                      {labelRow('Fecha Confirmación', cobro.fechaConfirmacion ? formatDate(cobro.fechaConfirmacion) : null)}
                     </> : <>
                       {labelRow('Confirmación Cliente', cobro.confirmacionCliente)}
                       {labelRow('Fecha Venc. Pago', cobro.fechaVencimientoPago ? formatDate(cobro.fechaVencimientoPago) : null)}
@@ -959,6 +1007,33 @@ export default function CxCDetallePage() {
           )}
         </div>
       </div>
+
+      {/* ── Dialog Confirmar cliente (factoring) ── */}
+      <Dialog open={showConfirmarFactoring} onOpenChange={open => { if (!open) setShowConfirmarFactoring(false) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar cliente</DialogTitle>
+            <DialogDescription>
+              El cliente confirmó la factura a la financiera. Esto libera el excedente retenido
+              ({cobro?.excedenteMonto != null ? formatCurrency(cobro.excedenteMonto, cxc.moneda) : '—'})
+              como cobro real y cierra la operación de factoring.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Fecha de confirmación *</Label>
+              <Input type="date" value={fechaConfirmarFactoring} onChange={e => setFechaConfirmarFactoring(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConfirmarFactoring(false)}>Cancelar</Button>
+            <Button onClick={handleConfirmarFactoring} disabled={savingConfirmarFactoring}>
+              {savingConfirmarFactoring && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Confirmar cliente
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Dialog Registrar Pago ── */}
       <Dialog open={showPagoForm} onOpenChange={open => {

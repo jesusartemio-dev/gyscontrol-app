@@ -305,6 +305,33 @@ async function checkOrdenCompra(id: string): Promise<DeleteBlocker[]> {
   return blockers
 }
 
+/**
+ * ¿La valorización tiene alguna CuentaPorCobrar activa (no anulada) con montoPagado > 0?
+ * Reusado por checkValorizacion (bloqueo de DELETE) y por el guard de reversión de
+ * estado en valorizaciones/[valId]/route.ts (bloqueo de anular/revertir con dinero
+ * ya cobrado, para no dejar un PagoCobro huérfano de una CxC anulada).
+ */
+export async function verificarCxcConPagos(valorizacionId: string): Promise<DeleteBlocker[]> {
+  const blockers: DeleteBlocker[] = []
+
+  const cxcConPagos = await prisma.cuentaPorCobrar.count({
+    where: {
+      valorizacionId,
+      montoPagado: { gt: 0 },
+      estado: { not: 'anulada' },
+    },
+  })
+  if (cxcConPagos > 0) {
+    blockers.push({
+      entity: 'CuentaPorCobrar',
+      count: cxcConPagos,
+      message: `Tiene ${cxcConPagos} cuenta(s) por cobrar con pagos registrados`,
+    })
+  }
+
+  return blockers
+}
+
 async function checkValorizacion(id: string): Promise<DeleteBlocker[]> {
   const blockers: DeleteBlocker[] = []
 
@@ -327,20 +354,7 @@ async function checkValorizacion(id: string): Promise<DeleteBlocker[]> {
     })
   }
 
-  const cxcConPagos = await prisma.cuentaPorCobrar.count({
-    where: {
-      valorizacionId: id,
-      montoPagado: { gt: 0 },
-      estado: { not: 'anulada' },
-    },
-  })
-  if (cxcConPagos > 0) {
-    blockers.push({
-      entity: 'CuentaPorCobrar',
-      count: cxcConPagos,
-      message: `Tiene ${cxcConPagos} cuenta(s) por cobrar con pagos registrados`,
-    })
-  }
+  blockers.push(...(await verificarCxcConPagos(id)))
 
   return blockers
 }

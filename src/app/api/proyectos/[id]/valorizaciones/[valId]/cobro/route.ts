@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
+import { procesarDesembolsoFactoring } from '@/lib/services/factoringCobro'
 
 type Ctx = { params: Promise<{ id: string; valId: string }> }
 
@@ -106,11 +107,37 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     const data = CobroSchema.parse(body)
     const payload = buildUpsertPayload(data)
 
-    const cobro = await prisma.cobroValorizacion.upsert({
-      where: { valorizacionId: valId },
-      create: { valorizacionId: valId, ...payload },
-      update: payload,
-      include: { abonos: true },
+    const cobro = await prisma.$transaction(async (tx) => {
+      // Snapshot previo — para detectar la transición null -> poblado de
+      // fechaDesembolso sin importar cuántas veces se re-guarde el formulario
+      // con otros campos editados (idempotencia: Fase 4, caso C).
+      const existente = await tx.cobroValorizacion.findUnique({
+        where: { valorizacionId: valId },
+        select: { fechaDesembolso: true },
+      })
+
+      const actualizado = await tx.cobroValorizacion.upsert({
+        where: { valorizacionId: valId },
+        create: { valorizacionId: valId, ...payload },
+        update: payload,
+        include: { abonos: true },
+      })
+
+      const esNuevoDesembolso =
+        data.tipo === 'factoring' &&
+        existente?.fechaDesembolso == null &&
+        actualizado.fechaDesembolso != null
+
+      if (esNuevoDesembolso) {
+        await procesarDesembolsoFactoring(actualizado.id, tx)
+        // Releer para devolver el estado ya actualizado a 'desembolsada'.
+        return tx.cobroValorizacion.findUniqueOrThrow({
+          where: { id: actualizado.id },
+          include: { abonos: true },
+        })
+      }
+
+      return actualizado
     })
 
     return NextResponse.json(cobro)

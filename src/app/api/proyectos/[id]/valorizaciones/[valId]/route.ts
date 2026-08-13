@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { calcularAdelantoValorizacion } from '@/lib/utils/adelantoUtils'
-import { canDelete } from '@/lib/utils/deleteValidation'
+import { canDelete, verificarCxcConPagos } from '@/lib/utils/deleteValidation'
 import {
   calcularMontos,
   calcularAcumuladoAnterior,
@@ -160,6 +160,29 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     // Manejo de cambio de estado
     if (body.estado && body.estado !== existing.estado) {
+      // Anti-dinero-colgado: si esta transición va a anular la(s) CxC de la
+      // valorización y esa CxC ya tiene montoPagado > 0 (cobro directo o
+      // factoring ya aplicado), bloquear salvo confirmación explícita — de lo
+      // contrario el PagoCobro real queda huérfano en una CxC anulada.
+      const estadosConCxC = ['facturada', 'pagada']
+      const transicionAnulariaCxC =
+        (body.estado === 'anulada' && estadosConCxC.includes(existing.estado)) ||
+        (existing.estado === 'facturada' && body.estado === 'hes_pendiente') ||
+        (existing.estado === 'facturada' && body.estado === 'aprobada_cliente')
+
+      if (transicionAnulariaCxC && !body.confirmarReversionConPagos) {
+        const blockers = await verificarCxcConPagos(valId)
+        if (blockers.length > 0) {
+          return NextResponse.json(
+            {
+              error: `No se puede hacer ${existing.estado} → ${body.estado}: ${blockers.map(b => b.message).join('; ')}. Si estás seguro, reenvía con confirmarReversionConPagos: true.`,
+              blockers,
+            },
+            { status: 409 }
+          )
+        }
+      }
+
       // Amortización de adelanto al aprobar
       if (body.estado === 'aprobada_cliente' && existing.adelantoMonto > 0) {
         await prisma.proyecto.update({
@@ -182,7 +205,6 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       }
 
       // Al anular desde facturada/pagada: anular CxC asociadas
-      const estadosConCxC = ['facturada', 'pagada']
       if (body.estado === 'anulada' && estadosConCxC.includes(existing.estado)) {
         await prisma.cuentaPorCobrar.updateMany({
           where: { valorizacionId: valId, estado: { not: 'anulada' } },

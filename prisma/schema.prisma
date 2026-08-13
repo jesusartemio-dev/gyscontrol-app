@@ -4719,6 +4719,11 @@ model PagoCobro {
   retencionPorcentaje       Float?
   retencionMonto            Float?
   retencionNumeroConstancia String? // N° de comprobante de retención emitido por el cliente
+  // Costo de financiamiento de factoring (interés + comisión + gastos + IGV gastos):
+  // reduce saldoPendiente igual que una detracción/retención, pero no es dinero que
+  // GYS reciba ni que el cliente retenga — es lo que cobra la financiera. El desglose
+  // vive en CobroValorizacion; acá solo el monto agregado.
+  esCostoFinanciamiento     Boolean   @default(false)
   createdAt                 DateTime  @default(now())
   updatedAt                 DateTime
 
