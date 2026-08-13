@@ -31,8 +31,8 @@ interface ValorizacionAdjunto {
 interface AbonoValorizacion {
   id: string
   cobroId: string
-  monto: number
-  fecha: string
+  montoReal: number
+  fechaReal: string
   observaciones: string | null
 }
 

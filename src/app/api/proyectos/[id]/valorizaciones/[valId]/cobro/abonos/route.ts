@@ -31,8 +31,8 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     const abono = await prisma.abonoValorizacion.create({
       data: {
         cobroId: cobro.id,
-        monto: data.monto,
-        fecha: new Date(data.fecha),
+        montoReal: data.monto,
+        fechaReal: new Date(data.fecha),
         observaciones: data.observaciones ?? null,
       },
     })

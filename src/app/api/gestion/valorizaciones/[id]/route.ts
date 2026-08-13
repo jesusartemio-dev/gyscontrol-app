@@ -38,7 +38,7 @@ export async function GET(
           },
         },
         adjuntos: { orderBy: { createdAt: 'asc' } },
-        cobro: { include: { abonos: { orderBy: { fecha: 'asc' } } } },
+        cobro: { include: { abonos: { orderBy: { fechaReal: 'asc' } } } },
         partidas: { orderBy: { orden: 'asc' } },
         valorizacionHH: {
           select: {

@@ -85,7 +85,7 @@ export async function GET(_: NextRequest, { params }: Ctx) {
     const { valId } = await params
     const cobro = await prisma.cobroValorizacion.findUnique({
       where: { valorizacionId: valId },
-      include: { abonos: { orderBy: { fecha: 'asc' } } },
+      include: { abonos: { orderBy: { fechaReal: 'asc' } } },
     })
 
     return NextResponse.json(cobro)

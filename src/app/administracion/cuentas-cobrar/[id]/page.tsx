@@ -21,8 +21,8 @@ import Link from 'next/link'
 interface AbonoValorizacion {
   id: string
   cobroId: string
-  monto: number
-  fecha: string
+  montoReal: number
+  fechaReal: string
   observaciones: string | null
 }
 
@@ -920,9 +920,9 @@ export default function CxCDetallePage() {
                         <TableBody>
                           {cobro.abonos.map(a => (
                             <TableRow key={a.id}>
-                              <TableCell>{formatDate(a.fecha)}</TableCell>
+                              <TableCell>{formatDate(a.fechaReal)}</TableCell>
                               <TableCell className="text-muted-foreground text-xs">{a.observaciones || '—'}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(a.monto, cxc.moneda)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(a.montoReal, cxc.moneda)}</TableCell>
                               <TableCell>
                                 <Button variant="ghost" size="sm" className="text-red-500 h-7 w-7 p-0"
                                   onClick={() => handleDeleteAbono(a.id)}>

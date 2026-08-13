@@ -22,7 +22,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           select: {
             id: true, codigo: true, numero: true, proyectoId: true,
             cobro: {
-              include: { abonos: { orderBy: { fecha: 'asc' } } },
+              include: { abonos: { orderBy: { fechaReal: 'asc' } } },
             },
           },
         },

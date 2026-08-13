@@ -2395,15 +2395,41 @@ model CobroValorizacion {
   @@map("cobro_valorizacion")
 }
 
-model AbonoValorizacion {
-  id            String   @id @default(cuid())
-  cobroId       String
-  monto         Float
-  fecha         DateTime
-  observaciones String?
-  createdAt     DateTime @default(now())
+// Ciclo de vida de un "cobro esperado" dentro de una operación de factoring:
+// pendiente (se conoce el monto teórico, todavía no llega) -> recibido (llegó,
+// con su monto y fecha reales, que pueden diferir del teórico por mora).
+enum EstadoAbonoFactoring {
+  pendiente
+  recibido
+}
 
-  cobro CobroValorizacion @relation(fields: [cobroId], references: [id], onDelete: Cascade)
+// Los 4 eventos de cobro de una operación de factoring con recurso.
+enum TipoAbonoFactoring {
+  adelanto
+  saldo_girar
+  detraccion
+  excedente
+}
+
+model AbonoValorizacion {
+  id            String                @id @default(cuid())
+  cobroId       String
+  // null = abono legacy sin clasificar (creado antes de este modelo de eventos)
+  tipo          TipoAbonoFactoring?
+  estado        EstadoAbonoFactoring  @default(recibido)
+  montoEsperado Float? // monto teórico de la liquidación al crear el evento como 'pendiente'
+  // "montoReal"/"fechaReal": antes se llamaban monto/fecha y eran obligatorios;
+  // ahora son opcionales (se llenan al marcar el evento como 'recibido'). El
+  // @map conserva el nombre de columna en BD para no mover los datos existentes.
+  montoReal     Float?                @map("monto")
+  fechaReal     DateTime?             @map("fecha")
+  fechaEsperada DateTime? // fecha teórica/estimada del evento (puede quedar sin definir)
+  pagoCobroId   String?               @unique // PagoCobro real generado al marcar 'recibido'
+  observaciones String?
+  createdAt     DateTime              @default(now())
+
+  cobro     CobroValorizacion @relation(fields: [cobroId], references: [id], onDelete: Cascade)
+  pagoCobro PagoCobro?        @relation(fields: [pagoCobroId], references: [id])
 
   @@index([cobroId])
   @@map("abono_valorizacion")
@@ -4724,11 +4750,17 @@ model PagoCobro {
   // GYS reciba ni que el cliente retenga — es lo que cobra la financiera. El desglose
   // vive en CobroValorizacion; acá solo el monto agregado.
   esCostoFinanciamiento     Boolean   @default(false)
+  // Diferencia entre el monto esperado y el real de un "cobro esperado" de
+  // factoring (ej. excedente que llega recortado por mora del cliente): cierra
+  // saldoPendiente sin ser dinero recibido, igual que esCostoFinanciamiento,
+  // pero es una categoría de pérdida distinta (mora, no costo de financiamiento).
+  esAjusteMora              Boolean   @default(false)
   createdAt                 DateTime  @default(now())
   updatedAt                 DateTime
 
-  cuentaPorCobrar CuentaPorCobrar @relation(fields: [cuentaPorCobrarId], references: [id], onDelete: Cascade)
-  cuentaBancaria  CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])
+  cuentaPorCobrar   CuentaPorCobrar    @relation(fields: [cuentaPorCobrarId], references: [id], onDelete: Cascade)
+  cuentaBancaria    CuentaBancaria?    @relation(fields: [cuentaBancariaId], references: [id])
+  abonoValorizacion AbonoValorizacion?
 
   @@index([cuentaPorCobrarId])
   @@index([fechaPago])
