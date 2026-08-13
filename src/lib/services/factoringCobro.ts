@@ -151,6 +151,24 @@ export async function procesarConfirmacionFactoring(
     throw new Error('La valorización no tiene una CuentaPorCobrar activa para aplicar la confirmación')
   }
 
+  // El desembolso debe haber pasado por procesarDesembolsoFactoring (que deja un
+  // PagoCobro medioPago='factoring') antes de poder confirmar. Sin esto, una
+  // operación marcada 'desembolsada' solo por una migración/backfill de estado
+  // (como CJM43, que llegó a 'desembolsada' en la Fase 3 sin que su adelanto
+  // pasara nunca por el flujo nuevo) podría "confirmarse" y liberar el excedente
+  // sin que el adelanto ni el costo de financiamiento se hayan registrado nunca
+  // como PagoCobro real. No es un parche puntual: ninguna operación debería
+  // poder confirmarse si su adelanto no se registró por este flujo.
+  const tieneDesembolsoProcesado = await tx.pagoCobro.findFirst({
+    where: { cuentaPorCobrarId: cxc.id, medioPago: 'factoring' },
+    select: { id: true },
+  })
+  if (!tieneDesembolsoProcesado) {
+    throw new Error(
+      'No se puede confirmar: el desembolso de esta operación no fue procesado por el flujo actual; requiere regularización'
+    )
+  }
+
   const excedente = cobro.excedenteMonto ?? 0
   if (excedente > 0) {
     const cuentaBancaria = await resolverCuentaBancariaFactoring(cxc.moneda, tx)
