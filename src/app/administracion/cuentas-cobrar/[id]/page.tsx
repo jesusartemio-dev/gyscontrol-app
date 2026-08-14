@@ -1155,7 +1155,12 @@ export default function CxCDetallePage() {
                                   </span>
                                 </TableCell>
                                 <TableCell className="text-right text-sm">{a.montoEsperado != null ? formatCurrency(a.montoEsperado, cxc.moneda) : '—'}</TableCell>
-                                <TableCell className="text-right text-sm">{a.montoReal != null ? formatCurrency(a.montoReal, cxc.moneda) : '—'}</TableCell>
+                                <TableCell className="text-right text-sm">
+                                  {a.montoReal != null ? formatCurrency(a.montoReal, cxc.moneda) : '—'}
+                                  {a.montoReal != null && a.montoEsperado != null && a.montoEsperado - a.montoReal > 0.01 && (
+                                    <p className="text-[11px] text-red-600">−{formatCurrency(a.montoEsperado - a.montoReal, cxc.moneda)} mora</p>
+                                  )}
+                                </TableCell>
                                 <TableCell className="text-xs">
                                   {a.estado === 'recibido'
                                     ? (a.fechaReal ? formatDate(a.fechaReal) : '—')
