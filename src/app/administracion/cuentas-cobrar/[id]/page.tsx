@@ -226,6 +226,10 @@ export default function CxCDetallePage() {
   const [cobroTasa, setCobroTasa]                       = useState('')
   const [cobroFechaDesembolso, setCobroFechaDesembolso] = useState('')
   const [cobroFechaVencimiento, setCobroFechaVencimiento] = useState('')
+  // true mientras Fecha Vencimiento siga siendo la sugerencia calculada
+  // (Fecha Desembolso + Días Financiamiento) sin que el usuario la haya
+  // tocado a mano — mismo patrón que interesEsSugerido.
+  const [fechaVencimientoEsSugerida, setFechaVencimientoEsSugerida] = useState(false)
   const [cobroNumeroOperacion, setCobroNumeroOperacion] = useState('')
   const [cobroNumDocumentos, setCobroNumDocumentos]     = useState('')
   const [cobroDias, setCobroDias]                       = useState('')
@@ -305,6 +309,7 @@ export default function CxCDetallePage() {
         setCobroTasa(cobro.tasaDescuentoPct?.toString() || '')
         setCobroFechaDesembolso(cobro.fechaDesembolso ? cobro.fechaDesembolso.split('T')[0] : '')
         setCobroFechaVencimiento(cobro.fechaVencimiento ? cobro.fechaVencimiento.split('T')[0] : '')
+        setFechaVencimientoEsSugerida(false)
         setCobroNumeroOperacion(cobro.numeroOperacion || '')
         setCobroNumDocumentos(cobro.numeroDocumentos?.toString() || '')
         setCobroDias(cobro.diasFinanciamiento?.toString() || '')
@@ -367,6 +372,22 @@ export default function CxCDetallePage() {
     if (!interesEsSugerido) setInteresEsSugerido(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liq.refInteres, liq.refInteresDisponible])
+
+  // Sugerencia de Fecha Vencimiento = Fecha Desembolso + Días Financiamiento.
+  // Mismo patrón que el Interés: solo mientras el campo esté vacío o siga
+  // marcado como "sugerido" — nunca pisa una fecha que el usuario ya escribió
+  // a mano (ver onChange del input).
+  useEffect(() => {
+    const dias = parseInt(cobroDias) || 0
+    if (!cobroFechaDesembolso || dias <= 0) return
+    if (cobroFechaVencimiento !== '' && !fechaVencimientoEsSugerida) return
+    const base = new Date(cobroFechaDesembolso + 'T00:00:00')
+    base.setDate(base.getDate() + dias)
+    const sugerida = base.toISOString().split('T')[0]
+    if (sugerida !== cobroFechaVencimiento) setCobroFechaVencimiento(sugerida)
+    if (!fechaVencimientoEsSugerida) setFechaVencimientoEsSugerida(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cobroFechaDesembolso, cobroDias])
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -904,7 +925,19 @@ export default function CxCDetallePage() {
                           <div><Label>Financiera</Label><Input placeholder="Ej: Banpro, BCP..." value={cobroFinanciera} onChange={e => setCobroFinanciera(e.target.value)} /></div>
                           <div><Label>Tasa (%)</Label><Input type="number" step="0.01" placeholder="1.38" value={cobroTasa} onChange={e => setCobroTasa(e.target.value)} /></div>
                           <div><Label>Fecha Desembolso</Label><Input type="date" value={cobroFechaDesembolso} onChange={e => setCobroFechaDesembolso(e.target.value)} /></div>
-                          <div><Label>Fecha Vencimiento</Label><Input type="date" value={cobroFechaVencimiento} onChange={e => setCobroFechaVencimiento(e.target.value)} /></div>
+                          <div>
+                            <Label>
+                              Fecha Vencimiento
+                              {fechaVencimientoEsSugerida && cobroFechaVencimiento !== '' && (
+                                <span className="ml-1.5 text-[10px] font-normal text-gray-400 align-middle">(sugerido)</span>
+                              )}
+                            </Label>
+                            <Input
+                              type="date"
+                              value={cobroFechaVencimiento}
+                              onChange={e => { setCobroFechaVencimiento(e.target.value); setFechaVencimientoEsSugerida(false) }}
+                            />
+                          </div>
                           <div><Label>N° Operación</Label><Input value={cobroNumeroOperacion} onChange={e => setCobroNumeroOperacion(e.target.value)} /></div>
                           <div><Label>N° Documentos</Label><Input type="number" value={cobroNumDocumentos} onChange={e => setCobroNumDocumentos(e.target.value)} /></div>
                           <div><Label>Días Financiamiento</Label><Input type="number" value={cobroDias} onChange={e => setCobroDias(e.target.value)} /></div>
