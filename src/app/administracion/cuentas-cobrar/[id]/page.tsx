@@ -13,9 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Loader2, ArrowLeft, Pencil, Save, Plus, Trash2, ExternalLink, DollarSign, Building2, ChevronDown, ChevronUp, Ban, AlertTriangle, HelpCircle } from 'lucide-react'
+import { Loader2, ArrowLeft, Pencil, Save, Plus, Trash2, ExternalLink, DollarSign, Building2, ChevronDown, ChevronUp, Ban, AlertTriangle, HelpCircle, RotateCcw, Info } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import { ESTADO_COBRO_FACTORING_LABEL, TIPO_EVENTO_FACTORING_LABEL } from '@/lib/utils/factoringEstado'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -82,6 +83,9 @@ interface PagoCobro {
   retencionNumeroConstancia: string | null
   esCostoFinanciamiento: boolean
   esAjusteMora: boolean
+  anulado: boolean
+  motivoAnulacion: string | null
+  fechaAnulacion: string | null
   cuentaBancaria: { id: string; nombreBanco: string; numeroCuenta: string } | null
 }
 
@@ -175,6 +179,8 @@ const MEDIO_PAGO_OPTIONS = [
 export default function CxCDetallePage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { data: session } = useSession()
+  const userRole = session?.user?.role || ''
 
   const [cxc, setCxc] = useState<CxCDetalle | null>(null)
   const [loading, setLoading] = useState(true)
@@ -251,6 +257,15 @@ export default function CxCDetallePage() {
   const [fechaRecibir, setFechaRecibir]       = useState(new Date().toISOString().split('T')[0])
   const [obsRecibir, setObsRecibir]           = useState('')
   const [savingRecibir, setSavingRecibir]     = useState(false)
+
+  // Revertir (Sub-fase E) — Caso 1 (desembolso completo, nada recibido
+  // todavía) o Caso 2 (un evento puntual ya recibido). Mismo diálogo pesado
+  // para los dos, distinto contenido según revertirTarget.tipo.
+  const [revertirTarget, setRevertirTarget] = useState<
+    { tipo: 'abono'; abono: AbonoValorizacion } | { tipo: 'desembolso' } | null
+  >(null)
+  const [motivoRevertir, setMotivoRevertir] = useState('')
+  const [savingRevertir, setSavingRevertir] = useState(false)
 
   // ── Load ──────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -470,6 +485,43 @@ export default function CxCDetallePage() {
     }
   }
 
+  const abrirRevertirAbono = (abono: AbonoValorizacion) => {
+    setRevertirTarget({ tipo: 'abono', abono })
+    setMotivoRevertir('')
+  }
+
+  const abrirRevertirDesembolso = () => {
+    setRevertirTarget({ tipo: 'desembolso' })
+    setMotivoRevertir('')
+  }
+
+  const handleConfirmarRevertir = async () => {
+    if (!cxc?.valorizacion || !revertirTarget || motivoRevertir.trim().length < 10) return
+    setSavingRevertir(true)
+    try {
+      const url = revertirTarget.tipo === 'desembolso'
+        ? `/api/proyectos/${cxc.valorizacion.proyectoId}/valorizaciones/${cxc.valorizacion.id}/cobro/revertir-desembolso`
+        : `/api/proyectos/${cxc.valorizacion.proyectoId}/valorizaciones/${cxc.valorizacion.id}/cobro/abonos/${revertirTarget.abono.id}/revertir`
+      const res = await fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motivo: motivoRevertir.trim() }),
+      })
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
+      toast.success(revertirTarget.tipo === 'desembolso' ? 'Desembolso revertido — corrige y vuelve a guardar' : 'Cobro revertido — el evento vuelve a pendiente')
+      const eraDesembolso = revertirTarget.tipo === 'desembolso'
+      setRevertirTarget(null)
+      await load()
+      // Reabre el formulario de liquidación precargado con los últimos datos
+      // guardados — fechaDesembolso ya viene vacía desde el backend, así que
+      // load() la recarga vacía sin que haya que limpiarla a mano acá.
+      if (eraDesembolso) setShowCobroForm(true)
+    } catch (e: any) {
+      toast.error(e.message || 'Error al revertir')
+    } finally {
+      setSavingRevertir(false)
+    }
+  }
+
   const handleSaveEdit = async () => {
     if (!cxc) return
     const tipoCambio = editForm.tipoCambio ? parseFloat(editForm.tipoCambio) : null
@@ -566,12 +618,22 @@ export default function CxCDetallePage() {
   const eventosPendientes = cobro?.abonos.filter(a => a.estado === 'pendiente') ?? []
   const totalCobradoReal = eventosRecibidos.reduce((s, a) => s + (a.montoReal ?? 0), 0)
   const totalPendienteEsperado = eventosPendientes.reduce((s, a) => s + (a.montoEsperado ?? 0), 0)
-  const totalCostoFinanciamiento = cxc.pagos.filter(p => p.esCostoFinanciamiento).reduce((s, p) => s + p.monto, 0)
-  const totalAjusteMora = cxc.pagos.filter(p => p.esAjusteMora).reduce((s, p) => s + p.monto, 0)
+  // anulado excluido — un pago revertido ya no cuenta, ni en el resumen ni en
+  // las listas de abajo (queda visible tachado en el historial completo).
+  const totalCostoFinanciamiento = cxc.pagos.filter(p => p.esCostoFinanciamiento && !p.anulado).reduce((s, p) => s + p.monto, 0)
+  const totalAjusteMora = cxc.pagos.filter(p => p.esAjusteMora && !p.anulado).reduce((s, p) => s + p.monto, 0)
 
-  const pagosCobro = cxc.pagos.filter(p => !p.esDetraccion && !p.esRetencion)
-  const pagosDetraccion = cxc.pagos.filter(p => p.esDetraccion)
-  const pagosRetencion  = cxc.pagos.filter(p => p.esRetencion)
+  const pagosCobro = cxc.pagos.filter(p => !p.esDetraccion && !p.esRetencion && !p.anulado)
+  const pagosDetraccion = cxc.pagos.filter(p => p.esDetraccion && !p.anulado)
+  const pagosRetencion  = cxc.pagos.filter(p => p.esRetencion && !p.anulado)
+
+  // Revertir (Sub-fase E): mismas 2 restricciones que ya valida el backend,
+  // calculadas acá para que el ícono de revertir ni aparezca cuando no aplica.
+  const puedeRevertirDesembolso = !!cobro && cobro.tipo === 'factoring' && cobro.estado === 'desembolsada'
+    && !cobro.abonos.some(a => a.tipo !== 'adelanto' && a.estado === 'recibido')
+  // El rol para excedente se oculta, no se deshabilita (ver DISENO_UI_REVERSION_FACTORING.md,
+  // punto 3a) — restricción de rol, no de estado, el usuario no puede resolverla desde acá.
+  const puedeRevertirExcedente = ['admin', 'gerente'].includes(userRole)
 
   const labelRow = (label: string, value: React.ReactNode) => (
     <div className="flex justify-between py-1.5 border-b border-gray-50 last:border-0">
@@ -704,16 +766,30 @@ export default function CxCDetallePage() {
                   </TableHeader>
                   <TableBody>
                     {cxc.pagos.map(p => (
-                      <TableRow key={p.id}>
-                        <TableCell>{formatDate(p.fechaPago)}</TableCell>
+                      <TableRow key={p.id} className={p.anulado ? 'opacity-60' : ''}>
+                        <TableCell className={p.anulado ? 'line-through' : ''}>{formatDate(p.fechaPago)}</TableCell>
                         <TableCell>
-                          {p.esDetraccion ? <Badge variant="outline" className="text-orange-600 border-orange-300">Detracción {p.detraccionPorcentaje}%</Badge>
-                          : p.esRetencion ? <Badge variant="outline" className="text-purple-600 border-purple-300">Retención {p.retencionPorcentaje}%</Badge>
-                          : <Badge variant="outline" className="text-green-700 border-green-300">Cobro</Badge>}
+                          <span className={p.anulado ? 'line-through' : ''}>
+                            {p.esDetraccion ? <Badge variant="outline" className="text-orange-600 border-orange-300">Detracción {p.detraccionPorcentaje}%</Badge>
+                            : p.esRetencion ? <Badge variant="outline" className="text-purple-600 border-purple-300">Retención {p.retencionPorcentaje}%</Badge>
+                            : <Badge variant="outline" className="text-green-700 border-green-300">Cobro</Badge>}
+                          </span>
+                          {p.anulado && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span tabIndex={0} className="ml-1.5 inline-flex align-middle text-red-500">
+                                  <Ban className="h-3.5 w-3.5" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-72">
+                                Anulado{p.fechaAnulacion ? ` el ${formatDate(p.fechaAnulacion)}` : ''}: {p.motivoAnulacion}
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
                         </TableCell>
-                        <TableCell className="capitalize">{p.medioPago}</TableCell>
+                        <TableCell className={`capitalize ${p.anulado ? 'line-through' : ''}`}>{p.medioPago}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{p.numeroOperacion || '—'}</TableCell>
-                        <TableCell className="text-right font-medium">{formatCurrency(p.monto, cxc.moneda)}</TableCell>
+                        <TableCell className={`text-right font-medium ${p.anulado ? 'line-through' : ''}`}>{formatCurrency(p.monto, cxc.moneda)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -740,6 +816,21 @@ export default function CxCDetallePage() {
                       }`}>
                         {ESTADO_COBRO_FACTORING_LABEL[cobro.estado] ?? cobro.estado}
                       </Badge>
+                    )}
+                    {puedeRevertirDesembolso && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label="Revertir desembolso"
+                            onClick={abrirRevertirDesembolso}
+                            className="text-muted-foreground hover:text-red-600 transition-colors"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-64">Revertir el desembolso — nada se ha recibido todavía</TooltipContent>
+                      </Tooltip>
                     )}
                   </CardTitle>
                   <div className="flex items-center gap-2">
@@ -1003,8 +1094,27 @@ export default function CxCDetallePage() {
                               : !adelantoRecibido
                                 ? 'No se puede recibir ningún evento antes que el adelanto'
                                 : ''
+                            const puedeRevertirEsteEvento = esExcedente ? puedeRevertirExcedente : true
+                            const fueRevertido = a.estado === 'pendiente' && (a.observaciones ?? '').includes('Revertido:')
                             const boton = a.estado === 'recibido' ? (
-                              <span className="text-xs text-green-700">✓</span>
+                              <span className="inline-flex items-center gap-1.5">
+                                <span className="text-xs text-green-700">✓</span>
+                                {puedeRevertirEsteEvento && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        aria-label={`Revertir ${TIPO_EVENTO_FACTORING_LABEL[a.tipo ?? ''] ?? 'evento'}`}
+                                        onClick={() => abrirRevertirAbono(a)}
+                                        className="text-muted-foreground hover:text-red-600 transition-colors"
+                                      >
+                                        <RotateCcw className="h-3.5 w-3.5" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-64">Revertir este cobro</TooltipContent>
+                                  </Tooltip>
+                                )}
+                              </span>
                             ) : esExcedente ? (
                               <span className="text-[11px] text-muted-foreground italic">usa &quot;Confirmar cliente&quot; arriba</span>
                             ) : bloqueado ? (
@@ -1023,9 +1133,21 @@ export default function CxCDetallePage() {
                               <TableRow key={a.id}>
                                 <TableCell className="text-sm font-medium">{TIPO_EVENTO_FACTORING_LABEL[a.tipo ?? ''] ?? a.tipo ?? '—'}</TableCell>
                                 <TableCell>
-                                  <Badge variant="outline" className={a.estado === 'recibido' ? 'text-green-700 border-green-300' : 'text-amber-700 border-amber-300'}>
-                                    {a.estado === 'recibido' ? 'Recibido' : 'Pendiente'}
-                                  </Badge>
+                                  <span className="inline-flex items-center gap-1">
+                                    <Badge variant="outline" className={a.estado === 'recibido' ? 'text-green-700 border-green-300' : 'text-amber-700 border-amber-300'}>
+                                      {a.estado === 'recibido' ? 'Recibido' : 'Pendiente'}
+                                    </Badge>
+                                    {fueRevertido && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span tabIndex={0} className="text-muted-foreground">
+                                            <Info className="h-3.5 w-3.5" />
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="max-w-72">{a.observaciones}</TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                  </span>
                                 </TableCell>
                                 <TableCell className="text-right text-sm">{a.montoEsperado != null ? formatCurrency(a.montoEsperado, cxc.moneda) : '—'}</TableCell>
                                 <TableCell className="text-right text-sm">{a.montoReal != null ? formatCurrency(a.montoReal, cxc.moneda) : '—'}</TableCell>
@@ -1148,6 +1270,79 @@ export default function CxCDetallePage() {
             <Button onClick={handleMarcarRecibido} disabled={savingRecibir}>
               {savingRecibir && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {abonoRecibiendo?.tipo === 'excedente' ? 'Confirmar cliente' : 'Marcar recibido'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog Revertir (Sub-fase E) — Caso 1 (desembolso) / Caso 2 (evento) ──
+           Deliberadamente más pesado que "Marcar recibido": ícono de advertencia,
+           caja roja con lo que se anula, texto de consecuencias fijo, contador
+           de caracteres del motivo, botón destructive. */}
+      <Dialog open={!!revertirTarget} onOpenChange={open => { if (!open) setRevertirTarget(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <AlertTriangle className="h-5 w-5" />
+              {revertirTarget?.tipo === 'desembolso'
+                ? 'Revertir el desembolso'
+                : `Revertir "${TIPO_EVENTO_FACTORING_LABEL[revertirTarget?.tipo === 'abono' ? revertirTarget.abono.tipo ?? '' : ''] ?? ''}" recibido`}
+            </DialogTitle>
+            <DialogDescription>Esta acción anula dinero ya registrado — no es parte del flujo normal.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 space-y-1">
+              <p className="text-xs font-semibold text-red-700 mb-1">Esto va a anular:</p>
+              {revertirTarget?.tipo === 'abono' ? (
+                <p className="text-sm">
+                  {TIPO_EVENTO_FACTORING_LABEL[revertirTarget.abono.tipo ?? ''] ?? revertirTarget.abono.tipo} ·{' '}
+                  {revertirTarget.abono.montoReal != null ? formatCurrency(revertirTarget.abono.montoReal, cxc.moneda) : '—'} ·{' '}
+                  recibido el {revertirTarget.abono.fechaReal ? formatDate(revertirTarget.abono.fechaReal) : '—'}
+                </p>
+              ) : revertirTarget?.tipo === 'desembolso' ? (
+                <>
+                  {(() => {
+                    const pagoAdelanto = cxc.pagos.find(p => p.medioPago === 'factoring' && !p.esCostoFinanciamiento && !p.esAjusteMora && !p.anulado)
+                    const pagoCosto = cxc.pagos.find(p => p.esCostoFinanciamiento && !p.anulado)
+                    return (
+                      <>
+                        {pagoAdelanto && <p className="text-sm">Adelanto · {formatCurrency(pagoAdelanto.monto, cxc.moneda)} · {formatDate(pagoAdelanto.fechaPago)}</p>}
+                        {pagoCosto && <p className="text-sm">Costo de financiamiento · {formatCurrency(pagoCosto.monto, cxc.moneda)} · {formatDate(pagoCosto.fechaPago)}</p>}
+                      </>
+                    )
+                  })()}
+                </>
+              ) : null}
+            </div>
+
+            <div className="text-xs text-muted-foreground space-y-1 border-l-2 border-amber-300 pl-3">
+              {revertirTarget?.tipo === 'desembolso' ? (
+                <p>El pago se anula (no se borra) y queda en el historial marcado como anulado. Los 4 eventos del cronograma se eliminan — ninguno se ha recibido todavía, así que no hay nada más que perder. La operación vuelve a &quot;En negociación&quot; y el formulario de liquidación se reabre con tus datos, listo para corregir.</p>
+              ) : (
+                <>
+                  <p>El pago se anula (no se borra) y queda en el historial marcado como anulado, con el motivo que escribas abajo. El evento vuelve a &quot;Pendiente&quot; con su monto teórico intacto para volver a registrarlo bien.</p>
+                  {revertirTarget?.tipo === 'abono' && revertirTarget.abono.tipo === 'excedente' && (
+                    <p>Además, esto revierte el cierre de la operación: vuelve a &quot;Desembolsada&quot; (ya no &quot;Confirmada&quot;), y si la Valorización había subido a &quot;Pagada&quot; por este cobro, vuelve a &quot;Facturada&quot;.</p>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div>
+              <Label>Motivo de la reversión * (mínimo 10 caracteres)</Label>
+              <Textarea value={motivoRevertir} onChange={e => setMotivoRevertir(e.target.value)} rows={2} placeholder="Ej: se registró el monto de otra factura por error" />
+              <p className={`text-xs mt-1 ${motivoRevertir.trim().length >= 10 ? 'text-muted-foreground' : 'text-red-600'}`}>
+                {motivoRevertir.trim().length}/10 caracteres mínimos
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRevertirTarget(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleConfirmarRevertir} disabled={savingRevertir || motivoRevertir.trim().length < 10}>
+              {savingRevertir && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {revertirTarget?.tipo === 'desembolso' ? 'Revertir desembolso' : 'Revertir pago'}
             </Button>
           </DialogFooter>
         </DialogContent>
