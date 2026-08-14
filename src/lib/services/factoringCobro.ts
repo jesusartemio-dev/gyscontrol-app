@@ -4,7 +4,7 @@ import { recalcularCuentaPorCobrar } from '@/lib/services/pagoCobro'
 /** Subconjunto de delegados de Prisma que necesita este servicio. */
 type PrismaClientOrTx = Pick<
   typeof prisma,
-  'cobroValorizacion' | 'pagoCobro' | 'cuentaBancaria' | 'valorizacion' | 'cuentaPorCobrar'
+  'cobroValorizacion' | 'pagoCobro' | 'cuentaBancaria' | 'valorizacion' | 'cuentaPorCobrar' | 'abonoValorizacion'
 >
 
 const round2 = (n: number) => Math.round(n * 100) / 100
@@ -62,8 +62,8 @@ export async function procesarDesembolsoFactoring(cobroValorizacionId: string, t
       `No se puede procesar el desembolso: la operación ya está en estado '${cobro.estado}'`
     )
   }
-  if (!cobro.montoADesembolsar || cobro.montoADesembolsar <= 0) {
-    throw new Error('Falta montoADesembolsar para procesar el desembolso')
+  if (!cobro.adelantoBanpro || cobro.adelantoBanpro <= 0) {
+    throw new Error('Falta adelantoBanpro para procesar el desembolso')
   }
 
   const cxc = cobro.valorizacion.cuentasPorCobrar.find(c => c.estado !== 'anulada')
@@ -73,12 +73,15 @@ export async function procesarDesembolsoFactoring(cobroValorizacionId: string, t
 
   const cuentaBancaria = await resolverCuentaBancariaFactoring(cxc.moneda, tx)
 
-  // 1) Adelanto neto — dinero real que entra a Interbank.
-  await tx.pagoCobro.create({
+  // 1) Adelanto (evento 1) — dinero real que entra a Interbank el mismo día.
+  // Solo por el monto del adelanto, NO el montoADesembolsar completo (que
+  // junta adelanto + saldo a girar) — ese era el bug: el saldo a girar llega
+  // días después, por separado, y se crea como "cobro esperado" más abajo.
+  const pagoAdelanto = await tx.pagoCobro.create({
     data: {
       cuentaPorCobrarId: cxc.id,
       cuentaBancariaId: cuentaBancaria.id,
-      monto: cobro.montoADesembolsar,
+      monto: cobro.adelantoBanpro,
       fechaPago: cobro.fechaDesembolso,
       medioPago: 'factoring',
       numeroOperacion: cobro.numeroOperacion,
@@ -87,7 +90,23 @@ export async function procesarDesembolsoFactoring(cobroValorizacionId: string, t
     },
   })
 
-  // 2) Costo de financiamiento — cierra saldo, no es dinero recibido.
+  // El adelanto es, a la vez, el "cobro esperado" del evento 1 — se crea ya
+  // 'recibido' porque registrar el desembolso ES el evento (a diferencia de
+  // los otros 3, que llegan después).
+  await tx.abonoValorizacion.create({
+    data: {
+      cobroId: cobroValorizacionId,
+      tipo: 'adelanto',
+      estado: 'recibido',
+      montoEsperado: cobro.adelantoBanpro,
+      montoReal: cobro.adelantoBanpro,
+      fechaEsperada: cobro.fechaDesembolso,
+      fechaReal: cobro.fechaDesembolso,
+      pagoCobroId: pagoAdelanto.id,
+    },
+  })
+
+  // 2) Costo de financiamiento — cierra saldo, no es dinero recibido. Sin cambios.
   const totalCostos = round2(
     (cobro.interesMonto ?? 0) +
     (cobro.comisionEstructuracion ?? 0) +
@@ -109,7 +128,27 @@ export async function procesarDesembolsoFactoring(cobroValorizacionId: string, t
     })
   }
 
-  // Excedente: deliberadamente fuera de este paso — ver procesarConfirmacionFactoring.
+  // 3) Eventos 2, 3 y 4 — "cobros esperados" pendientes, sin PagoCobro todavía.
+  // Llegan después y se marcan recibidos por separado (Sub-fase C). Solo se
+  // crea cada uno si su monto teórico es > 0 — mismo criterio que el costo.
+  if (cobro.saldoAGirar && cobro.saldoAGirar > 0) {
+    await tx.abonoValorizacion.create({
+      data: { cobroId: cobroValorizacionId, tipo: 'saldo_girar', estado: 'pendiente', montoEsperado: cobro.saldoAGirar },
+    })
+  }
+  if (cobro.detraccionMonto && cobro.detraccionMonto > 0) {
+    await tx.abonoValorizacion.create({
+      data: { cobroId: cobroValorizacionId, tipo: 'detraccion', estado: 'pendiente', montoEsperado: cobro.detraccionMonto },
+    })
+  }
+  if (cobro.excedenteMonto && cobro.excedenteMonto > 0) {
+    await tx.abonoValorizacion.create({
+      data: {
+        cobroId: cobroValorizacionId, tipo: 'excedente', estado: 'pendiente',
+        montoEsperado: cobro.excedenteMonto, fechaEsperada: cobro.fechaVencimiento,
+      },
+    })
+  }
 
   await recalcularCuentaPorCobrar(cxc.id, tx)
 
