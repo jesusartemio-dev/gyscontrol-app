@@ -21,8 +21,11 @@ import Link from 'next/link'
 interface AbonoValorizacion {
   id: string
   cobroId: string
-  montoReal: number
-  fechaReal: string
+  tipo: 'adelanto' | 'saldo_girar' | 'detraccion' | 'excedente' | null
+  estado: 'pendiente' | 'recibido'
+  montoEsperado: number | null
+  montoReal: number | null
+  fechaReal: string | null
   observaciones: string | null
 }
 
@@ -206,9 +209,11 @@ export default function CxCDetallePage() {
   const [cobroObs, setCobroObs]                         = useState('')
   const [savingCobro, setSavingCobro]                   = useState(false)
 
-  // Confirmación del cliente (factoring): libera el excedente retenido
+  // Confirmación del cliente (factoring): recibe el evento 'excedente' —
+  // libera el excedente retenido y cierra la operación
   const [showConfirmarFactoring, setShowConfirmarFactoring] = useState(false)
   const [fechaConfirmarFactoring, setFechaConfirmarFactoring] = useState(new Date().toISOString().split('T')[0])
+  const [montoConfirmarFactoring, setMontoConfirmarFactoring] = useState('')
   const [savingConfirmarFactoring, setSavingConfirmarFactoring] = useState(false)
 
   // Abonos
@@ -396,13 +401,15 @@ export default function CxCDetallePage() {
   }
 
   const handleConfirmarFactoring = async () => {
-    if (!cxc?.valorizacion || !fechaConfirmarFactoring) return
+    if (!cxc?.valorizacion || !fechaConfirmarFactoring || !montoConfirmarFactoring) return
+    const abonoPendiente = cxc.valorizacion.cobro?.abonos.find(a => a.tipo === 'excedente' && a.estado === 'pendiente')
+    if (!abonoPendiente) { toast.error('No hay un evento de excedente pendiente para confirmar'); return }
     setSavingConfirmarFactoring(true)
     try {
       const res = await fetch(
-        `/api/proyectos/${cxc.valorizacion.proyectoId}/valorizaciones/${cxc.valorizacion.id}/cobro/confirmar`,
+        `/api/proyectos/${cxc.valorizacion.proyectoId}/valorizaciones/${cxc.valorizacion.id}/cobro/abonos/${abonoPendiente.id}/recibir`,
         { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fechaConfirmacion: fechaConfirmarFactoring }) }
+          body: JSON.stringify({ montoReal: parseFloat(montoConfirmarFactoring), fechaReal: fechaConfirmarFactoring }) }
       )
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
       toast.success('Cliente confirmado — excedente liberado y aplicado a la CxC')
@@ -534,6 +541,7 @@ export default function CxCDetallePage() {
 
   const cobro = cxc.valorizacion?.cobro ?? null
   const tieneFactoring = !!cxc.valorizacionId
+  const abonoExcedentePendiente = cobro?.abonos.find(a => a.tipo === 'excedente' && a.estado === 'pendiente') ?? null
 
   const pagosCobro = cxc.pagos.filter(p => !p.esDetraccion && !p.esRetencion)
   const pagosDetraccion = cxc.pagos.filter(p => p.esDetraccion)
@@ -700,8 +708,11 @@ export default function CxCDetallePage() {
                     )}
                   </CardTitle>
                   <div className="flex items-center gap-2">
-                    {cobro?.tipo === 'factoring' && cobro.estado === 'desembolsada' && (
-                      <Button size="sm" onClick={() => setShowConfirmarFactoring(true)}>
+                    {cobro?.tipo === 'factoring' && cobro.estado === 'desembolsada' && abonoExcedentePendiente && (
+                      <Button size="sm" onClick={() => {
+                        setMontoConfirmarFactoring(abonoExcedentePendiente.montoEsperado != null ? String(abonoExcedentePendiente.montoEsperado) : '')
+                        setShowConfirmarFactoring(true)
+                      }}>
                         Confirmar cliente
                       </Button>
                     )}
@@ -911,6 +922,7 @@ export default function CxCDetallePage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
+                            <TableHead>Evento</TableHead>
                             <TableHead>Fecha</TableHead>
                             <TableHead>Observaciones</TableHead>
                             <TableHead className="text-right">Monto</TableHead>
@@ -920,14 +932,24 @@ export default function CxCDetallePage() {
                         <TableBody>
                           {cobro.abonos.map(a => (
                             <TableRow key={a.id}>
-                              <TableCell>{formatDate(a.fechaReal)}</TableCell>
+                              <TableCell className="text-xs">
+                                {a.tipo ?? '—'}{' '}
+                                <Badge variant="outline" className={a.estado === 'recibido' ? 'text-green-700 border-green-300' : 'text-amber-700 border-amber-300'}>
+                                  {a.estado === 'recibido' ? 'Recibido' : 'Pendiente'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{a.fechaReal ? formatDate(a.fechaReal) : '—'}</TableCell>
                               <TableCell className="text-muted-foreground text-xs">{a.observaciones || '—'}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(a.montoReal, cxc.moneda)}</TableCell>
+                              <TableCell className="text-right">
+                                {a.montoReal != null ? formatCurrency(a.montoReal, cxc.moneda) : (a.montoEsperado != null ? `~${formatCurrency(a.montoEsperado, cxc.moneda)}` : '—')}
+                              </TableCell>
                               <TableCell>
-                                <Button variant="ghost" size="sm" className="text-red-500 h-7 w-7 p-0"
-                                  onClick={() => handleDeleteAbono(a.id)}>
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
+                                {a.estado !== 'recibido' && (
+                                  <Button variant="ghost" size="sm" className="text-red-500 h-7 w-7 p-0"
+                                    onClick={() => handleDeleteAbono(a.id)}>
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                )}
                               </TableCell>
                             </TableRow>
                           ))}
@@ -1015,11 +1037,15 @@ export default function CxCDetallePage() {
             <DialogTitle>Confirmar cliente</DialogTitle>
             <DialogDescription>
               El cliente confirmó la factura a la financiera. Esto libera el excedente retenido
-              ({cobro?.excedenteMonto != null ? formatCurrency(cobro.excedenteMonto, cxc.moneda) : '—'})
-              como cobro real y cierra la operación de factoring.
+              (esperado: {abonoExcedentePendiente?.montoEsperado != null ? formatCurrency(abonoExcedentePendiente.montoEsperado, cxc.moneda) : '—'})
+              como cobro real y cierra la operación de factoring. Si llegó menos por mora, edita el monto.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <div>
+              <Label>Monto real recibido ({cxc.moneda}) *</Label>
+              <Input type="number" step="0.01" value={montoConfirmarFactoring} onChange={e => setMontoConfirmarFactoring(e.target.value)} />
+            </div>
             <div>
               <Label>Fecha de confirmación *</Label>
               <Input type="date" value={fechaConfirmarFactoring} onChange={e => setFechaConfirmarFactoring(e.target.value)} />

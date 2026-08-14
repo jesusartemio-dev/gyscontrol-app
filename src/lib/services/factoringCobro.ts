@@ -32,13 +32,15 @@ async function resolverCuentaBancariaFactoring(moneda: string, client: PrismaCli
 }
 
 /**
- * Desembolso de factoring (opción B): genera el PagoCobro del adelanto neto real
- * y, si corresponde, el del costo de financiamiento (interés+comisión+gastos+IGV,
- * marcado esCostoFinanciamiento). El excedente NO se toca acá — queda pendiente
- * hasta procesarConfirmacionFactoring. Recalcula la CxC y deja CobroValorizacion
- * en 'desembolsada'. Debe correr dentro de una transacción (tx obligatorio: a
- * diferencia de recalcularCuentaPorCobrar, acá sí queremos que todo o nada se
- * escriba junto, porque involucra crear dinero real).
+ * Desembolso de factoring (opción B, modelo de cobros esperados): genera el
+ * PagoCobro del adelanto real y su AbonoValorizacion ya 'recibido', el del
+ * costo de financiamiento (esCostoFinanciamiento), y crea saldo_girar,
+ * detraccion y excedente como AbonoValorizacion 'pendiente' con su monto
+ * teórico — se marcan recibidos por separado, vía marcarAbonoFactoringRecibido,
+ * cuando llegan. Recalcula la CxC y deja CobroValorizacion en 'desembolsada'.
+ * Debe correr dentro de una transacción (tx obligatorio: a diferencia de
+ * recalcularCuentaPorCobrar, acá sí queremos que todo o nada se escriba
+ * junto, porque involucra crear dinero real).
  */
 export async function procesarDesembolsoFactoring(cobroValorizacionId: string, tx: PrismaClientOrTx) {
   const cobro = await tx.cobroValorizacion.findUnique({
@@ -159,75 +161,136 @@ export async function procesarDesembolsoFactoring(cobroValorizacionId: string, t
 }
 
 /**
- * Confirmación del cliente (opción B): libera el excedente retenido (PagoCobro
- * real) y cierra la operación como 'confirmada'. Solo procede si la operación
- * está 'desembolsada' — bloquea si ya está 'confirmada' (doble clic / doble
- * llamada) o si todavía no se desembolsó.
+ * Marca un "cobro esperado" (evento 2, 3 o 4 de una operación de factoring)
+ * como recibido: crea el PagoCobro real por el monto REAL (no el teórico —
+ * puede diferir por mora), y si llegó por menos, un segundo PagoCobro de
+ * ajuste (esAjusteMora) por la diferencia, para que el saldo de la CxC
+ * siempre pueda cerrar en 0 exacto sin fingir dinero que no llegó.
+ *
+ * Orden entre eventos: el adelanto (evento 1, creado por
+ * procesarDesembolsoFactoring) debe estar 'recibido' antes que cualquier
+ * otro — esto generaliza y reemplaza el guard viejo de
+ * procesarConfirmacionFactoring (que buscaba un PagoCobro medioPago=
+ * 'factoring' por texto): ahora se busca el AbonoValorizacion tipo='adelanto'
+ * estado='recibido' directamente. Sigue bloqueando el caso CJM43 (operación
+ * 'desembolsada' solo por backfill de estado, sin que el adelanto pasara
+ * nunca por procesarDesembolsoFactoring) porque esa operación tampoco tiene
+ * ese abono. saldo_girar y detraccion no tienen orden entre sí. excedente
+ * exige que los dos anteriores ya estén recibidos (o que nunca hayan
+ * existido, si su monto teórico era 0) — y al recibirse, cierra la operación
+ * como 'confirmada', absorbiendo lo que antes hacía procesarConfirmacionFactoring.
+ *
+ * Idempotente: si el abono ya está 'recibido', bloquea.
  */
-export async function procesarConfirmacionFactoring(
-  cobroValorizacionId: string,
-  fechaConfirmacion: Date,
-  tx: PrismaClientOrTx
+export async function marcarAbonoFactoringRecibido(
+  abonoId: string,
+  montoReal: number,
+  fechaReal: Date,
+  tx: PrismaClientOrTx,
+  observaciones?: string | null
 ) {
-  const cobro = await tx.cobroValorizacion.findUnique({
-    where: { id: cobroValorizacionId },
-    include: { valorizacion: { include: { cuentasPorCobrar: true } } },
+  const abono = await tx.abonoValorizacion.findUnique({
+    where: { id: abonoId },
+    include: { cobro: { include: { valorizacion: { include: { cuentasPorCobrar: true } } } } },
   })
-  if (!cobro) {
-    throw new Error('CobroValorizacion no encontrado')
+  if (!abono) {
+    throw new Error('Cobro esperado no encontrado')
   }
-  if (cobro.estado === 'confirmada') {
-    throw new Error('La operación ya fue confirmada')
+  if (abono.estado === 'recibido') {
+    throw new Error('Este cobro esperado ya fue recibido')
   }
-  if (cobro.estado !== 'desembolsada') {
-    throw new Error(
-      `No se puede confirmar: la operación está en estado '${cobro.estado}', se esperaba 'desembolsada'`
-    )
+  if (!abono.tipo) {
+    throw new Error('Este abono no tiene un tipo de evento definido — no se puede procesar por este flujo')
   }
 
+  const cobro = abono.cobro
   const cxc = cobro.valorizacion.cuentasPorCobrar.find(c => c.estado !== 'anulada')
   if (!cxc) {
-    throw new Error('La valorización no tiene una CuentaPorCobrar activa para aplicar la confirmación')
+    throw new Error('La valorización no tiene una CuentaPorCobrar activa')
   }
 
-  // El desembolso debe haber pasado por procesarDesembolsoFactoring (que deja un
-  // PagoCobro medioPago='factoring') antes de poder confirmar. Sin esto, una
-  // operación marcada 'desembolsada' solo por una migración/backfill de estado
-  // (como CJM43, que llegó a 'desembolsada' en la Fase 3 sin que su adelanto
-  // pasara nunca por el flujo nuevo) podría "confirmarse" y liberar el excedente
-  // sin que el adelanto ni el costo de financiamiento se hayan registrado nunca
-  // como PagoCobro real. No es un parche puntual: ninguna operación debería
-  // poder confirmarse si su adelanto no se registró por este flujo.
-  const tieneDesembolsoProcesado = await tx.pagoCobro.findFirst({
-    where: { cuentaPorCobrarId: cxc.id, medioPago: 'factoring' },
+  // Orden entre eventos.
+  const adelantoRecibido = await tx.abonoValorizacion.findFirst({
+    where: { cobroId: cobro.id, tipo: 'adelanto', estado: 'recibido' },
     select: { id: true },
   })
-  if (!tieneDesembolsoProcesado) {
-    throw new Error(
-      'No se puede confirmar: el desembolso de esta operación no fue procesado por el flujo actual; requiere regularización'
-    )
+  if (!adelantoRecibido) {
+    throw new Error('No se puede recibir ningún evento antes que el adelanto')
+  }
+  if (abono.tipo === 'excedente') {
+    const pendientesPrevios = await tx.abonoValorizacion.findFirst({
+      where: { cobroId: cobro.id, tipo: { in: ['saldo_girar', 'detraccion'] }, estado: 'pendiente' },
+      select: { id: true },
+    })
+    if (pendientesPrevios) {
+      throw new Error('No se puede recibir el excedente: todavía falta recibir el saldo a girar y/o la detracción')
+    }
   }
 
-  const excedente = cobro.excedenteMonto ?? 0
-  if (excedente > 0) {
+  const medioPago = abono.tipo === 'saldo_girar' ? 'factoring'
+    : abono.tipo === 'detraccion' ? 'detraccion'
+    : 'factoring_excedente' // excedente
+
+  let cuentaBancariaId: string | null = null
+  if (abono.tipo !== 'detraccion') {
     const cuentaBancaria = await resolverCuentaBancariaFactoring(cxc.moneda, tx)
+    cuentaBancariaId = cuentaBancaria.id
+  }
+
+  const etiqueta = abono.tipo === 'saldo_girar' ? 'Saldo a girar'
+    : abono.tipo === 'detraccion' ? 'Detracción'
+    : 'Excedente'
+
+  const pagoReal = await tx.pagoCobro.create({
+    data: {
+      cuentaPorCobrarId: cxc.id,
+      cuentaBancariaId,
+      monto: montoReal,
+      fechaPago: fechaReal,
+      medioPago,
+      esDetraccion: abono.tipo === 'detraccion',
+      observaciones: observaciones || `${etiqueta} factoring${cobro.financiera ? ` ${cobro.financiera}` : ''}`,
+      updatedAt: new Date(),
+    },
+  })
+
+  // Ajuste por mora: si llegó menos de lo esperado, la diferencia cierra el
+  // saldo como costo/pérdida (esAjusteMora), no como dinero recibido.
+  const diferencia = abono.montoEsperado != null ? round2(abono.montoEsperado - montoReal) : 0
+  if (diferencia > 0.01) {
     await tx.pagoCobro.create({
       data: {
         cuentaPorCobrarId: cxc.id,
-        cuentaBancariaId: cuentaBancaria.id,
-        monto: excedente,
-        fechaPago: fechaConfirmacion,
-        medioPago: 'factoring_excedente',
-        observaciones: `Excedente liberado factoring${cobro.financiera ? ` ${cobro.financiera}` : ''} tras confirmación del cliente`,
+        cuentaBancariaId: null,
+        monto: diferencia,
+        fechaPago: fechaReal,
+        medioPago: 'factoring_ajuste_mora',
+        esAjusteMora: true,
+        observaciones: `Ajuste por mora — ${etiqueta.toLowerCase()} esperado ${abono.montoEsperado}, recibido ${montoReal}`,
         updatedAt: new Date(),
       },
     })
   }
 
+  const abonoActualizado = await tx.abonoValorizacion.update({
+    where: { id: abonoId },
+    data: {
+      estado: 'recibido',
+      montoReal,
+      fechaReal,
+      observaciones: observaciones ?? abono.observaciones,
+      pagoCobroId: pagoReal.id,
+    },
+  })
+
   await recalcularCuentaPorCobrar(cxc.id, tx)
 
-  await tx.cobroValorizacion.update({
-    where: { id: cobroValorizacionId },
-    data: { estado: 'confirmada', fechaConfirmacion, updatedAt: new Date() },
-  })
+  if (abono.tipo === 'excedente') {
+    await tx.cobroValorizacion.update({
+      where: { id: cobro.id },
+      data: { estado: 'confirmada', fechaConfirmacion: fechaReal, updatedAt: new Date() },
+    })
+  }
+
+  return abonoActualizado
 }
