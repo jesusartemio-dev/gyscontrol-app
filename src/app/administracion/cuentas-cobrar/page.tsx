@@ -17,6 +17,7 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import CxCImportExcelModal from '@/components/administracion/CxCImportExcelModal'
 import { exportarCxCContable, exportarCxCFinanciero } from '@/lib/utils/cuentasCobrarExcel'
+import { ESTADO_COBRO_FACTORING_LABEL } from '@/lib/utils/factoringEstado'
 
 interface CuentaBancaria {
   id: string
@@ -1003,10 +1004,7 @@ export default function CuentasCobrarPage() {
                             : 'text-slate-500'
                           }`}>
                             {item.valorizacion.cobro.tipo !== 'factoring' ? 'Directo'
-                              : item.valorizacion.cobro.estado === 'confirmada' ? 'Factoring · Confirmada'
-                              : item.valorizacion.cobro.estado === 'desembolsada' ? 'Factoring · Desembolsada'
-                              : item.valorizacion.cobro.estado === 'letra_cambio' ? 'Factoring · Letra de cambio'
-                              : 'Factoring · En negociación'}
+                              : `Factoring · ${ESTADO_COBRO_FACTORING_LABEL[item.valorizacion.cobro.estado ?? ''] ?? item.valorizacion.cobro.estado}`}
                           </div>
                         )}
                       </TableCell>

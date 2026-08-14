@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Loader2, ArrowLeft, Pencil, Save, Plus, Trash2, ExternalLink, DollarSign, Building2, ChevronDown, ChevronUp, Ban, AlertTriangle, HelpCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
+import { ESTADO_COBRO_FACTORING_LABEL, TIPO_EVENTO_FACTORING_LABEL } from '@/lib/utils/factoringEstado'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -26,8 +27,10 @@ interface AbonoValorizacion {
   estado: 'pendiente' | 'recibido'
   montoEsperado: number | null
   montoReal: number | null
+  fechaEsperada: string | null
   fechaReal: string | null
   observaciones: string | null
+  createdAt: string
 }
 
 interface CobroValorizacion {
@@ -77,6 +80,8 @@ interface PagoCobro {
   retencionPorcentaje: number | null
   retencionMonto: number | null
   retencionNumeroConstancia: string | null
+  esCostoFinanciamiento: boolean
+  esAjusteMora: boolean
   cuentaBancaria: { id: string; nombreBanco: string; numeroCuenta: string } | null
 }
 
@@ -126,6 +131,29 @@ const formatCurrency = (n: number, moneda: string) =>
   new Intl.NumberFormat('es-PE', { style: 'currency', currency: moneda }).format(n)
 
 const n = (v: string) => parseFloat(v) || 0
+
+/**
+ * Señal de "lleva pendiente" para un cobro esperado. El excedente compara
+ * contra su fecha esperada (= fechaVencimiento de la operación); saldo_girar
+ * y detracción, sin fecha esperada real, comparan contra cuánto hace que
+ * quedaron pendientes (createdAt), con umbrales según lo que Administración
+ * describió (saldo a girar: 2-10 días; detracción: ~fin de mes) — ajustables.
+ */
+function senalAbono(abono: AbonoValorizacion): { texto: string; clase: string } | null {
+  if (abono.estado === 'recibido') return null
+  const hoy = new Date()
+  if (abono.tipo === 'excedente' && abono.fechaEsperada) {
+    const dias = Math.round((new Date(abono.fechaEsperada).getTime() - hoy.getTime()) / 86400000)
+    if (dias < 0) return { texto: `vencido hace ${Math.abs(dias)}d`, clase: 'text-red-600 font-medium' }
+    if (dias <= 7) return { texto: `vence en ${dias}d`, clase: 'text-amber-600 font-medium' }
+    return { texto: `vence en ${dias}d`, clase: 'text-muted-foreground' }
+  }
+  const diasPendiente = Math.round((hoy.getTime() - new Date(abono.createdAt).getTime()) / 86400000)
+  const umbralAmbar = abono.tipo === 'saldo_girar' ? 10 : 35
+  const umbralRojo = abono.tipo === 'saldo_girar' ? 20 : 45
+  const clase = diasPendiente > umbralRojo ? 'text-red-600 font-medium' : diasPendiente > umbralAmbar ? 'text-amber-600 font-medium' : 'text-muted-foreground'
+  return { texto: `hace ${diasPendiente}d`, clase }
+}
 
 const ESTADO_COLORS: Record<string, string> = {
   pendiente: 'bg-yellow-100 text-yellow-800',
@@ -210,19 +238,15 @@ export default function CxCDetallePage() {
   const [cobroObs, setCobroObs]                         = useState('')
   const [savingCobro, setSavingCobro]                   = useState(false)
 
-  // Confirmación del cliente (factoring): recibe el evento 'excedente' —
-  // libera el excedente retenido y cierra la operación
-  const [showConfirmarFactoring, setShowConfirmarFactoring] = useState(false)
-  const [fechaConfirmarFactoring, setFechaConfirmarFactoring] = useState(new Date().toISOString().split('T')[0])
-  const [montoConfirmarFactoring, setMontoConfirmarFactoring] = useState('')
-  const [savingConfirmarFactoring, setSavingConfirmarFactoring] = useState(false)
-
-  // Abonos
-  const [showAbonoForm, setShowAbonoForm]   = useState(false)
-  const [abonoMonto, setAbonoMonto]         = useState('')
-  const [abonoFecha, setAbonoFecha]         = useState(new Date().toISOString().split('T')[0])
-  const [abonoObs, setAbonoObs]             = useState('')
-  const [savingAbono, setSavingAbono]       = useState(false)
+  // Marcar un "cobro esperado" (saldo_girar / detraccion / excedente) como
+  // recibido. Un solo diálogo genérico para los 3 — "Confirmar cliente" es
+  // solo el disparador visualmente distinto para el evento excedente, pero
+  // por dentro abre este mismo diálogo y llama el mismo endpoint.
+  const [abonoRecibiendo, setAbonoRecibiendo] = useState<AbonoValorizacion | null>(null)
+  const [montoRecibir, setMontoRecibir]       = useState('')
+  const [fechaRecibir, setFechaRecibir]       = useState(new Date().toISOString().split('T')[0])
+  const [obsRecibir, setObsRecibir]           = useState('')
+  const [savingRecibir, setSavingRecibir]     = useState(false)
 
   // ── Load ──────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -401,61 +425,30 @@ export default function CxCDetallePage() {
     }
   }
 
-  const handleConfirmarFactoring = async () => {
-    if (!cxc?.valorizacion || !fechaConfirmarFactoring || !montoConfirmarFactoring) return
-    const abonoPendiente = cxc.valorizacion.cobro?.abonos.find(a => a.tipo === 'excedente' && a.estado === 'pendiente')
-    if (!abonoPendiente) { toast.error('No hay un evento de excedente pendiente para confirmar'); return }
-    setSavingConfirmarFactoring(true)
-    try {
-      const res = await fetch(
-        `/api/proyectos/${cxc.valorizacion.proyectoId}/valorizaciones/${cxc.valorizacion.id}/cobro/abonos/${abonoPendiente.id}/recibir`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ montoReal: parseFloat(montoConfirmarFactoring), fechaReal: fechaConfirmarFactoring }) }
-      )
-      if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
-      toast.success('Cliente confirmado — excedente liberado y aplicado a la CxC')
-      setShowConfirmarFactoring(false)
-      load()
-    } catch (e: any) {
-      toast.error(e.message || 'Error al confirmar')
-    } finally {
-      setSavingConfirmarFactoring(false)
-    }
+  const abrirRecibirDialog = (abono: AbonoValorizacion) => {
+    setAbonoRecibiendo(abono)
+    setMontoRecibir(abono.montoEsperado != null ? String(abono.montoEsperado) : '')
+    setFechaRecibir(new Date().toISOString().split('T')[0])
+    setObsRecibir('')
   }
 
-  const handleAddAbono = async () => {
-    if (!cxc?.valorizacion || !abonoMonto || !abonoFecha) return
-    setSavingAbono(true)
+  const handleMarcarRecibido = async () => {
+    if (!cxc?.valorizacion || !abonoRecibiendo || !montoRecibir || !fechaRecibir) return
+    setSavingRecibir(true)
     try {
       const res = await fetch(
-        `/api/proyectos/${cxc.valorizacion.proyectoId}/valorizaciones/${cxc.valorizacion.id}/cobro/abonos`,
+        `/api/proyectos/${cxc.valorizacion.proyectoId}/valorizaciones/${cxc.valorizacion.id}/cobro/abonos/${abonoRecibiendo.id}/recibir`,
         { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ monto: parseFloat(abonoMonto), fecha: abonoFecha, observaciones: abonoObs || null }) }
+          body: JSON.stringify({ montoReal: parseFloat(montoRecibir), fechaReal: fechaRecibir, observaciones: obsRecibir || null }) }
       )
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
-      toast.success('Abono registrado')
-      setAbonoMonto(''); setAbonoObs(''); setShowAbonoForm(false)
+      toast.success(abonoRecibiendo.tipo === 'excedente' ? 'Cliente confirmado — excedente liberado y aplicado a la CxC' : 'Cobro registrado')
+      setAbonoRecibiendo(null)
       load()
     } catch (e: any) {
-      toast.error(e.message || 'Error al registrar abono')
+      toast.error(e.message || 'Error al registrar el cobro')
     } finally {
-      setSavingAbono(false)
-    }
-  }
-
-  const handleDeleteAbono = async (abonoId: string) => {
-    if (!cxc?.valorizacion) return
-    if (!window.confirm('¿Eliminar este abono?')) return
-    try {
-      const res = await fetch(
-        `/api/proyectos/${cxc.valorizacion.proyectoId}/valorizaciones/${cxc.valorizacion.id}/cobro/abonos?abonoId=${abonoId}`,
-        { method: 'DELETE' }
-      )
-      if (!res.ok) throw new Error('Error')
-      toast.success('Abono eliminado')
-      load()
-    } catch {
-      toast.error('Error al eliminar abono')
+      setSavingRecibir(false)
     }
   }
 
@@ -543,6 +536,20 @@ export default function CxCDetallePage() {
   const cobro = cxc.valorizacion?.cobro ?? null
   const tieneFactoring = !!cxc.valorizacionId
   const abonoExcedentePendiente = cobro?.abonos.find(a => a.tipo === 'excedente' && a.estado === 'pendiente') ?? null
+
+  // Cronograma de cobro (factoring): orden entre eventos, reflejando el guard
+  // del backend (marcarAbonoFactoringRecibido) para que el botón ya aparezca
+  // deshabilitado en vez de que el usuario descubra el bloqueo al hacer clic.
+  const adelantoRecibido = cobro?.abonos.some(a => a.tipo === 'adelanto' && a.estado === 'recibido') ?? false
+  const requiereRegularizacion = !!cobro && cobro.tipo === 'factoring' && cobro.estado !== 'en_negociacion' && !adelantoRecibido
+  const faltantesParaExcedente = (cobro?.abonos ?? []).filter(a => (a.tipo === 'saldo_girar' || a.tipo === 'detraccion') && a.estado === 'pendiente')
+
+  const eventosRecibidos = cobro?.abonos.filter(a => a.estado === 'recibido') ?? []
+  const eventosPendientes = cobro?.abonos.filter(a => a.estado === 'pendiente') ?? []
+  const totalCobradoReal = eventosRecibidos.reduce((s, a) => s + (a.montoReal ?? 0), 0)
+  const totalPendienteEsperado = eventosPendientes.reduce((s, a) => s + (a.montoEsperado ?? 0), 0)
+  const totalCostoFinanciamiento = cxc.pagos.filter(p => p.esCostoFinanciamiento).reduce((s, p) => s + p.monto, 0)
+  const totalAjusteMora = cxc.pagos.filter(p => p.esAjusteMora).reduce((s, p) => s + p.monto, 0)
 
   const pagosCobro = cxc.pagos.filter(p => !p.esDetraccion && !p.esRetencion)
   const pagosDetraccion = cxc.pagos.filter(p => p.esDetraccion)
@@ -713,22 +720,32 @@ export default function CxCDetallePage() {
                         : cobro.estado === 'letra_cambio' ? 'bg-red-100 text-red-700'
                         : 'bg-gray-100 text-gray-700'
                       }`}>
-                        {cobro.estado === 'en_negociacion' ? 'En negociación'
-                          : cobro.estado === 'desembolsada' ? 'Desembolsada — excedente pendiente'
-                          : cobro.estado === 'confirmada' ? 'Confirmada'
-                          : 'Letra de cambio'}
+                        {ESTADO_COBRO_FACTORING_LABEL[cobro.estado] ?? cobro.estado}
                       </Badge>
                     )}
                   </CardTitle>
                   <div className="flex items-center gap-2">
-                    {cobro?.tipo === 'factoring' && cobro.estado === 'desembolsada' && abonoExcedentePendiente && (
-                      <Button size="sm" onClick={() => {
-                        setMontoConfirmarFactoring(abonoExcedentePendiente.montoEsperado != null ? String(abonoExcedentePendiente.montoEsperado) : '')
-                        setShowConfirmarFactoring(true)
-                      }}>
-                        Confirmar cliente
-                      </Button>
-                    )}
+                    {cobro?.tipo === 'factoring' && cobro.estado === 'desembolsada' && abonoExcedentePendiente && (() => {
+                      const bloqueado = requiereRegularizacion || faltantesParaExcedente.length > 0
+                      const razon = requiereRegularizacion
+                        ? 'Esta operación no tiene el adelanto registrado por el flujo actual — requiere regularización'
+                        : faltantesParaExcedente.length > 0
+                          ? `Faltan por recibir: ${faltantesParaExcedente.map(a => TIPO_EVENTO_FACTORING_LABEL[a.tipo ?? ''] ?? a.tipo).join(', ')}`
+                          : ''
+                      const boton = (
+                        <Button size="sm" disabled={bloqueado} onClick={() => abrirRecibirDialog(abonoExcedentePendiente)}>
+                          {bloqueado && <span className="mr-1">🔒</span>}
+                          Confirmar cliente
+                        </Button>
+                      )
+                      if (!bloqueado) return boton
+                      return (
+                        <Tooltip>
+                          <TooltipTrigger asChild><span tabIndex={0}>{boton}</span></TooltipTrigger>
+                          <TooltipContent className="max-w-64">{razon}</TooltipContent>
+                        </Tooltip>
+                      )
+                    })()}
                     <Button variant="outline" size="sm" onClick={() => setShowCobroForm(v => !v)}>
                       {showCobroForm ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
                       {cobro ? 'Editar' : 'Registrar'}
@@ -902,70 +919,94 @@ export default function CxCDetallePage() {
                   </div>
                 )}
 
-                {/* Abonos de la financiera */}
+                {/* Resumen de esta operación — el "entró X, falta Y, costó Z" */}
+                {cobro && cobro.tipo === 'factoring' && cobro.abonos.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-gray-50 rounded-lg border">
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">Cobrado (real)</p>
+                      <p className="text-sm font-semibold text-green-700">{formatCurrency(totalCobradoReal, cxc.moneda)}</p>
+                      <p className="text-[10px] text-muted-foreground">{eventosRecibidos.length} de {cobro.abonos.length} eventos</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">Pendiente por cobrar</p>
+                      <p className="text-sm font-semibold text-amber-700">{formatCurrency(totalPendienteEsperado, cxc.moneda)}</p>
+                      <p className="text-[10px] text-muted-foreground">{eventosPendientes.length} evento{eventosPendientes.length === 1 ? '' : 's'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">Costo de financiamiento</p>
+                      <p className="text-sm font-semibold text-red-700">{formatCurrency(totalCostoFinanciamiento, cxc.moneda)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">Ajuste por mora</p>
+                      <p className="text-sm font-semibold text-red-700">{formatCurrency(totalAjusteMora, cxc.moneda)}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Cronograma de Cobro — los 4 eventos de la operación de factoring */}
                 {cobro && cobro.tipo === 'factoring' && (
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-muted-foreground">Abonos de Financiera</p>
-                      <Button variant="outline" size="sm" onClick={() => setShowAbonoForm(v => !v)}>
-                        <Plus className="h-3 w-3 mr-1" /> Abono
-                      </Button>
-                    </div>
-
-                    {showAbonoForm && (
-                      <div className="border rounded-lg p-3 bg-gray-50 space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div><Label>Monto ({cxc.moneda})</Label><Input type="number" step="0.01" value={abonoMonto} onChange={e => setAbonoMonto(e.target.value)} /></div>
-                          <div><Label>Fecha</Label><Input type="date" value={abonoFecha} onChange={e => setAbonoFecha(e.target.value)} /></div>
-                          <div className="col-span-2"><Label>Observaciones</Label><Input placeholder="Opcional" value={abonoObs} onChange={e => setAbonoObs(e.target.value)} /></div>
-                        </div>
-                        <div className="flex gap-2 justify-end">
-                          <Button variant="outline" size="sm" onClick={() => setShowAbonoForm(false)}>Cancelar</Button>
-                          <Button size="sm" onClick={handleAddAbono} disabled={savingAbono}>
-                            {savingAbono ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-                            Registrar
-                          </Button>
-                        </div>
-                      </div>
-                    )}
+                    <p className="text-sm font-medium text-muted-foreground">Cronograma de Cobro</p>
 
                     {cobro.abonos.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">Sin abonos registrados</p>
+                      <p className="text-xs text-muted-foreground">Sin eventos todavía — se crean al registrar el desembolso.</p>
                     ) : (
                       <Table>
                         <TableHeader>
                           <TableRow>
                             <TableHead>Evento</TableHead>
+                            <TableHead>Estado</TableHead>
+                            <TableHead className="text-right">Esperado</TableHead>
+                            <TableHead className="text-right">Real</TableHead>
                             <TableHead>Fecha</TableHead>
-                            <TableHead>Observaciones</TableHead>
-                            <TableHead className="text-right">Monto</TableHead>
-                            <TableHead></TableHead>
+                            <TableHead className="text-right">Acción</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {cobro.abonos.map(a => (
-                            <TableRow key={a.id}>
-                              <TableCell className="text-xs">
-                                {a.tipo ?? '—'}{' '}
-                                <Badge variant="outline" className={a.estado === 'recibido' ? 'text-green-700 border-green-300' : 'text-amber-700 border-amber-300'}>
-                                  {a.estado === 'recibido' ? 'Recibido' : 'Pendiente'}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>{a.fechaReal ? formatDate(a.fechaReal) : '—'}</TableCell>
-                              <TableCell className="text-muted-foreground text-xs">{a.observaciones || '—'}</TableCell>
-                              <TableCell className="text-right">
-                                {a.montoReal != null ? formatCurrency(a.montoReal, cxc.moneda) : (a.montoEsperado != null ? `~${formatCurrency(a.montoEsperado, cxc.moneda)}` : '—')}
-                              </TableCell>
-                              <TableCell>
-                                {a.estado !== 'recibido' && (
-                                  <Button variant="ghost" size="sm" className="text-red-500 h-7 w-7 p-0"
-                                    onClick={() => handleDeleteAbono(a.id)}>
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                          {cobro.abonos.map(a => {
+                            const senal = senalAbono(a)
+                            const esExcedente = a.tipo === 'excedente'
+                            const bloqueado = requiereRegularizacion || !adelantoRecibido
+                            const razon = requiereRegularizacion
+                              ? 'Esta operación no tiene el adelanto registrado por el flujo actual — requiere regularización'
+                              : !adelantoRecibido
+                                ? 'No se puede recibir ningún evento antes que el adelanto'
+                                : ''
+                            const boton = a.estado === 'recibido' ? (
+                              <span className="text-xs text-green-700">✓</span>
+                            ) : esExcedente ? (
+                              <span className="text-[11px] text-muted-foreground italic">usa &quot;Confirmar cliente&quot; arriba</span>
+                            ) : bloqueado ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span tabIndex={0}>
+                                    <Button size="sm" variant="outline" disabled>🔒 Marcar recibido</Button>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-64">{razon}</TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <Button size="sm" variant="outline" onClick={() => abrirRecibirDialog(a)}>Marcar recibido</Button>
+                            )
+                            return (
+                              <TableRow key={a.id}>
+                                <TableCell className="text-sm font-medium">{TIPO_EVENTO_FACTORING_LABEL[a.tipo ?? ''] ?? a.tipo ?? '—'}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className={a.estado === 'recibido' ? 'text-green-700 border-green-300' : 'text-amber-700 border-amber-300'}>
+                                    {a.estado === 'recibido' ? 'Recibido' : 'Pendiente'}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right text-sm">{a.montoEsperado != null ? formatCurrency(a.montoEsperado, cxc.moneda) : '—'}</TableCell>
+                                <TableCell className="text-right text-sm">{a.montoReal != null ? formatCurrency(a.montoReal, cxc.moneda) : '—'}</TableCell>
+                                <TableCell className="text-xs">
+                                  {a.estado === 'recibido'
+                                    ? (a.fechaReal ? formatDate(a.fechaReal) : '—')
+                                    : (senal ? <span className={senal.clase}>{senal.texto}</span> : '—')}
+                                </TableCell>
+                                <TableCell className="text-right">{boton}</TableCell>
+                              </TableRow>
+                            )
+                          })}
                         </TableBody>
                       </Table>
                     )}
@@ -1043,32 +1084,39 @@ export default function CxCDetallePage() {
         </div>
       </div>
 
-      {/* ── Dialog Confirmar cliente (factoring) ── */}
-      <Dialog open={showConfirmarFactoring} onOpenChange={open => { if (!open) setShowConfirmarFactoring(false) }}>
+      {/* ── Dialog Marcar recibido (genérico: saldo_girar / detraccion / excedente) ── */}
+      <Dialog open={!!abonoRecibiendo} onOpenChange={open => { if (!open) setAbonoRecibiendo(null) }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirmar cliente</DialogTitle>
+            <DialogTitle>
+              {abonoRecibiendo?.tipo === 'excedente' ? 'Confirmar cliente' : `Marcar "${TIPO_EVENTO_FACTORING_LABEL[abonoRecibiendo?.tipo ?? ''] ?? ''}" como recibido`}
+            </DialogTitle>
             <DialogDescription>
-              El cliente confirmó la factura a la financiera. Esto libera el excedente retenido
-              (esperado: {abonoExcedentePendiente?.montoEsperado != null ? formatCurrency(abonoExcedentePendiente.montoEsperado, cxc.moneda) : '—'})
-              como cobro real y cierra la operación de factoring. Si llegó menos por mora, edita el monto.
+              {abonoRecibiendo?.tipo === 'excedente'
+                ? <>El cliente confirmó la factura a la financiera. Esto libera el excedente retenido (esperado: {abonoRecibiendo?.montoEsperado != null ? formatCurrency(abonoRecibiendo.montoEsperado, cxc.moneda) : '—'}) como cobro real y <strong>cierra la operación de factoring</strong>. Si llegó menos por mora, edita el monto.</>
+                : <>Monto esperado: {abonoRecibiendo?.montoEsperado != null ? formatCurrency(abonoRecibiendo.montoEsperado, cxc.moneda) : '—'}. Si llegó menos, edita el monto — la diferencia se registra como ajuste, no se pierde.</>
+              }
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <Label>Monto real recibido ({cxc.moneda}) *</Label>
-              <Input type="number" step="0.01" value={montoConfirmarFactoring} onChange={e => setMontoConfirmarFactoring(e.target.value)} />
+              <Input type="number" step="0.01" value={montoRecibir} onChange={e => setMontoRecibir(e.target.value)} />
             </div>
             <div>
-              <Label>Fecha de confirmación *</Label>
-              <Input type="date" value={fechaConfirmarFactoring} onChange={e => setFechaConfirmarFactoring(e.target.value)} />
+              <Label>Fecha real *</Label>
+              <Input type="date" value={fechaRecibir} onChange={e => setFechaRecibir(e.target.value)} />
+            </div>
+            <div>
+              <Label>Observaciones (opcional)</Label>
+              <Input value={obsRecibir} onChange={e => setObsRecibir(e.target.value)} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConfirmarFactoring(false)}>Cancelar</Button>
-            <Button onClick={handleConfirmarFactoring} disabled={savingConfirmarFactoring}>
-              {savingConfirmarFactoring && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Confirmar cliente
+            <Button variant="outline" onClick={() => setAbonoRecibiendo(null)}>Cancelar</Button>
+            <Button onClick={handleMarcarRecibido} disabled={savingRecibir}>
+              {savingRecibir && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {abonoRecibiendo?.tipo === 'excedente' ? 'Confirmar cliente' : 'Marcar recibido'}
             </Button>
           </DialogFooter>
         </DialogContent>
