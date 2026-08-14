@@ -775,63 +775,6 @@ export default function CxCDetallePage() {
             </CardContent>
           </Card>
 
-          {/* Historial de Pagos */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-muted-foreground" /> Historial de Pagos
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-
-              {/* Lista de pagos */}
-              {cxc.pagos.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Sin pagos registrados</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Medio</TableHead>
-                      <TableHead>N° Operación</TableHead>
-                      <TableHead className="text-right">Monto</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {cxc.pagos.map(p => (
-                      <TableRow key={p.id} className={p.anulado ? 'opacity-60' : ''}>
-                        <TableCell className={p.anulado ? 'line-through' : ''}>{formatDate(p.fechaPago)}</TableCell>
-                        <TableCell>
-                          <span className={p.anulado ? 'line-through' : ''}>
-                            {p.esDetraccion ? <Badge variant="outline" className="text-orange-600 border-orange-300">Detracción {p.detraccionPorcentaje}%</Badge>
-                            : p.esRetencion ? <Badge variant="outline" className="text-purple-600 border-purple-300">Retención {p.retencionPorcentaje}%</Badge>
-                            : <Badge variant="outline" className="text-green-700 border-green-300">Cobro</Badge>}
-                          </span>
-                          {p.anulado && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span tabIndex={0} className="ml-1.5 inline-flex align-middle text-red-500">
-                                  <Ban className="h-3.5 w-3.5" />
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent className="max-w-72">
-                                Anulado{p.fechaAnulacion ? ` el ${formatDate(p.fechaAnulacion)}` : ''}: {p.motivoAnulacion}
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                        </TableCell>
-                        <TableCell className={`capitalize ${p.anulado ? 'line-through' : ''}`}>{p.medioPago}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{p.numeroOperacion || '—'}</TableCell>
-                        <TableCell className={`text-right font-medium ${p.anulado ? 'line-through' : ''}`}>{formatCurrency(p.monto, cxc.moneda)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Factoring / Cobro con Financiera */}
           {tieneFactoring && (
             <Card>
@@ -1230,6 +1173,63 @@ export default function CxCDetallePage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Historial de Pagos */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-muted-foreground" /> Historial de Pagos
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+
+              {/* Lista de pagos */}
+              {cxc.pagos.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">Sin pagos registrados</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Medio</TableHead>
+                      <TableHead>N° Operación</TableHead>
+                      <TableHead className="text-right">Monto</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {cxc.pagos.map(p => (
+                      <TableRow key={p.id} className={p.anulado ? 'opacity-60' : ''}>
+                        <TableCell className={p.anulado ? 'line-through' : ''}>{formatDate(p.fechaPago)}</TableCell>
+                        <TableCell>
+                          <span className={p.anulado ? 'line-through' : ''}>
+                            {p.esDetraccion ? <Badge variant="outline" className="text-orange-600 border-orange-300">Detracción {p.detraccionPorcentaje}%</Badge>
+                            : p.esRetencion ? <Badge variant="outline" className="text-purple-600 border-purple-300">Retención {p.retencionPorcentaje}%</Badge>
+                            : <Badge variant="outline" className="text-green-700 border-green-300">Cobro</Badge>}
+                          </span>
+                          {p.anulado && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span tabIndex={0} className="ml-1.5 inline-flex align-middle text-red-500">
+                                  <Ban className="h-3.5 w-3.5" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-72">
+                                Anulado{p.fechaAnulacion ? ` el ${formatDate(p.fechaAnulacion)}` : ''}: {p.motivoAnulacion}
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </TableCell>
+                        <TableCell className={`capitalize ${p.anulado ? 'line-through' : ''}`}>{p.medioPago}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{p.numeroOperacion || '—'}</TableCell>
+                        <TableCell className={`text-right font-medium ${p.anulado ? 'line-through' : ''}`}>{formatCurrency(p.monto, cxc.moneda)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* ── Columna derecha: Montos ── */}
