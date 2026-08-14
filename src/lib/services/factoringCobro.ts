@@ -407,6 +407,16 @@ export async function revertirAbonoFactoringRecibido(
   if (!abono.tipo) {
     throw new Error('Este abono no tiene un tipo de evento definido — no se puede procesar por este flujo')
   }
+  // El adelanto no se revierte suelto: es la base de todo el resto del
+  // cronograma (el guard de orden de marcarAbonoFactoringRecibido exige que
+  // esté 'recibido' antes que cualquier otro evento). Revertirlo con esta
+  // función solo anularía SU PagoCobro, dejando el de costo de financiamiento
+  // (que no está vinculado a ningún abono) activo y el resto del cronograma
+  // en un estado inconsistente. La única forma correcta de deshacer el
+  // adelanto es revertir el desembolso completo (Caso 1).
+  if (abono.tipo === 'adelanto') {
+    throw new Error('El adelanto no se revierte individualmente — usa "Revertir desembolso" para deshacer la operación completa')
+  }
 
   const cobro = abono.cobro
   const cxc = cobro.valorizacion.cuentasPorCobrar.find(c => c.estado !== 'anulada')

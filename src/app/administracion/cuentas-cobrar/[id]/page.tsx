@@ -1144,7 +1144,9 @@ export default function CxCDetallePage() {
                               : !adelantoRecibido
                                 ? 'No se puede recibir ningún evento antes que el adelanto'
                                 : ''
-                            const puedeRevertirEsteEvento = esExcedente ? puedeRevertirExcedente : true
+                            // El adelanto no se revierte suelto (ver revertirAbonoFactoringRecibido) —
+                            // solo se deshace completo con "Revertir desembolso" (ícono del header).
+                            const puedeRevertirEsteEvento = a.tipo === 'adelanto' ? false : esExcedente ? puedeRevertirExcedente : true
                             const fueRevertido = a.estado === 'pendiente' && (a.observaciones ?? '').includes('Revertido:')
                             const boton = a.estado === 'recibido' ? (
                               <span className="inline-flex items-center gap-1.5">
