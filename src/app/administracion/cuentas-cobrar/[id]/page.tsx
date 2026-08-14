@@ -159,6 +159,12 @@ function senalAbono(abono: AbonoValorizacion): { texto: string; clase: string } 
   return { texto: `hace ${diasPendiente}d`, clase }
 }
 
+// Orden fijo del Cronograma de Cobro — NO ordenar por fechaReal: los eventos
+// 'pendiente' no tienen fechaReal (null), y Postgres no da un orden estable
+// entre nulls, así que las filas pendientes se reacomodaban solas cada vez
+// que algo cambiaba (ej. al revertir un evento).
+const ORDEN_TIPO_EVENTO: Record<string, number> = { adelanto: 0, saldo_girar: 1, detraccion: 2, excedente: 3 }
+
 const ESTADO_COLORS: Record<string, string> = {
   pendiente: 'bg-yellow-100 text-yellow-800',
   parcial:   'bg-blue-100 text-blue-800',
@@ -1135,7 +1141,7 @@ export default function CxCDetallePage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {cobro.abonos.map(a => {
+                          {[...cobro.abonos].sort((a, b) => (ORDEN_TIPO_EVENTO[a.tipo ?? ''] ?? 99) - (ORDEN_TIPO_EVENTO[b.tipo ?? ''] ?? 99)).map(a => {
                             const senal = senalAbono(a)
                             const esExcedente = a.tipo === 'excedente'
                             const bloqueado = requiereRegularizacion || !adelantoRecibido
