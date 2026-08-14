@@ -278,8 +278,12 @@ export default function CxCDetallePage() {
   const [savingRevertir, setSavingRevertir] = useState(false)
 
   // ── Load ──────────────────────────────────────────────────────────────────
-  const load = useCallback(async () => {
-    setLoading(true)
+  // silent=true evita el spinner de pantalla completa (loading) — se usa al
+  // refrescar después de una acción (pago, marcar recibido, revertir, etc.),
+  // donde ya hay datos en pantalla y no tiene sentido desmontar toda la
+  // página; solo el mount inicial pasa por el spinner.
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const [cxcRes, bancosRes] = await Promise.all([
         fetch(`/api/administracion/cuentas-cobrar/${id}`),
@@ -434,7 +438,7 @@ export default function CxCDetallePage() {
       setShowPagoForm(false)
       setPagoMonto(''); setPagoOperacion(''); setPagoObs('')
       setConDetraccion(false); setConRetencion(false)
-      load()
+      load(true)
     } catch (e: any) {
       toast.error(e.message || 'Error al registrar pago')
     } finally {
@@ -480,7 +484,7 @@ export default function CxCDetallePage() {
       )
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
       toast.success('Cobro guardado')
-      load()
+      load(true)
     } catch (e: any) {
       toast.error(e.message || 'Error al guardar cobro')
     } finally {
@@ -507,7 +511,7 @@ export default function CxCDetallePage() {
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
       toast.success(abonoRecibiendo.tipo === 'excedente' ? 'Cliente confirmado — excedente liberado y aplicado a la CxC' : 'Cobro registrado')
       setAbonoRecibiendo(null)
-      load()
+      load(true)
     } catch (e: any) {
       toast.error(e.message || 'Error al registrar el cobro')
     } finally {
@@ -540,7 +544,7 @@ export default function CxCDetallePage() {
       toast.success(revertirTarget.tipo === 'desembolso' ? 'Desembolso revertido — corrige y vuelve a guardar' : 'Cobro revertido — el evento vuelve a pendiente')
       const eraDesembolso = revertirTarget.tipo === 'desembolso'
       setRevertirTarget(null)
-      await load()
+      await load(true)
       // Reabre el formulario de liquidación precargado con los últimos datos
       // guardados — fechaDesembolso ya viene vacía desde el backend, así que
       // load() la recarga vacía sin que haya que limpiarla a mano acá.
@@ -580,7 +584,7 @@ export default function CxCDetallePage() {
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Error') }
       toast.success('CxC actualizada')
       setShowEditForm(false)
-      load()
+      load(true)
     } catch (e: any) {
       toast.error(e.message || 'Error al actualizar')
     } finally {
@@ -599,7 +603,7 @@ export default function CxCDetallePage() {
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
       toast.success('CxC anulada')
       setConfirmAction(null)
-      load()
+      load(true)
     } catch (e: any) {
       toast.error(e.message || 'Error al anular')
     } finally {
