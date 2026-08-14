@@ -374,20 +374,23 @@ export default function CxCDetallePage() {
   }, [liq.refInteres, liq.refInteresDisponible])
 
   // Sugerencia de Fecha Vencimiento = Fecha Desembolso + Días Financiamiento.
-  // Mismo patrón que el Interés: solo mientras el campo esté vacío o siga
-  // marcado como "sugerido" — nunca pisa una fecha que el usuario ya escribió
-  // a mano (ver onChange del input).
-  useEffect(() => {
-    const dias = parseInt(cobroDias) || 0
-    if (!cobroFechaDesembolso || dias <= 0) return
-    if (cobroFechaVencimiento !== '' && !fechaVencimientoEsSugerida) return
-    const base = new Date(cobroFechaDesembolso + 'T00:00:00')
+  // A diferencia del Interés (que solo se sugiere si el campo está vacío),
+  // acá SÍ recalcula y pisa el valor cada vez que el usuario edita Desembolso
+  // o Días — son 2 datos mecánicamente ligados (fecha base + plazo), no una
+  // cifra que la financiera pueda dar distinta. Deliberadamente NO es un
+  // useEffect: si dependiera de cobroFechaDesembolso/cobroDias, se
+  // recalcularía también cuando load() puebla el formulario al abrir un
+  // cobro ya guardado, pisando silenciosamente una Fecha Vencimiento real
+  // que no siga la fórmula exacta (ej. ajustada a día hábil). Se dispara
+  // solo desde el onChange de esos 2 campos — una edición real del usuario.
+  const recalcularFechaVencimientoSugerida = (fechaDesembolso: string, diasStr: string) => {
+    const dias = parseInt(diasStr) || 0
+    if (!fechaDesembolso || dias <= 0) return
+    const base = new Date(fechaDesembolso + 'T00:00:00')
     base.setDate(base.getDate() + dias)
-    const sugerida = base.toISOString().split('T')[0]
-    if (sugerida !== cobroFechaVencimiento) setCobroFechaVencimiento(sugerida)
-    if (!fechaVencimientoEsSugerida) setFechaVencimientoEsSugerida(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cobroFechaDesembolso, cobroDias])
+    setCobroFechaVencimiento(base.toISOString().split('T')[0])
+    setFechaVencimientoEsSugerida(true)
+  }
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -924,7 +927,14 @@ export default function CxCDetallePage() {
                         <div className="grid grid-cols-2 gap-3">
                           <div><Label>Financiera</Label><Input placeholder="Ej: Banpro, BCP..." value={cobroFinanciera} onChange={e => setCobroFinanciera(e.target.value)} /></div>
                           <div><Label>Tasa (%)</Label><Input type="number" step="0.01" placeholder="1.38" value={cobroTasa} onChange={e => setCobroTasa(e.target.value)} /></div>
-                          <div><Label>Fecha Desembolso</Label><Input type="date" value={cobroFechaDesembolso} onChange={e => setCobroFechaDesembolso(e.target.value)} /></div>
+                          <div>
+                            <Label>Fecha Desembolso</Label>
+                            <Input
+                              type="date"
+                              value={cobroFechaDesembolso}
+                              onChange={e => { setCobroFechaDesembolso(e.target.value); recalcularFechaVencimientoSugerida(e.target.value, cobroDias) }}
+                            />
+                          </div>
                           <div>
                             <Label>
                               Fecha Vencimiento
@@ -940,7 +950,14 @@ export default function CxCDetallePage() {
                           </div>
                           <div><Label>N° Operación</Label><Input value={cobroNumeroOperacion} onChange={e => setCobroNumeroOperacion(e.target.value)} /></div>
                           <div><Label>N° Documentos</Label><Input type="number" value={cobroNumDocumentos} onChange={e => setCobroNumDocumentos(e.target.value)} /></div>
-                          <div><Label>Días Financiamiento</Label><Input type="number" value={cobroDias} onChange={e => setCobroDias(e.target.value)} /></div>
+                          <div>
+                            <Label>Días Financiamiento</Label>
+                            <Input
+                              type="number"
+                              value={cobroDias}
+                              onChange={e => { setCobroDias(e.target.value); recalcularFechaVencimientoSugerida(cobroFechaDesembolso, e.target.value) }}
+                            />
+                          </div>
                         </div>
 
                         {/* Hoja de liquidación */}
