@@ -294,3 +294,191 @@ export async function marcarAbonoFactoringRecibido(
 
   return abonoActualizado
 }
+
+/**
+ * Revierte (Caso 1, Sub-fase E) un desembolso de factoring ya guardado, siempre
+ * que ningún evento posterior (saldo_girar/detraccion/excedente) se haya
+ * marcado recibido todavía — es decir, deshace exactamente lo que hizo
+ * procesarDesembolsoFactoring, sin nada más encima.
+ *
+ * El adelanto (evento 1) siempre está 'recibido' — lo pone automático el
+ * propio desembolso, no es una acción del usuario — así que no cuenta para la
+ * precondición ni bloquea esta reversión.
+ *
+ * anula (no borra) los PagoCobro reales del desembolso (adelanto + costo de
+ * financiamiento, si existió); borra sin rastro los 4 AbonoValorizacion —
+ * seguro porque nada más referencia un AbonoValorizacion por FK y el rastro
+ * de auditoría real vive en el PagoCobro anulado, no en el abono. Deja
+ * fechaDesembolso en null para que el trigger existente en POST /cobro
+ * (transición null→poblado) reprocese solo cuando se corrija y regrabe.
+ */
+export async function revertirDesembolsoFactoring(
+  cobroValorizacionId: string,
+  motivo: string,
+  tx: PrismaClientOrTx
+) {
+  const cobro = await tx.cobroValorizacion.findUnique({
+    where: { id: cobroValorizacionId },
+    include: { valorizacion: { include: { cuentasPorCobrar: true } }, abonos: true },
+  })
+  if (!cobro) {
+    throw new Error('CobroValorizacion no encontrado')
+  }
+  if (cobro.estado !== 'desembolsada') {
+    throw new Error(`No se puede revertir: la operación está en estado '${cobro.estado}', no 'desembolsada'`)
+  }
+  const yaHayRecibidos = cobro.abonos.some(
+    a => a.tipo !== 'adelanto' && a.estado === 'recibido'
+  )
+  if (yaHayRecibidos) {
+    throw new Error(
+      'No se puede revertir el desembolso: ya hay eventos recibidos sobre él. Revierte primero cada evento recibido (incluido el excedente si aplica) y luego el desembolso.'
+    )
+  }
+
+  const cxc = cobro.valorizacion.cuentasPorCobrar.find(c => c.estado !== 'anulada')
+  if (!cxc) {
+    throw new Error('La valorización no tiene una CuentaPorCobrar activa')
+  }
+
+  const fechaAnulacion = new Date()
+
+  const abonoAdelanto = cobro.abonos.find(a => a.tipo === 'adelanto')
+  if (abonoAdelanto?.pagoCobroId) {
+    await tx.pagoCobro.update({
+      where: { id: abonoAdelanto.pagoCobroId },
+      data: { anulado: true, motivoAnulacion: motivo, fechaAnulacion, updatedAt: new Date() },
+    })
+  }
+
+  const pagoCosto = await tx.pagoCobro.findFirst({
+    where: { cuentaPorCobrarId: cxc.id, esCostoFinanciamiento: true, anulado: false },
+  })
+  if (pagoCosto) {
+    await tx.pagoCobro.update({
+      where: { id: pagoCosto.id },
+      data: { anulado: true, motivoAnulacion: motivo, fechaAnulacion, updatedAt: new Date() },
+    })
+  }
+
+  await tx.abonoValorizacion.deleteMany({ where: { cobroId: cobroValorizacionId } })
+
+  await tx.cobroValorizacion.update({
+    where: { id: cobroValorizacionId },
+    data: { estado: 'en_negociacion', fechaDesembolso: null, updatedAt: new Date() },
+  })
+
+  await recalcularCuentaPorCobrar(cxc.id, tx)
+}
+
+/**
+ * Revierte (Caso 2, Sub-fase E) un "cobro esperado" ya marcado recibido —
+ * ej. detraccion recibida con el monto equivocado. Anula el PagoCobro real y,
+ * si existió, su PagoCobro hermano de ajuste por mora (mismo pago, misma
+ * fecha, mismo tipo de evento en la observación — se crean juntos en
+ * marcarAbonoFactoringRecibido, deben revertirse juntos). El abono vuelve a
+ * 'pendiente' con su monto teórico intacto.
+ *
+ * Guard de orden simétrico al de recepción: si se intenta revertir
+ * saldo_girar o detraccion mientras el excedente de la misma operación ya
+ * está 'recibido', bloquea — revertir dejaría un excedente confirmado sin la
+ * premisa que lo permitió.
+ *
+ * Si el evento es 'excedente', además revierte sus 2 efectos: CobroValorizacion
+ * vuelve de 'confirmada' a 'desembolsada' (sin fechaConfirmacion), y si la
+ * Valorizacion había subido a 'pagada' por este cobro, baja a 'facturada'
+ * (recalcularCuentaPorCobrar ya hace ese downgrade).
+ */
+export async function revertirAbonoFactoringRecibido(
+  abonoId: string,
+  motivo: string,
+  tx: PrismaClientOrTx
+) {
+  const abono = await tx.abonoValorizacion.findUnique({
+    where: { id: abonoId },
+    include: { cobro: { include: { valorizacion: { include: { cuentasPorCobrar: true } } } } },
+  })
+  if (!abono) {
+    throw new Error('Cobro esperado no encontrado')
+  }
+  if (abono.estado !== 'recibido') {
+    throw new Error('Este cobro esperado no está recibido — no hay nada que revertir')
+  }
+  if (!abono.tipo) {
+    throw new Error('Este abono no tiene un tipo de evento definido — no se puede procesar por este flujo')
+  }
+
+  const cobro = abono.cobro
+  const cxc = cobro.valorizacion.cuentasPorCobrar.find(c => c.estado !== 'anulada')
+  if (!cxc) {
+    throw new Error('La valorización no tiene una CuentaPorCobrar activa')
+  }
+
+  // Guard de orden simétrico: no se puede revertir saldo_girar/detraccion si
+  // el excedente (que dependía de ambos) ya está recibido.
+  if (abono.tipo === 'saldo_girar' || abono.tipo === 'detraccion') {
+    const excedenteRecibido = await tx.abonoValorizacion.findFirst({
+      where: { cobroId: cobro.id, tipo: 'excedente', estado: 'recibido' },
+      select: { id: true },
+    })
+    if (excedenteRecibido) {
+      throw new Error('No se puede revertir: el excedente de esta operación ya fue recibido. Revierte primero el excedente.')
+    }
+  }
+
+  const fechaAnulacion = new Date()
+
+  if (abono.pagoCobroId) {
+    const pagoReal = await tx.pagoCobro.findUnique({ where: { id: abono.pagoCobroId } })
+    if (pagoReal) {
+      await tx.pagoCobro.update({
+        where: { id: pagoReal.id },
+        data: { anulado: true, motivoAnulacion: motivo, fechaAnulacion, updatedAt: new Date() },
+      })
+
+      // PagoCobro hermano de ajuste por mora — mismo pago, misma fecha, mismo
+      // tipo de evento en la observación (ver marcarAbonoFactoringRecibido).
+      const etiqueta = abono.tipo === 'saldo_girar' ? 'Saldo a girar'
+        : abono.tipo === 'detraccion' ? 'Detracción'
+        : 'Excedente'
+      const pagoMora = await tx.pagoCobro.findFirst({
+        where: {
+          cuentaPorCobrarId: cxc.id,
+          esAjusteMora: true,
+          anulado: false,
+          fechaPago: pagoReal.fechaPago,
+          observaciones: { contains: etiqueta, mode: 'insensitive' },
+        },
+      })
+      if (pagoMora) {
+        await tx.pagoCobro.update({
+          where: { id: pagoMora.id },
+          data: { anulado: true, motivoAnulacion: motivo, fechaAnulacion, updatedAt: new Date() },
+        })
+      }
+    }
+  }
+
+  const notaReversion = `Revertido: ${motivo} — antes: ${abono.montoReal ?? ''} el ${abono.fechaReal ? abono.fechaReal.toISOString().split('T')[0] : ''}`
+  const abonoActualizado = await tx.abonoValorizacion.update({
+    where: { id: abonoId },
+    data: {
+      estado: 'pendiente',
+      montoReal: null,
+      fechaReal: null,
+      pagoCobroId: null,
+      observaciones: abono.observaciones ? `${abono.observaciones} | ${notaReversion}` : notaReversion,
+    },
+  })
+
+  if (abono.tipo === 'excedente') {
+    await tx.cobroValorizacion.update({
+      where: { id: cobro.id },
+      data: { estado: 'desembolsada', fechaConfirmacion: null, updatedAt: new Date() },
+    })
+  }
+
+  await recalcularCuentaPorCobrar(cxc.id, tx)
+
+  return abonoActualizado
+}

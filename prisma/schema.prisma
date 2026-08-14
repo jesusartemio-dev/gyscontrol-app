@@ -4755,6 +4755,13 @@ model PagoCobro {
   // saldoPendiente sin ser dinero recibido, igual que esCostoFinanciamiento,
   // pero es una categoría de pérdida distinta (mora, no costo de financiamiento).
   esAjusteMora              Boolean   @default(false)
+  // Anulación con rastro (no se borra): igual patrón que CuentaPorCobrar.estado
+  // = 'anulada', pero a nivel de un pago individual — permite corregir un
+  // desembolso/evento de factoring mal registrado sin anular toda la CxC.
+  // recalcularCuentaPorCobrar excluye los pagos con anulado=true de la suma.
+  anulado                   Boolean   @default(false)
+  motivoAnulacion           String?
+  fechaAnulacion            DateTime?
   createdAt                 DateTime  @default(now())
   updatedAt                 DateTime
 

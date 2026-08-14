@@ -29,16 +29,22 @@ export async function recalcularCuentaPorCobrar(
   }
 
   const totalPagado = await client.pagoCobro.aggregate({
-    where: { cuentaPorCobrarId },
+    where: { cuentaPorCobrarId, anulado: false },
     _sum: { monto: true },
   })
 
   const montoPagado = totalPagado._sum.monto || 0
   const saldoPendiente = round2(cuenta.monto - montoPagado)
 
+  // Antes de esta función existir la reversión de pagos, montoPagado solo podía
+  // subir — por eso el estado, al no calzar 'pagada' ni 'parcial', se dejaba tal
+  // cual estaba (cuenta.estado). Con la reversión de PagoCobro (anulado=true),
+  // montoPagado puede volver a 0, y dejarlo en 'pagada'/'parcial' sería una CxC
+  // marcada pagada con saldo pendiente > 0 — se recalcula contra fechaVencimiento
+  // en vez de conservar el estado previo.
   const nuevoEstado: typeof cuenta.estado = saldoPendiente <= 0 ? 'pagada'
     : montoPagado > 0 ? 'parcial'
-    : cuenta.estado
+    : (cuenta.fechaVencimiento < new Date() ? 'vencida' : 'pendiente')
 
   const cuentaActualizada = await client.cuentaPorCobrar.update({
     where: { id: cuentaPorCobrarId },
@@ -50,17 +56,29 @@ export async function recalcularCuentaPorCobrar(
     },
   })
 
-  // Auto-sync: si CxC queda pagada y tiene valorización vinculada, marcarla como pagada también
-  if (nuevoEstado === 'pagada' && cuentaActualizada.valorizacionId) {
+  // Auto-sync con Valorizacion, en ambos sentidos:
+  // - CxC queda pagada y su Valorizacion estaba 'facturada' → sube a 'pagada'.
+  // - CxC deja de estar pagada (reversión) y su Valorizacion estaba 'pagada'
+  //   por este mismo auto-sync → baja de vuelta a 'facturada', igual que ya
+  //   permite manualmente la transición pagada→facturada del endpoint de
+  //   valorizaciones, pero disparado acá como consecuencia directa.
+  if (cuentaActualizada.valorizacionId) {
     const val = await client.valorizacion.findUnique({
       where: { id: cuentaActualizada.valorizacionId },
       select: { id: true, estado: true, proyectoId: true },
     })
-    if (val && val.estado === 'facturada') {
-      await client.valorizacion.update({
-        where: { id: val.id },
-        data: { estado: 'pagada', updatedAt: new Date() },
-      })
+    if (val) {
+      if (nuevoEstado === 'pagada' && val.estado === 'facturada') {
+        await client.valorizacion.update({
+          where: { id: val.id },
+          data: { estado: 'pagada', updatedAt: new Date() },
+        })
+      } else if (nuevoEstado !== 'pagada' && val.estado === 'pagada') {
+        await client.valorizacion.update({
+          where: { id: val.id },
+          data: { estado: 'facturada', updatedAt: new Date() },
+        })
+      }
     }
   }
 
