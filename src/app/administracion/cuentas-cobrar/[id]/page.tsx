@@ -229,6 +229,10 @@ export default function CxCDetallePage() {
   const [cobroExcedenteMonto, setCobroExcedenteMonto]   = useState('')
   const [cobroValorAFinanciar, setCobroValorAFinanciar] = useState('')
   const [cobroInteres, setCobroInteres]                 = useState('')
+  // true mientras el valor de Interés siga siendo la sugerencia calculada
+  // (tasa × valorAFinanciar × días/30) sin que el usuario la haya tocado a
+  // mano — se apaga en cuanto el usuario escribe algo en el campo.
+  const [interesEsSugerido, setInteresEsSugerido]       = useState(false)
   const [cobroComision, setCobroComision]               = useState('')
   const [cobroGastos, setCobroGastos]                   = useState('')
   const [cobroIgvGastos, setCobroIgvGastos]             = useState('')
@@ -295,6 +299,7 @@ export default function CxCDetallePage() {
         setCobroExcedenteMonto(cobro.excedenteMonto?.toString() || '')
         setCobroValorAFinanciar(cobro.valorAFinanciar?.toString() || '')
         setCobroInteres(cobro.interesMonto?.toString() || '')
+        setInteresEsSugerido(false)
         setCobroComision(cobro.comisionEstructuracion?.toString() || '')
         setCobroGastos(cobro.gastosAdicionales?.toString() || '')
         setCobroIgvGastos(cobro.igvGastos?.toString() || '')
@@ -330,10 +335,23 @@ export default function CxCDetallePage() {
     const tasa      = n(cobroTasa)
     const dias      = parseInt(cobroDias) || 0
     const refInteres = tasa > 0 && dias > 0 ? aFinanciar * (tasa / 100 / 30) * dias : 0
-    return { base, detMonto, valorNeto, excMonto, aFinanciar, totalCostos, aDesembolsar, saldo, refInteres }
+    const refInteresDisponible = tasa > 0 && dias > 0 && aFinanciar > 0
+    return { base, detMonto, valorNeto, excMonto, aFinanciar, totalCostos, aDesembolsar, saldo, refInteres, refInteresDisponible }
   }, [cxc, cobroDetraccionPct, cobroDetraccionMonto, cobroExcedentePct, cobroExcedenteMonto,
       cobroValorAFinanciar, cobroInteres, cobroComision, cobroGastos, cobroIgvGastos,
       cobroAdelantoBanpro, cobroTasa, cobroDias])
+
+  // Sugerencia de Interés: tasa × valorAFinanciar × (días/30). Solo se aplica
+  // mientras el campo esté vacío o siga marcado como "sugerido" — nunca pisa
+  // un valor que el usuario ya escribió a mano (ver onChange del input).
+  useEffect(() => {
+    if (!liq.refInteresDisponible) return
+    if (cobroInteres !== '' && !interesEsSugerido) return
+    const sugerido = liq.refInteres.toFixed(2)
+    if (sugerido !== cobroInteres) setCobroInteres(sugerido)
+    if (!interesEsSugerido) setInteresEsSugerido(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liq.refInteres, liq.refInteresDisponible])
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -844,11 +862,24 @@ export default function CxCDetallePage() {
                                 </td>
                               </tr>
                               <tr className="border-b bg-gray-50">
-                                <td className="px-3 py-2 text-muted-foreground">Interés</td>
+                                <td className="px-3 py-2 text-muted-foreground">
+                                  Interés
+                                  {interesEsSugerido && cobroInteres !== '' && (
+                                    <span className="ml-1.5 text-[10px] font-normal text-gray-400 align-middle">(sugerido)</span>
+                                  )}
+                                </td>
                                 <td className="px-3 py-2 text-right text-red-600">− {formatCurrency(n(cobroInteres), cxc.moneda)}</td>
                                 <td className="px-3 py-2">
-                                  <Input className="h-7 text-xs" type="number" placeholder="0.00" value={cobroInteres} onChange={e => setCobroInteres(e.target.value)} />
-                                  {liq.refInteres > 0 && <p className="text-xs text-muted-foreground mt-0.5">Ref: {formatCurrency(liq.refInteres, cxc.moneda)}</p>}
+                                  <Input
+                                    className="h-7 text-xs"
+                                    type="number"
+                                    placeholder="0.00"
+                                    value={cobroInteres}
+                                    onChange={e => { setCobroInteres(e.target.value); setInteresEsSugerido(false) }}
+                                  />
+                                  {liq.refInteresDisponible && !interesEsSugerido && Math.abs(n(cobroInteres) - liq.refInteres) > 0.01 && (
+                                    <p className="text-xs text-muted-foreground mt-0.5">Ref: {formatCurrency(liq.refInteres, cxc.moneda)}</p>
+                                  )}
                                 </td>
                               </tr>
                               <tr className="border-b bg-gray-50">
