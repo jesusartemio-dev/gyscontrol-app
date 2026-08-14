@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Loader2, Search, ArrowDownCircle, AlertTriangle, DollarSign, Clock, CheckCircle, Plus, Ban, Download, Upload, Trash2, ChevronDown, Pencil, CalendarDays, X } from 'lucide-react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
@@ -58,6 +59,7 @@ interface Proyecto {
 
 interface CobroValorizacion {
   tipo: string
+  estado?: string
   financiera: string | null
   tasaDescuentoPct: number | null
   fechaDesembolso: string | null
@@ -992,14 +994,36 @@ export default function CuentasCobrarPage() {
                         <Badge className={getEstadoColor(item.estado)}>
                           {ESTADOS_CXC.find(e => e.value === item.estado)?.label || item.estado}
                         </Badge>
+                        {item.valorizacion?.cobro && (
+                          <div className={`text-[10px] font-medium mt-1 ${
+                            item.valorizacion.cobro.tipo !== 'factoring' ? 'text-slate-500'
+                            : item.valorizacion.cobro.estado === 'confirmada' ? 'text-green-700'
+                            : item.valorizacion.cobro.estado === 'desembolsada' ? 'text-blue-700'
+                            : item.valorizacion.cobro.estado === 'letra_cambio' ? 'text-red-700'
+                            : 'text-slate-500'
+                          }`}>
+                            {item.valorizacion.cobro.tipo !== 'factoring' ? 'Directo'
+                              : item.valorizacion.cobro.estado === 'confirmada' ? 'Factoring · Confirmada'
+                              : item.valorizacion.cobro.estado === 'desembolsada' ? 'Factoring · Desembolsada'
+                              : item.valorizacion.cobro.estado === 'letra_cambio' ? 'Factoring · Letra de cambio'
+                              : 'Factoring · En negociación'}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           {(item.estado === 'pendiente' || item.estado === 'parcial' || item.estado === 'vencida') && (
-                            <Button variant="outline" size="sm" onClick={() => openPago(item)}>
-                              <ArrowDownCircle className="h-3 w-3 mr-1" />
-                              Pago
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="outline" size="sm" onClick={() => openPago(item)}>
+                                  <ArrowDownCircle className="h-3 w-3 mr-1" />
+                                  Pago
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-64">
+                                Para cobro directo del cliente. Si esta factura va por factoring, entra al detalle y usa la tarjeta "Factoring / Cobro con Financiera" en su lugar.
+                              </TooltipContent>
+                            </Tooltip>
                           )}
                           <Button variant="ghost" size="sm" asChild>
                             <Link href={`/administracion/cuentas-cobrar/${item.id}`}>Ver →</Link>

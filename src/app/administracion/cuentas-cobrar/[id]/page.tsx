@@ -12,7 +12,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Loader2, ArrowLeft, Pencil, Save, Plus, Trash2, ExternalLink, DollarSign, Building2, ChevronDown, ChevronUp, Ban, AlertTriangle } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Loader2, ArrowLeft, Pencil, Save, Plus, Trash2, ExternalLink, DollarSign, Building2, ChevronDown, ChevronUp, Ban, AlertTriangle, HelpCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 
@@ -578,9 +579,21 @@ export default function CxCDetallePage() {
             </Button>
           )}
           {(cxc.estado === 'pendiente' || cxc.estado === 'parcial' || cxc.estado === 'vencida') && (
-            <Button size="sm" onClick={() => setShowPagoForm(v => !v)}>
-              <Plus className="h-4 w-4 mr-1" /> Registrar Pago
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button size="sm" onClick={() => setShowPagoForm(v => !v)}>
+                <Plus className="h-4 w-4 mr-1" /> Registrar Pago
+              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="¿Qué es Registrar Pago?">
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-64">
+                  Para cobro directo del cliente (transferencia, cheque, efectivo). Si esta factura va por factoring, no uses este botón — usa la tarjeta "Factoring / Cobro con Financiera" más abajo.
+                </TooltipContent>
+              </Tooltip>
+            </div>
           )}
           {cxc.estado !== 'anulada' && (
             <Button variant="outline" size="sm" className="text-amber-700 border-amber-300 hover:bg-amber-50"
