@@ -259,9 +259,10 @@ export default function CxCDetallePage() {
   const [savingCobro, setSavingCobro]                   = useState(false)
 
   // Marcar un "cobro esperado" (saldo_girar / detraccion / excedente) como
-  // recibido. Un solo diálogo genérico para los 3 — "Confirmar cliente" es
-  // solo el disparador visualmente distinto para el evento excedente, pero
-  // por dentro abre este mismo diálogo y llama el mismo endpoint.
+  // recibido. Un solo diálogo genérico para los 3 — "Cliente pagó factura" es
+  // solo el disparador visualmente distinto para el evento excedente (el
+  // deudor le paga la factura a la financiera, que libera el 1% retenido),
+  // pero por dentro abre este mismo diálogo y llama el mismo endpoint.
   const [abonoRecibiendo, setAbonoRecibiendo] = useState<AbonoValorizacion | null>(null)
   const [montoRecibir, setMontoRecibir]       = useState('')
   const [fechaRecibir, setFechaRecibir]       = useState(new Date().toISOString().split('T')[0])
@@ -509,7 +510,7 @@ export default function CxCDetallePage() {
           body: JSON.stringify({ montoReal: parseFloat(montoRecibir), fechaReal: fechaRecibir, observaciones: obsRecibir || null }) }
       )
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
-      toast.success(abonoRecibiendo.tipo === 'excedente' ? 'Cliente confirmado — excedente liberado y aplicado a la CxC' : 'Cobro registrado')
+      toast.success(abonoRecibiendo.tipo === 'excedente' ? 'Cliente pagó la factura — excedente liberado y aplicado a la CxC' : 'Cobro registrado')
       setAbonoRecibiendo(null)
       load(true)
     } catch (e: any) {
@@ -821,7 +822,7 @@ export default function CxCDetallePage() {
                       const boton = (
                         <Button size="sm" disabled={bloqueado} onClick={() => abrirRecibirDialog(abonoExcedentePendiente)}>
                           {bloqueado && <span className="mr-1">🔒</span>}
-                          Confirmar cliente
+                          Cliente pagó factura
                         </Button>
                       )
                       if (!bloqueado) return boton
@@ -1121,7 +1122,7 @@ export default function CxCDetallePage() {
                                 )}
                               </span>
                             ) : esExcedente ? (
-                              <span className="text-[11px] text-muted-foreground italic">usa &quot;Confirmar cliente&quot; arriba</span>
+                              <span className="text-[11px] text-muted-foreground italic">usa &quot;Cliente pagó factura&quot; arriba</span>
                             ) : bloqueado ? (
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -1309,11 +1310,11 @@ export default function CxCDetallePage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {abonoRecibiendo?.tipo === 'excedente' ? 'Confirmar cliente' : `Marcar "${TIPO_EVENTO_FACTORING_LABEL[abonoRecibiendo?.tipo ?? ''] ?? ''}" como recibido`}
+              {abonoRecibiendo?.tipo === 'excedente' ? 'Cliente pagó factura' : `Marcar "${TIPO_EVENTO_FACTORING_LABEL[abonoRecibiendo?.tipo ?? ''] ?? ''}" como recibido`}
             </DialogTitle>
             <DialogDescription>
               {abonoRecibiendo?.tipo === 'excedente'
-                ? <>El cliente confirmó la factura a la financiera. Esto libera el excedente retenido (esperado: {abonoRecibiendo?.montoEsperado != null ? formatCurrency(abonoRecibiendo.montoEsperado, cxc.moneda) : '—'}) como cobro real y <strong>cierra la operación de factoring</strong>. Si llegó menos por mora, edita el monto.</>
+                ? <>El cliente le pagó la factura a la financiera. Eso libera el excedente retenido (esperado: {abonoRecibiendo?.montoEsperado != null ? formatCurrency(abonoRecibiendo.montoEsperado, cxc.moneda) : '—'}) como cobro real y <strong>cierra la operación de factoring</strong>. Si llegó menos por mora, edita el monto.</>
                 : <>Monto esperado: {abonoRecibiendo?.montoEsperado != null ? formatCurrency(abonoRecibiendo.montoEsperado, cxc.moneda) : '—'}. Si llegó menos, edita el monto — la diferencia se registra como ajuste, no se pierde.</>
               }
             </DialogDescription>
@@ -1336,7 +1337,7 @@ export default function CxCDetallePage() {
             <Button variant="outline" onClick={() => setAbonoRecibiendo(null)}>Cancelar</Button>
             <Button onClick={handleMarcarRecibido} disabled={savingRecibir}>
               {savingRecibir && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {abonoRecibiendo?.tipo === 'excedente' ? 'Confirmar cliente' : 'Marcar recibido'}
+              {abonoRecibiendo?.tipo === 'excedente' ? 'Cliente pagó factura' : 'Marcar recibido'}
             </Button>
           </DialogFooter>
         </DialogContent>
