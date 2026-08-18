@@ -1381,7 +1381,7 @@ export default function CuentasPagarPage() {
 
       {/* Dialog crear cuenta por pagar */}
       <Dialog open={showCreateDialog} onOpenChange={open => { if (!open) setShowCreateDialog(false) }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" onCloseAutoFocus={e => e.preventDefault()}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto" onCloseAutoFocus={e => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Nueva Cuenta por Pagar</DialogTitle>
             <DialogDescription>Registrar una factura o cuenta pendiente de pago a proveedor</DialogDescription>
@@ -1408,21 +1408,21 @@ export default function CuentasPagarPage() {
                       Desvincular OC
                     </Button>
                   </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+                  <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-0.5 text-xs">
                     <span className="text-muted-foreground">Proveedor:</span>
-                    <span className="font-medium">{oc.proveedor?.nombre}{oc.proveedor?.ruc ? ` (${oc.proveedor.ruc})` : ''}</span>
+                    <span className="font-medium break-words">{oc.proveedor?.nombre}{oc.proveedor?.ruc ? ` (${oc.proveedor.ruc})` : ''}</span>
                     <span className="text-muted-foreground">OC vinculada:</span>
-                    <span className="font-mono font-medium">{oc.numero}</span>
+                    <span className="font-mono font-medium break-words">{oc.numero}</span>
                     {oc.proyecto && <>
                       <span className="text-muted-foreground">Proyecto:</span>
-                      <span className="font-medium">{oc.proyecto.nombre}</span>
+                      <span className="font-medium break-words">{oc.proyecto.nombre}</span>
                     </>}
                     <span className="text-muted-foreground">Moneda:</span>
                     <span className="font-medium">{oc.moneda}</span>
                     {resumenOc && (
                       <>
                         <span className="text-muted-foreground">Facturado de la OC:</span>
-                        <span className="font-medium">
+                        <span className="font-medium break-words">
                           {formatCurrency(resumenOc.totalFacturado, oc.moneda)} de {formatCurrency(resumenOc.totalOc, oc.moneda)}
                           {resumenOc.saldoPorFacturar > 0.01 && (
                             <span className="text-amber-700"> · falta {formatCurrency(resumenOc.saldoPorFacturar, oc.moneda)}</span>
