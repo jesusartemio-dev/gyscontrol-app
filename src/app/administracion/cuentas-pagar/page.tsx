@@ -1474,16 +1474,21 @@ export default function CuentasPagarPage() {
                 </div>
                 <div>
                   <Label>Proveedor <span className="text-red-500">*</span></Label>
-                  <Select value={createForm.proveedorId} onValueChange={handleProveedorChange}>
-                    <SelectTrigger className={createErrors.has('proveedorId') ? 'border-red-500 ring-1 ring-red-500' : ''}>
-                      <SelectValue placeholder="Seleccionar proveedor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {proveedores.map(p => (
-                        <SelectItem key={p.id} value={p.id}>{p.nombre}{p.ruc ? ` (${p.ruc})` : ''}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {/* Combobox y no Select: la lista de proveedores incluye razones
+                      sociales muy largas que en un Select nativo desbordan el modal
+                      y obligan a hacer scroll horizontal para elegir. */}
+                  <Combobox
+                    options={proveedores.map(p => ({
+                      value: p.id,
+                      label: `${p.nombre}${p.ruc ? ` (${p.ruc})` : ''}`,
+                    }))}
+                    value={createForm.proveedorId || undefined}
+                    onValueChange={handleProveedorChange}
+                    placeholder="Seleccionar proveedor"
+                    searchPlaceholder="Buscar por nombre o RUC..."
+                    emptyMessage="No se encontró ningún proveedor."
+                    className={createErrors.has('proveedorId') ? 'border-red-500 ring-1 ring-red-500' : ''}
+                  />
                 </div>
                 <div>
                   <Label>Proyecto (opcional)</Label>
