@@ -116,13 +116,23 @@ export default function ProveedorForm({ onSaved, initial, onCancel }: Props) {
       }
       
       let result: Proveedor
-      
+
       if (initial) {
-        // Update existing provider (not implemented yet)
-        result = {
-          id: initial.id,
-          ...payload
+        const response = await fetch(`/api/proveedor/${initial.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Error al actualizar proveedor')
         }
+
+        result = await response.json()
+        toast.success('Proveedor actualizado exitosamente')
       } else {
         // Create new provider
         const response = await fetch('/api/proveedor', {
@@ -388,7 +398,7 @@ export default function ProveedorForm({ onSaved, initial, onCancel }: Props) {
         )}
         <Button
           type="submit"
-          disabled={isSubmitting || !isValid || !isDirty}
+          disabled={isSubmitting || !isValid || (!isDirty && tipoProveedor === (initial?.tipoProveedor || ''))}
           className="bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200"
         >
           {isSubmitting ? (
