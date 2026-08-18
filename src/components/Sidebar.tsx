@@ -380,6 +380,7 @@ export default function Sidebar() {
       roles: ['admin', 'gerente', 'administracion'],
       links: [
         { href: '/administracion', label: 'Dashboard', icon: LayoutDashboard },
+        { href: '/administracion/situacion-financiera', label: 'Situación Financiera', icon: TrendingUp },
         { href: '/administracion/gastos', label: 'Gestión de Gastos', icon: Receipt },
         { href: '/administracion/gastos/pendientes', label: 'Pendientes', icon: AlertCircle },
         { href: '/administracion/rendiciones', label: 'Rendiciones', icon: FileCheck },
