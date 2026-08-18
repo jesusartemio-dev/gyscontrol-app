@@ -1516,7 +1516,7 @@ export default function CuentasPagarPage() {
                   checked={esAdelanto}
                   onCheckedChange={v => setEsAdelanto(!!v)}
                 />
-                <Label htmlFor="esAdelantoP" className="text-xs cursor-pointer leading-tight">
+                <Label htmlFor="esAdelantoP" className="min-w-0 text-xs cursor-pointer leading-tight">
                   Es un anticipo del proveedor — se paga antes de recibir el ítem (equipos de importación).
                   No cuenta como entrega; al llegar la factura final se puede restar acá.
                 </Label>
@@ -1612,7 +1612,7 @@ export default function CuentasPagarPage() {
                                     setAplicarAnticipo(prev => ({ ...prev, [item.id]: !!v }))
                                   }
                                 />
-                                <Label htmlFor={`anticipo-${item.id}`} className="text-[11px] text-amber-700 cursor-pointer">
+                                <Label htmlFor={`anticipo-${item.id}`} className="min-w-0 text-[11px] text-amber-700 cursor-pointer">
                                   Restar anticipo ya pagado: {formatCurrency(item.anticipoPendienteDeAplicar, createForm.moneda)}
                                 </Label>
                               </div>
@@ -1699,7 +1699,7 @@ export default function CuentasPagarPage() {
                     checked={createForm.guardarDetraccionDefault}
                     onCheckedChange={(v) => setCreateForm(f => ({ ...f, guardarDetraccionDefault: !!v }))}
                   />
-                  <Label htmlFor="guardarDetDefault" className="text-xs font-normal cursor-pointer text-muted-foreground">
+                  <Label htmlFor="guardarDetDefault" className="min-w-0 text-xs font-normal cursor-pointer text-muted-foreground">
                     Guardar {createForm.detraccionPorcentaje}% como default para este proveedor (próximas facturas se llenarán solas)
                   </Label>
                 </div>
@@ -1926,7 +1926,7 @@ export default function CuentasPagarPage() {
                       }
                     }}
                   />
-                  <Label htmlFor="soloDetraccionP" className="text-xs cursor-pointer leading-tight">
+                  <Label htmlFor="soloDetraccionP" className="min-w-0 text-xs cursor-pointer leading-tight">
                     Es SOLO el pago de la detracción — el neto de la factura se paga después, por separado
                     (ej. factura a crédito, o detracción depositada en la fecha límite SUNAT)
                   </Label>
@@ -2342,7 +2342,7 @@ export default function CuentasPagarPage() {
                     checked={editForm.guardarDetraccionDefault}
                     onCheckedChange={(v) => setEditForm(f => ({ ...f, guardarDetraccionDefault: !!v }))}
                   />
-                  <Label htmlFor="editGuardarDetDefault" className="text-xs font-normal cursor-pointer text-muted-foreground">
+                  <Label htmlFor="editGuardarDetDefault" className="min-w-0 text-xs font-normal cursor-pointer text-muted-foreground">
                     Guardar {editForm.detraccionPorcentaje}% como default para este proveedor
                   </Label>
                 </div>
