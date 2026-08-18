@@ -53,10 +53,10 @@ export function Combobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn('w-full justify-between font-normal', className)}
+          className={cn('h-auto min-h-9 w-full justify-between whitespace-normal py-2 font-normal', className)}
           disabled={disabled}
         >
-          <span className="truncate">
+          <span className="min-w-0 break-words text-left">
             {value
               ? options.find((option) => option.value === value)?.label
               : placeholder}
