@@ -21,6 +21,7 @@ import { useSession } from 'next-auth/react'
 import { getOrdenCompraById, aprobarOC, enviarOC, confirmarOC, cancelarOC, deleteOrdenCompra, registrarRecepcionOC, completarOC, editarAdministrativoOC, fetchItemsDisponibles, type ItemDisponible, type PedidoPendiente } from '@/lib/services/ordenCompra'
 import { CONDICIONES_PAGO, FORMAS_PAGO, DIAS_CREDITO_PRESETS, formatPago, formaRequiereDias } from '@/lib/utils/formaPago'
 import OCEstadoStepper from '@/components/logistica/OCEstadoStepper'
+import CostosImportacionCard from '@/components/logistica/CostosImportacionCard'
 import { RollbackButton } from '@/components/RollbackButton'
 import { useDeleteWithValidation } from '@/hooks/useDeleteWithValidation'
 import { DeleteWithValidationDialog } from '@/components/DeleteWithValidationDialog'
@@ -1057,6 +1058,8 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
           </CardContent>
         </Card>
       )}
+
+      <CostosImportacionCard oc={oc} puedeEditar={puedeEditarAdministrativo} onSaved={loadData} />
 
       {/* Items Table */}
       <Card>

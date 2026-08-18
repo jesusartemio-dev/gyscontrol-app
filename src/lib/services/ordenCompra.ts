@@ -102,6 +102,12 @@ export interface EditarAdministrativoPayload {
   contactoEntrega?: string | null
   fechaEntregaEstimada?: string | null
   fechaEmision?: string | null
+  tipoCompraOverride?: string | null
+  arancelMonto?: number | null
+  igvAduanaMonto?: number | null
+  fleteMonto?: number | null
+  seguroMonto?: number | null
+  gastosAgenteMonto?: number | null
 }
 
 export async function editarAdministrativoOC(

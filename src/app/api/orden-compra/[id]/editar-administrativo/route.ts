@@ -17,7 +17,15 @@ const CAMPOS_PERMITIDOS = [
   'contactoEntrega',
   'fechaEntregaEstimada',
   'fechaEmision',
+  'tipoCompraOverride',
+  'arancelMonto',
+  'igvAduanaMonto',
+  'fleteMonto',
+  'seguroMonto',
+  'gastosAgenteMonto',
 ] as const
+
+const CAMPOS_COSTO_IMPORTACION = ['arancelMonto', 'igvAduanaMonto', 'fleteMonto', 'seguroMonto', 'gastosAgenteMonto'] as const
 
 type CampoEditable = (typeof CAMPOS_PERMITIDOS)[number]
 
@@ -51,6 +59,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         contactoEntrega: true,
         fechaEntregaEstimada: true,
         fechaEmision: true,
+        tipoCompraOverride: true,
+        arancelMonto: true,
+        igvAduanaMonto: true,
+        fleteMonto: true,
+        seguroMonto: true,
+        gastosAgenteMonto: true,
       },
     })
     if (!existing) {
@@ -141,6 +155,23 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         return NextResponse.json({ error: 'fechaEmision inválida' }, { status: 400 })
       }
       setIfChanged('fechaEmision', v)
+    }
+
+    if (payload.tipoCompraOverride !== undefined) {
+      const v = payload.tipoCompraOverride === null || payload.tipoCompraOverride === '' ? null : String(payload.tipoCompraOverride)
+      if (v !== null && v !== 'nacional' && v !== 'extranjero') {
+        return NextResponse.json({ error: "tipoCompraOverride debe ser 'nacional', 'extranjero' o null" }, { status: 400 })
+      }
+      setIfChanged('tipoCompraOverride', v)
+    }
+    for (const campo of CAMPOS_COSTO_IMPORTACION) {
+      if (payload[campo] === undefined) continue
+      const raw = payload[campo]
+      const v = raw === null || raw === '' ? null : Number(raw)
+      if (v !== null && (Number.isNaN(v) || v < 0)) {
+        return NextResponse.json({ error: `${campo} debe ser un número positivo` }, { status: 400 })
+      }
+      setIfChanged(campo, v)
     }
 
     if (Object.keys(cambios).length === 0) {

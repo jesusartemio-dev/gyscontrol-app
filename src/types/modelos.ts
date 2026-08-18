@@ -1503,6 +1503,8 @@ export interface Proveedor {
   numeroCuenta?: string | null
   cci?: string | null
   tipoCuenta?: string | null
+  detraccionPorcentajeDefault?: number | null
+  tipoProveedor?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -2971,6 +2973,14 @@ export interface OrdenCompra {
   fechaEnvio?: string | null
   fechaConfirmacion?: string | null
   fechaEntregaEstimada?: string | null
+  // Excepción puntual a la clasificación del proveedor. null = hereda de proveedor.tipoProveedor.
+  tipoCompraOverride?: string | null
+  // Costos de nacionalización (solo importaciones). costo real = total + suma de estos 5.
+  arancelMonto?: number | null
+  igvAduanaMonto?: number | null
+  fleteMonto?: number | null
+  seguroMonto?: number | null
+  gastosAgenteMonto?: number | null
   createdAt: string
   updatedAt: string
   // Relations

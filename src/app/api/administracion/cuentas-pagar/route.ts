@@ -6,13 +6,14 @@ import { authOptions } from '@/lib/auth'
 const ROLES_ALLOWED = ['admin', 'gerente', 'administracion']
 
 const includeRelations = {
-  proveedor: { select: { id: true, nombre: true, ruc: true } },
+  proveedor: { select: { id: true, nombre: true, ruc: true, tipoProveedor: true } },
   proyecto: { select: { id: true, codigo: true, nombre: true } },
   ordenCompra: {
     select: {
       id: true,
       numero: true,
       total: true,
+      tipoCompraOverride: true,
       centroCosto: { select: { id: true, nombre: true } },
     },
   },

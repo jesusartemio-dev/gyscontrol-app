@@ -28,13 +28,19 @@ interface CxPItem {
   fechaRecepcion: string
   tipoDocumento: string
   numeroFactura: string | null
-  proveedor?: { nombre: string; ruc: string } | null
+  proveedor?: { nombre: string; ruc: string; tipoProveedor?: string | null } | null
   descripcion: string | null
   monto: number
   moneda: string
   tipoCambio?: number | null
   proyecto?: { codigo: string; nombre: string } | null
   estado: string
+  ordenCompra?: { id: string; numero: string; tipoCompraOverride?: string | null } | null
+}
+
+/** 'nacional' | 'extranjero' | null. El override de la OC manda sobre el proveedor. */
+function getOrigenCompra(item: CxPItem): string | null {
+  return item.ordenCompra?.tipoCompraOverride ?? item.proveedor?.tipoProveedor ?? null
 }
 
 interface GastoItem {
@@ -125,6 +131,18 @@ export default function ComprasMesPage() {
     return { pen, usd }
   }, [filas])
 
+  const totalImportacion = useMemo(() => {
+    let pen = 0, usd = 0, count = 0
+    for (const item of cxp) {
+      if (getOrigenCompra(item) !== 'extranjero') continue
+      const monto = item.tipoDocumento === 'nota_credito' ? -Math.abs(item.monto) : item.monto
+      if (item.moneda === 'USD') usd += monto
+      else pen += monto
+      count++
+    }
+    return { pen, usd, count }
+  }, [cxp])
+
   const handleExport = async () => {
     setExporting(true)
     try {
@@ -207,6 +225,18 @@ export default function ComprasMesPage() {
             <p className="text-lg font-semibold">{gastos.length}</p>
           </CardContent>
         </Card>
+        {totalImportacion.count > 0 && (
+          <Card className="flex-1 min-w-[160px] border-sky-200">
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs text-muted-foreground">Importación ({totalImportacion.count})</p>
+              <p className="text-lg font-semibold text-sky-700">
+                {totalImportacion.pen !== 0 && `S/ ${fmt(totalImportacion.pen)}`}
+                {totalImportacion.pen !== 0 && totalImportacion.usd !== 0 && ' + '}
+                {totalImportacion.usd !== 0 && `$ ${fmt(totalImportacion.usd)}`}
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Tabla */}
@@ -234,6 +264,7 @@ export default function ComprasMesPage() {
                   <TableHead className="w-16">Moneda</TableHead>
                   <TableHead className="w-28">Estado</TableHead>
                   <TableHead className="w-20">Origen</TableHead>
+                  <TableHead className="w-24">Compra</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -268,6 +299,15 @@ export default function ComprasMesPage() {
                         <TableCell>
                           <Badge variant="secondary" className="text-xs bg-blue-50 text-blue-700">Factura</Badge>
                         </TableCell>
+                        <TableCell>
+                          {getOrigenCompra(item) === 'extranjero' ? (
+                            <Badge variant="outline" className="text-xs text-sky-700 border-sky-300">Importación</Badge>
+                          ) : getOrigenCompra(item) === 'nacional' ? (
+                            <span className="text-xs text-muted-foreground">Nacional</span>
+                          ) : (
+                            <span className="text-xs text-gray-300">—</span>
+                          )}
+                        </TableCell>
                       </TableRow>
                     )
                   } else {
@@ -297,6 +337,7 @@ export default function ComprasMesPage() {
                         <TableCell>
                           <Badge variant="secondary" className="text-xs bg-amber-50 text-amber-700">Gasto</Badge>
                         </TableCell>
+                        <TableCell><span className="text-xs text-gray-300">—</span></TableCell>
                       </TableRow>
                     )
                   }

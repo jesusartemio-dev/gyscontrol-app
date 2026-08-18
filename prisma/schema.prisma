@@ -1073,6 +1073,10 @@ model Proveedor {
   // % de detracción que SUNAT define para los servicios de este proveedor (4, 10, 12...).
   // Sirve de sugerencia automática al crear una CxP — el usuario puede sobrescribirlo.
   detraccionPorcentajeDefault Float?
+  /// 'nacional' | 'extranjero'. Nullable: proveedores sin RUC pendientes de confirmar
+  /// (importación vs. local, para reportes) se quedan sin clasificar hasta que
+  /// Administración lo confirme manualmente.
+  tipoProveedor               String?
   createdAt                   DateTime              @default(now())
   updatedAt                   DateTime              @updatedAt
   cotizacionProveedor         CotizacionProveedor[]
@@ -4577,6 +4581,19 @@ model OrdenCompra {
   fechaEnvio           DateTime?
   fechaConfirmacion    DateTime?
   fechaEntregaEstimada DateTime?
+  /// Excepción puntual: por defecto la clasificación importación/local se hereda de
+  /// Proveedor.tipoProveedor. Solo se llena cuando una OC concreta necesita apartarse
+  /// de la clasificación general del proveedor. null = hereda del proveedor.
+  tipoCompraOverride   String?
+  /// Costos de nacionalización de una compra de importación (arancel, IGV de aduana
+  /// sobre CIF+arancel, flete, seguro, gastos del agente de aduana). Nullable: solo
+  /// aplica a OCs de importación y se llenan cuando llegan los documentos de aduana,
+  /// no al crear la OC. costo real = total (precio de lista) + suma de estos 5 campos.
+  arancelMonto         Float?
+  igvAduanaMonto       Float?
+  fleteMonto           Float?
+  seguroMonto          Float?
+  gastosAgenteMonto    Float?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime
 

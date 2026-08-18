@@ -25,8 +25,9 @@ export async function GET(req: Request) {
       prisma.cuentaPorPagar.findMany({
         where: { fechaRecepcion: { gte: desde, lt: hasta } },
         include: {
-          proveedor: { select: { id: true, nombre: true, ruc: true } },
+          proveedor: { select: { id: true, nombre: true, ruc: true, tipoProveedor: true } },
           proyecto: { select: { id: true, codigo: true, nombre: true } },
+          ordenCompra: { select: { id: true, numero: true, tipoCompraOverride: true } },
         },
         orderBy: { fechaRecepcion: 'asc' },
       }),

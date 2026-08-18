@@ -45,6 +45,7 @@ interface Proveedor {
   nombre: string
   ruc: string | null
   detraccionPorcentajeDefault?: number | null
+  tipoProveedor?: string | null
 }
 
 interface Proyecto {
@@ -67,6 +68,7 @@ interface OrdenCompra {
   proveedor?: { id: string; nombre: string; ruc?: string | null }
   proyecto?: { id: string; codigo: string; nombre: string } | null
   centroCosto?: { id: string; nombre: string } | null
+  tipoCompraOverride?: string | null
 }
 
 /** Ítem de una OC con lo recibido por Logística y lo ya facturado. */
@@ -163,6 +165,11 @@ const formatDate = (date: string) => {
     .toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+/** 'nacional' | 'extranjero' | null. La OC puede sobrescribir la clasificación
+ *  del proveedor (caso raro); si no hay override, se hereda de este. */
+const getOrigenCxp = (item: CuentaPorPagar): string | null =>
+  item.ordenCompra?.tipoCompraOverride ?? item.proveedor?.tipoProveedor ?? null
+
 const isVencida = (fecha: string, estado: string) => {
   if (estado === 'pagada' || estado === 'anulada') return false
   return new Date(fecha) < new Date()
@@ -187,6 +194,7 @@ export default function CuentasPagarPage() {
   const [saving, setSaving] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterEstados, setFilterEstados] = useState<string[]>([])
+  const [filterOrigen, setFilterOrigen] = useState<string>('all')
 
   // Create dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -369,6 +377,7 @@ export default function CuentasPagarPage() {
     let result = items
     if (filterEstados.length > 0) result = result.filter(i => filterEstados.includes(i.estado))
     if (filterProyectoId !== 'all') result = result.filter(i => i.proyectoId === filterProyectoId)
+    if (filterOrigen !== 'all') result = result.filter(i => getOrigenCxp(i) === filterOrigen)
     const campoFecha = filterTipoFecha === 'vencimiento' ? 'fechaVencimiento' : 'fechaRecepcion'
     if (filterFechaDesde) result = result.filter(i => (i[campoFecha] as string) >= filterFechaDesde)
     if (filterFechaHasta) result = result.filter(i => (i[campoFecha] as string) <= filterFechaHasta + 'T23:59:59')
@@ -396,7 +405,7 @@ export default function CuentasPagarPage() {
       return 0
     })
     return result
-  }, [items, filterEstados, filterProyectoId, filterFechaDesde, filterFechaHasta, filterTipoFecha, searchTerm, sortField, sortDir])
+  }, [items, filterEstados, filterProyectoId, filterOrigen, filterFechaDesde, filterFechaHasta, filterTipoFecha, searchTerm, sortField, sortDir])
 
   const filteredTotals = useMemo(() => {
     const active = filtered.filter(i => i.estado !== 'anulada')
@@ -1166,6 +1175,16 @@ export default function CuentasPagarPage() {
               ))}
             </SelectContent>
           </Select>
+          <Select value={filterOrigen} onValueChange={setFilterOrigen}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Origen" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Origen: Todos</SelectItem>
+              <SelectItem value="nacional">Nacional</SelectItem>
+              <SelectItem value="extranjero">Importación</SelectItem>
+            </SelectContent>
+          </Select>
           <div className="flex items-center gap-1">
             <Select value={filterTipoFecha} onValueChange={v => setFilterTipoFecha(v as 'emision' | 'vencimiento')}>
               <SelectTrigger className="w-36 h-9">
@@ -1180,8 +1199,8 @@ export default function CuentasPagarPage() {
             <span className="text-muted-foreground text-xs">—</span>
             <Input type="date" className="w-36 h-9" value={filterFechaHasta} onChange={e => setFilterFechaHasta(e.target.value)} />
           </div>
-          {(filterEstados.length > 0 || filterProyectoId !== 'all' || filterFechaDesde || filterFechaHasta || searchTerm) && (
-            <Button variant="ghost" size="sm" className="text-muted-foreground h-9" onClick={() => { setFilterEstados([]); setFilterProyectoId('all'); setFilterFechaDesde(''); setFilterFechaHasta(''); setSearchTerm('') }}>
+          {(filterEstados.length > 0 || filterProyectoId !== 'all' || filterOrigen !== 'all' || filterFechaDesde || filterFechaHasta || searchTerm) && (
+            <Button variant="ghost" size="sm" className="text-muted-foreground h-9" onClick={() => { setFilterEstados([]); setFilterProyectoId('all'); setFilterOrigen('all'); setFilterFechaDesde(''); setFilterFechaHasta(''); setSearchTerm('') }}>
               Limpiar filtros
             </Button>
           )}
@@ -1235,7 +1254,12 @@ export default function CuentasPagarPage() {
                         {item.proyecto && <div className="text-xs text-muted-foreground font-sans">{item.proyecto.codigo}</div>}
                       </TableCell>
                       <TableCell className="text-sm max-w-[180px]">
-                        <div className="font-medium truncate">{item.proveedor?.nombre}</div>
+                        <div className="font-medium truncate flex items-center gap-1">
+                          {item.proveedor?.nombre}
+                          {getOrigenCxp(item) === 'extranjero' && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 shrink-0 text-sky-700 border-sky-300">Import.</Badge>
+                          )}
+                        </div>
                         {item.proveedor?.ruc && <div className="text-xs text-muted-foreground">{item.proveedor.ruc}</div>}
                       </TableCell>
                       <TableCell className="text-xs font-mono text-muted-foreground">{item.ordenCompra?.numero || <span className="text-gray-300">—</span>}</TableCell>

@@ -9,6 +9,7 @@
 
 'use client'
 
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -20,6 +21,14 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { ProveedorPayload, Proveedor } from '@/types'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Globe2 } from 'lucide-react'
 
 // Validation schema with Zod
 const proveedorSchema = z.object({
@@ -68,6 +77,7 @@ interface Props {
 }
 
 export default function ProveedorForm({ onSaved, initial, onCancel }: Props) {
+  const [tipoProveedor, setTipoProveedor] = useState<string>(initial?.tipoProveedor || '')
   const {
     register,
     handleSubmit,
@@ -101,7 +111,8 @@ export default function ProveedorForm({ onSaved, initial, onCancel }: Props) {
         ruc: data.ruc?.trim() || undefined,
         direccion: data.direccion?.trim() || undefined,
         telefono: data.telefono?.trim() || undefined,
-        correo: data.correo?.trim() || undefined
+        correo: data.correo?.trim() || undefined,
+        tipoProveedor: tipoProveedor || undefined
       }
       
       let result: Proveedor
@@ -220,6 +231,27 @@ export default function ProveedorForm({ onSaved, initial, onCancel }: Props) {
                 )}
                 <p className="text-xs text-muted-foreground">
                   Registro Único de Contribuyentes (11 dígitos)
+                </p>
+              </div>
+
+              {/* Tipo de proveedor Field */}
+              <div className="space-y-2">
+                <Label htmlFor="tipoProveedor" className="flex items-center gap-2 text-sm font-medium">
+                  <Globe2 className="h-4 w-4 text-teal-600" />
+                  Tipo de proveedor
+                  <span className="text-xs text-muted-foreground">(Opcional)</span>
+                </Label>
+                <Select value={tipoProveedor || undefined} onValueChange={setTipoProveedor} disabled={isSubmitting}>
+                  <SelectTrigger id="tipoProveedor">
+                    <SelectValue placeholder="Sin clasificar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nacional">Nacional</SelectItem>
+                    <SelectItem value="extranjero">Extranjero</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Para reportes de importación vs. compra local
                 </p>
               </div>
 
