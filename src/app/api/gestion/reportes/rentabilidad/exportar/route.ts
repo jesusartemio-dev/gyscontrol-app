@@ -16,7 +16,7 @@ function convertir(amount: number, fromMoneda: string, toMoneda: string, tipoCam
 const round2 = (n: number) => Math.round(n * 100) / 100
 
 function costoHoraPEN(
-  emp: { sueldoPlanilla: number | null; sueldoHonorarios: number | null; asignacionFamiliar: number; emo: number },
+  emp: { sueldoPlanilla: number | null; sueldoHonorarios: number | null; asignacionFamiliar: number; emo: number; regimenLaboral?: 'mype' | 'general' },
   horasMensuales: number
 ): number {
   const costos = calcularCostosLaborales({
@@ -24,6 +24,7 @@ function costoHoraPEN(
     sueldoHonorarios: emp.sueldoHonorarios || 0,
     asignacionFamiliar: emp.asignacionFamiliar || 0,
     emo: emp.emo || 25,
+    regimenLaboral: emp.regimenLaboral,
   })
   return horasMensuales > 0 ? costos.totalMensual / horasMensuales : 0
 }
@@ -175,7 +176,7 @@ export async function GET(request: NextRequest) {
       const userIds = horasSinSnapshot.map(h => h.usuarioId)
       const empleados = await prisma.empleado.findMany({
         where: { userId: { in: userIds } },
-        select: { userId: true, sueldoPlanilla: true, sueldoHonorarios: true, asignacionFamiliar: true, emo: true },
+        select: { userId: true, sueldoPlanilla: true, sueldoHonorarios: true, asignacionFamiliar: true, emo: true, regimenLaboral: true },
       })
       const empMap = new Map(empleados.map(e => [e.userId, e]))
       for (const h of horasSinSnapshot) {

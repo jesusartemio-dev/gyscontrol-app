@@ -19,7 +19,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100
 
 // Fallback: calculate hourly cost in PEN from current payroll data
 function costoHoraPEN(
-  emp: { sueldoPlanilla: number | null; sueldoHonorarios: number | null; asignacionFamiliar: number; emo: number },
+  emp: { sueldoPlanilla: number | null; sueldoHonorarios: number | null; asignacionFamiliar: number; emo: number; regimenLaboral?: 'mype' | 'general' },
   horasMensuales: number
 ): number {
   const costos = calcularCostosLaborales({
@@ -27,6 +27,7 @@ function costoHoraPEN(
     sueldoHonorarios: emp.sueldoHonorarios || 0,
     asignacionFamiliar: emp.asignacionFamiliar || 0,
     emo: emp.emo || 25,
+    regimenLaboral: emp.regimenLaboral,
   })
   return horasMensuales > 0 ? costos.totalMensual / horasMensuales : 0
 }
@@ -268,6 +269,7 @@ async function getResumenTodos(tcDefault: number, horasMes: number) {
       sueldoHonorarios: true,
       asignacionFamiliar: true,
       emo: true,
+      regimenLaboral: true,
     },
   }) : []
   const empMap = new Map(empleados.map(e => [e.userId, e]))
@@ -385,6 +387,7 @@ async function calcularCostoFallbackPEN(
       sueldoHonorarios: true,
       asignacionFamiliar: true,
       emo: true,
+      regimenLaboral: true,
     },
   })
   const empMap = new Map(empleados.map(e => [e.userId, e]))
