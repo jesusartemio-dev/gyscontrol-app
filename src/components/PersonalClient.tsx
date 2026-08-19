@@ -65,6 +65,7 @@ const empleadoSchema = z.object({
   sueldoHonorarios: z.string().optional(),
   asignacionFamiliar: z.string().optional(),
   emo: z.string().optional(),
+  regimenLaboral: z.enum(['mype', 'general']).default('mype'),
   fechaIngreso: z.string().optional(),
   fechaCese: z.string().optional(),
   activo: z.boolean().default(true),
@@ -87,6 +88,7 @@ const defaultForm: EmpleadoForm = {
   sueldoHonorarios: '',
   asignacionFamiliar: '0',
   emo: '25',
+  regimenLaboral: 'mype',
   fechaIngreso: '',
   fechaCese: '',
   activo: true,
@@ -289,6 +291,7 @@ export default function PersonalClient() {
       sueldoHonorarios: empleado.sueldoHonorarios?.toString() || '',
       asignacionFamiliar: empleado.asignacionFamiliar?.toString() || '0',
       emo: empleado.emo?.toString() || '25',
+      regimenLaboral: empleado.regimenLaboral || 'mype',
       fechaIngreso: empleado.fechaIngreso ? empleado.fechaIngreso.split('T')[0] : '',
       fechaCese: empleado.fechaCese ? empleado.fechaCese.split('T')[0] : '',
       activo: empleado.activo,
@@ -340,6 +343,7 @@ export default function PersonalClient() {
         sueldoHonorarios: form.sueldoHonorarios ? parseFloat(form.sueldoHonorarios) : undefined,
         asignacionFamiliar: form.asignacionFamiliar ? parseFloat(form.asignacionFamiliar) : 0,
         emo: form.emo ? parseFloat(form.emo) : 25,
+        regimenLaboral: form.regimenLaboral,
         fechaIngreso: form.fechaIngreso || undefined,
         fechaCese: form.fechaCese || undefined,
         activo: form.activo,
@@ -1040,11 +1044,12 @@ export default function PersonalClient() {
                   sueldoHonorarios: form.sueldoHonorarios ? parseFloat(form.sueldoHonorarios) : 0,
                   asignacionFamiliar: form.asignacionFamiliar ? parseFloat(form.asignacionFamiliar) : 0,
                   emo: form.emo ? parseFloat(form.emo) : 25,
+                  regimenLaboral: form.regimenLaboral,
                 }, { tipoCambio: config.tipoCambio, horasMensuales: config.horasMensuales })
 
                 return (
                   <div className="p-3 bg-gradient-to-r from-blue-50 to-orange-50 border border-blue-100 rounded-lg">
-                    <div className="grid grid-cols-4 gap-3 mb-3">
+                    <div className="grid grid-cols-5 gap-3 mb-3">
                       <div className="space-y-1">
                         <Label htmlFor="sueldoPlanilla" className="text-xs">Remuneración (PEN)</Label>
                         <Input
@@ -1092,6 +1097,18 @@ export default function PersonalClient() {
                           placeholder="25.00"
                           className="h-9"
                         />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="regimenLaboral" className="text-xs">Régimen laboral</Label>
+                        <Select value={form.regimenLaboral} onValueChange={(v) => setForm({ ...form, regimenLaboral: v as 'mype' | 'general' })}>
+                          <SelectTrigger id="regimenLaboral" className="h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="mype">Mype (50% gratif.)</SelectItem>
+                            <SelectItem value="general">General (100% gratif.)</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                     <div className="flex items-center justify-between pt-2 border-t border-blue-200">

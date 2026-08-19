@@ -7,11 +7,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, LineChart, AlertTriangle, ArrowRight, Info, Clock3 } from 'lucide-react'
+import { Loader2, LineChart, AlertTriangle, ArrowRight, Info, Clock3, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { getClientes } from '@/lib/services/cliente'
 import type { Cliente } from '@/types/modelos'
 import type { SituacionFinanciera, SituacionFinancieraMoneda } from '@/lib/administracion/situacionFinanciera'
+import type { PisoPlanilla } from '@/lib/administracion/pisoPlanilla'
 
 const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -36,9 +37,16 @@ export default function SituacionFinancieraPage() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [data, setData] = useState<SituacionFinanciera | null>(null)
   const [loading, setLoading] = useState(false)
+  const [piso, setPiso] = useState<PisoPlanilla | null>(null)
 
   useEffect(() => {
     getClientes().then(setClientes).catch(() => {})
+    // Snapshot de hoy, no depende del rango/cliente/moneda seleccionados —
+    // mismo criterio que DSO/DPO (trailing fijo, no el filtro de arriba).
+    fetch('/api/administracion/piso-planilla')
+      .then(res => res.ok ? res.json() : null)
+      .then(setPiso)
+      .catch(() => {})
   }, [])
 
   const { desde, hasta } = useMemo(() => {
@@ -118,10 +126,13 @@ export default function SituacionFinancieraPage() {
       <Alert className="border-amber-300 bg-amber-50">
         <AlertTriangle className="h-4 w-4 text-amber-600" />
         <AlertDescription className="text-amber-800 text-sm">
-          Este tablero <strong>no incluye</strong> el piso fijo mensual (planilla/gastos fijos) ni el saldo bancario real —
-          no reemplaza una revisión de caja. Ver detalle al pie.
+          El piso de planilla de abajo es <strong>parcial</strong> (falta sueldo de varios empleados activos) y este
+          tablero <strong>todavía no incluye</strong> gastos fijos (alquiler, contabilidad, etc.) ni el saldo bancario
+          real — no reemplaza una revisión de caja. Ver detalle al pie.
         </AlertDescription>
       </Alert>
+
+      <PisoPlanillaCard piso={piso} />
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
@@ -142,10 +153,10 @@ export default function SituacionFinancieraPage() {
         </CardHeader>
         <CardContent className="text-sm text-slate-600 space-y-2">
           <div className="flex gap-2">
-            <span className="font-medium shrink-0">Piso fijo mensual:</span>
-            <span>planilla y gastos fijos todavía no están en el sistema. Sin esto, este tablero muestra el
-              movimiento de la cartera (cuánto se factura, cuánto se cobra), pero <strong>no</strong> si el mes fue
-              rentable — eso requiere restar el piso fijo, que hoy se revisa aparte.</span>
+            <span className="font-medium shrink-0">Gastos fijos:</span>
+            <span>alquiler, contabilidad, servicios, etc. todavía no están en el sistema. Sin esto (y con el piso de
+              planilla aún parcial), este tablero muestra el movimiento de la cartera, pero <strong>no</strong> si el
+              mes fue rentable — eso requiere restar el piso fijo completo, que hoy se revisa aparte.</span>
           </div>
           <div className="flex gap-2">
             <span className="font-medium shrink-0">Saldo bancario real:</span>
@@ -155,6 +166,32 @@ export default function SituacionFinancieraPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function PisoPlanillaCard({ piso }: { piso: PisoPlanilla | null }) {
+  if (!piso) return null
+  const incompleto = piso.empleadosSinSueldo > 0
+  return (
+    <Card className={incompleto ? 'border-amber-200' : undefined}>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          Piso de Planilla
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-xl font-bold font-mono">{fmt(piso.totalMensual, 'PEN')}<span className="text-sm font-normal text-muted-foreground">/mes</span></p>
+        <p className={`text-xs mt-1 ${incompleto ? 'text-amber-700' : 'text-muted-foreground'}`}>
+          Calculado sobre {piso.empleadosConSueldo} de {piso.empleadosActivos} empleados activos
+          {incompleto && ` — ${piso.empleadosSinSueldo} sin sueldo cargado, excluidos del total`}.
+        </p>
+        <p className="text-[11px] text-muted-foreground mt-2 border-t pt-2">
+          Incluye EsSalud, gratificación, CTS, SCTR, Vida Ley y EMO según el régimen laboral de cada empleado (Mype o
+          general) — no es solo el sueldo base. No incluye provisión de vacaciones todavía.
+        </p>
+      </CardContent>
+    </Card>
   )
 }
 

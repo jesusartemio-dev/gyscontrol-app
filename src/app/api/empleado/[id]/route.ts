@@ -55,6 +55,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (body.departamentoId !== undefined) updateData.departamentoId = body.departamentoId || null
     if (body.sueldoPlanilla !== undefined) updateData.sueldoPlanilla = body.sueldoPlanilla ? parseFloat(body.sueldoPlanilla) : null
     if (body.sueldoHonorarios !== undefined) updateData.sueldoHonorarios = body.sueldoHonorarios ? parseFloat(body.sueldoHonorarios) : null
+    if (body.regimenLaboral !== undefined) updateData.regimenLaboral = body.regimenLaboral === 'general' ? 'general' : 'mype'
     if (body.fechaIngreso !== undefined) updateData.fechaIngreso = body.fechaIngreso ? new Date(body.fechaIngreso) : null
     if (body.fechaCese !== undefined) updateData.fechaCese = body.fechaCese ? new Date(body.fechaCese) : null
     if (body.activo !== undefined) updateData.activo = body.activo

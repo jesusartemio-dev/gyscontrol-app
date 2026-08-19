@@ -12,6 +12,7 @@ export interface EmpleadoPayload {
   sueldoHonorarios?: number
   asignacionFamiliar?: number
   emo?: number
+  regimenLaboral?: 'mype' | 'general'
   fechaIngreso?: string
   fechaCese?: string
   activo?: boolean
