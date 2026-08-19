@@ -9,7 +9,7 @@ export async function obtenerCostoHoraPEN(usuarioId: string): Promise<number> {
   const [empleado, config] = await Promise.all([
     prisma.empleado.findFirst({
       where: { userId: usuarioId },
-      select: { sueldoPlanilla: true, sueldoHonorarios: true, asignacionFamiliar: true, emo: true }
+      select: { sueldoPlanilla: true, sueldoHonorarios: true, asignacionFamiliar: true, emo: true, regimenLaboral: true }
     }),
     prisma.configuracionGeneral.findFirst({ select: { horasMensuales: true } })
   ])
@@ -22,6 +22,7 @@ export async function obtenerCostoHoraPEN(usuarioId: string): Promise<number> {
     sueldoHonorarios: empleado.sueldoHonorarios || 0,
     asignacionFamiliar: empleado.asignacionFamiliar || 0,
     emo: empleado.emo || 25,
+    regimenLaboral: empleado.regimenLaboral,
   })
 
   return horasMes > 0 ? costos.totalMensual / horasMes : 0
@@ -37,7 +38,7 @@ export async function obtenerCostosHoraPENBatch(usuarioIds: string[]): Promise<M
   const [empleados, config] = await Promise.all([
     prisma.empleado.findMany({
       where: { userId: { in: usuarioIds } },
-      select: { userId: true, sueldoPlanilla: true, sueldoHonorarios: true, asignacionFamiliar: true, emo: true }
+      select: { userId: true, sueldoPlanilla: true, sueldoHonorarios: true, asignacionFamiliar: true, emo: true, regimenLaboral: true }
     }),
     prisma.configuracionGeneral.findFirst({ select: { horasMensuales: true } })
   ])
@@ -51,6 +52,7 @@ export async function obtenerCostosHoraPENBatch(usuarioIds: string[]): Promise<M
       sueldoHonorarios: emp.sueldoHonorarios || 0,
       asignacionFamiliar: emp.asignacionFamiliar || 0,
       emo: emp.emo || 25,
+      regimenLaboral: emp.regimenLaboral,
     })
     result.set(emp.userId, horasMes > 0 ? costos.totalMensual / horasMes : 0)
   }

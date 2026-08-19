@@ -64,22 +64,25 @@ export interface CostosLaboralesResult {
  * @returns Objeto con todos los costos calculados
  */
 export function calcularCostosLaborales(
-  empleado: Pick<Empleado, 'sueldoPlanilla' | 'sueldoHonorarios' | 'asignacionFamiliar' | 'emo'>,
+  empleado: Pick<Empleado, 'sueldoPlanilla' | 'sueldoHonorarios' | 'asignacionFamiliar' | 'emo' | 'regimenLaboral'>,
   config?: { tipoCambio?: number; horasMensuales?: number }
 ): CostosLaboralesResult {
   const remuneracion = empleado.sueldoPlanilla || 0
   const asignacionFamiliar = empleado.asignacionFamiliar || 0
   const honorarios = empleado.sueldoHonorarios || 0
   const emo = empleado.emo || 25
+  const esRegimenGeneral = empleado.regimenLaboral === 'general'
 
   // Total Remuneración = Sueldo base + Asignación Familiar
   const totalRemuneracion = remuneracion + asignacionFamiliar
 
-  // Essalud = 9% del total de remuneración
+  // Essalud = 9% del total de remuneración (igual en ambos regímenes — es un
+  // aporte del empleador sobre el puesto, no depende del tipo de contrato)
   const essalud = totalRemuneracion * COSTOS_LABORALES.ESSALUD_PCT
 
-  // Gratificación (Mype = 50% del sueldo, 2 veces al año)
-  const gratificacion = totalRemuneracion * COSTOS_LABORALES.GRATIFICACION_MYPE_PCT
+  // Gratificación: 50% (Mype) o 100% (régimen general) del sueldo, 2 veces al año
+  const gratifPct = esRegimenGeneral ? COSTOS_LABORALES.GRATIFICACION_RG_PCT : COSTOS_LABORALES.GRATIFICACION_MYPE_PCT
+  const gratificacion = totalRemuneracion * gratifPct
   const gratificacionMensual = gratificacion / 6 // Provisión mensual (gratif/6 meses)
 
   // Bonificación Extraordinaria = 9% de la gratificación
@@ -87,9 +90,11 @@ export function calcularCostosLaborales(
   const bonifExtraordinariaMensual = bonifExtraordinaria / 6
 
   // CTS (Compensación por Tiempo de Servicios)
-  // Base CTS = (Remuneración + 1/6 de Gratificación) / 2
+  // Base CTS = (Remuneración + 1/6 de Gratificación) — Mype divide entre 2
+  // (media CTS), régimen general no divide (CTS completa)
   const sextoGratificacion = gratificacion / 6
-  const baseCTS = (totalRemuneracion + sextoGratificacion) / 2
+  const baseCTSSinDividir = totalRemuneracion + sextoGratificacion
+  const baseCTS = esRegimenGeneral ? baseCTSSinDividir : baseCTSSinDividir / 2
   const cts = baseCTS // CTS semestral
   const ctsMensual = baseCTS / 6 // Provisión mensual
 
@@ -148,7 +153,7 @@ export function formatPEN(amount: number): string {
  * Calcula el resumen de costos para una lista de empleados
  */
 export function calcularResumenCostos(
-  empleados: Pick<Empleado, 'sueldoPlanilla' | 'sueldoHonorarios' | 'asignacionFamiliar' | 'emo'>[]
+  empleados: Pick<Empleado, 'sueldoPlanilla' | 'sueldoHonorarios' | 'asignacionFamiliar' | 'emo' | 'regimenLaboral'>[]
 ): {
   totalRemuneracion: number
   totalEssalud: number

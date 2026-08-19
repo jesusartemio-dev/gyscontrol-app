@@ -2153,9 +2153,9 @@ model User {
   orgNodos                                 ProyectoOrgNodo[]
   planTrabajoGeneraciones                  PlanTrabajoGeneracion[]
   planTrabajoImagenes                      PlanTrabajoImagen[]
-  ipercVersionesArchivoSubidas              IpercVersionArchivo[]
-  petsVersionesArchivoSubidas               PetsVersionArchivo[]
-  mppVersionesArchivoSubidas                MppVersionArchivo[]
+  ipercVersionesArchivoSubidas             IpercVersionArchivo[]
+  petsVersionesArchivoSubidas              PetsVersionArchivo[]
+  mppVersionesArchivoSubidas               MppVersionArchivo[]
   catalogoImagenesCreadas                  CatalogoImagen[]
   proyectoCronogramaGeneracionesIA         ProyectoCronogramaGeneracionIA[]
   cronogramaIATareaDecisiones              CronogramaIATareaDecision[]
@@ -2178,6 +2178,7 @@ model User {
   ventasEquipoComercial                    VentaEquipo[]                        @relation("VentaEquipoComercial")
   avancesTareaRegistrados                  ProyectoTareaAvance[]
   plantillaOrgNodos                        PlantillaOrgNodo[]
+  gastosFijosMensualesRegistrados          GastoFijoMensual[]
 
   @@map("user")
 }
@@ -2224,6 +2225,11 @@ model Empleado {
   sueldoHonorarios     Float? // Sueldo adicional en honorarios
   asignacionFamiliar   Float                @default(0) // Asignación familiar (10% RMV si aplica)
   emo                  Float                @default(25) // EMO mensual (Examen Médico Ocupacional)
+  // Régimen laboral: cambia gratificación (50% Mype vs. 100% general) y CTS
+  // (mitad vs. completa) dentro de calcularCostosLaborales(). Default 'mype'
+  // porque así se calculaba TODA la planilla antes de este campo — no cambia
+  // el resultado de nadie hasta que se marque explícitamente 'general'.
+  regimenLaboral       RegimenLaboral       @default(mype)
   fechaIngreso         DateTime?
   fechaCese            DateTime?
   activo               Boolean              @default(true)
@@ -2354,8 +2360,8 @@ model ValorizacionAdjunto {
 }
 
 model CobroValorizacion {
-  id                     String    @id @default(cuid())
-  valorizacionId         String    @unique
+  id                     String                  @id @default(cuid())
+  valorizacionId         String                  @unique
   tipo                   String // 'factoring' | 'directo'
   // Factoring — datos de operación
   financiera             String? // "Banpro", "BCP", nombre libre
@@ -2390,8 +2396,8 @@ model CobroValorizacion {
   // Ciclo de vida (factoring): en_negociacion -> desembolsada -> confirmada | letra_cambio
   estado                 EstadoCobroValorizacion @default(en_negociacion)
   fechaConfirmacion      DateTime? // cuándo el cliente confirmó a la financiera y se liberó el excedente
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
 
   valorizacion Valorizacion        @relation(fields: [valorizacionId], references: [id], onDelete: Cascade)
   abonos       AbonoValorizacion[]
@@ -2416,21 +2422,21 @@ enum TipoAbonoFactoring {
 }
 
 model AbonoValorizacion {
-  id            String                @id @default(cuid())
+  id            String               @id @default(cuid())
   cobroId       String
   // null = abono legacy sin clasificar (creado antes de este modelo de eventos)
   tipo          TipoAbonoFactoring?
-  estado        EstadoAbonoFactoring  @default(recibido)
+  estado        EstadoAbonoFactoring @default(recibido)
   montoEsperado Float? // monto teórico de la liquidación al crear el evento como 'pendiente'
   // "montoReal"/"fechaReal": antes se llamaban monto/fecha y eran obligatorios;
   // ahora son opcionales (se llenan al marcar el evento como 'recibido'). El
   // @map conserva el nombre de columna en BD para no mover los datos existentes.
-  montoReal     Float?                @map("monto")
-  fechaReal     DateTime?             @map("fecha")
+  montoReal     Float?               @map("monto")
+  fechaReal     DateTime?            @map("fecha")
   fechaEsperada DateTime? // fecha teórica/estimada del evento (puede quedar sin definir)
-  pagoCobroId   String?               @unique // PagoCobro real generado al marcar 'recibido'
+  pagoCobroId   String?              @unique // PagoCobro real generado al marcar 'recibido'
   observaciones String?
-  createdAt     DateTime              @default(now())
+  createdAt     DateTime             @default(now())
 
   cobro     CobroValorizacion @relation(fields: [cobroId], references: [id], onDelete: Cascade)
   pagoCobro PagoCobro?        @relation(fields: [pagoCobroId], references: [id])
@@ -4680,6 +4686,43 @@ model RecepcionPendiente {
 }
 
 // ======================
+// 📌 Gastos Fijos (piso fijo mensual de empresa — Situación Financiera)
+// ======================
+
+model ConceptoGastoFijo {
+  id        String   @id @default(cuid())
+  nombre    String // "Alquiler", "Contabilidad", "Claro", etc.
+  categoria String?
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  montosMensuales GastoFijoMensual[]
+
+  @@map("concepto_gasto_fijo")
+}
+
+model GastoFijoMensual {
+  id              String   @id @default(cuid())
+  conceptoId      String
+  // Primer día del mes que representa este monto (ej. 2026-08-01) — mismo
+  // patrón de bucketing por mes que el resto de Situación Financiera.
+  mes             DateTime
+  monto           Float
+  moneda          String   @default("PEN")
+  observaciones   String?
+  registradoPorId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  concepto      ConceptoGastoFijo @relation(fields: [conceptoId], references: [id], onDelete: Cascade)
+  registradoPor User?             @relation(fields: [registradoPorId], references: [id])
+
+  @@unique([conceptoId, mes])
+  @@map("gasto_fijo_mensual")
+}
+
+// ======================
 // 🏦 Cuentas Bancarias, CxC, CxP
 // ======================
 
@@ -4830,11 +4873,11 @@ model CuentaPorPagar {
   createdAt            DateTime          @default(now())
   updatedAt            DateTime
 
-  proveedor        Proveedor         @relation(fields: [proveedorId], references: [id])
-  proyecto         Proyecto?         @relation(fields: [proyectoId], references: [id])
-  ordenCompra      OrdenCompra?      @relation(fields: [ordenCompraId], references: [id])
-  pedidoEquipo     PedidoEquipo?     @relation(fields: [pedidoEquipoId], references: [id])
-  pedidoEquipoItem PedidoEquipoItem? @relation(fields: [pedidoEquipoItemId], references: [id])
+  proveedor        Proveedor            @relation(fields: [proveedorId], references: [id])
+  proyecto         Proyecto?            @relation(fields: [proyectoId], references: [id])
+  ordenCompra      OrdenCompra?         @relation(fields: [ordenCompraId], references: [id])
+  pedidoEquipo     PedidoEquipo?        @relation(fields: [pedidoEquipoId], references: [id])
+  pedidoEquipoItem PedidoEquipoItem?    @relation(fields: [pedidoEquipoItemId], references: [id])
   pagos            PagoPagar[]
   adjuntos         CxPAdjunto[]
   /// Ítems de la OC que cubre esta factura (facturación parcial de una OC).
@@ -5276,6 +5319,13 @@ enum ModalidadTrabajo {
   remoto
   hibrido
   confianza
+}
+
+// Mype (mayoría de la planilla) vs. general (los 3 socios) — cambia
+// gratificación y CTS dentro de calcularCostosLaborales().
+enum RegimenLaboral {
+  mype
+  general
 }
 
 enum EstadoSolicitudRemoto {
@@ -6064,9 +6114,9 @@ model PlanTrabajo {
   // Tracking de completitud por sección
   bloquesCompletitud Json?
 
-  generaciones        PlanTrabajoGeneracion[]
-  imagenes            PlanTrabajoImagen[]
-  imagenesPendientes  PlanTrabajoImagenPendiente[]
+  generaciones       PlanTrabajoGeneracion[]
+  imagenes           PlanTrabajoImagen[]
+  imagenesPendientes PlanTrabajoImagenPendiente[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -6118,9 +6168,9 @@ model PlanTrabajoGeneracion {
 /// mano en Word. Quedan acá hasta que alguien las asigne a una Tarea real
 /// (se promueven a PlanTrabajoImagen, origen='IMPORTADA') o las descarte.
 model PlanTrabajoImagenPendiente {
-  id            String   @id @default(cuid())
+  id            String                 @id @default(cuid())
   planTrabajoId String
-  planTrabajo   PlanTrabajo @relation(fields: [planTrabajoId], references: [id], onDelete: Cascade)
+  planTrabajo   PlanTrabajo            @relation(fields: [planTrabajoId], references: [id], onDelete: Cascade)
   generacionId  String?
   generacion    PlanTrabajoGeneracion? @relation(fields: [generacionId], references: [id], onDelete: SetNull)
 
@@ -6128,7 +6178,7 @@ model PlanTrabajoImagenPendiente {
   nombreArchivo String
   tipoArchivo   String
   tamano        Int
-  orden         Int      @default(0)
+  orden         Int    @default(0)
 
   /// Seteado cuando esta foto ocupa el mismo "Figura N." que una
   /// PlanTrabajoImagen ya existente PERO sus bytes son distintos — el
@@ -6168,7 +6218,7 @@ model PlanTrabajoImagen {
   // cubre tanto la subida directa como el picker "Desde biblioteca" (una
   // decisión humana explícita); 'IA_AUTO' es una propuesta automática
   // pendiente de revisión; 'CONFIRMADA' es una 'IA_AUTO' que un humano validó.
-  origen String @default("MANUAL") // 'MANUAL' | 'IA_AUTO' | 'CONFIRMADA'
+  origen           String  @default("MANUAL") // 'MANUAL' | 'IA_AUTO' | 'CONFIRMADA'
   // CatalogoImagen.id de origen — presente cuando la imagen viene del picker
   // "Desde biblioteca" o de una sugerencia de IA; null si es una foto subida
   // directamente. Permite registrar el rechazo de una sugerencia por tarea
@@ -6323,8 +6373,8 @@ model IpercVersionArchivo {
   /// Siempre 'IMPORTADO' hoy (el único origen es "alguien lo subió a mano") —
   /// mismo campo que PlanTrabajoGeneracion.origen por si en el futuro se
   /// registran acá también los exports generados por la app.
-  origen  String  @default("IMPORTADO")
-  vigente Boolean @default(true)
+  origen         String  @default("IMPORTADO")
+  vigente        Boolean @default(true)
 
   subidoPorId String
   subidoPor   User     @relation(fields: [subidoPorId], references: [id])
@@ -6407,8 +6457,8 @@ model MppVersionArchivo {
 
   numeroRevision String
   /// Siempre 'IMPORTADO' hoy — mismo campo que IpercVersionArchivo.origen.
-  origen  String  @default("IMPORTADO")
-  vigente Boolean @default(true)
+  origen         String  @default("IMPORTADO")
+  vigente        Boolean @default(true)
 
   subidoPorId String
   subidoPor   User     @relation(fields: [subidoPorId], references: [id])
@@ -6514,8 +6564,8 @@ model PetsVersionArchivo {
 
   numeroRevision String
   /// Siempre 'IMPORTADO' hoy — mismo campo que IpercVersionArchivo.origen.
-  origen  String  @default("IMPORTADO")
-  vigente Boolean @default(true)
+  origen         String  @default("IMPORTADO")
+  vigente        Boolean @default(true)
 
   subidoPorId String
   subidoPor   User     @relation(fields: [subidoPorId], references: [id])

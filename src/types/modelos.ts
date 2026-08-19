@@ -523,6 +523,7 @@ export interface Empleado {
   sueldoHonorarios?: number  // Sueldo adicional en honorarios
   asignacionFamiliar: number // Asignación familiar (10% RMV si aplica)
   emo: number                // EMO mensual (Examen Médico Ocupacional)
+  regimenLaboral?: 'mype' | 'general' // Cambia gratificación (50%/100%) y CTS en calcularCostosLaborales()
   fechaIngreso?: string
   fechaCese?: string
   activo: boolean
