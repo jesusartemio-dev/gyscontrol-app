@@ -13,6 +13,7 @@ const AsignacionSchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD requerido'),
   turno: z.enum(['turno_a', 'turno_b', 'turno_c']).default('turno_a'),
   proyectoId: z.string().min(1),
+  proyectoEdtId: z.string().nullable().optional(),
   esExcepcional: z.boolean().default(false),
   notas: z.string().nullable().optional(),
 })

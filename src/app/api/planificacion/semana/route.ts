@@ -15,6 +15,7 @@ type CeldaEntry = {
   turno: string
   tipo: 'proyecto' | 'ausencia'
   proyecto?: { id: string; codigo: string; nombre: string; color: string }
+  edt?: { id: string; codigo: string }
   ausencia?: { tipo: string | undefined; codigo: string | undefined; color: string | undefined }
   esExcepcional: boolean
   notas: string | null
@@ -112,6 +113,7 @@ export async function GET(request: NextRequest) {
       where: { userId: { in: userIds }, fecha: { gte: inicio, lte: fin } },
       include: {
         proyecto: { select: { id: true, codigo: true, nombre: true, colorPlanificacion: true } },
+        proyectoEdt: { select: { id: true, edt: { select: { nombre: true } } } },
         solicitudAusencia: {
           select: {
             tipoAusencia: { select: { nombre: true, codigo: true, color: true } },
@@ -148,6 +150,7 @@ export async function GET(request: NextRequest) {
           turno: celda.turno,
           tipo: 'proyecto',
           proyecto: { id: celda.proyecto.id, codigo: celda.proyecto.codigo, nombre: celda.proyecto.nombre, color },
+          edt: celda.proyectoEdt ? { id: celda.proyectoEdt.id, codigo: celda.proyectoEdt.edt.nombre } : undefined,
           esExcepcional: celda.esExcepcional,
           notas: celda.notas,
         })

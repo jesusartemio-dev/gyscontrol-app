@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Copy, GripVertical, SlidersHorizontal } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ClipboardPaste, Copy, GripVertical, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { cn, normalizeStr } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -119,6 +119,7 @@ interface CeldaEntry {
   turno: string
   tipo: 'proyecto' | 'ausencia'
   proyecto?: { id: string; codigo: string; nombre: string; color: string }
+  edt?: { id: string; codigo: string }
   ausencia?: { tipo: string | undefined; codigo: string | undefined; color: string | undefined }
   esExcepcional: boolean
   notas: string | null
@@ -188,6 +189,16 @@ type CeldaPreviewEstado =
   | 'ausencia'
   | 'fin_semana_bloqueado'
 
+// ── Copiar/pegar de una asignación ──────────────────────────────────────────────
+interface ClipboardAsignacion {
+  proyectoId: string
+  proyectoEdtId: string | null
+  turno: TurnoAsignable
+  esExcepcional: boolean
+  notas: string | null
+  label: string // ej. "ANT01.PLC", para mostrar en la UI
+}
+
 type DragInfo =
   | { type: 'idle' }
   | {
@@ -195,6 +206,7 @@ type DragInfo =
       userId: string
       turno: TurnoDia
       proyectoId: string
+      proyectoEdtId: string | null
       color: string
       esExcepcional: boolean
       fechaOrigen: string
@@ -212,6 +224,7 @@ interface DragStateExtending {
   userId: string
   turno: TurnoDia
   proyectoId: string
+  proyectoEdtId: string | null
   color: string
   esExcepcional: boolean
   fechaOrigen: string
@@ -292,9 +305,9 @@ function formatDateRange(inicio: string): string {
   return `${format(d1, 'd MMM', { locale: es })} – ${format(d2, 'd MMM yyyy', { locale: es })}`
 }
 
-function celdaLabel(codigo: string | undefined, textMode: TextMode): string | null {
+function celdaLabel(codigo: string | undefined, edtCodigo: string | undefined, textMode: TextMode): string | null {
   if (!codigo) return null
-  if (textMode === 'full' || textMode === 'short') return codigo
+  if (textMode === 'full' || textMode === 'short') return edtCodigo ? `${codigo}.${edtCodigo}` : codigo
   if (textMode === 'mini') {
     // first char + last 2 chars, e.g. "CJM46" → "C46"
     return codigo.length <= 3 ? codigo : codigo[0] + codigo.slice(-2)
@@ -309,6 +322,7 @@ function TurnoBloque({
   dimmed,
   textMode,
   dragHandleEnabled,
+  isCopiaSelected,
   onDragHandleMouseDown,
   onClickProyecto,
   onClickAusencia,
@@ -318,8 +332,9 @@ function TurnoBloque({
   dimmed: boolean
   textMode: TextMode
   dragHandleEnabled: boolean
+  isCopiaSelected?: boolean
   onDragHandleMouseDown?: (e: React.MouseEvent) => void
-  onClickProyecto: () => void
+  onClickProyecto: (e: React.MouseEvent) => void
   onClickAusencia: () => void
 }) {
   const letra = TURNO_LETRA[c.turno] ?? 'A'
@@ -359,7 +374,7 @@ function TurnoBloque({
   }
 
   const color = c.proyecto?.color ?? '#6b7280'
-  const label = celdaLabel(c.proyecto?.codigo, textMode)
+  const label = celdaLabel(c.proyecto?.codigo, c.edt?.codigo, textMode)
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -367,6 +382,7 @@ function TurnoBloque({
           className={cn(
             'group relative flex min-h-0 flex-1 items-center justify-center rounded cursor-pointer text-[10px] font-bold px-0.5 shadow-sm',
             dimmed && 'opacity-40',
+            isCopiaSelected && 'ring-2 ring-violet-500 ring-offset-1',
           )}
           style={{ backgroundColor: color, color: 'white' }}
           onClick={onClickProyecto}
@@ -374,9 +390,12 @@ function TurnoBloque({
           {showLetra && (
             <span className="absolute left-0 top-0 rounded-br bg-black/25 px-0.5 text-[7px] font-bold leading-tight">{letra}</span>
           )}
-          {label && <span className="truncate drop-shadow-sm">{label}</span>}
+          {label && <span className="truncate drop-shadow-sm text-[9px]">{label}</span>}
           {c.esExcepcional && (
             <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-amber-300 border border-white/60" />
+          )}
+          {isCopiaSelected && (
+            <span className="absolute bottom-0 right-0 flex h-3 w-3 items-center justify-center rounded-full bg-violet-600 text-[8px] leading-none text-white border border-white/70">✓</span>
           )}
           {dragHandleEnabled && onDragHandleMouseDown && (
             <div
@@ -394,7 +413,7 @@ function TurnoBloque({
       </TooltipTrigger>
       <TooltipContent side="top" className="max-w-[220px]">
         <p className="font-medium text-xs">
-          {nombreTurno} · [{c.proyecto?.codigo}] {c.proyecto?.nombre}
+          {nombreTurno} · [{c.proyecto?.codigo}{c.edt?.codigo ? `.${c.edt.codigo}` : ''}] {c.proyecto?.nombre}
         </p>
         {c.notas && <p className="text-xs text-muted-foreground mt-0.5">{c.notas}</p>}
       </TooltipContent>
@@ -412,6 +431,7 @@ function CeldaDia({
   dragHandleEnabled,
   isSelected,
   isInSelectionRect,
+  celdasCopiaState,
   onClickEmpty,
   onClickProyecto,
   onClickAusencia,
@@ -427,8 +447,9 @@ function CeldaDia({
   dragHandleEnabled: boolean
   isSelected?: boolean
   isInSelectionRect?: boolean
+  celdasCopiaState: Set<string>
   onClickEmpty: () => void
-  onClickProyecto: (celda: CeldaEntry) => void
+  onClickProyecto: (celda: CeldaEntry, e: React.MouseEvent) => void
   onClickAusencia: (celda: CeldaEntry) => void
   onDragHandleMouseDown?: (e: React.MouseEvent) => void
   onMouseDownEmpty?: (e: React.MouseEvent) => void
@@ -472,8 +493,9 @@ function CeldaDia({
           dimmed={dimmed}
           textMode={textMode}
           dragHandleEnabled={dragHandleEnabled && single}
+          isCopiaSelected={celdasCopiaState.has(c.id)}
           onDragHandleMouseDown={onDragHandleMouseDown}
-          onClickProyecto={() => onClickProyecto(c)}
+          onClickProyecto={(e) => onClickProyecto(c, e)}
           onClickAusencia={() => onClickAusencia(c)}
         />
       ))}
@@ -573,6 +595,7 @@ function SortablePersonaRow({
   seleccionKeys,
   seleccionRectKeys,
   seleccionEnabled,
+  celdasCopiaState,
   colorOverrides,
   onClickEmpty,
   onClickProyecto,
@@ -594,9 +617,10 @@ function SortablePersonaRow({
   seleccionKeys: Set<string>
   seleccionRectKeys: Set<string>
   seleccionEnabled: boolean
+  celdasCopiaState: Set<string>
   colorOverrides: Record<string, string>
   onClickEmpty: (fecha: string) => void
-  onClickProyecto: (fecha: string, celda: CeldaEntry) => void
+  onClickProyecto: (fecha: string, celda: CeldaEntry, e: React.MouseEvent) => void
   onClickAusencia: (fecha: string, celda: CeldaEntry) => void
   onDragStart: (info: Omit<DragStateExtending, 'type' | 'direction' | 'celdasPreview' | 'fechaFin'>) => void
   onCeldaMouseDown: (userId: string, fecha: string, e: React.MouseEvent) => void
@@ -621,7 +645,7 @@ function SortablePersonaRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={cn("h-6 border-b items-center hover:brightness-95", rowBgClass)}
+      className={cn("h-8 border-b items-center hover:brightness-95", rowBgClass)}
     >
       {/* Dept stripe — 12px first column, overlaid by parent absolute label */}
       <div className="self-stretch" style={{ backgroundColor: deptStripeColor, opacity: 0.15 }} />
@@ -678,6 +702,7 @@ function SortablePersonaRow({
                   userId: persona.userId,
                   turno: c0.turno as TurnoDia,
                   proyectoId: c0.proyecto?.id ?? '',
+                  proyectoEdtId: c0.edt?.id ?? null,
                   color: c0.proyecto?.color ?? '#6b7280',
                   esExcepcional: c0.esExcepcional,
                   fechaOrigen: dateKey,
@@ -715,8 +740,9 @@ function SortablePersonaRow({
               dragHandleEnabled={dragHandleEnabled}
               isSelected={isSelected}
               isInSelectionRect={isInSelectionRect}
+              celdasCopiaState={celdasCopiaState}
               onClickEmpty={isDragActive ? () => {} : () => onClickEmpty(dateKey)}
-              onClickProyecto={isDragActive ? () => {} : (celda) => onClickProyecto(dateKey, celda)}
+              onClickProyecto={isDragActive ? () => {} : (celda, e) => onClickProyecto(dateKey, celda, e)}
               onClickAusencia={isDragActive ? () => {} : (celda) => onClickAusencia(dateKey, celda)}
               onDragHandleMouseDown={handleDragMouseDown}
               onMouseDownEmpty={handleMouseDownEmpty}
@@ -856,6 +882,9 @@ export default function PlanificacionPage() {
   const [modalDetalle, setModalDetalle] = useState<CeldaDetalleData | null>(null)
   const [seleccionState, setSeleccionState] = useState<SeleccionState>({ type: 'idle' })
   const [modalMasivo, setModalMasivo] = useState(false)
+  // Celdas ya asignadas marcadas con Ctrl+click, para copiar o eliminar en bloque.
+  const [celdasCopiaState, setCeldasCopiaState] = useState<Set<string>>(new Set())
+  const [clipboard, setClipboard] = useState<ClipboardAsignacion | null>(null)
   const [colorOverrides, setColorOverrides] = useState<Record<string, string>>({})
   const viewport = useViewport()
   const isDesktop = viewport === 'desktop'
@@ -919,6 +948,10 @@ export default function PlanificacionPage() {
   const fechasOrdenadasRef = useRef<string[]>([])
   // Suppresses the onClick that fires after a Ctrl/Cmd+mousedown on an empty cell
   const ctrlClickSuppressRef = useRef(false)
+  const celdasCopiaRef = useRef<Set<string>>(new Set())
+  celdasCopiaRef.current = celdasCopiaState
+  const clipboardRef = useRef<ClipboardAsignacion | null>(null)
+  clipboardRef.current = clipboard
 
   useEffect(() => {
     if (!semanaInicio) return
@@ -1108,6 +1141,105 @@ export default function PlanificacionPage() {
   const dataRef = useRef<SemanaResponse | null>(null)
   dataRef.current = data
 
+  // ── Copiar / pegar / eliminar en bloque celdas ya asignadas ───────────────────
+  const copiarSeleccionActual = () => {
+    if (celdasCopiaState.size !== 1) return
+    const id = Array.from(celdasCopiaState)[0]
+    let found: CeldaEntry | null = null
+    for (const p of data?.personas ?? []) {
+      for (const dias of Object.values(p.dias)) {
+        const c = dias.find((x) => x.id === id)
+        if (c) { found = c; break }
+      }
+      if (found) break
+    }
+    if (!found || found.tipo !== 'proyecto' || !found.proyecto) return
+    const label = `${found.proyecto.codigo}${found.edt?.codigo ? '.' + found.edt.codigo : ''}`
+    setClipboard({
+      proyectoId: found.proyecto.id,
+      proyectoEdtId: found.edt?.id ?? null,
+      turno: turnoAsignable(found.turno),
+      esExcepcional: found.esExcepcional,
+      notas: found.notas,
+      label,
+    })
+    setCeldasCopiaState(new Set())
+    toast.success(`Copiado: ${label}`)
+  }
+
+  const pegarEnSeleccion = async () => {
+    if (!clipboard || seleccionState.type !== 'selected' || seleccionState.celdas.size === 0) return
+    const keys = Array.from(seleccionState.celdas).slice(0, 50)
+    const asignaciones = keys.map((key) => {
+      const [userId, fecha] = key.split('|')
+      const dow = new Date(fecha + 'T00:00:00.000Z').getUTCDay()
+      const isWeekend = dow === 0 || dow === 6
+      return {
+        userId,
+        fecha,
+        turno: clipboard.turno,
+        proyectoId: clipboard.proyectoId,
+        proyectoEdtId: clipboard.proyectoEdtId,
+        esExcepcional: isWeekend,
+        notas: clipboard.notas,
+      }
+    })
+    try {
+      const res = await fetch('/api/planificacion/dia/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ asignaciones }),
+      })
+      const result = await res.json()
+      if (!res.ok && res.status !== 207) {
+        toast.error(result?.error ?? 'Error al pegar')
+        return
+      }
+      const msgs: string[] = []
+      if (result.creadas > 0) msgs.push(`✓ ${result.creadas} pegada${result.creadas !== 1 ? 's' : ''}`)
+      if (result.actualizadas > 0) msgs.push(`✓ ${result.actualizadas} actualizada${result.actualizadas !== 1 ? 's' : ''}`)
+      const omitidas: Array<{ razon: string }> = result.omitidas ?? []
+      msgs.push(...resumenOmisiones(omitidas))
+      toast.success(msgs.join(' · ') || 'Sin cambios')
+      setSeleccionState({ type: 'idle' })
+      reload()
+    } catch {
+      toast.error('Error al pegar')
+    }
+  }
+
+  const eliminarSeleccionCopia = async () => {
+    if (celdasCopiaState.size === 0) return
+    const ids = Array.from(celdasCopiaState)
+    if (!window.confirm(`¿Eliminar ${ids.length} asignación${ids.length !== 1 ? 'es' : ''}?`)) return
+    try {
+      const res = await fetch('/api/planificacion/dia/batch-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      })
+      const result = await res.json()
+      if (!res.ok) {
+        toast.error(result?.error ?? 'Error al eliminar')
+        return
+      }
+      const msgs = [`✓ ${result.eliminadas} eliminada${result.eliminadas !== 1 ? 's' : ''}`]
+      if (result.omitidas?.length > 0) {
+        msgs.push(`${result.omitidas.length} omitida${result.omitidas.length !== 1 ? 's' : ''} (ausencia)`)
+      }
+      toast.success(msgs.join(' · '))
+      setCeldasCopiaState(new Set())
+      reload()
+    } catch {
+      toast.error('Error al eliminar')
+    }
+  }
+
+  // Ref para invocar siempre la versión más reciente de estas acciones desde el
+  // listener de teclado global (que solo se re-suscribe cuando cambia seleccionEnabled).
+  const actionsRef = useRef({ copiar: copiarSeleccionActual, pegar: pegarEnSeleccion, eliminar: eliminarSeleccionCopia })
+  actionsRef.current = { copiar: copiarSeleccionActual, pegar: pegarEnSeleccion, eliminar: eliminarSeleccionCopia }
+
   // ── Compartir programación del día (texto para WhatsApp) ──────────────────────
   const TURNOS_ORDEN: TurnoAsignable[] = ['turno_a', 'turno_b', 'turno_c']
   const TURNO_EMOJI: Record<TurnoAsignable, string> = { turno_a: '🌅', turno_b: '🌆', turno_c: '🌙' }
@@ -1203,6 +1335,7 @@ export default function PlanificacionPage() {
       if (!seleccionEnabled) return
       if (dragInfo.type === 'extending') return
       e.preventDefault()
+      setCeldasCopiaState(new Set())
 
       // Ctrl/Cmd+click: toggle individual cell
       if (e.ctrlKey || e.metaKey) {
@@ -1292,6 +1425,7 @@ export default function PlanificacionPage() {
                 fecha: c.fecha,
                 turno: state.turno,
                 proyectoId: state.proyectoId,
+                proyectoEdtId: state.proyectoEdtId,
                 esExcepcional: state.esExcepcional,
                 notas: null,
               })),
@@ -1416,12 +1550,21 @@ export default function PlanificacionPage() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const state = seleccionRef.current
+      const copia = celdasCopiaRef.current
+      const clip = clipboardRef.current
 
-      if (e.key === 'Escape' && state.type !== 'idle') {
+      if (e.key === 'Escape' && (state.type !== 'idle' || copia.size > 0 || clip)) {
         e.preventDefault()
         setSeleccionState({ type: 'idle' })
+        setCeldasCopiaState(new Set())
+        setClipboard(null)
         return
       }
+
+      // A partir de aquí, ignorar atajos si el foco está en un input/textarea
+      // (búsqueda de persona, notas de un modal, etc.)
+      const tag = (document.activeElement as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
 
       if (e.key === 'Enter' && state.type === 'selected' && state.celdas.size > 0) {
         e.preventDefault()
@@ -1429,10 +1572,28 @@ export default function PlanificacionPage() {
         return
       }
 
+      // Ctrl/Cmd+C: copiar la única asignación marcada
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && copia.size === 1) {
+        e.preventDefault()
+        actionsRef.current.copiar()
+        return
+      }
+
+      // Ctrl/Cmd+V: pegar sobre las celdas vacías seleccionadas
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v' && clip && state.type === 'selected' && state.celdas.size > 0) {
+        e.preventDefault()
+        actionsRef.current.pegar()
+        return
+      }
+
+      // Delete/Backspace: eliminar las asignaciones marcadas
+      if ((e.key === 'Delete' || e.key === 'Backspace') && copia.size > 0) {
+        e.preventDefault()
+        actionsRef.current.eliminar()
+        return
+      }
+
       if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !e.shiftKey) {
-        // Only activate Ctrl+A if no input/textarea is focused
-        const tag = (document.activeElement as HTMLElement)?.tagName
-        if (tag === 'INPUT' || tag === 'TEXTAREA') return
         e.preventDefault()
         if (!seleccionEnabled) return
 
@@ -1842,6 +2003,7 @@ export default function PlanificacionPage() {
                           seleccionKeys={seleccionKeys}
                           seleccionRectKeys={seleccionRectKeys}
                           seleccionEnabled={seleccionEnabled}
+                          celdasCopiaState={celdasCopiaState}
                           colorOverrides={colorOverrides}
                           onCeldaMouseDown={handleCeldaMouseDown}
                           onClickEmpty={(fecha) => {
@@ -1850,14 +2012,27 @@ export default function PlanificacionPage() {
                               return
                             }
                             if (isReadOnly) return
+                            setCeldasCopiaState(new Set())
                             if (seleccionState.type !== 'idle') {
                               setSeleccionState({ type: 'idle' })
                               return
                             }
                             setModalCelda({ userId: persona.userId, nombre: persona.nombre, fecha, celdasDia: [], turnoInicial: 'turno_a' })
                           }}
-                          onClickProyecto={(fecha, celda) => {
+                          onClickProyecto={(fecha, celda, e) => {
+                            if (!isReadOnly && seleccionEnabled && (e.ctrlKey || e.metaKey)) {
+                              e.preventDefault()
+                              setSeleccionState({ type: 'idle' })
+                              setCeldasCopiaState((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(celda.id)) next.delete(celda.id)
+                                else next.add(celda.id)
+                                return next
+                              })
+                              return
+                            }
                             setSeleccionState({ type: 'idle' })
+                            setCeldasCopiaState(new Set())
                             if (isReadOnly) {
                               setModalDetalle({ nombrePersona: persona.nombre, fecha, celda })
                             } else {
@@ -1873,6 +2048,7 @@ export default function PlanificacionPage() {
                           }}
                           onClickAusencia={(fecha, celda) => {
                             setSeleccionState({ type: 'idle' })
+                            setCeldasCopiaState(new Set())
                             if (isReadOnly) {
                               setModalDetalle({ nombrePersona: persona.nombre, fecha, celda })
                             } else {
@@ -2053,8 +2229,38 @@ export default function PlanificacionPage() {
         />
       </div>
 
-      {/* ── Floating selection action bar ──────────────────────────────────────── */}
-      {seleccionState.type === 'selected' && seleccionState.celdas.size > 0 && (
+      {/* ── Floating action bar: celdas ya asignadas marcadas (copiar/eliminar) ──── */}
+      {celdasCopiaState.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-background border shadow-lg rounded-full px-5 py-2.5 select-none">
+          <span className="text-sm font-medium text-foreground">
+            {celdasCopiaState.size} asignación{celdasCopiaState.size !== 1 ? 'es' : ''} seleccionada{celdasCopiaState.size !== 1 ? 's' : ''}
+          </span>
+          {celdasCopiaState.size === 1 && (
+            <Button size="sm" onClick={() => actionsRef.current.copiar()}>
+              <Copy className="h-3.5 w-3.5 mr-1.5" />
+              Copiar
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => actionsRef.current.eliminar()}
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+            Eliminar
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setCeldasCopiaState(new Set())}
+          >
+            Limpiar
+          </Button>
+        </div>
+      )}
+
+      {/* ── Floating selection action bar: celdas vacías seleccionadas ──────────── */}
+      {celdasCopiaState.size === 0 && seleccionState.type === 'selected' && seleccionState.celdas.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-background border shadow-lg rounded-full px-5 py-2.5 select-none">
           <span className="text-sm font-medium text-foreground">
             {Math.min(seleccionState.celdas.size, 50)} celda{seleccionState.celdas.size !== 1 ? 's' : ''} seleccionada{seleccionState.celdas.size !== 1 ? 's' : ''}
@@ -2076,6 +2282,16 @@ export default function PlanificacionPage() {
               <TooltipContent>Máximo 50 celdas por asignación</TooltipContent>
             )}
           </Tooltip>
+          {clipboard && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => actionsRef.current.pegar()}
+            >
+              <ClipboardPaste className="h-3.5 w-3.5 mr-1.5" />
+              Pegar {clipboard.label}
+            </Button>
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -2083,6 +2299,22 @@ export default function PlanificacionPage() {
           >
             Limpiar
           </Button>
+        </div>
+      )}
+
+      {/* ── Indicador persistente de portapapeles activo ─────────────────────────── */}
+      {clipboard && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-violet-600 text-white text-xs font-medium rounded-full px-3 py-1.5 shadow-lg select-none">
+          <Copy className="h-3 w-3" />
+          <span>Copiado: {clipboard.label} · {TURNO_LETRA[clipboard.turno]}</span>
+          <button
+            type="button"
+            onClick={() => setClipboard(null)}
+            className="ml-1 hover:opacity-70"
+            aria-label="Cancelar copia"
+          >
+            <X className="h-3 w-3" />
+          </button>
         </div>
       )}
     </TooltipProvider>

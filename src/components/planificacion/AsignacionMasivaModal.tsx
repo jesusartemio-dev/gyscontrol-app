@@ -25,6 +25,14 @@ interface ProyectoActivo {
   color: string
 }
 
+interface ProyectoEdtOption {
+  id: string
+  nombre: string
+  categoriaNombre: string
+}
+
+const SIN_EDT = '__sin_edt__'
+
 export interface CeldaMasiva {
   userId: string
   fecha: string
@@ -47,6 +55,9 @@ const TURNOS: TurnoVal[] = ['turno_a', 'turno_b', 'turno_c']
 
 export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }: Props) {
   const [proyectoId, setProyectoId] = useState('')
+  const [proyectoEdtId, setProyectoEdtId] = useState('')
+  const [proyectoEdts, setProyectoEdts] = useState<ProyectoEdtOption[]>([])
+  const [cargandoEdts, setCargandoEdts] = useState(false)
   const [turno, setTurno] = useState<TurnoVal>('turno_a')
   const [horaIngreso, setHoraIngreso] = useState(TURNO_HORA_DEFAULT.turno_a.ingreso)
   const [horaSalida, setHoraSalida] = useState(TURNO_HORA_DEFAULT.turno_a.salida)
@@ -74,6 +85,8 @@ export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }:
   useEffect(() => {
     if (!open) {
       setProyectoId('')
+      setProyectoEdtId('')
+      setProyectoEdts([])
       setTurno('turno_a')
       setHoraIngreso(TURNO_HORA_DEFAULT.turno_a.ingreso)
       setHoraSalida(TURNO_HORA_DEFAULT.turno_a.salida)
@@ -92,6 +105,20 @@ export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
+  // EDT del proyecto seleccionado (opcional).
+  useEffect(() => {
+    if (!open || !proyectoId) {
+      setProyectoEdts([])
+      return
+    }
+    setCargandoEdts(true)
+    fetch(`/api/edts-proyecto-simple?proyectoId=${proyectoId}`)
+      .then((r) => r.json())
+      .then((data: { edts?: ProyectoEdtOption[] }) => setProyectoEdts(data.edts ?? []))
+      .catch(() => {})
+      .finally(() => setCargandoEdts(false))
+  }, [open, proyectoId])
+
   const handleConfirm = async () => {
     if (!proyectoId) return
     setSaving(true)
@@ -104,6 +131,7 @@ export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }:
           fecha,
           turno,
           proyectoId,
+          proyectoEdtId: proyectoEdtId || null,
           esExcepcional: isWeekend ? esExcepcional : false,
           notas: notas.trim() || null,
         }
@@ -216,7 +244,14 @@ export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }:
             <Label>
               Proyecto <span className="text-destructive">*</span>
             </Label>
-            <Select value={proyectoId} onValueChange={setProyectoId} disabled={cargandoProyectos}>
+            <Select
+              value={proyectoId}
+              onValueChange={(v) => {
+                setProyectoId(v)
+                setProyectoEdtId('')
+              }}
+              disabled={cargandoProyectos}
+            >
               <SelectTrigger>
                 <SelectValue placeholder={cargandoProyectos ? 'Cargando proyectos...' : 'Seleccionar proyecto...'} />
               </SelectTrigger>
@@ -230,6 +265,29 @@ export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }:
                       />
                       [{p.codigo}] {p.nombre}
                     </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>EDT <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+            <Select
+              value={proyectoEdtId || SIN_EDT}
+              onValueChange={(v) => setProyectoEdtId(v === SIN_EDT ? '' : v)}
+              disabled={!proyectoId || cargandoEdts}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={cargandoEdts ? 'Cargando EDT...' : 'Sin EDT'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SIN_EDT}>Sin EDT</SelectItem>
+                {proyectoEdts.map((e) => (
+                  <SelectItem key={e.id} value={e.id}>
+                    {e.nombre && e.nombre !== e.categoriaNombre
+                      ? `${e.categoriaNombre} — ${e.nombre}`
+                      : e.categoriaNombre}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -32,6 +32,7 @@ const ESTADOS_INACTIVOS = ['cerrado', 'pausado', 'cancelado']
  * Reglas (en orden de cortocircuito):
  * 1. Empleado activo
  * 2. Proyecto activo (no en estado inactivo)
+ * 2b. EDT (opcional) pertenece al proyecto
  * 3. Fecha no anterior al inicio del proyecto (no se valida contra fechaFin)
  * 4. Sin ausencia aprobada que cubra esa fecha+turno
  * 5. No es fin de semana sin esExcepcional=true
@@ -44,6 +45,7 @@ export async function validarAsignacion(
   proyectoId: string,
   esExcepcional: boolean,
   tx: PrismaTx,
+  proyectoEdtId?: string | null,
 ): Promise<ValidacionResult> {
   const errores: ValidacionError[] = []
   const warnings: ValidacionWarning[] = []
@@ -71,6 +73,21 @@ export async function validarAsignacion(
       valido: false,
       errores: [{ codigo: 'proyecto_no_activo', mensaje: 'El proyecto no existe o no está activo' }],
       warnings,
+    }
+  }
+
+  // 2b. EDT (opcional) debe pertenecer al proyecto seleccionado
+  if (proyectoEdtId) {
+    const proyectoEdt = await tx.proyectoEdt.findUnique({
+      where: { id: proyectoEdtId },
+      select: { proyectoId: true },
+    })
+    if (!proyectoEdt || proyectoEdt.proyectoId !== proyectoId) {
+      return {
+        valido: false,
+        errores: [{ codigo: 'edt_no_pertenece_proyecto', mensaje: 'El EDT seleccionado no pertenece al proyecto' }],
+        warnings,
+      }
     }
   }
 

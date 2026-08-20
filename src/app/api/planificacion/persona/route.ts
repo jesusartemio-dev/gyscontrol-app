@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
       where: { userId: targetUserId, fecha: { gte: inicio, lte: fin } },
       include: {
         proyecto: { select: { id: true, codigo: true, nombre: true } },
+        proyectoEdt: { select: { id: true, edt: { select: { nombre: true } } } },
         solicitudAusencia: {
           select: { tipoAusencia: { select: { nombre: true, color: true } } },
         },
@@ -64,6 +65,7 @@ export async function GET(request: NextRequest) {
         turno: string
         tipo: 'proyecto' | 'ausencia'
         proyecto?: { id: string; codigo: string; nombre: string }
+        edt?: { id: string; codigo: string }
         ausencia?: { nombre: string; color: string | null }
         esExcepcional: boolean
         notas: string | null
@@ -78,6 +80,7 @@ export async function GET(request: NextRequest) {
         turno: celda.turno,
         tipo: celda.proyectoId ? 'proyecto' : 'ausencia',
         proyecto: celda.proyecto ?? undefined,
+        edt: celda.proyectoEdt ? { id: celda.proyectoEdt.id, codigo: celda.proyectoEdt.edt.nombre } : undefined,
         ausencia: celda.solicitudAusencia?.tipoAusencia ?? undefined,
         esExcepcional: celda.esExcepcional,
         notas: celda.notas,

@@ -9,6 +9,7 @@ export interface CeldaCompacta {
   turno: string
   tipo: 'proyecto' | 'ausencia'
   proyecto?: { id: string; codigo: string; nombre: string; color?: string }
+  edt?: { id: string; codigo: string }
   // /semana uses { tipo, codigo, color }; /persona uses { nombre, color }
   ausencia?: { nombre?: string; tipo?: string; codigo?: string; color?: string | null }
   esExcepcional: boolean
@@ -86,6 +87,7 @@ export function CeldaPlanificacionCompacta({ celda, mostrarNotas, onTap, classNa
       <div className="min-w-0">
         <span className="text-sm font-medium" style={{ color }}>
           {celda.proyecto?.codigo}
+          {celda.edt?.codigo ? `.${celda.edt.codigo}` : ''}
         </span>
         {celda.esExcepcional && <span className="ml-1 text-[10px]">⏰</span>}
         {mostrarNotas && celda.notas && (

@@ -12,6 +12,7 @@ type Ctx = { params: Promise<{ id: string }> }
 
 const UpdateSchema = z.object({
   proyectoId: z.string().min(1),
+  proyectoEdtId: z.string().nullable().optional(),
   esExcepcional: z.boolean().default(false),
   notas: z.string().optional(),
 })
@@ -52,6 +53,7 @@ export async function PUT(request: NextRequest, context: Ctx) {
         data.proyectoId,
         data.esExcepcional,
         tx as unknown as PrismaTx,
+        data.proyectoEdtId,
       )
       if (!validacion.valido) {
         return { error: validacion.errores[0] }
@@ -61,6 +63,7 @@ export async function PUT(request: NextRequest, context: Ctx) {
         where: { id },
         data: {
           proyectoId: data.proyectoId,
+          proyectoEdtId: data.proyectoEdtId ?? null,
           esExcepcional: data.esExcepcional,
           notas: data.notas ?? null,
           updatedById: session.user.id,

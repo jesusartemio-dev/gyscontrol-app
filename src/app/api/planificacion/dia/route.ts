@@ -13,6 +13,7 @@ const DiaSchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD requerido'),
   turno: z.enum(['turno_a', 'turno_b', 'turno_c']).default('turno_a'),
   proyectoId: z.string().min(1),
+  proyectoEdtId: z.string().nullable().optional(),
   esExcepcional: z.boolean().default(false),
   notas: z.string().optional(),
 })
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
         data.proyectoId,
         data.esExcepcional,
         tx as unknown as PrismaTx,
+        data.proyectoEdtId,
       )
       if (!validacion.valido) {
         return { error: validacion.errores[0], statusCode: 422 }
@@ -66,6 +68,7 @@ export async function POST(request: NextRequest) {
           where: { id: existente.id },
           data: {
             proyectoId: data.proyectoId,
+            proyectoEdtId: data.proyectoEdtId ?? null,
             esExcepcional: data.esExcepcional,
             notas: data.notas ?? null,
             updatedById: session.user.id,
@@ -93,6 +96,7 @@ export async function POST(request: NextRequest) {
           fecha,
           turno: data.turno,
           proyectoId: data.proyectoId,
+          proyectoEdtId: data.proyectoEdtId ?? null,
           esExcepcional: data.esExcepcional,
           notas: data.notas ?? null,
           createdById: session.user.id,

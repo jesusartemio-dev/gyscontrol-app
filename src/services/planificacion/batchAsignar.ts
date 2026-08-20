@@ -6,6 +6,7 @@ export interface AsignacionInput {
   fecha: string // YYYY-MM-DD
   turno: TurnoDia
   proyectoId: string
+  proyectoEdtId?: string | null
   esExcepcional: boolean
   notas?: string | null
 }
@@ -41,6 +42,7 @@ export async function batchAsignar(
       item.proyectoId,
       item.esExcepcional,
       tx,
+      item.proyectoEdtId,
     )
 
     if (!validacion.valido) {
@@ -66,6 +68,7 @@ export async function batchAsignar(
         where: { id: existente.id },
         data: {
           proyectoId: item.proyectoId,
+          proyectoEdtId: item.proyectoEdtId ?? null,
           esExcepcional: item.esExcepcional,
           notas: item.notas ?? null,
           updatedById: createdById,
@@ -92,6 +95,7 @@ export async function batchAsignar(
           fecha,
           turno: item.turno,
           proyectoId: item.proyectoId,
+          proyectoEdtId: item.proyectoEdtId ?? null,
           esExcepcional: item.esExcepcional,
           notas: item.notas ?? null,
           createdById,

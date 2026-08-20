@@ -3669,6 +3669,7 @@ model ProyectoEdt {
   proyectoTarea        ProyectoTarea[]
   registrosCampo       RegistroHorasCampo[]
   matrizFilas          MatrizComunicacionFila[]
+  planificacionesDia   PlanificacionDia[]
 
   @@unique([proyectoId, proyectoCronogramaId, nombre])
   @@index([estado, fechaFinPlan])
@@ -6746,6 +6747,7 @@ model PlanificacionDia {
   turno  TurnoDia @default(turno_a)
 
   proyectoId          String? // asignación productiva a proyecto
+  proyectoEdtId       String? // EDT del proyecto asignado (opcional)
   solicitudAusenciaId String? // ausencia materializada al aprobar SolicitudAusencia
   tipoAusenciaId      String? // snapshot de display (evita JOIN en vistas de planificación)
 
@@ -6758,6 +6760,7 @@ model PlanificacionDia {
 
   user              User               @relation("PlanificacionPersona", fields: [userId], references: [id])
   proyecto          Proyecto?          @relation(fields: [proyectoId], references: [id], onDelete: SetNull)
+  proyectoEdt       ProyectoEdt?       @relation(fields: [proyectoEdtId], references: [id], onDelete: SetNull)
   solicitudAusencia SolicitudAusencia? @relation(fields: [solicitudAusenciaId], references: [id], onDelete: Cascade)
   tipoAusencia      TipoAusencia?      @relation(fields: [tipoAusenciaId], references: [id], onDelete: SetNull)
   createdBy         User               @relation("PlanificacionCreador", fields: [createdById], references: [id])
@@ -6767,6 +6770,7 @@ model PlanificacionDia {
   @@index([fecha, userId])
   @@index([userId, fecha])
   @@index([proyectoId, fecha])
+  @@index([proyectoEdtId, fecha])
   @@index([fecha])
   @@map("planificacion_dia")
 }

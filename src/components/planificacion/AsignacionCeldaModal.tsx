@@ -24,6 +24,7 @@ interface CeldaEntry {
   turno: string
   tipo: 'proyecto' | 'ausencia'
   proyecto?: { id: string; codigo: string; nombre: string; color: string }
+  edt?: { id: string; codigo: string }
   esExcepcional: boolean
   notas: string | null
 }
@@ -34,6 +35,12 @@ interface ProyectoActivo {
   nombre: string
   color: string
   estado: string
+}
+
+interface ProyectoEdtOption {
+  id: string
+  nombre: string
+  categoriaNombre: string
 }
 
 type TurnoVal = 'turno_a' | 'turno_b' | 'turno_c'
@@ -53,6 +60,7 @@ interface Props {
 
 const FormSchema = z.object({
   proyectoId: z.string().min(1, 'Seleccione un proyecto'),
+  proyectoEdtId: z.string().optional(),
   turno: z.enum(['turno_a', 'turno_b', 'turno_c']),
   esExcepcional: z.boolean(),
   notas: z.string().max(200).optional(),
@@ -66,11 +74,17 @@ const TURNO_LABELS: Record<TurnoVal, string> = {
   turno_c: 'Turno C · Noche',
 }
 const TURNOS: TurnoVal[] = ['turno_a', 'turno_b', 'turno_c']
+const SIN_EDT = '__sin_edt__'
 
 export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, userName, fecha, celdasDia, turnoInicial }: Props) {
   const [proyectos, setProyectos] = useState<ProyectoActivo[]>([])
+  const [proyectoEdts, setProyectoEdts] = useState<ProyectoEdtOption[]>([])
+  const [cargandoEdts, setCargandoEdts] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // Si al cambiar de turno el destino está vacío, por defecto se "mueve" la
+  // asignación original (se elimina) en vez de dejar duplicada la del turno de origen.
+  const [moverDesdeOriginal, setMoverDesdeOriginal] = useState(true)
 
   // Horario (ingreso/salida) por turno de este día, para compartir la programación.
   const [horarios, setHorarios] = useState<Record<string, { ingreso: string; salida: string }>>({})
@@ -107,6 +121,7 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
     ),
     defaultValues: {
       proyectoId: '',
+      proyectoEdtId: '',
       turno: turnoInicial ?? 'turno_a',
       esExcepcional: isWeekend,
       notas: '',
@@ -114,10 +129,19 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
   })
 
   const proyectoId = watch('proyectoId')
+  const proyectoEdtId = watch('proyectoEdtId')
   const esExcepcional = watch('esExcepcional')
   const turnoSel = watch('turno')
   const celdaExistente = celdaDeTurno(turnoSel)
   const isEditing = Boolean(celdaExistente)
+
+  // Turno con el que se abrió el modal (el que se estaba editando originalmente).
+  const turnoOrigen = turnoInicial ?? 'turno_a'
+  const celdaOrigen = celdaDeTurno(turnoOrigen)
+  // Se muestra la opción de "mover" solo cuando: había una asignación en el turno
+  // de origen, el usuario cambió a OTRO turno, y ese destino está vacío (si el
+  // destino ya tiene su propia asignación, no hay nada que "mover": es solo edición).
+  const mostrarMover = Boolean(celdaOrigen) && turnoSel !== turnoOrigen && !celdaExistente
 
   useEffect(() => {
     if (!open) return
@@ -163,10 +187,12 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
     const existente = celdaDeTurno(t)
     reset({
       proyectoId: existente?.proyecto?.id ?? '',
+      proyectoEdtId: existente?.edt?.id ?? '',
       turno: t,
       esExcepcional: existente?.esExcepcional ?? isWeekend,
       notas: existente?.notas ?? '',
     })
+    setMoverDesdeOriginal(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, turnoInicial, fecha])
 
@@ -181,11 +207,51 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, turnoSel, proyectos])
 
+  // EDT del proyecto seleccionado (opcional). Se recarga cada vez que cambia el proyecto.
+  useEffect(() => {
+    if (!open) return
+    if (!proyectoId) {
+      setProyectoEdts([])
+      return
+    }
+    // Sembrar con el EDT ya asignado en este turno (si aplica), para evitar el
+    // placeholder de Radix mientras carga la lista real.
+    const existente = celdaDeTurno(turnoSel)
+    const seed: ProyectoEdtOption[] =
+      existente?.proyecto?.id === proyectoId && existente.edt
+        ? [{ id: existente.edt.id, nombre: existente.edt.codigo, categoriaNombre: existente.edt.codigo }]
+        : []
+    if (seed.length > 0) setProyectoEdts(seed)
+    setCargandoEdts(true)
+    fetch(`/api/edts-proyecto-simple?proyectoId=${proyectoId}`)
+      .then((r) => r.json())
+      .then((data: { edts?: ProyectoEdtOption[] }) => {
+        const lista = data.edts ?? []
+        const ids = new Set(lista.map((e) => e.id))
+        const faltantes = seed.filter((e) => !ids.has(e.id))
+        setProyectoEdts([...lista, ...faltantes])
+      })
+      .catch(() => {})
+      .finally(() => setCargandoEdts(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, proyectoId])
+
+  // Re-aplicar el EDT del turno cuando ya cargaron las opciones.
+  useEffect(() => {
+    if (!open) return
+    const existente = celdaDeTurno(turnoSel)
+    if (existente?.edt?.id && proyectoEdtId !== existente.edt.id) {
+      setValue('proyectoEdtId', existente.edt.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, turnoSel, proyectoEdts])
+
   // Cambiar de turno carga la asignación de ese turno (o lo deja en blanco).
   const cambiarTurno = (t: TurnoVal) => {
     const existente = celdaDeTurno(t)
     setValue('turno', t)
     setValue('proyectoId', existente?.proyecto?.id ?? '')
+    setValue('proyectoEdtId', existente?.edt?.id ?? '')
     setValue('esExcepcional', existente?.esExcepcional ?? isWeekend)
     setValue('notas', existente?.notas ?? '')
   }
@@ -201,6 +267,7 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
           fecha,
           turno: values.turno,
           proyectoId: values.proyectoId,
+          proyectoEdtId: values.proyectoEdtId || null,
           esExcepcional: values.esExcepcional,
           notas: values.notas || undefined,
         }),
@@ -220,8 +287,21 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
         } else {
           toast.warning(w.mensaje)
         }
+      } else if (mostrarMover && moverDesdeOriginal) {
+        toast.success(`Movida de ${TURNO_LABELS[turnoOrigen]} a ${TURNO_LABELS[values.turno]}`)
       } else {
         toast.success(data.accion === 'creada' ? 'Asignación creada' : 'Asignación actualizada')
+      }
+
+      // Si se cambió de turno respecto al original y se eligió "mover", eliminar
+      // la asignación del turno de origen para no dejarla duplicada.
+      if (mostrarMover && moverDesdeOriginal && celdaOrigen) {
+        const delRes = await fetch(`/api/planificacion/dia/${celdaOrigen.id}`, { method: 'DELETE' })
+        if (!delRes.ok) {
+          toast.warning(
+            `Se guardó en ${TURNO_LABELS[values.turno]}, pero no se pudo eliminar la asignación original de ${TURNO_LABELS[turnoOrigen]}`,
+          )
+        }
       }
 
       // Guardar el horario del turno para este día (ingreso/salida).
@@ -300,6 +380,20 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
               <p className="text-[11px] text-muted-foreground">
                 Una persona puede tener un proyecto por turno el mismo día. ✓ = turno ya asignado.
               </p>
+              {mostrarMover && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20 p-2.5 mt-1">
+                  <input
+                    type="checkbox"
+                    id="mover-turno"
+                    checked={moverDesdeOriginal}
+                    onChange={(e) => setMoverDesdeOriginal(e.target.checked)}
+                    className="h-4 w-4 mt-0.5 rounded border-border flex-shrink-0"
+                  />
+                  <Label htmlFor="mover-turno" className="cursor-pointer text-xs font-normal text-amber-800 dark:text-amber-200">
+                    Mover esta asignación desde {TURNO_LABELS[turnoOrigen]} (se eliminará de ahí). Desmarca esta opción si en realidad quieres agregar un turno adicional ese día.
+                  </Label>
+                </div>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -335,7 +429,13 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
 
             <div className="space-y-1.5">
               <Label>Proyecto <span className="text-destructive">*</span></Label>
-              <Select value={proyectoId} onValueChange={(v) => setValue('proyectoId', v)}>
+              <Select
+                value={proyectoId}
+                onValueChange={(v) => {
+                  setValue('proyectoId', v)
+                  setValue('proyectoEdtId', '')
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar proyecto..." />
                 </SelectTrigger>
@@ -353,6 +453,29 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
               {errors.proyectoId && (
                 <p className="text-xs text-destructive">{errors.proyectoId.message}</p>
               )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>EDT <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <Select
+                value={proyectoEdtId || SIN_EDT}
+                onValueChange={(v) => setValue('proyectoEdtId', v === SIN_EDT ? '' : v)}
+                disabled={!proyectoId || cargandoEdts}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={cargandoEdts ? 'Cargando EDT...' : 'Sin EDT'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SIN_EDT}>Sin EDT</SelectItem>
+                  {proyectoEdts.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.nombre && e.nombre !== e.categoriaNombre
+                        ? `${e.categoriaNombre} — ${e.nombre}`
+                        : e.categoriaNombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {isWeekend && (
