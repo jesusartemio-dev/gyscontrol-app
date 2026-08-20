@@ -67,7 +67,7 @@ interface ProyectoConsolidado {
   recepcionesPendientes: number
   alertas: number
   progreso: number
-  moneda: 'PEN' | 'USD'
+  moneda: 'PEN' | 'USD' | 'EUR'
 }
 
 // 🎯 Función para calcular estado del proyecto

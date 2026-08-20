@@ -53,7 +53,7 @@ export interface ProyectoConsolidado {
   recepcionesPendientes: number
   alertas: number
   progreso: number
-  moneda: 'PEN' | 'USD'
+  moneda: 'PEN' | 'USD' | 'EUR'
 }
 
 export interface KPIsConsolidados {

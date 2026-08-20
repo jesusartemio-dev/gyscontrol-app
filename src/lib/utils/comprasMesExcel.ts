@@ -123,6 +123,7 @@ export async function exportarComprasMes(
   let dataRow = 3
   let totalPEN = 0
   let totalUSD = 0
+  let totalEUR = 0
 
   // Separador sección facturas
   const sepCxP = ws.getRow(dataRow)
@@ -138,6 +139,7 @@ export async function exportarComprasMes(
     const montoFinal = esNC ? -Math.abs(item.monto) : item.monto
 
     if (item.moneda === 'USD') totalUSD += montoFinal
+    else if (item.moneda === 'EUR') totalEUR += montoFinal
     else totalPEN += montoFinal
 
     const row = ws.getRow(dataRow)
@@ -181,6 +183,7 @@ export async function exportarComprasMes(
   for (const item of gastoRows) {
     const montoFinal = item.monto
     if (item.moneda === 'USD') totalUSD += montoFinal
+    else if (item.moneda === 'EUR') totalEUR += montoFinal
     else totalPEN += montoFinal
 
     const row = ws.getRow(dataRow)
@@ -220,14 +223,23 @@ export async function exportarComprasMes(
   tRow.getCell(8).value = totalPEN
   tRow.getCell(8).numFmt = '#,##0.00'
   tRow.getCell(8).font = { bold: true }
-  dataRow++
   if (totalUSD !== 0) {
+    dataRow++
     const tUSD = ws.getRow(dataRow)
     tUSD.getCell(7).value = 'TOTAL USD'
     tUSD.getCell(7).font = { bold: true }
     tUSD.getCell(8).value = totalUSD
     tUSD.getCell(8).numFmt = '#,##0.00'
     tUSD.getCell(8).font = { bold: true }
+  }
+  if (totalEUR !== 0) {
+    dataRow++
+    const tEUR = ws.getRow(dataRow)
+    tEUR.getCell(7).value = 'TOTAL EUR'
+    tEUR.getCell(7).font = { bold: true }
+    tEUR.getCell(8).value = totalEUR
+    tEUR.getCell(8).numFmt = '#,##0.00'
+    tEUR.getCell(8).font = { bold: true }
   }
 
   // Freeze header

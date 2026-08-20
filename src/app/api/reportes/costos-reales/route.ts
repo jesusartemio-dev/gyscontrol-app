@@ -3,15 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { calcularCostosLaborales } from '@/lib/utils/costosLaborales'
+import { convertirMonto, type TasasCambio } from '@/lib/utils/currency'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'gestor']
-
-function convertir(amount: number, fromMoneda: string, toMoneda: string, tipoCambio: number): number {
-  if (fromMoneda === toMoneda) return amount
-  if (fromMoneda === 'PEN' && toMoneda === 'USD') return amount / tipoCambio
-  if (fromMoneda === 'USD' && toMoneda === 'PEN') return amount * tipoCambio
-  return amount
-}
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 
@@ -46,6 +40,7 @@ export async function GET(request: NextRequest) {
 
     const config = await prisma.configuracionGeneral.findFirst()
     const tcDefault = config ? Number(config.tipoCambio) : 3.75
+    const tcEurDefault = config ? Number(config.tipoCambioEur) : 1.08
     const horasMes = config?.horasMensuales || 192
 
     const whereProyecto: Record<string, unknown> = { estado: { notIn: ['cancelado'] } }
@@ -177,11 +172,12 @@ export async function GET(request: NextRequest) {
     const proyectosResult = proyectos.map(p => {
       const monedaProy = p.moneda || 'USD'
       const tc = p.tipoCambio || tcDefault
+      const tasas: TasasCambio = { penPorUsd: tc, usdPorEur: tcEurDefault }
 
       // Equipment
       let costoEquipos = 0
       for (const oc of ocMap.get(p.id) || []) {
-        costoEquipos += convertir(oc.total, oc.moneda, monedaProy, tc)
+        costoEquipos += convertirMonto(oc.total, oc.moneda, monedaProy, tasas)
       }
 
       // Services - build user detail
@@ -190,12 +186,12 @@ export async function GET(request: NextRequest) {
       // Users with snapshot
       for (const h of snapshotDetalleMap.get(p.id) || []) {
         const costoHoraCalc = h.horas > 0 ? h.costo / h.horas : 0
-        const subtotalReporte = convertir(h.costo, 'PEN', monedaReporte, tc)
+        const subtotalReporte = convertirMonto(h.costo, 'PEN', monedaReporte, tasas)
         usuariosDetalle.push({
           usuarioId: h.usuarioId,
           nombre: userMap.get(h.usuarioId) || 'Sin nombre',
           horas: round2(h.horas),
-          costoHora: round2(convertir(costoHoraCalc, 'PEN', monedaReporte, tc)),
+          costoHora: round2(convertirMonto(costoHoraCalc, 'PEN', monedaReporte, tasas)),
           subtotal: round2(subtotalReporte),
         })
       }
@@ -205,7 +201,7 @@ export async function GET(request: NextRequest) {
         const emp = empMap.get(h.usuarioId)
         const chPEN = emp ? costoHoraPEN(emp, horasMes) : 0
         const costoPEN = h.horas * chPEN
-        const subtotalReporte = convertir(costoPEN, 'PEN', monedaReporte, tc)
+        const subtotalReporte = convertirMonto(costoPEN, 'PEN', monedaReporte, tasas)
         // Check if user already in list (merge)
         const existing = usuariosDetalle.find(u => u.usuarioId === h.usuarioId)
         if (existing) {
@@ -217,7 +213,7 @@ export async function GET(request: NextRequest) {
             usuarioId: h.usuarioId,
             nombre: userMap.get(h.usuarioId) || 'Sin nombre',
             horas: round2(h.horas),
-            costoHora: round2(convertir(chPEN, 'PEN', monedaReporte, tc)),
+            costoHora: round2(convertirMonto(chPEN, 'PEN', monedaReporte, tasas)),
             subtotal: round2(subtotalReporte),
           })
         }
@@ -229,17 +225,17 @@ export async function GET(request: NextRequest) {
         const emp = empMap.get(h.usuarioId)
         if (emp) costoFallbackPEN += h.horas * costoHoraPEN(emp, horasMes)
       }
-      const costoServicios = convertir(costoSnapshotPEN + costoFallbackPEN, 'PEN', monedaProy, tc)
+      const costoServicios = convertirMonto(costoSnapshotPEN + costoFallbackPEN, 'PEN', monedaProy, tasas)
 
       // Expenses
       let costoGastos = 0
       for (const g of gastosMap.get(p.id) || []) {
-        costoGastos += convertir(g.total, g.moneda, monedaProy, tc)
+        costoGastos += convertirMonto(g.total, g.moneda, monedaProy, tasas)
       }
 
-      const equiposR = round2(convertir(costoEquipos, monedaProy, monedaReporte, tc))
-      const serviciosR = round2(convertir(costoServicios, monedaProy, monedaReporte, tc))
-      const gastosR = round2(convertir(costoGastos, monedaProy, monedaReporte, tc))
+      const equiposR = round2(convertirMonto(costoEquipos, monedaProy, monedaReporte, tasas))
+      const serviciosR = round2(convertirMonto(costoServicios, monedaProy, monedaReporte, tasas))
+      const gastosR = round2(convertirMonto(costoGastos, monedaProy, monedaReporte, tasas))
       const horasProyecto = round2(usuariosDetalle.reduce((s, u) => s + u.horas, 0))
 
       totalEquipos += equiposR

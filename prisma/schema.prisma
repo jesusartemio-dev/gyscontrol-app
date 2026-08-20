@@ -3905,6 +3905,7 @@ model UserPermission {
 model ConfiguracionGeneral {
   id                     String   @id @default("default")
   tipoCambio             Decimal  @default(3.75) @db.Decimal(10, 4) // PEN a USD
+  tipoCambioEur          Decimal  @default(1.08) @db.Decimal(10, 4) // USD por 1 EUR
   horasSemanales         Int      @default(48) // Horas laborales por semana
   diasLaborables         Int      @default(5) // Días laborables por semana (L-V)
   semanasxMes            Float    @default(4) // Semanas por mes para cálculo (permite decimales, ej: 4.34)

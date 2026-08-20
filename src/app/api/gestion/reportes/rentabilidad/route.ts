@@ -3,17 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { calcularCostosLaborales } from '@/lib/utils/costosLaborales'
+import { convertirMonto, type TasasCambio } from '@/lib/utils/currency'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'gestor']
-
-// Convert amount from one currency to the project's currency
-function convertir(amount: number, fromMoneda: string, toMoneda: string, tipoCambio: number): number {
-  if (fromMoneda === toMoneda) return amount
-  // tipoCambio = cuántos PEN por 1 USD
-  if (fromMoneda === 'PEN' && toMoneda === 'USD') return amount / tipoCambio
-  if (fromMoneda === 'USD' && toMoneda === 'PEN') return amount * tipoCambio
-  return amount
-}
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 
@@ -48,19 +40,20 @@ export async function GET(request: NextRequest) {
     // System config: exchange rate + working hours
     const config = await prisma.configuracionGeneral.findFirst()
     const tcDefault = config ? Number(config.tipoCambio) : 3.75
+    const tcEurDefault = config ? Number(config.tipoCambioEur) : 1.08
     const horasMes = config?.horasMensuales || 192
 
     if (proyectoId) {
-      return await getProyectoDetalle(proyectoId, tcDefault, horasMes)
+      return await getProyectoDetalle(proyectoId, tcDefault, tcEurDefault, horasMes)
     }
-    return await getResumenTodos(tcDefault, horasMes)
+    return await getResumenTodos(tcDefault, tcEurDefault, horasMes)
   } catch (error) {
     console.error('Error en reporte rentabilidad:', error)
     return NextResponse.json({ error: 'Error del servidor' }, { status: 500 })
   }
 }
 
-async function getProyectoDetalle(proyectoId: string, tcDefault: number, horasMes: number) {
+async function getProyectoDetalle(proyectoId: string, tcDefault: number, tcEurDefault: number, horasMes: number) {
   const [proyecto, ocsByCurrency, costoSnapshotRaw, horasSinSnapshot, gastosByCurrency, hhByMoneda] = await Promise.all([
     prisma.proyecto.findUnique({
       where: { id: proyectoId },
@@ -124,23 +117,24 @@ async function getProyectoDetalle(proyectoId: string, tcDefault: number, horasMe
 
   const monedaProy = proyecto.moneda || 'USD'
   const tc = proyecto.tipoCambio || tcDefault
+  const tasas: TasasCambio = { penPorUsd: tc, usdPorEur: tcEurDefault }
 
   // Convert OC costs to project currency
   let costoEquipos = 0
   for (const oc of ocsByCurrency) {
-    costoEquipos += convertir(oc._sum.total || 0, oc.moneda, monedaProy, tc)
+    costoEquipos += convertirMonto(oc._sum.total || 0, oc.moneda, monedaProy, tasas)
   }
 
   // Service cost = snapshot (PEN) + fallback (PEN), converted to project currency
   const costoSnapshotPEN = Number(costoSnapshotRaw[0]?.total || 0)
   const costoFallbackPEN = await calcularCostoFallbackPEN(horasSinSnapshot, horasMes)
   const costoServiciosPEN = costoSnapshotPEN + costoFallbackPEN
-  const costoServicios = convertir(costoServiciosPEN, 'PEN', monedaProy, tc)
+  const costoServicios = convertirMonto(costoServiciosPEN, 'PEN', monedaProy, tasas)
 
   // Convert gastos by currency
   let costoGastos = 0
   for (const g of gastosByCurrency) {
-    costoGastos += convertir(Number(g.total), g.moneda, monedaProy, tc)
+    costoGastos += convertirMonto(Number(g.total), g.moneda, monedaProy, tasas)
   }
 
   costoEquipos = round2(costoEquipos)
@@ -150,7 +144,7 @@ async function getProyectoDetalle(proyectoId: string, tcDefault: number, horasMe
   // HH income: valorizaciones aprobadas de HH, convertidas a moneda del proyecto
   let ingresoHH = 0
   for (const hh of hhByMoneda) {
-    ingresoHH += convertir(Number(hh.total), hh.moneda, monedaProy, tc)
+    ingresoHH += convertirMonto(Number(hh.total), hh.moneda, monedaProy, tasas)
   }
 
   const ingreso = round2(proyecto.totalCliente + ingresoHH)
@@ -197,7 +191,7 @@ async function getProyectoDetalle(proyectoId: string, tcDefault: number, horasMe
   })
 }
 
-async function getResumenTodos(tcDefault: number, horasMes: number) {
+async function getResumenTodos(tcDefault: number, tcEurDefault: number, horasMes: number) {
   const [proyectos, ocsByProyectoMoneda, snapshotByProyecto, horasSinSnapshotByProyecto, gastosByProyectoMoneda, hhByProyecto] = await Promise.all([
     prisma.proyecto.findMany({
       where: { estado: { notIn: ['cancelado'] } },
@@ -311,18 +305,19 @@ async function getResumenTodos(tcDefault: number, horasMes: number) {
   const resumen = proyectos.map(p => {
     const monedaProy = p.moneda || 'USD'
     const tc = p.tipoCambio || tcDefault
+    const tasas: TasasCambio = { penPorUsd: tc, usdPorEur: tcEurDefault }
 
     // HH income: valorizaciones HH aprobadas
     let ingresoHH = 0
     for (const hh of hhMap.get(p.id) || []) {
-      ingresoHH += convertir(hh.total, hh.moneda, monedaProy, tc)
+      ingresoHH += convertirMonto(hh.total, hh.moneda, monedaProy, tasas)
     }
     const ingreso = round2(p.totalCliente + ingresoHH)
 
     // Convert OCs
     let costoEquipos = 0
     for (const oc of ocMap.get(p.id) || []) {
-      costoEquipos += convertir(oc.total, oc.moneda, monedaProy, tc)
+      costoEquipos += convertirMonto(oc.total, oc.moneda, monedaProy, tasas)
     }
 
     // Service cost: snapshot (PEN) + fallback from current payroll (PEN)
@@ -334,12 +329,12 @@ async function getResumenTodos(tcDefault: number, horasMes: number) {
         costoFallbackPEN += h.horas * costoHoraPEN(emp, horasMes)
       }
     }
-    const costoServicios = convertir(costoSnapshotPEN + costoFallbackPEN, 'PEN', monedaProy, tc)
+    const costoServicios = convertirMonto(costoSnapshotPEN + costoFallbackPEN, 'PEN', monedaProy, tasas)
 
     // Convert gastos
     let costoGastos = 0
     for (const g of gastosMap.get(p.id) || []) {
-      costoGastos += convertir(g.total, g.moneda, monedaProy, tc)
+      costoGastos += convertirMonto(g.total, g.moneda, monedaProy, tasas)
     }
 
     costoEquipos = round2(costoEquipos)

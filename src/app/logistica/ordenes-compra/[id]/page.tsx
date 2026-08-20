@@ -20,6 +20,7 @@ import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { getOrdenCompraById, aprobarOC, enviarOC, confirmarOC, cancelarOC, deleteOrdenCompra, registrarRecepcionOC, completarOC, editarAdministrativoOC, fetchItemsDisponibles, type ItemDisponible, type PedidoPendiente } from '@/lib/services/ordenCompra'
 import { CONDICIONES_PAGO, FORMAS_PAGO, DIAS_CREDITO_PRESETS, formatPago, formaRequiereDias } from '@/lib/utils/formaPago'
+import { getMonedaSymbol } from '@/lib/utils/currency'
 import OCEstadoStepper from '@/components/logistica/OCEstadoStepper'
 import CostosImportacionCard from '@/components/logistica/CostosImportacionCard'
 import { RollbackButton } from '@/components/RollbackButton'
@@ -59,7 +60,7 @@ function PedidoItemsTable({
 }) {
   const toggleItem = (id: string) =>
     setPedidoSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const simbolo = moneda === 'USD' ? 'US$' : 'S/'
+  const simbolo = getMonedaSymbol(moneda)
   return (
     <Table>
       <TableHeader>
@@ -1741,7 +1742,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                     {catalogoResults.map(item => {
                       const isSelected = catalogoSelectedIds.has(item.id)
                       const precio = item.precioLogistica || item.precioReal || item.precioInterno || 0
-                      const simbolo = oc?.moneda === 'USD' ? 'US$' : 'S/'
+                      const simbolo = getMonedaSymbol(oc?.moneda)
                       return (
                         <TableRow
                           key={item.id}
@@ -1934,6 +1935,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                     <SelectContent>
                       <SelectItem value="PEN">Soles (PEN)</SelectItem>
                       <SelectItem value="USD">Dólares (USD)</SelectItem>
+                      <SelectItem value="EUR">Euros (EUR)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

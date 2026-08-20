@@ -120,27 +120,29 @@ export default function ComprasMesPage() {
   }, [cxp, gastos])
 
   const totales = useMemo(() => {
-    let pen = 0, usd = 0
+    let pen = 0, usd = 0, eur = 0
     for (const f of filas) {
       const monto = f.tipo === 'cxp'
         ? (f.item.tipoDocumento === 'nota_credito' ? -Math.abs(f.item.monto) : f.item.monto)
         : f.item.monto
       if (f.item.moneda === 'USD') usd += monto
+      else if (f.item.moneda === 'EUR') eur += monto
       else pen += monto
     }
-    return { pen, usd }
+    return { pen, usd, eur }
   }, [filas])
 
   const totalImportacion = useMemo(() => {
-    let pen = 0, usd = 0, count = 0
+    let pen = 0, usd = 0, eur = 0, count = 0
     for (const item of cxp) {
       if (getOrigenCompra(item) !== 'extranjero') continue
       const monto = item.tipoDocumento === 'nota_credito' ? -Math.abs(item.monto) : item.monto
       if (item.moneda === 'USD') usd += monto
+      else if (item.moneda === 'EUR') eur += monto
       else pen += monto
       count++
     }
-    return { pen, usd, count }
+    return { pen, usd, eur, count }
   }, [cxp])
 
   const handleExport = async () => {
@@ -213,6 +215,14 @@ export default function ComprasMesPage() {
             </CardContent>
           </Card>
         )}
+        {totales.eur !== 0 && (
+          <Card className="flex-1 min-w-[160px]">
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs text-muted-foreground">Total EUR</p>
+              <p className="text-lg font-semibold">{fmt(totales.eur)}</p>
+            </CardContent>
+          </Card>
+        )}
         <Card className="flex-1 min-w-[160px]">
           <CardContent className="pt-4 pb-3">
             <p className="text-xs text-muted-foreground">Facturas / NC</p>
@@ -231,8 +241,10 @@ export default function ComprasMesPage() {
               <p className="text-xs text-muted-foreground">Importación ({totalImportacion.count})</p>
               <p className="text-lg font-semibold text-sky-700">
                 {totalImportacion.pen !== 0 && `S/ ${fmt(totalImportacion.pen)}`}
-                {totalImportacion.pen !== 0 && totalImportacion.usd !== 0 && ' + '}
+                {totalImportacion.pen !== 0 && (totalImportacion.usd !== 0 || totalImportacion.eur !== 0) && ' + '}
                 {totalImportacion.usd !== 0 && `$ ${fmt(totalImportacion.usd)}`}
+                {totalImportacion.usd !== 0 && totalImportacion.eur !== 0 && ' + '}
+                {totalImportacion.eur !== 0 && `€ ${fmt(totalImportacion.eur)}`}
               </p>
             </CardContent>
           </Card>

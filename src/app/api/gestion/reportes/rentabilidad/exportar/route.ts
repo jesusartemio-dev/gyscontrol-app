@@ -3,15 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { calcularCostosLaborales } from '@/lib/utils/costosLaborales'
+import { convertirMonto, type TasasCambio } from '@/lib/utils/currency'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'gestor']
-
-function convertir(amount: number, fromMoneda: string, toMoneda: string, tipoCambio: number): number {
-  if (fromMoneda === toMoneda) return amount
-  if (fromMoneda === 'PEN' && toMoneda === 'USD') return amount / tipoCambio
-  if (fromMoneda === 'USD' && toMoneda === 'PEN') return amount * tipoCambio
-  return amount
-}
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 
@@ -55,6 +49,7 @@ export async function GET(request: NextRequest) {
     // System config
     const config = await prisma.configuracionGeneral.findFirst()
     const tcDefault = config ? Number(config.tipoCambio) : 3.75
+    const tcEurDefault = config ? Number(config.tipoCambioEur) : 1.08
     const horasMes = config?.horasMensuales || 192
 
     // Parallel queries
@@ -162,12 +157,13 @@ export async function GET(request: NextRequest) {
 
     const monedaProy = proyecto.moneda || 'USD'
     const tc = proyecto.tipoCambio || tcDefault
-    const simbolo = monedaProy === 'USD' ? 'USD' : 'PEN'
+    const tasas: TasasCambio = { penPorUsd: tc, usdPorEur: tcEurDefault }
+    const simbolo = monedaProy
 
     // Calculate costs (same logic as existing route.ts)
     let costoEquipos = 0
     for (const oc of ocsByCurrency) {
-      costoEquipos += convertir(oc._sum.total || 0, oc.moneda, monedaProy, tc)
+      costoEquipos += convertirMonto(oc._sum.total || 0, oc.moneda, monedaProy, tasas)
     }
 
     const costoSnapshotPEN = Number(costoSnapshotRaw[0]?.total || 0)
@@ -184,11 +180,11 @@ export async function GET(request: NextRequest) {
         if (emp) costoFallbackPEN += (h._sum.horasTrabajadas || 0) * costoHoraPEN(emp, horasMes)
       }
     }
-    const costoServicios = convertir(costoSnapshotPEN + costoFallbackPEN, 'PEN', monedaProy, tc)
+    const costoServicios = convertirMonto(costoSnapshotPEN + costoFallbackPEN, 'PEN', monedaProy, tasas)
 
     let costoGastos = 0
     for (const g of gastosByCurrency) {
-      costoGastos += convertir(Number(g.total), g.moneda, monedaProy, tc)
+      costoGastos += convertirMonto(Number(g.total), g.moneda, monedaProy, tasas)
     }
 
     costoEquipos = round2(costoEquipos)

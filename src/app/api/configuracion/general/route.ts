@@ -14,6 +14,7 @@ export async function GET() {
         data: {
           id: 'default',
           tipoCambio: 3.75,
+          tipoCambioEur: 1.08,
           horasSemanales: 48,
           diasLaborables: 5,
           semanasxMes: 4,
@@ -46,6 +47,7 @@ export async function PUT(req: Request) {
       where: { id: 'default' },
       update: {
         tipoCambio: body.tipoCambio !== undefined ? parseFloat(body.tipoCambio) : undefined,
+        tipoCambioEur: body.tipoCambioEur !== undefined ? parseFloat(body.tipoCambioEur) : undefined,
         horasSemanales: body.horasSemanales !== undefined ? parseInt(body.horasSemanales) : undefined,
         diasLaborables: body.diasLaborables !== undefined ? parseInt(body.diasLaborables) : undefined,
         semanasxMes: body.semanasxMes !== undefined ? parseFloat(body.semanasxMes) : undefined,
@@ -55,6 +57,7 @@ export async function PUT(req: Request) {
       create: {
         id: 'default',
         tipoCambio: body.tipoCambio ?? 3.75,
+        tipoCambioEur: body.tipoCambioEur ?? 1.08,
         horasSemanales,
         diasLaborables: body.diasLaborables ?? 5,
         semanasxMes,

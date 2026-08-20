@@ -340,7 +340,8 @@ export default function CuentasPagarPage() {
     const byMoneda = (arr: CuentaPorPagar[], field: 'saldoPendiente' | 'monto') => {
       const pen = arr.filter(i => i.moneda === 'PEN').reduce((s, i) => s + i[field], 0)
       const usd = arr.filter(i => i.moneda === 'USD').reduce((s, i) => s + i[field], 0)
-      return { pen, usd }
+      const eur = arr.filter(i => i.moneda === 'EUR').reduce((s, i) => s + i[field], 0)
+      return { pen, usd, eur }
     }
 
     return {
@@ -411,11 +412,14 @@ export default function CuentasPagarPage() {
     const active = filtered.filter(i => i.estado !== 'anulada')
     const pen = active.filter(i => i.moneda === 'PEN')
     const usd = active.filter(i => i.moneda === 'USD')
+    const eur = active.filter(i => i.moneda === 'EUR')
     return {
       montoPEN: pen.reduce((s, i) => s + i.monto, 0),
       saldoPEN: pen.reduce((s, i) => s + i.saldoPendiente, 0),
       montoUSD: usd.reduce((s, i) => s + i.monto, 0),
       saldoUSD: usd.reduce((s, i) => s + i.saldoPendiente, 0),
+      montoEUR: eur.reduce((s, i) => s + i.monto, 0),
+      saldoEUR: eur.reduce((s, i) => s + i.saldoPendiente, 0),
       count: active.length,
     }
   }, [filtered])
@@ -924,10 +928,11 @@ export default function CuentasPagarPage() {
     }
   }
 
-  const renderMonedaTotals = (pen: number, usd: number) => {
+  const renderMonedaTotals = (pen: number, usd: number, eur: number = 0) => {
     const parts: string[] = []
     if (pen > 0) parts.push(`PEN: ${formatCurrency(pen, 'PEN')}`)
     if (usd > 0) parts.push(`USD: ${formatCurrency(usd, 'USD')}`)
+    if (eur > 0) parts.push(`EUR: ${formatCurrency(eur, 'EUR')}`)
     if (parts.length === 0) return formatCurrency(0, 'PEN')
     return parts.join(' | ')
   }
@@ -985,7 +990,7 @@ export default function CuentasPagarPage() {
                 <Clock className="h-5 w-5 text-yellow-600" />
               </div>
               <div>
-                <div className="text-lg font-bold">{renderMonedaTotals(resumen.pendiente.pen, resumen.pendiente.usd)}</div>
+                <div className="text-lg font-bold">{renderMonedaTotals(resumen.pendiente.pen, resumen.pendiente.usd, resumen.pendiente.eur)}</div>
                 <div className="text-xs text-muted-foreground">{resumen.countPendiente} pendientes</div>
               </div>
             </div>
@@ -998,7 +1003,7 @@ export default function CuentasPagarPage() {
                 <AlertTriangle className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <div className="text-lg font-bold text-red-600">{renderMonedaTotals(resumen.vencido.pen, resumen.vencido.usd)}</div>
+                <div className="text-lg font-bold text-red-600">{renderMonedaTotals(resumen.vencido.pen, resumen.vencido.usd, resumen.vencido.eur)}</div>
                 <div className="text-xs text-muted-foreground">{resumen.countVencido} vencidas</div>
               </div>
             </div>
@@ -1011,7 +1016,7 @@ export default function CuentasPagarPage() {
                 <CheckCircle className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <div className="text-lg font-bold text-green-600">{renderMonedaTotals(resumen.pagado.pen, resumen.pagado.usd)}</div>
+                <div className="text-lg font-bold text-green-600">{renderMonedaTotals(resumen.pagado.pen, resumen.pagado.usd, resumen.pagado.eur)}</div>
                 <div className="text-xs text-muted-foreground">pagado total</div>
               </div>
             </div>
@@ -1366,10 +1371,12 @@ export default function CuentasPagarPage() {
                   <td className="px-4 py-2 text-right font-mono">
                     {filteredTotals.montoPEN > 0 && <div>S/ {filteredTotals.montoPEN.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</div>}
                     {filteredTotals.montoUSD > 0 && <div>$ {filteredTotals.montoUSD.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</div>}
+                    {filteredTotals.montoEUR > 0 && <div>€ {filteredTotals.montoEUR.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</div>}
                   </td>
                   <td className="px-4 py-2 text-right font-mono font-bold">
                     {filteredTotals.saldoPEN > 0 && <div>S/ {filteredTotals.saldoPEN.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</div>}
                     {filteredTotals.saldoUSD > 0 && <div>$ {filteredTotals.saldoUSD.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</div>}
+                    {filteredTotals.saldoEUR > 0 && <div>€ {filteredTotals.saldoEUR.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</div>}
                   </td>
                   <td colSpan={3}></td>
                 </tr>
@@ -1725,6 +1732,7 @@ export default function CuentasPagarPage() {
                     <SelectContent>
                       <SelectItem value="PEN">PEN (S/)</SelectItem>
                       <SelectItem value="USD">USD ($)</SelectItem>
+                      <SelectItem value="EUR">EUR (€)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

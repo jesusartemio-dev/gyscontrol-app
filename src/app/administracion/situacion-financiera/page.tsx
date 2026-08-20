@@ -13,6 +13,7 @@ import { getClientes } from '@/lib/services/cliente'
 import type { Cliente } from '@/types/modelos'
 import type { SituacionFinanciera, SituacionFinancieraMoneda } from '@/lib/administracion/situacionFinanciera'
 import type { PisoPlanilla } from '@/lib/administracion/pisoPlanilla'
+import { getMonedaSymbol } from '@/lib/utils/currency'
 
 const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -20,7 +21,7 @@ const MESES = [
 ]
 
 function fmt(n: number, moneda: string) {
-  const simbolo = moneda === 'USD' ? '$' : 'S/'
+  const simbolo = getMonedaSymbol(moneda)
   return `${simbolo} ${n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
@@ -114,9 +115,10 @@ export default function SituacionFinancieraPage() {
           <Select value={moneda} onValueChange={setMoneda}>
             <SelectTrigger className="w-32 h-9"><SelectValue placeholder="Moneda" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">PEN + USD</SelectItem>
+              <SelectItem value="all">Todas</SelectItem>
               <SelectItem value="PEN">Solo PEN</SelectItem>
               <SelectItem value="USD">Solo USD</SelectItem>
+              <SelectItem value="EUR">Solo EUR</SelectItem>
             </SelectContent>
           </Select>
         </div>

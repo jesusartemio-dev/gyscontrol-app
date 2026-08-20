@@ -9,6 +9,7 @@ import {
   PDFDownloadLink,
 } from '@react-pdf/renderer'
 import type { OrdenCompra } from '@/types'
+import { getMonedaSymbol } from '@/lib/utils/currency'
 
 interface Props {
   oc: OrdenCompra
@@ -263,7 +264,7 @@ const formatNum = (n: number) =>
   n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 
 const formatCurrency = (amount: number, moneda = 'PEN') => {
-  const symbol = moneda === 'USD' ? 'US$' : 'S/'
+  const symbol = getMonedaSymbol(moneda)
   return `${symbol} ${formatNum(amount)}`
 }
 

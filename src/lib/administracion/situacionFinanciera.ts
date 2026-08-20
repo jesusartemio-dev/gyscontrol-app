@@ -14,7 +14,7 @@
 
 import { prisma } from '@/lib/prisma'
 
-const MONEDAS = ['PEN', 'USD'] as const
+const MONEDAS = ['PEN', 'USD', 'EUR'] as const
 type Moneda = (typeof MONEDAS)[number]
 
 const ESTADOS_VALORIZADO = ['aprobada_cliente', 'hes_pendiente', 'facturada', 'pagada'] as const

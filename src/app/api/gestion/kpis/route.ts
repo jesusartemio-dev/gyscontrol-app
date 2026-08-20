@@ -3,13 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { calcularCostosLaborales } from '@/lib/utils/costosLaborales'
-
-function kpiConvertir(amount: number, from: string, to: string, tc: number): number {
-  if (from === to) return amount
-  if (from === 'PEN' && to === 'USD') return amount / tc
-  if (from === 'USD' && to === 'PEN') return amount * tc
-  return amount
-}
+import { convertirMonto, type TasasCambio } from '@/lib/utils/currency'
 
 function kpiCostoHoraPEN(
   emp: { sueldoPlanilla: number | null; sueldoHonorarios: number | null; asignacionFamiliar: number; emo: number; regimenLaboral?: 'mype' | 'general' },
@@ -28,6 +22,7 @@ function kpiCostoHoraPEN(
 async function calcularCostosEjecutados(
   proyectos: { id: string; moneda: string | null; tipoCambio: number | null }[],
   tcDefault: number,
+  tcEurDefault: number,
   horasMes: number,
 ): Promise<Map<string, number>> {
   const [ocsByProyectoMoneda, snapshotHoras, fallbackHoras, gastosData] = await Promise.all([
@@ -93,10 +88,11 @@ async function calcularCostosEjecutados(
   for (const p of proyectos) {
     const moneda = p.moneda || 'USD'
     const tc = p.tipoCambio || tcDefault
+    const tasas: TasasCambio = { penPorUsd: tc, usdPorEur: tcEurDefault }
 
     let costoEquipos = 0
     for (const oc of ocMap.get(p.id) || []) {
-      costoEquipos += kpiConvertir(oc.total, oc.moneda, moneda, tc)
+      costoEquipos += convertirMonto(oc.total, oc.moneda, moneda, tasas)
     }
 
     const costoSnapshotPEN = snapshotMap.get(p.id) || 0
@@ -105,11 +101,11 @@ async function calcularCostosEjecutados(
       const emp = empMap.get(h.usuarioId)
       if (emp) costoFallbackPEN += h.horas * kpiCostoHoraPEN(emp, horasMes)
     }
-    const costoServicios = kpiConvertir(costoSnapshotPEN + costoFallbackPEN, 'PEN', moneda, tc)
+    const costoServicios = convertirMonto(costoSnapshotPEN + costoFallbackPEN, 'PEN', moneda, tasas)
 
     let costoGastos = 0
     for (const g of gastosMap.get(p.id) || []) {
-      costoGastos += kpiConvertir(g.total, g.moneda, moneda, tc)
+      costoGastos += convertirMonto(g.total, g.moneda, moneda, tasas)
     }
 
     costosMap.set(p.id, costoEquipos + costoServicios + costoGastos)
@@ -273,6 +269,7 @@ async function getProyectosKpis() {
 
   const config = await prisma.configuracionGeneral.findFirst()
   const tcDefault = config ? Number(config.tipoCambio) : 3.75
+  const tcEurDefault = config ? Number(config.tipoCambioEur) : 1.08
   const horasMes = config?.horasMensuales || 192
 
   const [proyectosActivos, tareasAtrasadas, edtsConHoras] = await Promise.all([
@@ -329,7 +326,7 @@ async function getProyectosKpis() {
     : 0
 
   // KPI 5: Proyectos en Rojo — usa costos ejecutados reales (OC + Horas + Gastos)
-  const costosMap = await calcularCostosEjecutados(proyectosActivos, tcDefault, horasMes)
+  const costosMap = await calcularCostosEjecutados(proyectosActivos, tcDefault, tcEurDefault, horasMes)
 
   const proyectosConPresupuesto = proyectosActivos.filter(p => p.totalInterno > 0)
   const proyectosConCosto = proyectosConPresupuesto.filter(p => (costosMap.get(p.id) || 0) > 0)
@@ -531,6 +528,7 @@ async function getLogisticaKpis() {
 async function getFinancieroKpis() {
   const config = await prisma.configuracionGeneral.findFirst()
   const tcDefault = config ? Number(config.tipoCambio) : 3.75
+  const tcEurDefault = config ? Number(config.tipoCambioEur) : 1.08
   const horasMes = config?.horasMensuales || 192
 
   const [proyectos, horasData, calendario] = await Promise.all([
@@ -569,7 +567,7 @@ async function getFinancieroKpis() {
   ])
 
   // Costos ejecutados reales: OC + RegistroHoras + Gastos
-  const costosMap = await calcularCostosEjecutados(proyectos, tcDefault, horasMes)
+  const costosMap = await calcularCostosEjecutados(proyectos, tcDefault, tcEurDefault, horasMes)
 
   // KPI 10: Margen Real por Proyecto
   const proyectosConCostos = proyectos.filter(p => (costosMap.get(p.id) || 0) > 0 && p.totalCliente > 0)

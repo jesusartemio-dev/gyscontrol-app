@@ -20,7 +20,7 @@ export async function GET(req: Request) {
     const hastaParam = searchParams.get('hasta')
     const clienteId = searchParams.get('clienteId') || undefined
     const monedaParam = searchParams.get('moneda')
-    const moneda = monedaParam === 'PEN' || monedaParam === 'USD' ? monedaParam : undefined
+    const moneda = monedaParam === 'PEN' || monedaParam === 'USD' || monedaParam === 'EUR' ? monedaParam : undefined
 
     if (!desdeParam || !hastaParam) {
       return NextResponse.json({ error: 'desde y hasta son requeridos (formato: YYYY-MM-DD)' }, { status: 400 })

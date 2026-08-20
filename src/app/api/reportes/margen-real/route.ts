@@ -3,17 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { calcularCostosLaborales } from '@/lib/utils/costosLaborales'
+import { convertirMonto, type TasasCambio } from '@/lib/utils/currency'
 
 const ROLES_ALLOWED = ['admin', 'gerente']
-
-// ─── Helpers (same as rentabilidad) ───
-
-function convertir(amount: number, fromMoneda: string, toMoneda: string, tipoCambio: number): number {
-  if (fromMoneda === toMoneda) return amount
-  if (fromMoneda === 'PEN' && toMoneda === 'USD') return amount / tipoCambio
-  if (fromMoneda === 'USD' && toMoneda === 'PEN') return amount * tipoCambio
-  return amount
-}
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 
@@ -61,6 +53,7 @@ export async function GET(request: NextRequest) {
     // System config
     const config = await prisma.configuracionGeneral.findFirst()
     const tcDefault = config ? Number(config.tipoCambio) : 3.75
+    const tcEurDefault = config ? Number(config.tipoCambioEur) : 1.08
     const horasMes = config?.horasMensuales || 192
 
     // ─── Parallel queries (same pattern as rentabilidad) ───
@@ -170,11 +163,12 @@ export async function GET(request: NextRequest) {
     const proyectosMargen = proyectos.map(p => {
       const monedaProy = p.moneda || 'USD'
       const tc = p.tipoCambio || tcDefault
+      const tasas: TasasCambio = { penPorUsd: tc, usdPorEur: tcEurDefault }
 
       // Equipment costs
       let costoEquipos = 0
       for (const oc of ocMap.get(p.id) || []) {
-        costoEquipos += convertir(oc.total, oc.moneda, monedaProy, tc)
+        costoEquipos += convertirMonto(oc.total, oc.moneda, monedaProy, tasas)
       }
 
       // Service costs (snapshot + fallback)
@@ -184,12 +178,12 @@ export async function GET(request: NextRequest) {
         const emp = empMap.get(h.usuarioId)
         if (emp) costoFallbackPEN += h.horas * costoHoraPEN(emp, horasMes)
       }
-      const costoServicios = convertir(costoSnapshotPEN + costoFallbackPEN, 'PEN', monedaProy, tc)
+      const costoServicios = convertirMonto(costoSnapshotPEN + costoFallbackPEN, 'PEN', monedaProy, tasas)
 
       // Operational expenses
       let costoGastos = 0
       for (const g of gastosMap.get(p.id) || []) {
-        costoGastos += convertir(g.total, g.moneda, monedaProy, tc)
+        costoGastos += convertirMonto(g.total, g.moneda, monedaProy, tasas)
       }
 
       costoEquipos = round2(costoEquipos)
@@ -202,10 +196,10 @@ export async function GET(request: NextRequest) {
       const margenPct = ingreso > 0 ? round2((margen / ingreso) * 100) : 0
 
       // Convert to report currency if needed
-      const ingresoR = round2(convertir(ingreso, monedaProy, monedaReporte, tc))
-      const equiposR = round2(convertir(costoEquipos, monedaProy, monedaReporte, tc))
-      const serviciosR = round2(convertir(costoServiciosR, monedaProy, monedaReporte, tc))
-      const gastosR = round2(convertir(costoGastos, monedaProy, monedaReporte, tc))
+      const ingresoR = round2(convertirMonto(ingreso, monedaProy, monedaReporte, tasas))
+      const equiposR = round2(convertirMonto(costoEquipos, monedaProy, monedaReporte, tasas))
+      const serviciosR = round2(convertirMonto(costoServiciosR, monedaProy, monedaReporte, tasas))
+      const gastosR = round2(convertirMonto(costoGastos, monedaProy, monedaReporte, tasas))
       const costoTotalR = round2(equiposR + serviciosR + gastosR)
       const margenR = round2(ingresoR - costoTotalR)
 

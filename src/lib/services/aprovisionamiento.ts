@@ -14,6 +14,7 @@ import type {
   ResponsePedidos
 } from '@/types/aprovisionamiento'
 import { buildApiUrl } from '@/lib/utils'
+import { getMonedaSymbol } from '@/lib/utils/currency'
 import { AprovisionamientoCalculos } from './aprovisionamientoCalculos'
 import { AprovisionamientoNotificaciones, crearCoherenciaExtendida, type CoherenciaResultExtended } from './aprovisionamientoNotificaciones'
 
@@ -723,8 +724,8 @@ export const utilidadesService = {
   /**
    * 💰 Formatear montos
    */
-  formatearMonto(monto: number, moneda: 'PEN' | 'USD' = 'USD') {
-    const simbolo = moneda === 'USD' ? '$' : 'S/'
+  formatearMonto(monto: number, moneda: 'PEN' | 'USD' | 'EUR' = 'USD') {
+    const simbolo = getMonedaSymbol(moneda)
     return `${simbolo} ${monto.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
   },
 

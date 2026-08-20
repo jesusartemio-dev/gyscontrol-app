@@ -91,11 +91,40 @@ export const formatMonedaCompact = (amount: number, moneda?: string | null): str
 }
 
 /**
+ * Tasas de cambio necesarias para convertir entre PEN, USD y EUR.
+ * penPorUsd: cuántos PEN equivale 1 USD (ConfiguracionGeneral.tipoCambio)
+ * usdPorEur: cuántos USD equivale 1 EUR (ConfiguracionGeneral.tipoCambioEur)
+ */
+export interface TasasCambio {
+  penPorUsd: number
+  usdPorEur: number
+}
+
+/**
+ * Convierte un monto entre PEN, USD y EUR usando USD como moneda puente.
+ */
+export const convertirMonto = (amount: number, from: string, to: string, tasas: TasasCambio): number => {
+  if (from === to) return amount
+
+  const toUsd = from === 'USD' ? amount
+    : from === 'PEN' ? amount / tasas.penPorUsd
+    : from === 'EUR' ? amount * tasas.usdPorEur
+    : amount
+
+  return to === 'USD' ? toUsd
+    : to === 'PEN' ? toUsd * tasas.penPorUsd
+    : to === 'EUR' ? toUsd / tasas.usdPorEur
+    : toUsd
+}
+
+/**
  * Convierte un monto USD a la moneda de display y lo formatea.
  * Items se almacenan siempre en USD; esta función aplica tipoCambio cuando moneda !== 'USD'.
  */
 export const toDisplayAmount = (amountUSD: number, moneda?: string | null, tipoCambio?: number | null): number => {
-  if (!moneda || moneda === 'USD' || !tipoCambio) return amountUSD
+  if (!moneda || moneda === 'USD') return amountUSD
+  if (moneda === 'EUR' && tipoCambio) return amountUSD / tipoCambio
+  if (!tipoCambio) return amountUSD
   return amountUSD * tipoCambio
 }
 

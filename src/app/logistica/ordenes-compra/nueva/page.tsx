@@ -19,12 +19,14 @@ import { toast } from 'sonner'
 import { createOrdenCompra, fetchItemsDisponibles, type ItemDisponible, type PedidoPendiente } from '@/lib/services/ordenCompra'
 import { getProveedores } from '@/lib/services/proveedor'
 import { CONDICIONES_PAGO, FORMAS_PAGO, DIAS_CREDITO_PRESETS } from '@/lib/utils/formaPago'
+import { getMonedaSymbol } from '@/lib/utils/currency'
 import SelectorAsignacion, { type AsignacionValue } from '@/components/shared/SelectorAsignacion'
 import type { Proveedor, OrdenCompraItemPayload } from '@/types'
 
 const MONEDAS = [
   { value: 'PEN', label: 'Soles (PEN)' },
   { value: 'USD', label: 'Dólares (USD)' },
+  { value: 'EUR', label: 'Euros (EUR)' },
 ]
 
 // Constantes y helpers en src/lib/utils/formaPago.ts
@@ -1089,7 +1091,7 @@ function NuevaOrdenCompraContent() {
                                       {item.precioUnitario > 0 ? (
                                         <>
                                           {item.precioMoneda && (
-                                            <span className="text-[9px] mr-0.5">{item.precioMoneda === 'USD' ? '$' : 'S/'}</span>
+                                            <span className="text-[9px] mr-0.5">{getMonedaSymbol(item.precioMoneda)}</span>
                                           )}
                                           {item.precioUnitario.toFixed(2)}
                                         </>

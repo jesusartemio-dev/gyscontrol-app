@@ -117,7 +117,7 @@ const FinancialIndicator: React.FC<{
   label: string;
   value: number;
   budget: number;
-  currency?: 'PEN' | 'USD';
+  currency?: 'PEN' | 'USD' | 'EUR';
 }> = ({ label, value, budget, currency = 'USD' }) => {
   const percentage = budget > 0 ? (value / budget) * 100 : 0;
   const deviation = value - budget;

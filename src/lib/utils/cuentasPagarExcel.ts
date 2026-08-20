@@ -86,7 +86,7 @@ export interface CxPAdminExportRow extends CxPExportRow {
 }
 
 const ESTADOS_VALIDOS = ['pendiente', 'parcial', 'pagada', 'vencida', 'anulada']
-const MONEDAS_VALIDAS = ['PEN', 'USD']
+const MONEDAS_VALIDAS = ['PEN', 'USD', 'EUR']
 // Soporta: nuevos valores ('contado'|'credito'|'adelanto') y legacy ('credito_NN').
 const CONDICIONES_VALIDAS = ['contado', 'credito', 'adelanto', 'credito_15', 'credito_30', 'credito_45', 'credito_60', 'credito_90']
 
@@ -184,7 +184,7 @@ export function validarCxPImport(
 
     // Validar moneda
     if (!MONEDAS_VALIDAS.includes(moneda)) {
-      errores.push(`Moneda "${moneda}" inválida. Use: PEN o USD`)
+      errores.push(`Moneda "${moneda}" inválida. Use: PEN, USD o EUR`)
     }
 
     // Validar fechas
@@ -318,10 +318,10 @@ export async function generarPlantillaCxP() {
     ws.getCell(`E${row}`).dataValidation = {
       type: 'list',
       allowBlank: true,
-      formulae: ['"PEN,USD"'],
+      formulae: ['"PEN,USD,EUR"'],
       showErrorMessage: true,
       errorTitle: 'Moneda inválida',
-      error: 'Use PEN o USD',
+      error: 'Use PEN, USD o EUR',
     }
     // Condición de pago
     ws.getCell(`H${row}`).dataValidation = {

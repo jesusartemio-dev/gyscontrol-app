@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { calcularCostosLaborales } from '@/lib/utils/costosLaborales'
+import { convertirMonto, type TasasCambio } from '@/lib/utils/currency'
 
 export const dynamic = 'force-dynamic'
 
 const round2 = (n: number) => Math.round(n * 100) / 100
-
-function convertir(amount: number, fromMoneda: string, toMoneda: string, tipoCambio: number): number {
-  if (fromMoneda === toMoneda) return amount
-  if (fromMoneda === 'PEN' && toMoneda === 'USD') return amount / tipoCambio
-  if (fromMoneda === 'USD' && toMoneda === 'PEN') return amount * tipoCambio
-  return amount
-}
 
 function costoHoraPEN(
   emp: { sueldoPlanilla: number | null; sueldoHonorarios: number | null; asignacionFamiliar: number; emo: number; regimenLaboral?: 'mype' | 'general' },
@@ -70,14 +64,16 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
     }
 
     const tcDefault = config ? Number(config.tipoCambio) : 3.75
+    const tcEurDefault = config ? Number(config.tipoCambioEur) : 1.08
     const horasMes = config?.horasMensuales || 192
     const monedaProy = proyecto.moneda || 'USD'
     const tc = proyecto.tipoCambio || tcDefault
+    const tasas: TasasCambio = { penPorUsd: tc, usdPorEur: tcEurDefault }
 
     // costoEquipos: OC totals converted to project currency
     let costoEquipos = 0
     for (const oc of ocsByCurrency) {
-      costoEquipos += convertir(Number(oc._sum.total) || 0, oc.moneda, monedaProy, tc)
+      costoEquipos += convertirMonto(Number(oc._sum.total) || 0, oc.moneda, monedaProy, tasas)
     }
 
     // costoServicios: snapshot (PEN) + fallback via payroll (PEN), then convert
@@ -95,12 +91,12 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
         if (emp) costoFallbackPEN += (h._sum.horasTrabajadas || 0) * costoHoraPEN(emp, horasMes)
       }
     }
-    const costoServicios = convertir(costoSnapshotPEN + costoFallbackPEN, 'PEN', monedaProy, tc)
+    const costoServicios = convertirMonto(costoSnapshotPEN + costoFallbackPEN, 'PEN', monedaProy, tasas)
 
     // costoGastos: expense line items per currency
     let costoGastos = 0
     for (const g of gastosByCurrency) {
-      costoGastos += convertir(Number(g.total), g.moneda, monedaProy, tc)
+      costoGastos += convertirMonto(Number(g.total), g.moneda, monedaProy, tasas)
     }
 
     return NextResponse.json({

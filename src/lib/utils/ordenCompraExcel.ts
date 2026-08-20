@@ -104,7 +104,7 @@ interface OCExportRow {
 
 const ESTADOS_OC = ['borrador', 'aprobada', 'enviada', 'confirmada', 'parcial', 'completada', 'cancelada']
 const CATEGORIAS_VALIDAS = ['equipos', 'servicios', 'gastos']
-const MONEDAS_VALIDAS = ['PEN', 'USD']
+const MONEDAS_VALIDAS = ['PEN', 'USD', 'EUR']
 // Soporta: nuevos valores ('contado'|'credito'|'adelanto') y legacy ('credito_NN').
 const CONDICIONES_VALIDAS = ['contado', 'credito', 'adelanto', 'credito_15', 'credito_30', 'credito_45', 'credito_60', 'credito_90']
 const FORMAS_VALIDAS = ['transferencia', 'factura', 'cheque', 'letra', 'factura_negociable', 'otro', '']
@@ -234,7 +234,7 @@ export function validarOCImport(
 
     // Validar moneda
     if (!MONEDAS_VALIDAS.includes(moneda)) {
-      errores.push(`Moneda "${moneda}" inválida. Use: PEN o USD`)
+      errores.push(`Moneda "${moneda}" inválida. Use: PEN, USD o EUR`)
     }
 
     // Validar categoría
@@ -491,10 +491,10 @@ export async function generarPlantillaOC() {
     ws.getCell(`G${row}`).dataValidation = {
       type: 'list',
       allowBlank: true,
-      formulae: ['"PEN,USD"'],
+      formulae: ['"PEN,USD,EUR"'],
       showErrorMessage: true,
       errorTitle: 'Moneda inválida',
-      error: 'Use PEN o USD',
+      error: 'Use PEN, USD o EUR',
     }
     // Condición Pago (H)
     ws.getCell(`H${row}`).dataValidation = {
@@ -524,7 +524,7 @@ export async function generarPlantillaOC() {
     ['Código Proyecto', 'Condicional', 'Código del proyecto. Requerido si no indica Centro Costo. No poner ambos.'],
     ['Centro Costo', 'Condicional', 'Nombre del centro de costo. Requerido si no indica Proyecto. No poner ambos.'],
     ['Categoría', 'No', 'equipos (defecto), servicios, gastos'],
-    ['Moneda', 'No', 'PEN (defecto) o USD. IGV se calcula automático (18% en PEN, 0 en USD).'],
+    ['Moneda', 'No', 'PEN (defecto), USD o EUR.'],
     ['Condición Pago', 'No', 'contado (defecto), credito_15, credito_30, credito_45, credito_60, credito_90'],
     ['Lugar Entrega', 'No', 'Dirección o referencia de entrega.'],
     ['Observaciones', 'No', 'Texto libre para la OC.'],

@@ -8,6 +8,7 @@ import type { Empleado, RecursoPerfil } from '@/types'
 // Valores por defecto (se sobrescriben con configuración de BD)
 export const DEFAULTS = {
   TIPO_CAMBIO: 3.75,        // PEN a USD
+  TIPO_CAMBIO_EUR: 1.08,    // USD por 1 EUR
   HORAS_SEMANALES: 48,      // Jornada laboral peruana
   DIAS_LABORABLES: 5,       // Lunes a Viernes
   SEMANAS_X_MES: 4,         // Semanas por mes

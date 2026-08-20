@@ -26,6 +26,7 @@ import { DEFAULTS } from '@/lib/costos'
 interface ConfiguracionGeneral {
   id: string
   tipoCambio: number
+  tipoCambioEur: number
   horasSemanales: number
   diasLaborables: number
   semanasxMes: number
@@ -37,6 +38,7 @@ export default function ConfiguracionGeneralPage() {
   const [config, setConfig] = useState<ConfiguracionGeneral>({
     id: 'default',
     tipoCambio: DEFAULTS.TIPO_CAMBIO,
+    tipoCambioEur: DEFAULTS.TIPO_CAMBIO_EUR,
     horasSemanales: DEFAULTS.HORAS_SEMANALES,
     diasLaborables: DEFAULTS.DIAS_LABORABLES,
     semanasxMes: DEFAULTS.SEMANAS_X_MES,
@@ -65,6 +67,7 @@ export default function ConfiguracionGeneralPage() {
         setConfig({
           ...data,
           tipoCambio: parseFloat(data.tipoCambio),
+          tipoCambioEur: parseFloat(data.tipoCambioEur),
         })
       }
     } catch (error) {
@@ -90,6 +93,7 @@ export default function ConfiguracionGeneralPage() {
       setConfig({
         ...data,
         tipoCambio: parseFloat(data.tipoCambio),
+        tipoCambioEur: parseFloat(data.tipoCambioEur),
       })
       toast.success('Configuración guardada correctamente')
     } catch (error) {
@@ -104,6 +108,7 @@ export default function ConfiguracionGeneralPage() {
     setConfig({
       ...config,
       tipoCambio: DEFAULTS.TIPO_CAMBIO,
+      tipoCambioEur: DEFAULTS.TIPO_CAMBIO_EUR,
       horasSemanales: DEFAULTS.HORAS_SEMANALES,
       diasLaborables: DEFAULTS.DIAS_LABORABLES,
       semanasxMes: DEFAULTS.SEMANAS_X_MES,
@@ -208,6 +213,41 @@ export default function ConfiguracionGeneralPage() {
                 <p className="text-muted-foreground">
                   Ejemplo: S/. 100 = <span className="font-mono font-medium text-green-600">
                     ${(100 / config.tipoCambio).toFixed(2)} USD
+                  </span>
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="tipoCambioEur">
+                  Tipo de Cambio (EUR/USD)
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-3.5 w-3.5 inline ml-1 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">Cuántos dólares equivale 1 euro. Se usa para convertir órdenes de compra en EUR a USD/PEN en los reportes</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">$ 1 EUR =</span>
+                  <Input
+                    id="tipoCambioEur"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={config.tipoCambioEur}
+                    onChange={(e) => setConfig({ ...config, tipoCambioEur: parseFloat(e.target.value) || 0 })}
+                    className="w-24 text-center font-mono"
+                  />
+                  <span className="text-sm text-muted-foreground">USD</span>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-3 text-sm">
+                <p className="text-muted-foreground">
+                  Ejemplo: € 100 = <span className="font-mono font-medium text-green-600">
+                    ${(100 * config.tipoCambioEur).toFixed(2)} USD
                   </span>
                 </p>
               </div>
