@@ -143,6 +143,10 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
   // destino ya tiene su propia asignación, no hay nada que "mover": es solo edición).
   const mostrarMover = Boolean(celdaOrigen) && turnoSel !== turnoOrigen && !celdaExistente
 
+  // Datos a precargar para el turno `t`: los propios si ya tiene una asignación,
+  // o si no, los del turno de origen (para "mover" sin perder lo ya cargado).
+  const celdaBaseParaTurno = (t: TurnoVal) => celdaDeTurno(t) ?? (t !== turnoOrigen ? celdaOrigen : undefined)
+
   useEffect(() => {
     if (!open) return
     // Sembrar de inmediato con los proyectos ya asignados ese día, para que el
@@ -200,7 +204,7 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
   // Radix puede quedar en placeholder si el valor se fijó antes de montar la opción.
   useEffect(() => {
     if (!open) return
-    const existente = celdaDeTurno(turnoSel)
+    const existente = celdaBaseParaTurno(turnoSel)
     if (existente?.proyecto?.id && proyectoId !== existente.proyecto.id) {
       setValue('proyectoId', existente.proyecto.id)
     }
@@ -216,7 +220,7 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
     }
     // Sembrar con el EDT ya asignado en este turno (si aplica), para evitar el
     // placeholder de Radix mientras carga la lista real.
-    const existente = celdaDeTurno(turnoSel)
+    const existente = celdaBaseParaTurno(turnoSel)
     const seed: ProyectoEdtOption[] =
       existente?.proyecto?.id === proyectoId && existente.edt
         ? [{ id: existente.edt.id, nombre: existente.edt.codigo, categoriaNombre: existente.edt.codigo }]
@@ -239,21 +243,23 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
   // Re-aplicar el EDT del turno cuando ya cargaron las opciones.
   useEffect(() => {
     if (!open) return
-    const existente = celdaDeTurno(turnoSel)
+    const existente = celdaBaseParaTurno(turnoSel)
     if (existente?.edt?.id && proyectoEdtId !== existente.edt.id) {
       setValue('proyectoEdtId', existente.edt.id)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, turnoSel, proyectoEdts])
 
-  // Cambiar de turno carga la asignación de ese turno (o lo deja en blanco).
+  // Cambiar de turno carga la asignación de ese turno; si está vacío pero se venía
+  // editando una asignación en otro turno, se precarga con esos mismos datos (se
+  // asume que la intención es moverla, no perderla).
   const cambiarTurno = (t: TurnoVal) => {
-    const existente = celdaDeTurno(t)
+    const base = celdaBaseParaTurno(t)
     setValue('turno', t)
-    setValue('proyectoId', existente?.proyecto?.id ?? '')
-    setValue('proyectoEdtId', existente?.edt?.id ?? '')
-    setValue('esExcepcional', existente?.esExcepcional ?? isWeekend)
-    setValue('notas', existente?.notas ?? '')
+    setValue('proyectoId', base?.proyecto?.id ?? '')
+    setValue('proyectoEdtId', base?.edt?.id ?? '')
+    setValue('esExcepcional', base?.esExcepcional ?? isWeekend)
+    setValue('notas', base?.notas ?? '')
   }
 
   const onSubmit = handleSubmit(async (values) => {
