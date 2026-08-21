@@ -64,6 +64,7 @@ interface Recepcion {
   motivoRechazo: string | null
   confirmadoPor: { name: string } | null
   entregadoPor: { name: string } | null
+  confirmadoProyectoPor: { name: string } | null
   rechazadoPor: { name: string } | null
   fechaConfirmacion: string | null
   fechaEntregaProyecto: string | null
@@ -86,7 +87,12 @@ interface Recepcion {
   pedidoEquipoItem: {
     id: string
     codigo: string
-    pedidoEquipo: { id: string; codigo: string }
+    pedidoEquipo: {
+      id: string
+      codigo: string
+      user: { name: string | null; email: string | null } | null
+      proyecto: { gestor: { name: string | null } | null } | null
+    }
   } | null
   requerimientoMaterialItem: {
     id: string
@@ -94,12 +100,41 @@ interface Recepcion {
     descripcion: string
     cantidadSolicitada: number
     unidad: string
-    hojaDeGastos: { id: string; numero: string }
+    hojaDeGastos: { id: string; numero: string; empleado: { name: string | null; email: string | null } | null }
     proyecto: { id: string; nombre: string; codigo: string } | null
   } | null
 }
 
 type RecepcionFuente = 'oc' | 'req' | 'directo'
+
+/**
+ * Quién debe dar la conformidad de esta recepción.
+ *
+ * Se prioriza el responsable del pedido porque es a quien la API de conformidad
+ * autoriza (junto al gestor del proyecto). El empleado del requerimiento es solo
+ * un fallback informativo: una recepción sin pedido no pasa por conformidad.
+ */
+function getResponsableConformidad(r: Recepcion): {
+  nombre: string
+  email: string | null
+  gestor: string | null
+  puedeConfirmar: boolean
+} | null {
+  const pedido = r.pedidoEquipoItem?.pedidoEquipo
+  if (pedido?.user?.name) {
+    return {
+      nombre: pedido.user.name,
+      email: pedido.user.email,
+      gestor: pedido.proyecto?.gestor?.name ?? null,
+      puedeConfirmar: true,
+    }
+  }
+  const empleado = r.requerimientoMaterialItem?.hojaDeGastos?.empleado
+  if (empleado?.name) {
+    return { nombre: empleado.name, email: empleado.email, gestor: null, puedeConfirmar: false }
+  }
+  return null
+}
 
 function getRecepcionInfo(r: Recepcion): {
   fuente: RecepcionFuente
@@ -534,6 +569,7 @@ export default function RecepcionesPage() {
                   <TableHead>Proyecto</TableHead>
                   <TableHead>Ítem</TableHead>
                   <TableHead className="text-right w-[120px]">Cantidad</TableHead>
+                  <TableHead className="w-[150px]">Confirma</TableHead>
                   <TableHead className="w-[100px]">Fecha</TableHead>
                   <TableHead className="w-[160px]">Estado</TableHead>
                   <TableHead className="w-[80px]">Acciones</TableHead>
@@ -583,6 +619,32 @@ export default function RecepcionesPage() {
                       </TableCell>
                       <TableCell className="text-right text-xs font-medium">
                         {r.cantidadRecibida} / {info.cantidad} {info.unidad}
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const resp = getResponsableConformidad(r)
+                          if (!resp) return <span className="text-xs text-muted-foreground">—</span>
+                          const yaConfirmado = r.estado === 'confirmado_proyecto'
+                          return (
+                            <div className="text-xs" title={resp.email || undefined}>
+                              <div className={cn(
+                                'truncate max-w-[140px]',
+                                yaConfirmado ? 'text-muted-foreground' : 'font-medium'
+                              )}>
+                                {yaConfirmado && r.confirmadoProyectoPor?.name
+                                  ? r.confirmadoProyectoPor.name
+                                  : resp.nombre}
+                              </div>
+                              {yaConfirmado ? (
+                                <div className="text-[10px] text-green-700">confirmó</div>
+                              ) : resp.gestor && resp.gestor !== resp.nombre ? (
+                                <div className="text-[10px] text-muted-foreground truncate max-w-[140px]">
+                                  o {resp.gestor}
+                                </div>
+                              ) : null}
+                            </div>
+                          )
+                        })()}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {formatFecha(r.fechaRecepcion)}

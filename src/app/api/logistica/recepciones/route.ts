@@ -77,7 +77,17 @@ export async function GET(request: NextRequest) {
             select: {
               id: true,
               codigo: true,
-              pedidoEquipo: { select: { id: true, codigo: true } },
+              // El responsable del pedido y el gestor del proyecto son justamente
+              // los dos que pueden dar la conformidad: Logística necesita verlos
+              // para saber a quién reclamarle la confirmación.
+              pedidoEquipo: {
+                select: {
+                  id: true,
+                  codigo: true,
+                  user: { select: { name: true, email: true } },
+                  proyecto: { select: { gestor: { select: { name: true } } } },
+                }
+              },
             }
           },
           requerimientoMaterialItem: {
@@ -87,12 +97,15 @@ export async function GET(request: NextRequest) {
               descripcion: true,
               cantidadSolicitada: true,
               unidad: true,
-              hojaDeGastos: { select: { id: true, numero: true } },
+              hojaDeGastos: {
+                select: { id: true, numero: true, empleado: { select: { name: true, email: true } } }
+              },
               proyecto: { select: { id: true, nombre: true, codigo: true } },
             }
           },
           confirmadoPor: { select: { name: true } },
           entregadoPor: { select: { name: true } },
+          confirmadoProyectoPor: { select: { name: true } },
           rechazadoPor: { select: { name: true } },
         },
         orderBy: { fechaRecepcion: 'desc' },
