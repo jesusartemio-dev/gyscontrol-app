@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/table'
 import {
   Package,
+  PackageCheck,
   Search,
   Loader2,
   CheckCircle,
@@ -144,13 +145,16 @@ function getRecepcionInfo(r: Recepcion): {
   }
 }
 
-type TabEstado = 'all' | 'pendiente' | 'en_almacen' | 'entregado_proyecto' | 'rechazado'
+type TabEstado = 'all' | 'pendiente' | 'en_almacen' | 'entregado_proyecto' | 'confirmado_proyecto' | 'rechazado'
 
+// "Entregadas" = despachadas pero el proyecto todavía no dio conformidad (es la
+// cola que Logística tiene que perseguir). "Confirmadas" = ciclo cerrado.
 const TABS: { key: TabEstado; label: string; icon: any; color: string }[] = [
   { key: 'all', label: 'Todas', icon: Package, color: 'text-gray-600' },
   { key: 'pendiente', label: 'Pendientes', icon: Clock, color: 'text-amber-600' },
   { key: 'en_almacen', label: 'En almacén', icon: Package, color: 'text-blue-600' },
-  { key: 'entregado_proyecto', label: 'Entregadas', icon: Truck, color: 'text-green-600' },
+  { key: 'entregado_proyecto', label: 'Por confirmar', icon: Truck, color: 'text-amber-600' },
+  { key: 'confirmado_proyecto', label: 'Confirmadas', icon: PackageCheck, color: 'text-green-600' },
   { key: 'rechazado', label: 'Rechazadas', icon: XCircle, color: 'text-red-600' },
 ]
 
@@ -159,6 +163,7 @@ const STEPPER_STEPS = [
   { key: 'pendiente', label: 'Pendiente' },
   { key: 'en_almacen', label: 'Almacén' },
   { key: 'entregado_proyecto', label: 'Entregado' },
+  { key: 'confirmado_proyecto', label: 'Conforme' },
 ]
 
 function RecepcionMiniStepper({ estado }: { estado: string }) {

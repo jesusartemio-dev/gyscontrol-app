@@ -38,6 +38,7 @@ export type NotificationBadgeType =
   | 'pedidos-pendientes'
   | 'listas-por-cotizar'
   | 'recepciones-pendientes'
+  | 'recepciones-por-confirmar'
   | 'notificaciones-no-leidas'
   // Tareas
   | 'tareas-asignadas'

@@ -230,6 +230,7 @@ export default function MobileSidebar() {
         { href: '/mi-trabajo/timesheet', label: 'Mi Timesheet', icon: Calendar, badge: 'timesheet-no-enviado' as NotificationBadgeType },
         { href: '/mi-trabajo/mi-jornada', label: 'Mi Jornada', icon: HardHat },
         { href: '/mi-trabajo/tareas', label: 'Mis Tareas', icon: CheckSquare, badge: 'tareas-vencidas' as NotificationBadgeType },
+        { href: '/mi-trabajo/mis-pedidos', label: 'Mis Pedidos', icon: ShoppingCart, badge: 'recepciones-por-confirmar' as NotificationBadgeType },
         { href: '/mi-trabajo/progreso', label: 'Mi Progreso', icon: TrendingUp },
         { href: '/mi-trabajo/herramientas', label: 'Mis Herramientas', icon: Wrench },
       ]

@@ -2108,6 +2108,7 @@ model User {
   // Recepciones pendientes
   recepcionesConfirmadas                   RecepcionPendiente[]                 @relation("RecepcionConfirmador")
   recepcionesEntregadas                    RecepcionPendiente[]                 @relation("RecepcionEntregador")
+  recepcionesConfirmadasProyecto           RecepcionPendiente[]                 @relation("RecepcionConfirmadorProyecto")
   recepcionesRechazadas                    RecepcionPendiente[]                 @relation("RecepcionRechazador")
   cxpAdjuntos                              CxPAdjunto[]                         @relation("CxPAdjuntoSubidoPor")
   cxcAdjuntos                              CxCAdjunto[]                         @relation("CxCAdjuntoSubidoPor")
@@ -4000,6 +4001,7 @@ enum EstadoRecepcion {
   pendiente
   en_almacen
   entregado_proyecto
+  confirmado_proyecto
   rechazado
 }
 
@@ -4670,6 +4672,12 @@ model RecepcionPendiente {
   fechaConfirmacion           DateTime?
   entregadoPorId              String?
   fechaEntregaProyecto        DateTime?
+  // Conformidad del proyecto: quien pidió (o el gestor) confirma que recibió lo
+  // despachado. cantidadConfirmada null = confirmó todo lo entregado.
+  confirmadoProyectoPorId     String?
+  fechaConfirmacionProyecto   DateTime?
+  cantidadConfirmada          Float?
+  observacionesConformidad    String?
   rechazadoPorId              String?
   fechaRechazo                DateTime?
   motivoRechazo               String?
@@ -4682,6 +4690,7 @@ model RecepcionPendiente {
   requerimientoMaterialItem RequerimientoMaterialItem? @relation(fields: [requerimientoMaterialItemId], references: [id], onDelete: Cascade)
   confirmadoPor             User?                      @relation("RecepcionConfirmador", fields: [confirmadoPorId], references: [id])
   entregadoPor              User?                      @relation("RecepcionEntregador", fields: [entregadoPorId], references: [id])
+  confirmadoProyectoPor     User?                      @relation("RecepcionConfirmadorProyecto", fields: [confirmadoProyectoPorId], references: [id])
   rechazadoPor              User?                      @relation("RecepcionRechazador", fields: [rechazadoPorId], references: [id])
   entregasItem              EntregaItem[]
   movimientosAlmacen        MovimientoAlmacen[]

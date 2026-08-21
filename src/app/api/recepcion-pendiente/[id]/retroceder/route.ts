@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { ajustarCantidadAtendida } from '@/lib/services/recepcionRecalculo'
 
 export async function POST(
   req: Request,
@@ -22,8 +23,8 @@ export async function POST(
     const targetEstado: string = body.targetEstado || 'pendiente'
     const observaciones: string = body.observaciones || ''
 
-    if (!['pendiente', 'en_almacen'].includes(targetEstado)) {
-      return NextResponse.json({ error: 'targetEstado inválido: debe ser "pendiente" o "en_almacen"' }, { status: 400 })
+    if (!['pendiente', 'en_almacen', 'entregado_proyecto'].includes(targetEstado)) {
+      return NextResponse.json({ error: 'targetEstado inválido: debe ser "pendiente", "en_almacen" o "entregado_proyecto"' }, { status: 400 })
     }
 
     const recepcion = await (prisma.recepcionPendiente as any).findUnique({
@@ -54,6 +55,82 @@ export async function POST(
     const ocNumero = recepcion.ordenCompraItem?.ordenCompra?.numero || '—'
     const proyectoId = pedido?.proyectoId || recepcion.ordenCompraItem?.ordenCompra?.proyectoId || null
     const itemCodigo = pedidoItem?.codigo || recepcion.ordenCompraItem?.codigo || '—'
+
+    // ═══════════════════════════════════════
+    // RETROCESO: confirmado_proyecto → entregado_proyecto
+    // Deshace una conformidad equivocada. Si había sido parcial, devuelve el
+    // faltante que se había descontado del pedido.
+    // ═══════════════════════════════════════
+    if (targetEstado === 'entregado_proyecto') {
+      if (recepcion.estado !== 'confirmado_proyecto') {
+        return NextResponse.json(
+          { error: 'Solo se puede retroceder a "entregado a proyecto" desde una recepción confirmada' },
+          { status: 409 }
+        )
+      }
+
+      const faltanteRevertido = recepcion.cantidadConfirmada != null
+        ? recepcion.cantidadRecibida - recepcion.cantidadConfirmada
+        : 0
+
+      await prisma.$transaction(async (tx) => {
+        if (faltanteRevertido > 0 && pedidoItem && pedido) {
+          await ajustarCantidadAtendida(
+            tx,
+            {
+              id: pedidoItem.id,
+              cantidadAtendida: pedidoItem.cantidadAtendida,
+              cantidadPedida: pedidoItem.cantidadPedida,
+              listaEquipoItemId: pedidoItem.listaEquipoItemId,
+            },
+            pedido.id,
+            faltanteRevertido
+          )
+          await tx.entregaItem.updateMany({
+            where: { recepcionPendienteId: id },
+            data: { cantidadEntregada: recepcion.cantidadRecibida },
+          })
+        }
+
+        await tx.recepcionPendiente.update({
+          where: { id },
+          data: {
+            estado: 'entregado_proyecto',
+            confirmadoProyectoPorId: null,
+            fechaConfirmacionProyecto: null,
+            cantidadConfirmada: null,
+            observacionesConformidad: observaciones.trim()
+              || `Conformidad revertida por ${session.user.name || session.user.email}`,
+          },
+        })
+
+        await tx.eventoTrazabilidad.create({
+          data: {
+            id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            proyectoId,
+            pedidoEquipoId: pedido?.id || null,
+            tipo: 'recepcion_retrocedida',
+            descripcion: `Conformidad del proyecto revertida: ${recepcion.cantidadRecibida} x ${itemCodigo} de OC ${ocNumero} vuelve a pendiente de confirmación.${observaciones.trim() ? ` Motivo: ${observaciones.trim()}` : ''}`,
+            usuarioId: session.user.id,
+            metadata: {
+              recepcionPendienteId: id,
+              ordenCompraNumero: ocNumero,
+              cantidadRecibida: recepcion.cantidadRecibida,
+              faltanteRevertido,
+              de: 'confirmado_proyecto',
+              a: 'entregado_proyecto',
+            },
+            updatedAt: new Date(),
+          },
+        })
+      })
+
+      return NextResponse.json({
+        recepcionId: id,
+        estado: 'entregado_proyecto',
+        mensaje: 'Conformidad revertida correctamente',
+      })
+    }
 
     // ═══════════════════════════════════════
     // RETROCESO: en_almacen → pendiente

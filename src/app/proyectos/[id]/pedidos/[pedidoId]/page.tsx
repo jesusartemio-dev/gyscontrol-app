@@ -25,6 +25,8 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Collapsible,
   CollapsibleContent,
@@ -147,6 +149,12 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
   const [rechazarDialog, setRechazarDialog] = useState<{ open: boolean; recepcionId: string | null }>({ open: false, recepcionId: null })
   const [rechazarObservaciones, setRechazarObservaciones] = useState('')
   const [procesandoRecepcion, setProcesandoRecepcion] = useState<string | null>(null)
+  // Conformidad del proyecto: confirmar cantidad real / reportar problema
+  const [conformidadDialog, setConformidadDialog] = useState<{ id: string; cantidad: number; codigo: string; unidad: string } | null>(null)
+  const [conformidadCantidad, setConformidadCantidad] = useState('')
+  const [conformidadObs, setConformidadObs] = useState('')
+  const [disconformidadDialog, setDisconformidadDialog] = useState<string | null>(null)
+  const [disconformidadMotivo, setDisconformidadMotivo] = useState('')
   const [rechazoDetalleModal, setRechazoDetalleModal] = useState<any>(null)
   const [revertirRechazo, setRevertirRechazo] = useState<{ confirmando: boolean; motivo: string; procesando: boolean }>({ confirmando: false, motivo: '', procesando: false })
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
@@ -318,8 +326,59 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
     }
   }, [rechazarDialog.recepcionId, rechazarObservaciones, reloadPedido])
 
+  // ── Conformidad del proyecto (último paso del ciclo) ──
+  const handleConformidad = useCallback(async (recepcionId: string, cantidadConfirmada?: number, obs?: string) => {
+    setProcesandoRecepcion(recepcionId)
+    try {
+      const res = await fetch(`/api/recepcion-pendiente/${recepcionId}/confirmar-proyecto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cantidadConfirmada, observaciones: obs || null }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al confirmar')
+      toast.success(data.faltante > 0 ? 'Conformidad parcial registrada' : 'Recepción confirmada')
+      setConformidadDialog(null)
+      await reloadPedido()
+    } catch (err: any) {
+      toast.error(err.message || 'Error al confirmar conformidad')
+    } finally {
+      setProcesandoRecepcion(null)
+    }
+  }, [reloadPedido])
+
+  const handleDisconformidad = useCallback(async () => {
+    if (!disconformidadDialog || !disconformidadMotivo.trim()) return
+    setProcesandoRecepcion(disconformidadDialog)
+    try {
+      const res = await fetch(`/api/recepcion-pendiente/${disconformidadDialog}/rechazar-proyecto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ observaciones: disconformidadMotivo.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al reportar')
+      toast.success('Disconformidad enviada a Logística')
+      setDisconformidadDialog(null)
+      setDisconformidadMotivo('')
+      await reloadPedido()
+    } catch (err: any) {
+      toast.error(err.message || 'Error al reportar disconformidad')
+    } finally {
+      setProcesandoRecepcion(null)
+    }
+  }, [disconformidadDialog, disconformidadMotivo, reloadPedido])
+
   const userRole = session?.user?.role || ''
   const puedeConfirmarRecepcion = ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador'].includes(userRole)
+
+  // Conformidad final: la autoriza la PERTENENCIA (soy quien pidió, o gestiono
+  // el proyecto), no el rol. El API es la fuente de verdad; esto solo decide si
+  // se muestran los botones.
+  const puedeDarConformidad =
+    !!pedido &&
+    (pedido.responsableId === session?.user?.id
+      || ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos'].includes(userRole))
 
   const ESTADO_LABELS: Record<string, string> = {
     borrador: 'Borrador', enviado: 'Enviado', aprobado: 'Aprobado',
@@ -548,6 +607,165 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
             </div>
           )
         })()}
+
+        {/* Banner recepciones — estado "entregado_proyecto": esperando MI conformidad.
+            Último paso del ciclo: Logística ya despachó, falta que el proyecto
+            confirme que recibió lo que pidió. */}
+        {(() => {
+          const porConfirmar = recepcionesPendientes.filter((r: any) => r.estado === 'entregado_proyecto')
+          if (porConfirmar.length === 0) return null
+          return (
+            <div className="bg-amber-50 border border-amber-300 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <PackageCheck className="h-4 w-4 text-amber-600" />
+                <span className="text-sm font-semibold text-amber-900">
+                  Entregado — confirma que lo recibiste ({porConfirmar.length})
+                </span>
+              </div>
+              <p className="text-xs text-amber-800 mb-3">
+                {puedeDarConformidad
+                  ? 'Logística despachó estos ítems. Confirma la recepción para cerrar el pedido.'
+                  : 'Logística despachó estos ítems. El solicitante del pedido debe confirmar la recepción.'}
+              </p>
+              <div className="space-y-2">
+                {porConfirmar.map((r: any) => (
+                  <div key={r.id} className="bg-white border border-amber-200 rounded p-2 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs">
+                      <span className="font-medium">{r.cantidadRecibida} x {r.itemCodigo}</span>
+                      {' — '}
+                      <span className="text-muted-foreground">
+                        Despachado{r.entregadoPor?.name && ` por ${r.entregadoPor.name}`}
+                        {r.fechaEntregaProyecto && ` el ${formatDate(r.fechaEntregaProyecto)}`}
+                      </span>
+                    </span>
+                    {puedeDarConformidad && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                          disabled={procesandoRecepcion === r.id}
+                          onClick={() => handleConformidad(r.id)}
+                        >
+                          <PackageCheck className="h-3 w-3 mr-1" />
+                          Recibí todo
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          disabled={procesandoRecepcion === r.id}
+                          onClick={() => {
+                            setConformidadDialog({ id: r.id, cantidad: r.cantidadRecibida, codigo: r.itemCodigo, unidad: r.unidad || 'und' })
+                            setConformidadCantidad(String(r.cantidadRecibida))
+                            setConformidadObs('')
+                          }}
+                        >
+                          Recibí menos
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                          disabled={procesandoRecepcion === r.id}
+                          onClick={() => { setDisconformidadDialog(r.id); setDisconformidadMotivo('') }}
+                        >
+                          Problema
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Dialog conformidad parcial */}
+        <Dialog open={!!conformidadDialog} onOpenChange={(open) => { if (!open) setConformidadDialog(null) }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Confirmar cantidad recibida</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Se despacharon <strong>{conformidadDialog?.cantidad} {conformidadDialog?.unidad}</strong> de {conformidadDialog?.codigo}.
+              Indica cuánto llegó realmente; la diferencia vuelve a quedar pendiente en el pedido.
+            </p>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label htmlFor="conformidadCantidad">Cantidad recibida</Label>
+                <Input
+                  id="conformidadCantidad"
+                  type="number"
+                  min="0"
+                  step="any"
+                  max={conformidadDialog?.cantidad}
+                  value={conformidadCantidad}
+                  onChange={(e) => setConformidadCantidad(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="conformidadObs">Observaciones</Label>
+                <Textarea
+                  id="conformidadObs"
+                  placeholder="Ej: llegaron 8 de 10, faltaron 2 unidades"
+                  value={conformidadObs}
+                  onChange={(e) => setConformidadObs(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setConformidadDialog(null)}>Cancelar</Button>
+              <Button
+                disabled={procesandoRecepcion !== null}
+                onClick={() => {
+                  const cant = parseFloat(conformidadCantidad)
+                  if (!Number.isFinite(cant) || cant <= 0) { toast.error('Indica una cantidad válida'); return }
+                  if (conformidadDialog && cant > conformidadDialog.cantidad) {
+                    toast.error(`No puede superar lo entregado (${conformidadDialog.cantidad})`); return
+                  }
+                  if (conformidadDialog && cant < conformidadDialog.cantidad && !conformidadObs.trim()) {
+                    toast.error('Explica por qué recibiste menos'); return
+                  }
+                  if (conformidadDialog) handleConformidad(conformidadDialog.id, cant, conformidadObs.trim() || undefined)
+                }}
+              >
+                Confirmar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog disconformidad */}
+        <Dialog open={!!disconformidadDialog} onOpenChange={(open) => { if (!open) setDisconformidadDialog(null) }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Reportar problema con la entrega</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              El ítem vuelve a la cola de Logística y el stock regresa al almacén.
+              Úsalo si no llegó, llegó dañado o no corresponde a lo pedido.
+            </p>
+            <div className="space-y-1">
+              <Label htmlFor="disconformidadMotivo">Motivo (obligatorio)</Label>
+              <Textarea
+                id="disconformidadMotivo"
+                placeholder="Ej: el material llegó dañado / nunca llegó a obra"
+                value={disconformidadMotivo}
+                onChange={(e) => setDisconformidadMotivo(e.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDisconformidadDialog(null)}>Cancelar</Button>
+              <Button
+                variant="destructive"
+                disabled={!disconformidadMotivo.trim() || procesandoRecepcion !== null}
+                onClick={handleDisconformidad}
+              >
+                Reportar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Dialog rechazar recepción */}
         <Dialog open={rechazarDialog.open} onOpenChange={(open) => { if (!open) setRechazarDialog({ open: false, recepcionId: null }) }}>

@@ -38,7 +38,7 @@ export async function POST(
         pedidoEquipoItem: {
           include: {
             pedidoEquipo: {
-              select: { id: true, codigo: true, proyectoId: true, proyecto: { select: { nombre: true, gestorId: true } } }
+              select: { id: true, codigo: true, proyectoId: true, responsableId: true, proyecto: { select: { nombre: true, gestorId: true } } }
             }
           }
         },
@@ -355,17 +355,30 @@ export async function POST(
       }
     })
 
-    if (gestorId) {
+    // Avisar al gestor y — sobre todo — a quien hizo el pedido: es quien tiene
+    // que entrar a confirmar la conformidad para cerrar el ciclo.
+    const solicitanteId = pedido?.responsableId || null
+    const destinatarios = new Set<string>()
+    if (gestorId) destinatarios.add(gestorId)
+    if (solicitanteId) destinatarios.add(solicitanteId)
+    destinatarios.delete(session.user.id)
+
+    for (const destinatarioId of destinatarios) {
+      const esSolicitante = destinatarioId === solicitanteId
       crearNotificacion(prisma, {
-        usuarioId: gestorId,
-        titulo: 'Material entregado a proyecto',
-        mensaje: `${recepcion.cantidadRecibida} x ${itemCodigo} (OC ${ocNumero}) entregado a ${proyectoNombre || 'proyecto'}`,
-        tipo: 'success',
-        prioridad: 'media',
+        usuarioId: destinatarioId,
+        titulo: esSolicitante ? 'Confirma tu recepción' : 'Material entregado a proyecto',
+        mensaje: esSolicitante
+          ? `Se entregó ${recepcion.cantidadRecibida} x ${itemCodigo} (OC ${ocNumero}). Confirma que lo recibiste conforme.`
+          : `${recepcion.cantidadRecibida} x ${itemCodigo} (OC ${ocNumero}) entregado a ${proyectoNombre || 'proyecto'}`,
+        tipo: esSolicitante ? 'warning' : 'success',
+        prioridad: esSolicitante ? 'alta' : 'media',
         entidadTipo: pedido ? 'PedidoEquipo' : 'OrdenCompra',
         entidadId: pedido?.id || ocItem?.ordenCompraId || reqItem?.hojaDeGastosId || id,
-        accionUrl: proyectoId ? `/proyectos/${proyectoId}` : '/logistica/recepciones',
-        accionTexto: pedido ? 'Ver proyecto' : 'Ver recepciones',
+        accionUrl: esSolicitante && pedido && proyectoId
+          ? `/proyectos/${proyectoId}/pedidos/${pedido.id}`
+          : proyectoId ? `/proyectos/${proyectoId}` : '/logistica/recepciones',
+        accionTexto: esSolicitante ? 'Confirmar recepción' : pedido ? 'Ver proyecto' : 'Ver recepciones',
       })
     }
 

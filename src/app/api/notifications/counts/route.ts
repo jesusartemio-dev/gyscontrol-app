@@ -80,6 +80,7 @@ export async function GET() {
       pedidosPendientes,
       listasPorCotizar,
       recepcionesPendientes,
+      recepcionesPorConfirmar,
       tareasAsignadas,
       tareasVencidas,
       tareasProximas,
@@ -97,6 +98,22 @@ export async function GET() {
       prisma.listaEquipo.count({ where: listasWhere }),
       prisma.recepcionPendiente.count({
         where: { estado: { in: ['pendiente', 'en_almacen'] } },
+      }),
+      // Despachado al proyecto y esperando MI conformidad: soy el solicitante
+      // del pedido o el gestor del proyecto. A diferencia del contador de
+      // arriba (global, para Logística), este es personal.
+      prisma.recepcionPendiente.count({
+        where: {
+          estado: 'entregado_proyecto',
+          pedidoEquipoItem: {
+            pedidoEquipo: {
+              OR: [
+                { responsableId: userId },
+                { proyecto: { gestorId: userId } },
+              ],
+            },
+          },
+        },
       }),
       prisma.proyectoTarea.count({
         where: {
@@ -163,6 +180,7 @@ export async function GET() {
       'pedidos-pendientes': pedidosPendientes,
       'listas-por-cotizar': listasPorCotizar,
       'recepciones-pendientes': recepcionesPendientes,
+      'recepciones-por-confirmar': recepcionesPorConfirmar,
       'tareas-asignadas': tareasAsignadas,
       'tareas-vencidas': tareasVencidas,
       'tareas-proximas': tareasProximas,
