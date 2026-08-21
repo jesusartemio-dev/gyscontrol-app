@@ -16,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import {
+  AlertTriangle,
   Package,
   PackageCheck,
   Search,
@@ -67,6 +68,9 @@ interface Recepcion {
   fechaConfirmacion: string | null
   fechaEntregaProyecto: string | null
   fechaRechazo: string | null
+  fechaRechazoProyecto: string | null
+  observacionesConformidad: string | null
+  cantidadConfirmada: number | null
   ordenCompraItem: {
     id: string
     codigo: string
@@ -570,6 +574,12 @@ export default function RecepcionesPage() {
                         <div className="text-[11px] text-muted-foreground truncate max-w-[200px]">
                           {info.descripcion}
                         </div>
+                        {r.fechaRechazoProyecto && r.observacionesConformidad && (
+                          <div className="text-[11px] text-red-700 mt-0.5 max-w-[260px]">
+                            <span className="font-medium">Motivo devolución:</span>{' '}
+                            {r.observacionesConformidad}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="text-right text-xs font-medium">
                         {r.cantidadRecibida} / {info.cantidad} {info.unidad}
@@ -579,6 +589,19 @@ export default function RecepcionesPage() {
                       </TableCell>
                       <TableCell>
                         <RecepcionMiniStepper estado={r.estado} />
+                        {/* Un ítem devuelto por obra vuelve a "en almacén" y sin
+                            esta marca sería indistinguible de uno recién llegado. */}
+                        {r.fechaRechazoProyecto && (
+                          <div
+                            className="mt-1 inline-flex items-center gap-1 rounded bg-red-50 border border-red-200 px-1.5 py-0.5"
+                            title={r.observacionesConformidad || 'Devuelto por el proyecto'}
+                          >
+                            <AlertTriangle className="h-3 w-3 text-red-600 shrink-0" />
+                            <span className="text-[10px] font-medium text-red-700">
+                              Devuelto por obra
+                            </span>
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell>
                         {(() => {

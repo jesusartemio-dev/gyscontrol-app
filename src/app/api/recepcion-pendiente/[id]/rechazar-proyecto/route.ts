@@ -139,6 +139,7 @@ export async function POST(
           entregadoPorId: null,
           fechaEntregaProyecto: null,
           observacionesConformidad: motivo,
+          fechaRechazoProyecto: new Date(),
           observaciones: `Disconformidad del proyecto: ${motivo}`,
         },
       })

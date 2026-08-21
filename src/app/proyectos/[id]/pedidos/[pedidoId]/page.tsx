@@ -575,6 +575,15 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                           {' el '}{formatDate(r.fechaConfirmacion || r.fechaRecepcion)}
                         </span>
                       </span>
+                      {/* Volvió a almacén porque el proyecto lo devolvió: sin esta
+                          marca parecería un ítem que nunca salió. */}
+                      {r.fechaRechazoProyecto && (
+                        <div className="text-xs text-red-700 mt-1">
+                          <AlertTriangle className="h-3 w-3 inline mr-1" />
+                          <span className="font-medium">Devuelto por disconformidad</span>
+                          {r.observacionesConformidad && `: ${r.observacionesConformidad}`}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5 ml-3 flex-shrink-0">
                       <Button

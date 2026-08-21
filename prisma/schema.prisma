@@ -4678,6 +4678,10 @@ model RecepcionPendiente {
   fechaConfirmacionProyecto   DateTime?
   cantidadConfirmada          Float?
   observacionesConformidad    String?
+  // Marca que el proyecto devolvió el material (volvió a en_almacen). Se conserva
+  // como historial aunque después se vuelva a despachar y confirmar, para que
+  // Logística pueda distinguir un ítem recién llegado de uno rebotado por obra.
+  fechaRechazoProyecto        DateTime?
   rechazadoPorId              String?
   fechaRechazo                DateTime?
   motivoRechazo               String?
