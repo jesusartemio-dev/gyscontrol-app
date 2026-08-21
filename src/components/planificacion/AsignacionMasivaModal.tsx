@@ -43,6 +43,8 @@ interface Props {
   onClose: () => void
   onDone: () => void
   celdas: CeldaMasiva[]
+  /** Horarios por defecto por turno (configurables en /configuracion/general). */
+  turnoHoraDefault?: Record<TurnoVal, { ingreso: string; salida: string }>
 }
 
 type TurnoVal = 'turno_a' | 'turno_b' | 'turno_c'
@@ -53,21 +55,21 @@ const TURNO_LABELS: Record<TurnoVal, string> = {
 }
 const TURNOS: TurnoVal[] = ['turno_a', 'turno_b', 'turno_c']
 
-export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }: Props) {
+export default function AsignacionMasivaModal({ open, onClose, onDone, celdas, turnoHoraDefault = TURNO_HORA_DEFAULT }: Props) {
   const [proyectoId, setProyectoId] = useState('')
   const [proyectoEdtId, setProyectoEdtId] = useState('')
   const [proyectoEdts, setProyectoEdts] = useState<ProyectoEdtOption[]>([])
   const [cargandoEdts, setCargandoEdts] = useState(false)
   const [turno, setTurno] = useState<TurnoVal>('turno_a')
-  const [horaIngreso, setHoraIngreso] = useState(TURNO_HORA_DEFAULT.turno_a.ingreso)
-  const [horaSalida, setHoraSalida] = useState(TURNO_HORA_DEFAULT.turno_a.salida)
+  const [horaIngreso, setHoraIngreso] = useState(turnoHoraDefault.turno_a.ingreso)
+  const [horaSalida, setHoraSalida] = useState(turnoHoraDefault.turno_a.salida)
   const [notas, setNotas] = useState('')
 
   // Al cambiar de turno, prellenar con su horario por defecto.
   const cambiarTurno = (t: TurnoVal) => {
     setTurno(t)
-    setHoraIngreso(TURNO_HORA_DEFAULT[t].ingreso)
-    setHoraSalida(TURNO_HORA_DEFAULT[t].salida)
+    setHoraIngreso(turnoHoraDefault[t].ingreso)
+    setHoraSalida(turnoHoraDefault[t].salida)
   }
   const [esExcepcional, setEsExcepcional] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -88,8 +90,8 @@ export default function AsignacionMasivaModal({ open, onClose, onDone, celdas }:
       setProyectoEdtId('')
       setProyectoEdts([])
       setTurno('turno_a')
-      setHoraIngreso(TURNO_HORA_DEFAULT.turno_a.ingreso)
-      setHoraSalida(TURNO_HORA_DEFAULT.turno_a.salida)
+      setHoraIngreso(turnoHoraDefault.turno_a.ingreso)
+      setHoraSalida(turnoHoraDefault.turno_a.salida)
       setNotas('')
       setEsExcepcional(false)
       return

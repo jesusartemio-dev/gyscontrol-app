@@ -56,6 +56,8 @@ interface Props {
   celdasDia?: CeldaEntry[]
   /** Turno a preseleccionar al abrir. */
   turnoInicial?: TurnoVal
+  /** Horarios por defecto por turno (configurables en /configuracion/general). */
+  turnoHoraDefault?: Record<TurnoVal, { ingreso: string; salida: string }>
 }
 
 const FormSchema = z.object({
@@ -76,7 +78,7 @@ const TURNO_LABELS: Record<TurnoVal, string> = {
 const TURNOS: TurnoVal[] = ['turno_a', 'turno_b', 'turno_c']
 const SIN_EDT = '__sin_edt__'
 
-export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, userName, fecha, celdasDia, turnoInicial }: Props) {
+export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, userName, fecha, celdasDia, turnoInicial, turnoHoraDefault = TURNO_HORA_DEFAULT }: Props) {
   const [proyectos, setProyectos] = useState<ProyectoActivo[]>([])
   const [proyectoEdts, setProyectoEdts] = useState<ProyectoEdtOption[]>([])
   const [cargandoEdts, setCargandoEdts] = useState(false)
@@ -88,7 +90,7 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
 
   // Horario (ingreso/salida) por turno de este día, para compartir la programación.
   const [horarios, setHorarios] = useState<Record<string, { ingreso: string; salida: string }>>({})
-  const horarioDe = (t: string) => horarios[t] ?? TURNO_HORA_DEFAULT[t as TurnoVal] ?? { ingreso: '', salida: '' }
+  const horarioDe = (t: string) => horarios[t] ?? turnoHoraDefault[t as TurnoVal] ?? { ingreso: '', salida: '' }
   const setHorario = (t: string, campo: 'ingreso' | 'salida', val: string) =>
     setHorarios((prev) => ({ ...prev, [t]: { ...horarioDe(t), [campo]: val } }))
 
@@ -175,7 +177,7 @@ export default function AsignacionCeldaModal({ open, onClose, onSaved, userId, u
         for (const x of arr) {
           h[x.turno] = {
             ingreso: x.horaIngreso,
-            salida: x.horaSalida || TURNO_HORA_DEFAULT[x.turno as TurnoVal]?.salida || '',
+            salida: x.horaSalida || turnoHoraDefault[x.turno as TurnoVal]?.salida || '',
           }
         }
         setHorarios(h)

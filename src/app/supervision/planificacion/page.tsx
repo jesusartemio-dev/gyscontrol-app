@@ -1111,6 +1111,24 @@ export default function PlanificacionPage() {
   // Horario (ingreso/salida) por turno/día. Clave: `${fecha}|${turno}`.
   const [turnoHoras, setTurnoHoras] = useState<Record<string, { ingreso: string; salida: string | null }>>({})
 
+  // Horarios por defecto de cada turno, configurables en /configuracion/general.
+  // Arranca con el fallback hardcodeado y se sobrescribe al cargar la configuración.
+  const [turnoHoraDefault, setTurnoHoraDefault] = useState<Record<TurnoAsignable, { ingreso: string; salida: string }>>(TURNO_HORA_DEFAULT)
+
+  useEffect(() => {
+    fetch('/api/configuracion/general')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return
+        setTurnoHoraDefault({
+          turno_a: { ingreso: data.turnoAIngreso, salida: data.turnoASalida },
+          turno_b: { ingreso: data.turnoBIngreso, salida: data.turnoBSalida },
+          turno_c: { ingreso: data.turnoCIngreso, salida: data.turnoCSalida },
+        })
+      })
+      .catch(() => {})
+  }, [])
+
   const reload = useCallback(() => {
     setLoading(true)
     const params = new URLSearchParams({ inicio: semanaInicio, semanas: String(numSemanas) })
@@ -1248,8 +1266,8 @@ export default function PlanificacionPage() {
   const horarioTurno = (dateKey: string, t: TurnoAsignable): { ingreso: string; salida: string } => {
     const g = turnoHoras[`${dateKey}|${t}`]
     return {
-      ingreso: g?.ingreso || TURNO_HORA_DEFAULT[t].ingreso,
-      salida: g?.salida || TURNO_HORA_DEFAULT[t].salida,
+      ingreso: g?.ingreso || turnoHoraDefault[t].ingreso,
+      salida: g?.salida || turnoHoraDefault[t].salida,
     }
   }
 
@@ -2186,6 +2204,7 @@ export default function PlanificacionPage() {
             fecha={modalCelda.fecha}
             celdasDia={modalCelda.celdasDia}
             turnoInicial={modalCelda.turnoInicial}
+            turnoHoraDefault={turnoHoraDefault}
           />
         )}
 
@@ -2226,6 +2245,7 @@ export default function PlanificacionPage() {
                 })
               : []
           }
+          turnoHoraDefault={turnoHoraDefault}
         />
       </div>
 
