@@ -22,6 +22,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { DEFAULTS } from '@/lib/costos'
+import { TURNO_HORA_DEFAULT } from '@/lib/planificacion/turnos'
 
 interface ConfiguracionGeneral {
   id: string
@@ -31,6 +32,12 @@ interface ConfiguracionGeneral {
   diasLaborables: number
   semanasxMes: number
   horasMensuales: number
+  turnoAIngreso: string
+  turnoASalida: string
+  turnoBIngreso: string
+  turnoBSalida: string
+  turnoCIngreso: string
+  turnoCSalida: string
   updatedAt?: string
 }
 
@@ -43,6 +50,12 @@ export default function ConfiguracionGeneralPage() {
     diasLaborables: DEFAULTS.DIAS_LABORABLES,
     semanasxMes: DEFAULTS.SEMANAS_X_MES,
     horasMensuales: DEFAULTS.HORAS_MENSUALES,
+    turnoAIngreso: TURNO_HORA_DEFAULT.turno_a.ingreso,
+    turnoASalida: TURNO_HORA_DEFAULT.turno_a.salida,
+    turnoBIngreso: TURNO_HORA_DEFAULT.turno_b.ingreso,
+    turnoBSalida: TURNO_HORA_DEFAULT.turno_b.salida,
+    turnoCIngreso: TURNO_HORA_DEFAULT.turno_c.ingreso,
+    turnoCSalida: TURNO_HORA_DEFAULT.turno_c.salida,
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -113,6 +126,12 @@ export default function ConfiguracionGeneralPage() {
       diasLaborables: DEFAULTS.DIAS_LABORABLES,
       semanasxMes: DEFAULTS.SEMANAS_X_MES,
       horasMensuales: DEFAULTS.HORAS_MENSUALES,
+      turnoAIngreso: TURNO_HORA_DEFAULT.turno_a.ingreso,
+      turnoASalida: TURNO_HORA_DEFAULT.turno_a.salida,
+      turnoBIngreso: TURNO_HORA_DEFAULT.turno_b.ingreso,
+      turnoBSalida: TURNO_HORA_DEFAULT.turno_b.salida,
+      turnoCIngreso: TURNO_HORA_DEFAULT.turno_c.ingreso,
+      turnoCSalida: TURNO_HORA_DEFAULT.turno_c.salida,
     })
   }
 
@@ -316,6 +335,60 @@ export default function ConfiguracionGeneralPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Horarios de Turnos */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="h-5 w-5 text-amber-600" />
+              Horarios de Turnos
+            </CardTitle>
+            <CardDescription>
+              Ingreso y salida por defecto de cada turno en planificación de personal. Se pueden
+              sobrescribir por día específico al asignar.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-3">
+              {(
+                [
+                  { letra: 'A', label: 'Turno A · Día', ingreso: 'turnoAIngreso', salida: 'turnoASalida' },
+                  { letra: 'B', label: 'Turno B · Tarde/Noche', ingreso: 'turnoBIngreso', salida: 'turnoBSalida' },
+                  { letra: 'C', label: 'Turno C · Noche', ingreso: 'turnoCIngreso', salida: 'turnoCSalida' },
+                ] as const
+              ).map((t) => (
+                <div key={t.letra} className="space-y-2 rounded-lg border p-3">
+                  <p className="text-sm font-medium">{t.label}</p>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 space-y-1">
+                      <Label htmlFor={t.ingreso} className="text-[11px] text-muted-foreground font-normal">Ingreso</Label>
+                      <Input
+                        id={t.ingreso}
+                        type="time"
+                        value={config[t.ingreso]}
+                        onChange={(e) => setConfig({ ...config, [t.ingreso]: e.target.value })}
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <Label htmlFor={t.salida} className="text-[11px] text-muted-foreground font-normal">Salida</Label>
+                      <Input
+                        id={t.salida}
+                        type="time"
+                        value={config[t.salida]}
+                        onChange={(e) => setConfig({ ...config, [t.salida]: e.target.value })}
+                        className="h-9"
+                      />
+                    </div>
+                  </div>
+                  {config[t.salida] && config[t.ingreso] && config[t.salida] <= config[t.ingreso] && (
+                    <p className="text-[11px] text-amber-600">La salida es al día siguiente.</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Fórmula y Ejemplo */}
         <Card>

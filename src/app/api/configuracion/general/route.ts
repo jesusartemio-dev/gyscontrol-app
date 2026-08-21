@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 
+const HORA_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/
+
 // GET - Obtener configuración general (crea si no existe)
 export async function GET() {
   try {
@@ -19,6 +21,12 @@ export async function GET() {
           diasLaborables: 5,
           semanasxMes: 4,
           horasMensuales: 192,
+          turnoAIngreso: '07:30',
+          turnoASalida: '18:00',
+          turnoBIngreso: '14:00',
+          turnoBSalida: '11:30',
+          turnoCIngreso: '19:30',
+          turnoCSalida: '06:00',
         }
       })
     }
@@ -43,6 +51,16 @@ export async function PUT(req: Request) {
     const semanasxMes = body.semanasxMes ?? 4
     const horasMensuales = horasSemanales * semanasxMes
 
+    const camposHora = ['turnoAIngreso', 'turnoASalida', 'turnoBIngreso', 'turnoBSalida', 'turnoCIngreso', 'turnoCSalida'] as const
+    for (const campo of camposHora) {
+      if (body[campo] !== undefined && !HORA_REGEX.test(body[campo])) {
+        return NextResponse.json(
+          { error: `${campo} debe tener formato HH:MM` },
+          { status: 400 }
+        )
+      }
+    }
+
     const config = await prisma.configuracionGeneral.upsert({
       where: { id: 'default' },
       update: {
@@ -52,6 +70,12 @@ export async function PUT(req: Request) {
         diasLaborables: body.diasLaborables !== undefined ? parseInt(body.diasLaborables) : undefined,
         semanasxMes: body.semanasxMes !== undefined ? parseFloat(body.semanasxMes) : undefined,
         horasMensuales,
+        turnoAIngreso: body.turnoAIngreso,
+        turnoASalida: body.turnoASalida,
+        turnoBIngreso: body.turnoBIngreso,
+        turnoBSalida: body.turnoBSalida,
+        turnoCIngreso: body.turnoCIngreso,
+        turnoCSalida: body.turnoCSalida,
         updatedBy: body.updatedBy || null,
       },
       create: {
@@ -62,6 +86,12 @@ export async function PUT(req: Request) {
         diasLaborables: body.diasLaborables ?? 5,
         semanasxMes,
         horasMensuales,
+        turnoAIngreso: body.turnoAIngreso ?? '07:30',
+        turnoASalida: body.turnoASalida ?? '18:00',
+        turnoBIngreso: body.turnoBIngreso ?? '14:00',
+        turnoBSalida: body.turnoBSalida ?? '11:30',
+        turnoCIngreso: body.turnoCIngreso ?? '19:30',
+        turnoCSalida: body.turnoCSalida ?? '06:00',
         updatedBy: body.updatedBy || null,
       }
     })

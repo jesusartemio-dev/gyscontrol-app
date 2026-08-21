@@ -3913,6 +3913,12 @@ model ConfiguracionGeneral {
   agenteLimiteMensualUsd Float    @default(25) // Limite mensual de gasto del agente IA (USD)
   iaFeatures             Json? // Feature flags IA: { chatGeneral, chatCotizacion, analisisTdr, importacionExcel, ocrComprobantes }
   limiteMateriales       Float    @default(500) // Monto máx para compra materiales sin pedido vinculado
+  turnoAIngreso          String   @default("07:30") // Horario por defecto Turno A (planificación)
+  turnoASalida           String   @default("18:00")
+  turnoBIngreso          String   @default("14:00") // Horario por defecto Turno B
+  turnoBSalida           String   @default("11:30")
+  turnoCIngreso          String   @default("19:30") // Horario por defecto Turno C
+  turnoCSalida           String   @default("06:00")
   updatedAt              DateTime @updatedAt
   updatedBy              String?
   user                   User?    @relation(fields: [updatedBy], references: [id])

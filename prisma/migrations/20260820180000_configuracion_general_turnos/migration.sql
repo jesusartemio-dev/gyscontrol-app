@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE "configuracion_general" ADD COLUMN     "turnoAIngreso" TEXT NOT NULL DEFAULT '07:30',
+ADD COLUMN     "turnoASalida" TEXT NOT NULL DEFAULT '18:00',
+ADD COLUMN     "turnoBIngreso" TEXT NOT NULL DEFAULT '14:00',
+ADD COLUMN     "turnoBSalida" TEXT NOT NULL DEFAULT '11:30',
+ADD COLUMN     "turnoCIngreso" TEXT NOT NULL DEFAULT '19:30',
+ADD COLUMN     "turnoCSalida" TEXT NOT NULL DEFAULT '06:00';
