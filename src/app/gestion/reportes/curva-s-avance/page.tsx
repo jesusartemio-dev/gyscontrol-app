@@ -29,15 +29,27 @@ interface AvanceWeek {
   weekLabel: string
   planificadoAcum: number | null
   realAcum: number | null
+  reportado: number | null
 }
 interface SnapshotResumen { semanaIso: string; progresoGeneral: number }
+interface HistoricoResumen {
+  porcentajeActual: number
+  porcentajeDerivado: number
+  brecha: number
+  tareasConAvance: number
+  tareasConHistorico: number
+}
+interface JornadaAbierta { id: string; fechaTrabajo: string; semanaIso: string }
 interface CurvaAvanceResponse {
   weeks: AvanceWeek[]
   hasBaseline: boolean
-  tieneSnapshots: boolean
+  tieneSerieReal: boolean
+  tieneReportados: boolean
   cronogramaPlanId: string | null
   cronogramaEjecId: string | null
   proyecto: ProyectoLight
+  historico: HistoricoResumen
+  jornadasAbiertas: JornadaAbierta[]
   snapshots: SnapshotResumen[]
 }
 
@@ -270,12 +282,46 @@ export default function CurvaSAvancePage() {
               </div>
             </div>
           )}
-          {!data.tieneSnapshots && (
+          {!data.tieneSerieReal && (
             <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
               <Camera className="h-4 w-4 mt-0.5 shrink-0" />
               <div>
-                <span className="font-medium">Aún no hay snapshots de avance.</span>{' '}
-                Toma uno desde el reporte semanal del proyecto para empezar a trazar la curva real.
+                <span className="font-medium">Este proyecto no tiene avance fechado.</span>{' '}
+                La línea Real se construye a partir del histórico que se registra al cerrar
+                jornadas de campo y al actualizar el % de una tarea.
+              </div>
+            </div>
+          )}
+
+          {/* Brecha: hay avance en las tareas que nunca pasó por el histórico fechado.
+              La curva arranca por debajo de la realidad hasta que se haga el punto cero. */}
+          {data.tieneSerieReal && data.historico.brecha > 1 && (
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-900">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <div>
+                <span className="font-medium">
+                  La curva Real llega a {data.historico.porcentajeDerivado.toFixed(1)}% pero el
+                  avance actual es {data.historico.porcentajeActual.toFixed(1)}%.
+                </span>{' '}
+                Son {data.historico.brecha.toFixed(1)} puntos de avance sin fecha registrada:{' '}
+                {data.historico.tareasConHistorico} de {data.historico.tareasConAvance} tareas con
+                avance tienen histórico. El resto avanzó antes de que se registrara la fecha.
+              </div>
+            </div>
+          )}
+
+          {/* Jornadas sin cerrar: su avance pertenece a semanas que ya pasaron. */}
+          {data.jornadasAbiertas.length > 0 && (
+            <div className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-900">
+              <Calendar className="h-4 w-4 mt-0.5 shrink-0" />
+              <div>
+                <span className="font-medium">
+                  {data.jornadasAbiertas.length}{' '}
+                  {data.jornadasAbiertas.length === 1 ? 'jornada sigue abierta' : 'jornadas siguen abiertas'}
+                  {' '}({data.jornadasAbiertas.map((j) => j.fechaTrabajo).join(', ')}).
+                </span>{' '}
+                Su avance todavía no existe, y cuando se cierren corregirá las semanas a las que
+                pertenece — no la semana en que se cierren.
               </div>
             </div>
           )}
@@ -310,6 +356,19 @@ export default function CurvaSAvancePage() {
                     <Legend verticalAlign="top" />
                     <Line type="monotone" dataKey="planificadoAcum" name="Planificado" stroke="#3B82F6" strokeWidth={2} strokeDasharray="6 3" dot={false} connectNulls />
                     <Line type="monotone" dataKey="realAcum" name="Real" stroke="#10B981" strokeWidth={2.5} dot={false} connectNulls />
+                    {/* Snapshots congelados: puntos sueltos, sin línea — es lo que se reportó
+                        en su momento, no una serie continua. */}
+                    <Line
+                      type="monotone"
+                      dataKey="reportado"
+                      name="Reportado"
+                      stroke="#7C3AED"
+                      strokeWidth={0}
+                      dot={{ r: 5, fill: '#7C3AED', stroke: '#7C3AED' }}
+                      legendType="circle"
+                      connectNulls={false}
+                      isAnimationActive={false}
+                    />
                     <ReferenceLine y={100} stroke="#9CA3AF" strokeDasharray="4 2" label={{ value: 'Meta 100%', position: 'insideTopRight', fill: '#6B7280', fontSize: 11 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -332,17 +391,23 @@ export default function CurvaSAvancePage() {
             <IndiceCard indice={indice} />
           </div>
 
-          {/* ─── Tabla editable de snapshots ─── */}
+          {/* ─── Tabla: Real derivado (lectura) + Reportado congelado (editable) ─── */}
           {data.weeks.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <Camera className="h-4 w-4" />
-                  Snapshots por semana
+                  Avance por semana
                   {!puedeEditar && (
                     <span className="ml-1 text-xs font-normal text-muted-foreground">(solo lectura)</span>
                   )}
                 </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium">Real</span> se calcula del avance fechado y se
+                  corrige solo cuando llega una jornada atrasada.{' '}
+                  <span className="font-medium">Reportado</span> es el snapshot congelado que se
+                  envió al cliente esa semana.
+                </p>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-auto max-h-96">
@@ -351,7 +416,8 @@ export default function CurvaSAvancePage() {
                       <TableRow>
                         <TableHead className="text-xs pl-4 w-40">Semana</TableHead>
                         <TableHead className="text-xs text-right w-24">Plan %</TableHead>
-                        <TableHead className="text-xs text-right w-36">Real %</TableHead>
+                        <TableHead className="text-xs text-right w-24">Real %</TableHead>
+                        <TableHead className="text-xs text-right w-36">Reportado %</TableHead>
                         <TableHead className="text-xs w-28">Estado</TableHead>
                         {puedeEditar && <TableHead className="text-xs w-20">Acción</TableHead>}
                       </TableRow>
@@ -373,7 +439,11 @@ export default function CurvaSAvancePage() {
                             <TableCell className="text-right font-mono text-muted-foreground py-1.5">
                               {pct(week.planificadoAcum)}
                             </TableCell>
-                            {/* Real % — input editable */}
+                            {/* Real % — derivado del histórico, solo lectura */}
+                            <TableCell className="text-right font-mono py-1.5">
+                              {pct(week.realAcum)}
+                            </TableCell>
+                            {/* Reportado % — snapshot congelado, editable */}
                             <TableCell className="text-right py-1.5">
                               <input
                                 type="number"
@@ -392,8 +462,8 @@ export default function CurvaSAvancePage() {
                             {/* Estado */}
                             <TableCell className="py-1.5">
                               {tieneSnap ? (
-                                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-green-100 text-green-700">
-                                  tomado
+                                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-violet-100 text-violet-700">
+                                  reportado
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500">

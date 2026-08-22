@@ -4,13 +4,29 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { construirCurvaAvance } from '@/lib/utils/curvaAvance'
 import { calcularPesosFase } from '@/lib/services/pesoFase'
+import { serieAvanceRealSemanal } from '@/lib/services/avanceHistorico'
+import { formatearSemanaIso } from '@/lib/utils/isoWeek'
 
 const ROLES = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
 
+const MS_PER_DAY = 86_400_000
+
+/** Lunes (UTC) de la semana ISO de una fecha, como "YYYY-MM-DD". */
+function lunesUTC(d: Date): string {
+  const dia = d.getUTCDay()
+  const delta = dia === 0 ? -6 : 1 - dia
+  const base = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+  return new Date(base + delta * MS_PER_DAY).toISOString().slice(0, 10)
+}
+
 /**
  * GET /api/proyectos/[id]/curva-avance
- * Curva S de avance físico (% 0-100): planeado del baseline (planificacion) vs real de los
- * snapshots semanales. Read-only, sin params extra. No toca la curva de costos.
+ * Curva S de avance físico (% 0-100). Read-only, sin params extra.
+ *  - Planeado: baseline del cronograma de planificación.
+ *  - Real: derivado del histórico fechado (ProyectoTareaAvance), recalculado en cada
+ *    consulta — una jornada cerrada tarde corrige la semana a la que pertenece.
+ *  - Reportado: los snapshots congelados, como puntos sueltos.
+ * No toca la curva de costos.
  */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -48,13 +64,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         })
       : []
 
-    const [snapshots, pesos] = await Promise.all([
+    const [snapshots, pesos, serie] = await Promise.all([
       prisma.proyectoAvanceSnapshot.findMany({
         where: { proyectoId: id },
         orderBy: { semanaIso: 'asc' },
         select: { semanaIso: true, fechaCorte: true, progresoGeneral: true },
       }),
       calcularPesosFase(id),
+      serieAvanceRealSemanal(id),
     ])
 
     const baselineTareas = tareasPlan.map((t) => ({
@@ -64,16 +81,45 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       horasEstimadas: Number(t.horasEstimadas ?? 0),
     }))
     const pesosFase = pesos.fases.map((f) => ({ faseNombre: f.nombre, pesoEfectivo: f.pesoEfectivo }))
+    const reportados = snapshots.map((s) => ({
+      weekStart: lunesUTC(s.fechaCorte),
+      porcentaje: s.progresoGeneral,
+    }))
 
-    const curva = construirCurvaAvance(baselineTareas, snapshots, pesosFase)
+    const curva = construirCurvaAvance(baselineTareas, serie.puntos, pesosFase, reportados)
+
+    // Si el histórico se queda muy por debajo del avance actual es que hay tareas que
+    // avanzaron antes de que existiera el registro fechado: la curva arranca demasiado
+    // abajo hasta que se haga el backfill del punto cero.
+    const brechaHistorico = Number((serie.porcentajeActual - serie.porcentajeDerivado).toFixed(2))
+
+    // Jornadas todavía abiertas: su avance aún no existe, y pertenece a semanas pasadas.
+    const jornadasAbiertas = await prisma.registroHorasCampo.findMany({
+      where: { proyectoId: id, estado: 'iniciado' },
+      orderBy: { fechaTrabajo: 'asc' },
+      select: { id: true, fechaTrabajo: true },
+    })
 
     return NextResponse.json({
       weeks: curva.weeks,
       hasBaseline: curva.hasBaseline,
-      tieneSnapshots: curva.tieneSnapshots,
+      tieneSerieReal: curva.tieneSerieReal,
+      tieneReportados: curva.tieneReportados,
       cronogramaPlanId: cronoPlan?.id ?? null,
       cronogramaEjecId: cronoEjec?.id ?? null,
       proyecto,
+      historico: {
+        porcentajeActual: serie.porcentajeActual,
+        porcentajeDerivado: serie.porcentajeDerivado,
+        brecha: brechaHistorico,
+        tareasConAvance: serie.tareasConAvance,
+        tareasConHistorico: serie.tareasConHistorico,
+      },
+      jornadasAbiertas: jornadasAbiertas.map((j) => ({
+        id: j.id,
+        fechaTrabajo: j.fechaTrabajo.toISOString().slice(0, 10),
+        semanaIso: formatearSemanaIso(j.fechaTrabajo),
+      })),
       snapshots: snapshots.map((s) => ({ semanaIso: s.semanaIso, progresoGeneral: s.progresoGeneral })),
     })
   } catch (e) {

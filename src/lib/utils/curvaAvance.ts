@@ -10,19 +10,6 @@ import {
 // ponderando por el PESO de cada fase (mismo criterio que el cronograma y el snapshot, para
 // una sola verdad). No modifica curvaS.ts.
 
-const MS_PER_DAY = 86_400_000
-
-function toDay(d: Date): number {
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
-}
-function getMonday(d: Date): Date {
-  const day = d.getUTCDay()
-  const diff = day === 0 ? -6 : 1 - day
-  return new Date(toDay(d) + diff * MS_PER_DAY)
-}
-function toISODate(d: Date): string {
-  return d.toISOString().slice(0, 10)
-}
 /** Normaliza un nombre de fase para casar baseline ↔ ejecución: MAYÚS, sin tildes, sin espacios. */
 function normFase(nombre: string | null): string {
   return (nombre ?? '')
@@ -38,10 +25,10 @@ export interface BaselineTareaInput {
   fechaFin: Date
   horasEstimadas: number
 }
-export interface SnapshotInput {
-  semanaIso: string
-  fechaCorte: Date
-  progresoGeneral: number // ya viene ponderado por peso de fase
+/** Punto semanal ya ponderado por peso de fase (lunes UTC "YYYY-MM-DD"). */
+export interface PuntoSemanalInput {
+  weekStart: string
+  porcentaje: number
 }
 export interface PesoFaseInput {
   faseNombre: string
@@ -52,13 +39,15 @@ export interface AvanceWeek {
   weekStart: string
   weekLabel: string
   planificadoAcum: number | null // % 0-100 (null si no hay baseline)
-  realAcum: number | null // % 0-100 (null antes del primer snapshot)
+  realAcum: number | null // % 0-100 (null antes del primer asiento del histórico)
+  reportado: number | null // % 0-100, solo en las semanas con snapshot congelado
 }
 
 export interface CurvaAvanceResult {
   weeks: AvanceWeek[]
   hasBaseline: boolean
-  tieneSnapshots: boolean
+  tieneSerieReal: boolean
+  tieneReportados: boolean
 }
 
 /**
@@ -66,22 +55,31 @@ export interface CurvaAvanceResult {
  *  - PLANEADO: por cada fase del baseline, se prorratean sus horas por semana (solape de
  *    días) → % completado de la fase; el aporte de la fase al total = pesoEfectivo(fase) ×
  *    %faseAcum. Suma sobre fases → % planificado acumulado del proyecto.
- *  - REAL: el progresoGeneral de cada snapshot (ya ponderado por peso) colocado en su semana
- *    y arrastrado hacia adelante.
+ *  - REAL: la serie derivada del histórico fechado (`serieAvanceRealSemanal`), colocada en
+ *    su semana y arrastrada hacia adelante. Se recalcula en cada consulta, así que una
+ *    jornada cerrada tarde corrige la semana a la que pertenece.
+ *  - REPORTADO: los snapshots congelados, como puntos sueltos (NO se arrastran) — son lo
+ *    que se envió al cliente en su momento, no una serie continua.
  */
 export function construirCurvaAvance(
   baselineTareas: BaselineTareaInput[],
-  snapshots: SnapshotInput[],
+  serieReal: PuntoSemanalInput[],
   pesosFase: PesoFaseInput[],
+  reportados: PuntoSemanalInput[] = [],
 ): CurvaAvanceResult {
   const hasBaseline = baselineTareas.length > 0
-  const tieneSnapshots = snapshots.length > 0
+  const tieneSerieReal = serieReal.length > 0
+  const tieneReportados = reportados.length > 0
 
-  // Rango temporal = min/max de fechas del baseline + cortes de los snapshots.
+  // Rango temporal = min/max de fechas del baseline + semanas con dato real o reportado.
   const fechas: number[] = []
   for (const t of baselineTareas) fechas.push(t.fechaInicio.getTime(), t.fechaFin.getTime())
-  for (const s of snapshots) fechas.push(s.fechaCorte.getTime())
-  if (fechas.length === 0) return { weeks: [], hasBaseline, tieneSnapshots }
+  for (const p of [...serieReal, ...reportados]) {
+    const ms = Date.parse(`${p.weekStart}T00:00:00.000Z`)
+    if (!Number.isNaN(ms)) fechas.push(ms)
+  }
+  if (fechas.length === 0)
+    return { weeks: [], hasBaseline, tieneSerieReal, tieneReportados }
 
   const buckets: WeekBucket[] = buildWeekBuckets(new Date(Math.min(...fechas)), new Date(Math.max(...fechas)))
   const nWeeks = buckets.length
@@ -120,11 +118,10 @@ export function construirCurvaAvance(
     }
   }
 
-  // ── REAL: % del snapshot por semana (lunes de fechaCorte); arrastre del último valor ──
-  const realPorSemana = new Map<string, number>()
-  for (const s of [...snapshots].sort((a, b) => a.fechaCorte.getTime() - b.fechaCorte.getTime())) {
-    realPorSemana.set(toISODate(getMonday(s.fechaCorte)), s.progresoGeneral)
-  }
+  // ── REAL: serie derivada del histórico; arrastre del último valor conocido ──
+  const realPorSemana = new Map(serieReal.map((p) => [p.weekStart, p.porcentaje]))
+  // ── REPORTADO: snapshots congelados, sin arrastre (puntos sueltos) ──
+  const reportadoPorSemana = new Map(reportados.map((p) => [p.weekStart, p.porcentaje]))
 
   let ultimoReal: number | null = null
   let realIniciado = false
@@ -135,8 +132,11 @@ export function construirCurvaAvance(
       realIniciado = true
     }
     const realAcum = realIniciado ? Number((ultimoReal as number).toFixed(2)) : null
-    return { weekStart: b.weekStart, weekLabel: b.weekLabel, planificadoAcum, realAcum }
+    const reportado = reportadoPorSemana.has(b.weekStart)
+      ? Number(reportadoPorSemana.get(b.weekStart)!.toFixed(2))
+      : null
+    return { weekStart: b.weekStart, weekLabel: b.weekLabel, planificadoAcum, realAcum, reportado }
   })
 
-  return { weeks, hasBaseline, tieneSnapshots }
+  return { weeks, hasBaseline, tieneSerieReal, tieneReportados }
 }

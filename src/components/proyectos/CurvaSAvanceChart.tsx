@@ -16,15 +16,25 @@ interface AvanceWeek {
   weekLabel: string
   planificadoAcum: number | null
   realAcum: number | null
+  reportado: number | null
 }
 
 interface CurvaAvanceResponse {
   weeks: AvanceWeek[]
   hasBaseline: boolean
-  tieneSnapshots: boolean
+  tieneSerieReal: boolean
+  tieneReportados: boolean
   cronogramaPlanId: string | null
   cronogramaEjecId: string | null
   proyecto: { id: string; codigo: string; nombre: string }
+  historico: {
+    porcentajeActual: number
+    porcentajeDerivado: number
+    brecha: number
+    tareasConAvance: number
+    tareasConHistorico: number
+  }
+  jornadasAbiertas: { id: string; fechaTrabajo: string; semanaIso: string }[]
 }
 
 const pct = (n: number | null | undefined) => (n == null ? '—' : `${n.toFixed(1)}%`)
@@ -94,11 +104,34 @@ export function CurvaSAvanceChart({ proyectoId, refreshKey }: { proyectoId: stri
                 </div>
               </div>
             )}
-            {!data.tieneSnapshots && (
+            {!data.tieneSerieReal && (
               <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
                 <Camera className="h-4 w-4 mt-0.5 shrink-0" />
                 <span>
-                  La línea Real aparecerá cuando tomes el primer snapshot de avance.
+                  La línea Real aparecerá cuando se registre avance fechado: al cerrar una
+                  jornada de campo o al actualizar el % de una tarea.
+                </span>
+              </div>
+            )}
+            {data.tieneSerieReal && data.historico.brecha > 1 && (
+              <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-900">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>
+                  La curva Real llega a {data.historico.porcentajeDerivado.toFixed(1)}% pero el
+                  avance actual es {data.historico.porcentajeActual.toFixed(1)}%:{' '}
+                  {data.historico.tareasConHistorico} de {data.historico.tareasConAvance} tareas
+                  con avance tienen fecha registrada.
+                </span>
+              </div>
+            )}
+            {data.jornadasAbiertas.length > 0 && (
+              <div className="flex items-start gap-2 bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-900">
+                <Calendar className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>
+                  {data.jornadasAbiertas.length}{' '}
+                  {data.jornadasAbiertas.length === 1 ? 'jornada sin cerrar' : 'jornadas sin cerrar'}
+                  {' '}({data.jornadasAbiertas.map((j) => j.fechaTrabajo).join(', ')}). Su avance
+                  corregirá las semanas a las que pertenece cuando se cierren.
                 </span>
               </div>
             )}
@@ -147,6 +180,18 @@ export function CurvaSAvanceChart({ proyectoId, refreshKey }: { proyectoId: stri
                     strokeWidth={2.5}
                     dot={false}
                     connectNulls
+                  />
+                  {/* Reportado: snapshots congelados, puntos sueltos sin línea */}
+                  <Line
+                    type="monotone"
+                    dataKey="reportado"
+                    name="Reportado"
+                    stroke="#7C3AED"
+                    strokeWidth={0}
+                    dot={{ r: 5, fill: '#7C3AED', stroke: '#7C3AED' }}
+                    legendType="circle"
+                    connectNulls={false}
+                    isAnimationActive={false}
                   />
                   {/* Meta 100% */}
                   <ReferenceLine
