@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { obtenerReporteAvanceAgregado } from '@/lib/services/reporteAvance'
 import { generarExcelReporteAvance } from '@/lib/services/excelAvanceGenerator'
-import { ROLES_PERMITIDOS } from '@/lib/auth/rolesEvidenciaProyecto'
+import { ROLES_PERMITIDOS, ROLES_LECTURA } from '@/lib/auth/rolesEvidenciaProyecto'
 
 // La descarga de fotos de Drive puede tardar varios segundos.
 export const maxDuration = 60
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    if (!(ROLES_PERMITIDOS as readonly string[]).includes(session.user.role))
+    if (!(ROLES_LECTURA as readonly string[]).includes(session.user.role))
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
     const agg = await obtenerReporteAvanceAgregado(id)

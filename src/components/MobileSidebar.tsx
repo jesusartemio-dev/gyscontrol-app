@@ -191,7 +191,7 @@ export default function MobileSidebar() {
         { href: '/proyectos/listas', label: 'Listas', icon: FileText, excludeRoles: ['seguridad'] as any },
         { href: '/proyectos/pedidos', label: 'Pedidos', icon: Package, badge: 'pedidos-pendientes' as NotificationBadgeType, excludeRoles: ['seguridad'] as any },
         { href: '/proyectos/evidencias', label: 'Evidencias técnicas', icon: ClipboardCheck },
-        { href: '/proyectos/reportes-semanales', label: 'Reportes de avance', icon: FileBarChart, excludeRoles: ['seguridad'] as any },
+        { href: '/proyectos/reportes-semanales', label: 'Reportes de avance', icon: FileBarChart },
         { href: '/proyectos/catalogo', label: 'Catálogo', icon: Wrench, excludeRoles: ['seguridad'] as any },
       ],
     },

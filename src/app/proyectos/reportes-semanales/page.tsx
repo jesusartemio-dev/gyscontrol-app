@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dialog'
 import { estadoReporteAvanceEnum, ESTADO_REPORTE_AVANCE_LABELS } from '@/lib/validators/reporteAvance'
 import { formatearSemanaIso } from '@/lib/utils/isoWeek'
+import { ROLES_PERMITIDOS } from '@/lib/auth/rolesEvidenciaProyecto'
 import { cn } from '@/lib/utils'
 
 interface ProyectoMin {
@@ -108,6 +109,8 @@ export default function ReportesAvanceListaPage() {
   const { data: session } = useSession()
   const role = session?.user?.role ?? ''
   const isBypass = ['admin', 'gerente', 'gestor'].includes(role)
+  // `seguridad` entra en solo lectura: no redacta reportes de avance técnico.
+  const puedeCapturar = (ROLES_PERMITIDOS as readonly string[]).includes(role)
 
   const [filtroProyectoId, setFiltroProyectoId] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
@@ -241,9 +244,11 @@ export default function ReportesAvanceListaPage() {
           <h1 className="text-lg font-bold">Reportes semanales de avance</h1>
           <p className="text-xs text-muted-foreground">Reporte de avance del proyecto por semana ISO</p>
         </div>
-        <Button size="sm" className="bg-orange-600 hover:bg-orange-700" onClick={() => setDialogNuevo(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Nuevo reporte
-        </Button>
+        {puedeCapturar && (
+          <Button size="sm" className="bg-orange-600 hover:bg-orange-700" onClick={() => setDialogNuevo(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Nuevo reporte
+          </Button>
+        )}
       </div>
 
       {/* ── Filtros ── */}
@@ -437,17 +442,19 @@ export default function ReportesAvanceListaPage() {
                           {s.evidenciasCount > 0 && ` (${s.evidenciasCount} con evidencia)`} esta semana
                         </span>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 border-orange-300 text-orange-700 hover:bg-orange-50 shrink-0"
-                        disabled={creandoEstaSemana}
-                        onClick={() => crearMutation.mutate({ proyectoId: filtroProyectoId, semanaIso: s.semanaIso })}
-                      >
-                        {creandoEstaSemana
-                          ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Creando…</>
-                          : <><Plus className="h-3.5 w-3.5 mr-1" /> Crear reporte</>}
-                      </Button>
+                      {puedeCapturar && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 border-orange-300 text-orange-700 hover:bg-orange-50 shrink-0"
+                          disabled={creandoEstaSemana}
+                          onClick={() => crearMutation.mutate({ proyectoId: filtroProyectoId, semanaIso: s.semanaIso })}
+                        >
+                          {creandoEstaSemana
+                            ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Creando…</>
+                            : <><Plus className="h-3.5 w-3.5 mr-1" /> Crear reporte</>}
+                        </Button>
+                      )}
                     </>
                   ) : (
                     <div className="flex-1 text-xs text-muted-foreground">Sin avance esta semana</div>

@@ -5,14 +5,14 @@ import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { actualizarReporteAvanceSchema } from '@/lib/validators/reporteAvance'
 import { REPORTE_AVANCE_INCLUDE } from '@/lib/services/reporteAvance'
-import { ROLES_PERMITIDOS, ROLES_BYPASS } from '@/lib/auth/rolesEvidenciaProyecto'
+import { ROLES_PERMITIDOS, ROLES_BYPASS, ROLES_LECTURA } from '@/lib/auth/rolesEvidenciaProyecto'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    if (!(ROLES_PERMITIDOS as readonly string[]).includes(session.user.role))
+    if (!(ROLES_LECTURA as readonly string[]).includes(session.user.role))
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
     const reporte = await prisma.reporteSemanalAvance.findUnique({

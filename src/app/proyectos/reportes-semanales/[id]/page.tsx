@@ -23,6 +23,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { ESTADO_REPORTE_AVANCE_LABELS } from '@/lib/validators/reporteAvance'
+import { ROLES_PERMITIDOS } from '@/lib/auth/rolesEvidenciaProyecto'
 import { cn } from '@/lib/utils'
 import { CurvaSAvanceChart } from '@/components/proyectos/CurvaSAvanceChart'
 
@@ -367,8 +368,12 @@ export default function ReporteAvanceDetallePage({ params }: { params: Promise<{
   const d = detalleQuery.data
   const agg = agregadoQuery.data
   const estado = d.estado
-  const isEditable = estado === 'borrador' || estado === 'rechazado' || isBypass
-  const puedeEnviar = estado === 'borrador' || estado === 'rechazado'
+  // `seguridad` consulta el reporte de avance pero no lo redacta ni lo mueve
+  // de estado: sin este filtro un borrador le mostraría el formulario editable
+  // y "Enviar a revisión", y la API respondería 403.
+  const puedeCapturar = (ROLES_PERMITIDOS as readonly string[]).includes(role)
+  const isEditable = puedeCapturar && (estado === 'borrador' || estado === 'rechazado' || isBypass)
+  const puedeEnviar = puedeCapturar && (estado === 'borrador' || estado === 'rechazado')
   const semanaLabel = (() => {
     const m = d.semanaIso.match(/^(\d{4})-W(\d{2})$/)
     return m ? `Semana ${m[2]} de ${m[1]}` : d.semanaIso
