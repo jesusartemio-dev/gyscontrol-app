@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
   Home, ChevronRight, Loader2, AlertTriangle, LayoutGrid, Settings2,
-  TrendingUp, PlusCircle, CalendarClock, ArrowUpRight,
+  TrendingUp, PlusCircle, CalendarClock, ArrowUpRight, Wallet,
 } from 'lucide-react'
 
 interface Fila {
@@ -14,7 +14,12 @@ interface Fila {
   codigo: string
   nombre: string
   estado: string
-  preparacion: { estado: string; listo: boolean; puedeCompararConPlan: boolean; titulo: string }
+  esInterno: boolean
+  centroCosto: string | null
+  preparacion: {
+    estado: string; listo: boolean; esInterno: boolean
+    puedeCompararConPlan: boolean; titulo: string
+  }
   avanceReal: number
   avanceActual: number
   brecha: number
@@ -29,8 +34,12 @@ interface Fila {
   }
   jornadasAbiertas: string[]
 }
+type Tipo = 'cliente' | 'interno' | 'todos'
+
 interface Respuesta {
   proyectos: Fila[]
+  tipo: Tipo
+  conteos: { cliente: number; interno: number; todos: number }
   resumen: {
     total: number; listos: number; sinArmar: number; conBrecha: number
     conSobrecosto: number; fueraDePlanAlto: number; jornadasAbiertas: number
@@ -53,10 +62,11 @@ export default function CarteraAvancePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [incluirCerrados, setIncluirCerrados] = useState(false)
+  const [tipo, setTipo] = useState<Tipo>('cliente')
 
   useEffect(() => {
     setLoading(true); setError('')
-    fetch(`/api/gestion/cartera-avance?incluirCerrados=${incluirCerrados ? 1 : 0}`)
+    fetch(`/api/gestion/cartera-avance?tipo=${tipo}&incluirCerrados=${incluirCerrados ? 1 : 0}`)
       .then(async (r) => {
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Error ${r.status}`)
         return r.json()
@@ -64,7 +74,7 @@ export default function CarteraAvancePage() {
       .then((d: Respuesta) => setData(d))
       .catch((e: Error) => setError(e.message || 'Error al cargar'))
       .finally(() => setLoading(false))
-  }, [incluirCerrados])
+  }, [incluirCerrados, tipo])
 
   return (
     <div className="p-4 space-y-4">
@@ -83,18 +93,41 @@ export default function CarteraAvancePage() {
           <h1 className="text-xl font-bold tracking-tight">Avance de la cartera</h1>
           <p className="text-sm text-muted-foreground">
             Una fila por proyecto: cuánto lleva, cuánto de eso está fechado, qué horas consumió
-            y cuánto trabajo va fuera del plan.
+            y cuánto trabajo va fuera del plan. Los proyectos internos son centros de costo para
+            imputar horas, no obras — por eso van aparte.
           </p>
         </div>
-        <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer shrink-0">
-          <input
-            type="checkbox"
-            checked={incluirCerrados}
-            onChange={(e) => setIncluirCerrados(e.target.checked)}
-            className="accent-primary"
-          />
-          Incluir proyectos cerrados
-        </label>
+        <div className="flex flex-col items-start sm:items-end gap-2 shrink-0">
+          <div className="inline-flex rounded-md border border-input overflow-hidden">
+            {([
+              ['cliente', 'De cliente'],
+              ['interno', 'Internos'],
+              ['todos', 'Todos'],
+            ] as [Tipo, string][]).map(([valor, etiqueta]) => (
+              <button
+                key={valor}
+                onClick={() => setTipo(valor)}
+                className={`px-3 py-1.5 text-xs transition-colors ${
+                  tipo === valor
+                    ? 'bg-primary text-primary-foreground font-medium'
+                    : 'bg-background hover:bg-muted text-muted-foreground'
+                }`}
+              >
+                {etiqueta}
+                {data && <span className="ml-1.5 opacity-70">{data.conteos[valor]}</span>}
+              </button>
+            ))}
+          </div>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+            <input
+              type="checkbox"
+              checked={incluirCerrados}
+              onChange={(e) => setIncluirCerrados(e.target.checked)}
+              className="accent-primary"
+            />
+            Incluir proyectos cerrados
+          </label>
+        </div>
       </div>
 
       {loading && (
@@ -155,7 +188,9 @@ export default function CarteraAvancePage() {
                       <TableRow key={p.id} className="text-xs">
                         <TableCell className="pl-4 py-2">
                           <span className="font-mono font-medium">{p.codigo}</span>
-                          <span className="block text-muted-foreground truncate max-w-[16rem]">{p.nombre}</span>
+                          <span className="block text-muted-foreground truncate max-w-[16rem]">
+                            {p.esInterno && p.centroCosto ? `Centro de costo · ${p.centroCosto}` : p.nombre}
+                          </span>
                         </TableCell>
 
                         <TableCell className="text-right py-2 font-mono tabular-nums">
@@ -202,9 +237,13 @@ export default function CarteraAvancePage() {
 
                         <TableCell className="py-2">
                           <div className="flex flex-wrap gap-1">
-                            {!p.preparacion.listo && (
+                            {p.preparacion.estado === 'centro_de_costo' ? (
+                              <Chip color="slate" icon={Wallet} title={p.preparacion.titulo}>
+                                centro de costo
+                              </Chip>
+                            ) : !p.preparacion.listo ? (
                               <Chip color="slate" icon={Settings2} title={p.preparacion.titulo}>sin armar</Chip>
-                            )}
+                            ) : null}
                             {p.preparacion.listo && !p.preparacion.puedeCompararConPlan && (
                               <Chip color="yellow" title="No hay línea base para comparar">sin plan</Chip>
                             )}

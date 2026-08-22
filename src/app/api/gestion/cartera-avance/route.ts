@@ -20,8 +20,12 @@ async function enLotes<T, R>(items: T[], n: number, fn: (item: T) => Promise<R>)
   return salida
 }
 
+/** Tipo de proyecto que se quiere ver. Los internos son cubos de horas de un centro de
+ *  costo, no obras: por defecto quedan fuera para que la cartera no mezcle peras y manzanas. */
+type Tipo = 'cliente' | 'interno' | 'todos'
+
 /**
- * GET /api/gestion/cartera-avance?incluirCerrados=0
+ * GET /api/gestion/cartera-avance?tipo=cliente&incluirCerrados=0
  *
  * Una fila por proyecto con el estado de su curva de avance: cuánto lleva, cuánto de eso
  * está fechado, cuántas horas consumió, cuánto trabajo va fuera del plan y qué le falta para
@@ -36,12 +40,30 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
     const incluirCerrados = req.nextUrl.searchParams.get('incluirCerrados') === '1'
+    const tipoParam = req.nextUrl.searchParams.get('tipo')
+    const tipo: Tipo = tipoParam === 'interno' || tipoParam === 'todos' ? tipoParam : 'cliente'
 
     const proyectos = await prisma.proyecto.findMany({
-      where: incluirCerrados ? undefined : { estado: { not: 'cerrado' } },
-      select: { id: true, codigo: true, nombre: true, estado: true },
-      orderBy: { codigo: 'asc' },
+      where: {
+        ...(incluirCerrados ? {} : { estado: { not: 'cerrado' as const } }),
+        ...(tipo === 'todos' ? {} : { esInterno: tipo === 'interno' }),
+      },
+      select: {
+        id: true, codigo: true, nombre: true, estado: true, esInterno: true,
+        centroCosto: { select: { nombre: true, tipo: true } },
+      },
+      orderBy: [{ esInterno: 'asc' }, { codigo: 'asc' }],
     })
+
+    // Conteos por tipo, para que el selector muestre cuántos hay de cada uno.
+    const [nCliente, nInterno] = await Promise.all([
+      prisma.proyecto.count({
+        where: { esInterno: false, ...(incluirCerrados ? {} : { estado: { not: 'cerrado' as const } }) },
+      }),
+      prisma.proyecto.count({
+        where: { esInterno: true, ...(incluirCerrados ? {} : { estado: { not: 'cerrado' as const } }) },
+      }),
+    ])
 
     // Jornadas abiertas de toda la cartera en una sola consulta.
     const abiertas = await prisma.registroHorasCampo.findMany({
@@ -73,9 +95,12 @@ export async function GET(req: NextRequest) {
         codigo: p.codigo,
         nombre: p.nombre,
         estado: p.estado,
+        esInterno: p.esInterno,
+        centroCosto: p.centroCosto?.nombre ?? null,
         preparacion: {
           estado: preparacion.estado,
           listo: preparacion.listo,
+          esInterno: preparacion.esInterno,
           puedeCompararConPlan: preparacion.puedeCompararConPlan,
           titulo: preparacion.titulo,
         },
@@ -102,14 +127,18 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       proyectos: filas,
+      tipo,
+      conteos: { cliente: nCliente, interno: nInterno, todos: nCliente + nInterno },
       resumen: {
         total: filas.length,
         listos: utiles.length,
-        sinArmar: filas.filter((f) => !f.preparacion.listo).length,
+        sinArmar: filas.filter((f) => !f.preparacion.listo && f.preparacion.estado !== 'centro_de_costo').length,
         conBrecha: filas.filter((f) => f.brecha > 1).length,
-        conSobrecosto: filas.filter((f) => f.eficiencia != null && f.eficiencia < 1).length,
+        conSobrecosto: filas.filter((f) => f.preparacion.listo && f.eficiencia != null && f.eficiencia < 1).length,
+        // Un centro de costo no tiene alcance del que salirse: no cuenta como desbordado.
         fueraDePlanAlto: filas.filter(
-          (f) => f.fueraDePlan.sinAlcancePlanificado || f.fueraDePlan.porcentajeSobrePlan >= 50,
+          (f) => f.preparacion.estado !== 'centro_de_costo'
+            && (f.fueraDePlan.sinAlcancePlanificado || f.fueraDePlan.porcentajeSobrePlan >= 50),
         ).length,
         jornadasAbiertas: abiertas.length,
         horasPresupuestadas: Number(hPres.toFixed(1)),

@@ -15,6 +15,7 @@ import { prisma } from '@/lib/prisma'
 
 export type EstadoPreparacion =
   | 'listo'
+  | 'centro_de_costo'
   | 'sin_cronograma'
   | 'sin_baseline'
   | 'sin_ejecucion'
@@ -23,6 +24,8 @@ export type EstadoPreparacion =
 
 export interface Preparacion {
   estado: EstadoPreparacion
+  /** Proyecto interno: es un contenedor de horas de un centro de costo, no una obra. */
+  esInterno: boolean
   /** true solo si se puede esperar una curva Real con sentido. */
   listo: boolean
   /** true si además puede dibujarse la línea Plan. */
@@ -39,6 +42,12 @@ export interface Preparacion {
 }
 
 export async function diagnosticarPreparacion(proyectoId: string): Promise<Preparacion> {
+  const proyecto = await prisma.proyecto.findUnique({
+    where: { id: proyectoId },
+    select: { esInterno: true, centroCosto: { select: { nombre: true } } },
+  })
+  const esInterno = proyecto?.esInterno ?? false
+
   const cronos = await prisma.proyectoCronograma.findMany({
     where: { proyectoId },
     select: { id: true, tipo: true, esBaseline: true },
@@ -59,12 +68,28 @@ export async function diagnosticarPreparacion(proyectoId: string): Promise<Prepa
   }
 
   const base = {
+    esInterno,
     tienePlanificacion: plan.length > 0,
     tieneBaseline: baseline.length > 0,
     tieneEjecucion: ejec.length > 0,
     tareasEjecucion,
     tareasSinFase,
     puedeCompararConPlan: baseline.length > 0,
+  }
+
+  // Un proyecto interno es un cubo de horas de un centro de costo: no tiene alcance que
+  // medir, así que "le falta cronograma" no es un diagnóstico útil sino ruido. Solo se
+  // considera una obra de verdad si alguien le armó fases con tareas.
+  if (esInterno && (ejec.length === 0 || tareasEjecucion === 0 || tareasSinFase === tareasEjecucion)) {
+    return {
+      ...base, estado: 'centro_de_costo', listo: false, puedeCompararConPlan: false,
+      titulo: 'Centro de costo, no un proyecto de obra',
+      detalle:
+        `Sirve para imputar horas${proyecto?.centroCosto?.nombre ? ` al centro de costo ${proyecto.centroCosto.nombre}` : ''}. ` +
+        'No tiene alcance planificado, así que no le corresponde curva de avance: lo que sí ' +
+        'tiene sentido mirar aquí son las horas consumidas.',
+      pasos: [],
+    }
   }
 
   const SIN_TAREAS =

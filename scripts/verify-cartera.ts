@@ -7,11 +7,18 @@ import { diagnosticarPreparacion } from '@/lib/services/preparacionCronograma'
 
 async function main() {
   const incluirCerrados = process.argv.includes('--cerrados')
+  const tipo = process.argv.includes('--internos') ? 'interno'
+    : process.argv.includes('--todos') ? 'todos' : 'cliente'
   const proyectos = await prisma.proyecto.findMany({
-    where: incluirCerrados ? undefined : { estado: { not: 'cerrado' } },
+    where: {
+      ...(incluirCerrados ? {} : { estado: { not: 'cerrado' as const } }),
+      ...(tipo === 'todos' ? {} : { esInterno: tipo === 'interno' }),
+    },
     select: { id: true, codigo: true, estado: true },
     orderBy: { codigo: 'asc' },
   })
+  console.log(`tipo=${tipo}  cerrados=${incluirCerrados}
+`)
   const abiertas = await prisma.registroHorasCampo.findMany({
     where: { estado: 'iniciado' }, select: { proyectoId: true },
   })
@@ -38,7 +45,7 @@ async function main() {
         ? `${pesos.fueraDePlan.tareas} · ${pesos.fueraDePlan.porcentajeSobrePlan.toFixed(0)}%` : '—',
       eficiencia: pctH && pctH > 0 ? (serie.porcentajeActual / pctH).toFixed(2) : '—',
       atencion: [
-        !prep.listo ? 'sin armar' : '',
+        prep.estado === 'centro_de_costo' ? 'centro de costo' : !prep.listo ? 'sin armar' : '',
         prep.listo && !prep.puedeCompararConPlan ? 'sin plan' : '',
         serie.porcentajeActual - serie.porcentajeDerivado > 1 ? 'sin fechar' : '',
         abiertasPorProyecto.get(p.id) ? `${abiertasPorProyecto.get(p.id)} jorn.` : '',
