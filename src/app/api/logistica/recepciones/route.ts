@@ -16,11 +16,28 @@ export async function GET(request: NextRequest) {
     const estado = searchParams.get('estado') || undefined
     const proyectoId = searchParams.get('proyectoId') || undefined
     const search = searchParams.get('search') || undefined
+    const origen = searchParams.get('origen') || undefined
 
     const where: any = {}
 
     if (estado && estado !== 'all') {
       where.estado = estado
+    }
+
+    // Cómo se atendió el pedido. Proyectos hace el PED y Logística lo atiende por
+    // OC o por REQ; las OC sin pedido son compras directas que no pasan por
+    // conformidad del proyecto.
+    if (origen && origen !== 'all') {
+      if (origen === 'ped_oc') {
+        where.pedidoEquipoItemId = { not: null }
+        where.ordenCompraItemId = { not: null }
+      } else if (origen === 'ped_req') {
+        where.pedidoEquipoItemId = { not: null }
+        where.requerimientoMaterialItemId = { not: null }
+      } else if (origen === 'oc_directa') {
+        where.pedidoEquipoItemId = null
+        where.ordenCompraItemId = { not: null }
+      }
     }
 
     if (proyectoId) {

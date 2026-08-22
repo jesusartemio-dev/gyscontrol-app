@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -134,6 +135,27 @@ function getResponsableConformidad(r: Recepcion): {
     return { nombre: empleado.name, email: empleado.email, gestor: null, puedeConfirmar: false }
   }
   return null
+}
+
+type TipoOrigen = 'ped_oc' | 'ped_req' | 'oc_directa' | 'otro'
+
+/**
+ * Cómo se atendió el pedido. Proyectos hace el PED y Logística lo atiende por OC
+ * o por REQ; una OC sin pedido es compra directa y no pasa por conformidad.
+ * Sin esto, un PED+OC y una OC suelta se veían idénticos en la lista.
+ */
+function getTipoOrigen(r: Recepcion): { key: TipoOrigen; label: string; style: string } {
+  const tienePed = !!r.pedidoEquipoItem
+  if (tienePed && r.ordenCompraItem) {
+    return { key: 'ped_oc', label: 'PED + OC', style: 'bg-blue-50 text-blue-700 border-blue-200' }
+  }
+  if (tienePed && r.requerimientoMaterialItem) {
+    return { key: 'ped_req', label: 'PED + REQ', style: 'bg-violet-50 text-violet-700 border-violet-200' }
+  }
+  if (!tienePed && r.ordenCompraItem) {
+    return { key: 'oc_directa', label: 'OC directa', style: 'bg-amber-50 text-amber-700 border-amber-200' }
+  }
+  return { key: 'otro', label: 'Directo', style: 'bg-gray-50 text-gray-600 border-gray-200' }
 }
 
 function getRecepcionInfo(r: Recepcion): {
@@ -274,6 +296,7 @@ export default function RecepcionesPage() {
     page: 1, limit: 20, total: 0, totalPages: 1, hasNextPage: false, hasPrevPage: false,
   })
   const [activeTab, setActiveTab] = useState<TabEstado>('pendiente')
+  const [filtroOrigen, setFiltroOrigen] = useState<'all' | TipoOrigen>('all')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -368,6 +391,7 @@ export default function RecepcionesPage() {
       params.set('page', page.toString())
       params.set('limit', limit.toString())
       if (activeTab !== 'all') params.set('estado', activeTab)
+      if (filtroOrigen !== 'all') params.set('origen', filtroOrigen)
       if (debouncedSearch) params.set('search', debouncedSearch)
 
       const res = await fetch(`/api/logistica/recepciones?${params.toString()}`)
@@ -390,7 +414,7 @@ export default function RecepcionesPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, limit, activeTab, debouncedSearch])
+  }, [page, limit, activeTab, filtroOrigen, debouncedSearch])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -531,6 +555,20 @@ export default function RecepcionesPage() {
             className="pl-9 h-9"
           />
         </div>
+        <Select
+          value={filtroOrigen}
+          onValueChange={(v) => { setFiltroOrigen(v as 'all' | TipoOrigen); resetPagination() }}
+        >
+          <SelectTrigger className="h-9 w-[170px]">
+            <SelectValue placeholder="Tipo de origen" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los orígenes</SelectItem>
+            <SelectItem value="ped_oc">PED + OC</SelectItem>
+            <SelectItem value="ped_req">PED + REQ</SelectItem>
+            <SelectItem value="oc_directa">OC directa (sin pedido)</SelectItem>
+          </SelectContent>
+        </Select>
         {activeTab === 'pendiente' && (counts['pendiente'] || 0) > 0 &&
           ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role) && (
           <Button size="sm" variant="outline" className="h-9 gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
@@ -589,18 +627,33 @@ export default function RecepcionesPage() {
                   return (
                     <TableRow key={r.id}>
                       <TableCell>
-                        <div className="flex flex-col gap-0.5">
-                          <span className={`inline-flex w-fit items-center text-[9px] font-semibold px-1.5 py-0.5 rounded border ${fuenteStyles[info.fuente]}`}>
-                            {fuenteLabel[info.fuente]}
-                          </span>
-                          {info.origenHref ? (
-                            <Link href={info.origenHref} className="font-mono text-[11px] text-blue-600 hover:underline">
-                              {info.origenLabel}
-                            </Link>
-                          ) : (
-                            <span className="font-mono text-[11px] text-muted-foreground">{info.origenLabel}</span>
-                          )}
-                        </div>
+                        {(() => {
+                          const tipo = getTipoOrigen(r)
+                          const ped = r.pedidoEquipoItem?.pedidoEquipo
+                          return (
+                            <div className="flex flex-col gap-0.5">
+                              <span className={`inline-flex w-fit items-center text-[9px] font-semibold px-1.5 py-0.5 rounded border ${tipo.style}`}>
+                                {tipo.label}
+                              </span>
+                              {/* El pedido es el origen real; OC/REQ es cómo se atendió. */}
+                              {ped && (
+                                <Link
+                                  href={`/logistica/pedidos/${ped.id}`}
+                                  className="font-mono text-[11px] text-blue-600 hover:underline"
+                                >
+                                  {ped.codigo}
+                                </Link>
+                              )}
+                              {info.origenHref ? (
+                                <Link href={info.origenHref} className="font-mono text-[10px] text-muted-foreground hover:underline">
+                                  {info.origenLabel}
+                                </Link>
+                              ) : (
+                                <span className="font-mono text-[10px] text-muted-foreground">{info.origenLabel}</span>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </TableCell>
                       <TableCell className="text-xs">
                         {info.proyecto?.nombre || '—'}
