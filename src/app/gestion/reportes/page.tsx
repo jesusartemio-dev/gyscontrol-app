@@ -58,6 +58,14 @@ const reportes = [
     roles: ['admin', 'gerente', 'gestor', 'coordinador'],
   },
   {
+    titulo: 'Puntualidad del registro',
+    descripcion: 'Con qué rapidez llega el dato que alimenta la curva de avance: cobertura de timesheets, días en cerrar jornadas y jornadas pendientes.',
+    icono: Clock,
+    href: '/gestion/reportes/puntualidad-registro',
+    color: 'bg-sky-100 text-sky-600',
+    roles: ['admin', 'gerente', 'gestor', 'coordinador'],
+  },
+  {
     titulo: 'Aging de CxC',
     descripcion: 'Tabla de antigüedad de cuentas por cobrar. Saldos pendientes agrupados por cliente y tramos de vencimiento: vigente, 1-30, 31-60, 61-90 y +90 días.',
     icono: Clock,
