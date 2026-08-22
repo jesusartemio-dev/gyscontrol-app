@@ -1,15 +1,18 @@
 /**
- * Utilidad para limpiar horas al reabrir/eliminar jornadas rechazadas.
+ * Utilidad para limpiar horas y avance al reabrir/eliminar jornadas rechazadas.
  *
  * Flujo de horas:
  * - Al cerrar: ProyectoTarea.horasReales se incrementa 1x
- * - Al aprobar: se incrementa OTRA VEZ + crea RegistroHoras vinculados
+ * - Al aprobar: NO se vuelve a incrementar; solo se crean los RegistroHoras vinculados
+ *   (ver campo/[id]/aprobar/route.ts, que lo dice explícito para evitar doble conteo)
  * - Al rechazar: solo cambia estado, NO revierte horas
  *
- * Esta función revierte esas horas y elimina RegistroHoras si existían.
+ * Esta función revierte esas horas, elimina los RegistroHoras si existían, y borra los
+ * asientos de avance fechado que dejó la jornada.
  */
 
 import { prisma } from '@/lib/prisma'
+import { revertirAvanceJornada } from '@/lib/services/avanceTarea'
 
 // Infer transaction client type from our prisma instance
 type TransactionClient = Omit<typeof prisma, '$transaction' | '$connect' | '$disconnect' | '$on' | '$extends'>
@@ -72,9 +75,11 @@ export async function limpiarHorasJornadaRechazada(
   }
 
   const wasApproved = registroHorasIds.length > 0
-  // Si fue aprobada: horas se incrementaron 2x (cierre + aprobación)
-  // Si solo fue cerrada: horas se incrementaron 1x (solo cierre)
-  const multiplier = wasApproved ? 2 : 1
+  // Las horas se incrementan UNA sola vez, al cerrar la jornada: aprobar ya no vuelve a
+  // sumarlas. El multiplicador 2 que había aquí descontaba el doble en las jornadas
+  // aprobadas, comiéndose horas de otras jornadas de la misma tarea (el Math.min de abajo
+  // evitaba el negativo, así que corrompía en silencio).
+  const multiplier = 1
 
   // 3. Si fue aprobada: limpiar FK y eliminar RegistroHoras
   if (wasApproved) {
@@ -122,6 +127,10 @@ export async function limpiarHorasJornadaRechazada(
       tareasAfectadas.push(tareaId)
     }
   }
+
+  // 5. Revertir el avance fechado que dejó la jornada. Hasta ahora solo se devolvían las
+  //    horas, así que el % declarado en una jornada rechazada quedaba aplicado para siempre.
+  await revertirAvanceJornada(tx, jornadaId)
 
   return {
     tareasAfectadas,

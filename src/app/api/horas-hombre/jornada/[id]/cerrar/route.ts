@@ -11,6 +11,7 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { ProgresoService } from '@/lib/services/progresoService'
+import { registrarAvanceTarea } from '@/lib/services/avanceTarea'
 
 interface Bloqueo {
   tipoBloqueoId?: string
@@ -214,40 +215,33 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       })
     }
 
-    // Actualizar ProyectoTarea: progreso + horas al cerrar
-    // Las APIs de listado ya solo devuelven tareas de ejecucion, así que siempre es ejecucion
-    const fechaJornada = new Date(jornada.fechaTrabajo)
-    fechaJornada.setHours(0, 0, 0, 0)
+    // Actualizar ProyectoTarea: progreso + horas al cerrar.
+    // El avance se fecha con la fechaTrabajo de la jornada, NO con hoy: más de la mitad de
+    // las jornadas se cierran con días de retraso y el avance pertenece al día trabajado.
+    // Las APIs de listado ya solo devuelven tareas de ejecucion, así que siempre es ejecucion.
     const tareasConProgreso = new Set<string>()
     for (const [proyectoTareaId, porcentaje] of progresoMap.entries()) {
-      const horasIncremento = horasPorTarea[proyectoTareaId] || 0
-      const updateData: Record<string, any> = {
-        porcentajeCompletado: porcentaje,
-        estado: porcentaje >= 100 ? 'completada' : 'en_progreso',
-        updatedAt: new Date()
-      }
-      if (porcentaje >= 100) updateData.fechaFinReal = new Date()
-      if (horasIncremento > 0) updateData.horasReales = { increment: horasIncremento }
-
-      await prisma.proyectoTarea.update({ where: { id: proyectoTareaId }, data: updateData })
-      tareasConProgreso.add(proyectoTareaId)
-
-      // Registrar histórico de avance de campo (fallo aislado: no corta el loop ni el cierre)
+      // El % pasa por el libro mayor (registrarAvanceTarea deja el caché coherente); aquí
+      // solo se suman las horas. Fallo aislado: no corta el loop ni el cierre.
       try {
-        await prisma.proyectoTareaAvance.upsert({
-          where: { proyectoTareaId_fecha: { proyectoTareaId, fecha: fechaJornada } },
-          update: { porcentaje, origen: 'campo', usuarioId: session.user.id },
-          create: {
-            proyectoTareaId,
-            proyectoId: jornada.proyecto.id,
-            fecha: fechaJornada,
-            porcentaje,
-            origen: 'campo',
-            usuarioId: session.user.id,
-          },
+        await registrarAvanceTarea(prisma, {
+          proyectoTareaId,
+          porcentaje,
+          fechaEfecto: jornada.fechaTrabajo,
+          origen: 'campo',
+          usuarioId: session.user.id,
         })
+        tareasConProgreso.add(proyectoTareaId)
       } catch (e) {
-        console.error(`[cerrar-jornada] histórico ProyectoTareaAvance tarea ${proyectoTareaId}:`, e)
+        console.error(`[cerrar-jornada] registrar avance tarea ${proyectoTareaId}:`, e)
+      }
+
+      const horasIncremento = horasPorTarea[proyectoTareaId] || 0
+      if (horasIncremento > 0) {
+        await prisma.proyectoTarea.update({
+          where: { id: proyectoTareaId },
+          data: { horasReales: { increment: horasIncremento }, updatedAt: new Date() },
+        })
       }
     }
 

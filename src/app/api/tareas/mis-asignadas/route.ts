@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { ProgresoService } from '@/lib/services/progresoService'
+import { registrarAvanceTarea, propagarRollup, fechaEfectoDe } from '@/lib/services/avanceTarea'
 
 export async function GET(request: NextRequest) {
   try {
@@ -230,7 +231,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { tareaId, tipo, estado, progreso } = body
+    const { tareaId, tipo, estado, progreso, fechaAvance } = body
 
     if (!tareaId || !tipo) {
       return NextResponse.json(
@@ -238,6 +239,10 @@ export async function PATCH(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Fecha a la que pertenece el avance. El cliente la manda (prellenada con la última
+    // fecha en que esta persona imputó horas a la tarea); si no viene, hoy.
+    const fechaEfecto = fechaEfectoDe(fechaAvance)
 
     let tareaActualizada
 
@@ -262,53 +267,33 @@ export async function PATCH(request: NextRequest) {
         )
       }
 
-      // Determinar el nuevo porcentaje antes del update (para el histórico)
+      // El nuevo porcentaje, si el cambio implica uno.
       const nuevoProgreso: number | undefined =
         estado === 'completada' ? 100 :
         progreso !== undefined ? (progreso as number) :
         undefined
 
-      const upd = await prisma.proyectoTarea.update({
-        where: { id: tareaId },
-        data: {
-          ...(estado && { estado }),
-          ...(progreso !== undefined && { porcentajeCompletado: progreso }),
-          ...(estado === 'completada' && {
-            porcentajeCompletado: 100,
-            fechaFinReal: new Date()
-          }),
-          updatedAt: new Date()
-        }
-      })
-      tareaActualizada = upd
-
-      // Registrar histórico de avance fechado (no debe romper el flujo si falla)
+      // El % va SIEMPRE por el libro mayor: registrarAvanceTarea deja porcentajeCompletado,
+      // estado y fechaFinReal coherentes con el asiento de mayor fecha de efecto.
       if (nuevoProgreso !== undefined) {
-        try {
-          const fechaAvance = new Date()
-          fechaAvance.setHours(0, 0, 0, 0)
-          await prisma.proyectoTareaAvance.upsert({
-            where: { proyectoTareaId_fecha: { proyectoTareaId: tareaId, fecha: fechaAvance } },
-            update: { porcentaje: nuevoProgreso, origen: 'oficina', usuarioId: session.user.id },
-            create: {
-              proyectoTareaId: tareaId,
-              proyectoId: tarea.proyectoEdt.proyectoId,
-              fecha: fechaAvance,
-              porcentaje: nuevoProgreso,
-              origen: 'oficina',
-              usuarioId: session.user.id,
-            },
-          })
-        } catch (e) {
-          console.error('[mis-asignadas] histórico ProyectoTareaAvance:', e)
-        }
+        await registrarAvanceTarea(prisma, {
+          proyectoTareaId: tareaId,
+          porcentaje: nuevoProgreso,
+          fechaEfecto,
+          origen: 'oficina',
+          usuarioId: session.user.id,
+        })
+      } else if (estado) {
+        // Cambio de estado que no mueve el %: se aplica tal cual.
+        await prisma.proyectoTarea.update({
+          where: { id: tareaId },
+          data: { estado, updatedAt: new Date() },
+        })
       }
 
-      // Propagar el rollup de avance hacia arriba (sin recalcular el % de la tarea).
-      try {
-        if (upd.proyectoActividadId) await ProgresoService.actualizarProgresoActividad(upd.proyectoActividadId)
-        else await ProgresoService.actualizarProgresoEDT(upd.proyectoEdtId)
-      } catch (e) { console.error('[mis-asignadas] rollup avance', e) }
+      tareaActualizada = await prisma.proyectoTarea.findUnique({ where: { id: tareaId } })
+
+      await propagarRollup(tareaId)
     } else {
       // Tarea de servicio
       const tarea = await prisma.tarea.findFirst({

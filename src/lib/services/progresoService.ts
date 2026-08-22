@@ -59,19 +59,18 @@ export class ProgresoService {
       )
       const horasReales = horasTimesheet + horasCampoPendiente
 
-      // Calcular progreso basado en horas
-      let porcentajeAvance = 0
-      if (tarea.horasEstimadas && Number(tarea.horasEstimadas) > 0) {
-        porcentajeAvance = Math.min(100, Math.round((horasReales / Number(tarea.horasEstimadas)) * 100))
-      }
-
-      // Actualizar tarea
+      // Solo se sincronizan las HORAS. El `porcentajeCompletado` NO se toca aquí.
+      //
+      // Antes esta función lo recalculaba como horasReales/horasEstimadas, así que
+      // registrar horas pisaba en silencio el avance físico que había declarado el
+      // supervisor en campo — y sin dejar rastro fechado, descuadrando la curva S.
+      // Consumir horas no es avanzar: son dos magnitudes distintas. El avance físico solo
+      // se escribe por `registrarAvanceTarea` (libro mayor), y el consumo se deriva de
+      // estas horas cuando se quiera graficar aparte.
       await prisma.proyectoTarea.update({
         where: { id: tareaId },
         data: {
           horasReales,
-          porcentajeCompletado: porcentajeAvance,
-          estado: porcentajeAvance >= 100 ? 'completada' : 'en_progreso',
           updatedAt: new Date()
         }
       })

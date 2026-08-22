@@ -13,6 +13,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ProgresoService } from '@/lib/services/progresoService'
+import { registrarAvanceTarea, fechaEfectoDe } from '@/lib/services/avanceTarea'
 import { validarPermisoCronogramaPorTarea } from '@/lib/services/cronogramaPermisos'
 
 // ✅ GET /api/proyecto-edt/[id]/tareas/[tareaId] - Obtener tarea individual
@@ -162,9 +163,10 @@ export async function PUT(
         fechaInicioReal: data.fechaInicioReal ? new Date(data.fechaInicioReal) : undefined,
         fechaFinReal: data.fechaFinReal ? new Date(data.fechaFinReal) : undefined,
         horasEstimadas: data.horasEstimadas,
-        estado: data.estado,
+        // El % NO se escribe aquí: pasa por el libro mayor para quedar fechado (ver abajo).
+        // El estado solo se aplica directo si el cambio no implica un %.
+        estado: data.porcentajeCompletado === undefined ? data.estado : undefined,
         prioridad: data.prioridad,
-        porcentajeCompletado: data.porcentajeCompletado,
         responsableId: data.responsableId,
         dependenciaId: data.dependenciaId
       },
@@ -179,6 +181,17 @@ export async function PUT(
       }
     })
 
+    if (data.porcentajeCompletado !== undefined) {
+      const session = await getServerSession(authOptions)
+      await registrarAvanceTarea(prisma, {
+        proyectoTareaId: tareaId,
+        porcentaje: data.porcentajeCompletado,
+        fechaEfecto: fechaEfectoDe((data as { fechaAvance?: unknown }).fechaAvance),
+        origen: 'oficina',
+        usuarioId: session?.user?.id ?? null,
+      })
+    }
+
     // Propagar el rollup de avance hacia arriba (sin recalcular el % de la tarea).
     try {
       if (tareaActualizada.proyectoActividadId) await ProgresoService.actualizarProgresoActividad(tareaActualizada.proyectoActividadId)
@@ -187,7 +200,10 @@ export async function PUT(
 
     return NextResponse.json({
       success: true,
-      data: tareaActualizada,
+      data: await prisma.proyectoTarea.findUnique({
+        where: { id: tareaId },
+        include: { user: { select: { id: true, name: true, email: true } } },
+      }),
       message: 'Tarea actualizada exitosamente'
     })
 
