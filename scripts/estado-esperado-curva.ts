@@ -76,6 +76,8 @@ async function main() {
       brecha: serie.porcentajeActual - serie.porcentajeDerivado > 1
         ? `⚠ ${(serie.porcentajeActual - serie.porcentajeDerivado).toFixed(1)}` : 'ok',
       'Horas %': consumo.tieneDatos ? `${pctHoras.toFixed(0)}%` : '—',
+      'fuera de plan': pesos.fueraDePlan.tareas > 0
+        ? `${pesos.fueraDePlan.tareas} (${pesos.fueraDePlan.porcentajeSobrePlan.toFixed(0)}%)` : '',
       eficiencia: consumo.tieneDatos && pctHoras > 0
         ? (serie.porcentajeActual / pctHoras).toFixed(2) : '—',
       reportados: snaps.length || '',
