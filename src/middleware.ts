@@ -22,19 +22,25 @@ const protectedRoutes = withAuth(
     }
 
     const role = token.role as string | undefined
+    // Multi-rol: los permisos son la unión de `role` + `rolesExtra`.
+    // Tokens emitidos antes del despliegue no traen `roles`; se cae al principal.
+    const roles = (token.roles as string[] | undefined)?.length
+      ? (token.roles as string[])
+      : [role || 'colaborador']
 
     // Obtener sectionAccess del token (inyectado en auth.ts)
     const sectionAccess = token.sectionAccess as string[] | undefined
 
     // Páginas con restricción de rol específica (más granular que secciones)
-    if (path.startsWith('/admin/uso-ia') && role !== 'admin') {
+    if (path.startsWith('/admin/uso-ia') && !roles.includes('admin')) {
       return NextResponse.redirect(new URL('/denied', req.url))
     }
 
-    // Secciones efectivas del usuario (BD si existe, si no el default del rol)
+    // Secciones efectivas del usuario (BD si existe, si no la unión de los
+    // defaults de cada rol)
     const seccionesUsuario = sectionAccess && sectionAccess.length > 0
       ? sectionAccess
-      : (DEFAULT_ROLE_SECTIONS[(role || 'colaborador') as RoleKey] || [])
+      : Array.from(new Set(roles.flatMap(r => DEFAULT_ROLE_SECTIONS[r as RoleKey] || [])))
 
     // Rutas compartidas entre secciones (ej. Órdenes de Compra: la usan
     // Logística y Administración). Se evalúan primero porque son más
@@ -47,20 +53,12 @@ const protectedRoutes = withAuth(
       return NextResponse.next()
     }
 
-    // Verificar acceso a sección por ruta
+    // Verificar acceso a sección por ruta. `seccionesUsuario` ya resuelve
+    // BD-vs-fallback y la unión de roles, así que basta con consultarlo.
     for (const [prefix, sectionKey] of ROUTE_PREFIXES) {
       if (path.startsWith(prefix)) {
-        if (sectionAccess && sectionAccess.length > 0) {
-          // Usar sectionAccess del token (desde BD)
-          if (!sectionAccess.includes(sectionKey)) {
-            return NextResponse.redirect(new URL('/denied', req.url))
-          }
-        } else {
-          // Fallback: usar config por defecto si no hay sectionAccess en token
-          const defaultSections = DEFAULT_ROLE_SECTIONS[(role || 'colaborador') as RoleKey] || []
-          if (!defaultSections.includes(sectionKey)) {
-            return NextResponse.redirect(new URL('/denied', req.url))
-          }
+        if (!seccionesUsuario.includes(sectionKey)) {
+          return NextResponse.redirect(new URL('/denied', req.url))
         }
         break
       }

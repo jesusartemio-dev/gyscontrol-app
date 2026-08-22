@@ -31,6 +31,19 @@ export async function getSectionAccessForRole(role: string): Promise<string[]> {
   }
 }
 
+/**
+ * Secciones accesibles para un conjunto de roles: la UNIÓN de lo que cada uno
+ * habilita. Con un solo rol devuelve exactamente lo mismo que
+ * getSectionAccessForRole, por eso es seguro reemplazar la llamada.
+ */
+export async function getSectionAccessForRoles(roles: readonly string[]): Promise<string[]> {
+  if (roles.length === 0) return getSectionAccessFallback('colaborador')
+  if (roles.length === 1) return getSectionAccessForRole(roles[0])
+
+  const listas = await Promise.all(roles.map((r) => getSectionAccessForRole(r)))
+  return Array.from(new Set(listas.flat()))
+}
+
 // Obtener accesos de todos los roles (para admin UI)
 export async function getSectionAccessForAllRoles(): Promise<Record<string, string[]>> {
   try {

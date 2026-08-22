@@ -76,6 +76,7 @@ import LogoutButton from './LogoutButton'
 import NotificacionesBell from './NotificacionesBell'
 import { useNotifications } from '@/lib/hooks/useNotifications'
 import type { RolUsuario, SidebarSection, NotificationBadgeType } from '@/types/modelos'
+import { rolesDe } from '@/lib/auth/roles'
 
 export default function Sidebar() {
   const { data: session, update: updateSession } = useSession()
@@ -495,6 +496,9 @@ export default function Sidebar() {
 
   const role = session?.user.role as RolUsuario | undefined
   const sectionAccess = session?.user?.sectionAccess as string[] | undefined
+  // Multi-rol: los permisos son la unión de `role` + `rolesExtra`.
+  const roles = useMemo(() => rolesDe(session), [session])
+  const rolesKey = roles.join(',')
 
   const visibleSections = useMemo(() => allSections
     .filter((section) => {
@@ -502,27 +506,31 @@ export default function Sidebar() {
         return sectionAccess.includes(section.key)
       }
       // Fallback: usar roles hardcodeados si no hay sectionAccess
-      return role ? section.roles.includes(role) : false
+      return roles.some(r => (section.roles as string[]).includes(r))
     })
     .map(section => ({
       ...section,
       links: section.links.filter(link => {
         // Filtrar links específicos por rol
-        if (link.href === '/admin/actividad' && role !== 'admin') {
+        if (link.href === '/admin/actividad' && !roles.includes('admin')) {
           return false
         }
-        // Per-link role filtering
-        if (link.roles && role && !(link.roles as string[]).includes(role)) {
+        // Per-link role filtering: basta que UNO de sus roles lo permita
+        if (link.roles && !roles.some(r => (link.roles as string[]).includes(r))) {
           return false
         }
-        if (link.excludeRoles && role && (link.excludeRoles as string[]).includes(role)) {
+        // Denylist: solo oculta si TODOS sus roles están excluidos. Si tiene
+        // otro rol al que el link sí le corresponde, se muestra.
+        if (link.excludeRoles && roles.length > 0 &&
+            roles.every(r => (link.excludeRoles as string[]).includes(r))) {
           return false
         }
         return true
       })
     }))
     .filter(section => section.links.length > 0), // Remover secciones sin links
-    [role, sectionAccess]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rolesKey, sectionAccess]
   )
 
   // ✅ Efecto para detectar la sección activa al cargar la página

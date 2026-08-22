@@ -4,7 +4,8 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
 import { prisma } from './prisma'
 import * as bcrypt from 'bcryptjs'
-import { getSectionAccessForRole } from './services/section-access'
+import { getSectionAccessForRole, getSectionAccessForRoles } from './services/section-access'
+import { combinarRoles } from './auth/roles'
 
 export const authOptions: AuthOptions = {
   adapter: PrismaAdapter(prisma as any),
@@ -52,6 +53,7 @@ export const authOptions: AuthOptions = {
             name: user.name ?? undefined,
             email: user.email,
             role: user.role,
+            rolesExtra: user.rolesExtra ?? [],
           }
         } catch (error) {
           console.error('Auth error:', error)
@@ -72,29 +74,46 @@ export const authOptions: AuthOptions = {
       if (user) {
         token.id = user.id
         let role = (user as any).role
-        // OAuth users no traen role del provider — buscar en DB
-        if (!role) {
+        let rolesExtra = (user as any).rolesExtra as string[] | undefined
+        // OAuth users no traen role del provider — buscar en DB.
+        // rolesExtra tampoco viaja por el provider, así que se lee siempre
+        // que no venga del authorize() de credentials.
+        if (!role || !rolesExtra) {
           const dbUser = await prisma.user.findUnique({
             where: { id: user.id },
-            select: { role: true }
+            select: { role: true, rolesExtra: true }
           })
-          role = dbUser?.role || 'colaborador'
+          role = role || dbUser?.role || 'colaborador'
+          rolesExtra = rolesExtra ?? dbUser?.rolesExtra ?? []
         }
         token.role = role
-        const sectionAccess = await getSectionAccessForRole(role)
-        token.sectionAccess = sectionAccess
+        token.rolesExtra = rolesExtra
+        token.roles = combinarRoles(role, rolesExtra)
+        token.sectionAccess = await getSectionAccessForRoles(token.roles)
       }
       if (trigger === 'update') {
-        const sectionAccess = await getSectionAccessForRole(token.role as string)
-        token.sectionAccess = sectionAccess
+        // Releer de BD: el admin pudo cambiar rol o rolesExtra.
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { role: true, rolesExtra: true }
+        })
+        if (dbUser) {
+          token.role = dbUser.role
+          token.rolesExtra = dbUser.rolesExtra
+        }
+        token.roles = combinarRoles(token.role as string, token.rolesExtra as string[])
+        token.sectionAccess = await getSectionAccessForRoles(token.roles)
       }
       return token
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).id = token.id as string
-        (session.user as any).role = token.role as string
-        (session.user as any).sectionAccess = token.sectionAccess || []
+        const u = session.user as any
+        u.id = token.id as string
+        u.role = token.role as string
+        u.rolesExtra = token.rolesExtra || []
+        u.roles = token.roles || [token.role as string]
+        u.sectionAccess = token.sectionAccess || []
       }
       return session
     },

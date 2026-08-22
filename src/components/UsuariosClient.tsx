@@ -65,6 +65,8 @@ interface UsuarioModel {
   email: string
   name: string | null
   role: RolUsuario
+  /** Roles adicionales al principal. Los permisos son la unión de ambos. */
+  rolesExtra?: RolUsuario[]
   hasPassword?: boolean
   authProviders?: string[]
 }
@@ -93,6 +95,7 @@ export const schema = z.object({
   name: z.string().min(2, { message: 'Nombre debe tener al menos 2 caracteres' }),
   password: z.string().min(4, { message: 'La contraseña debe tener al menos 4 caracteres' }).optional(),
   role: z.enum(roles as [RolUsuario, ...RolUsuario[]], { required_error: 'Elige un rol' }),
+  rolesExtra: z.array(z.enum(roles as [RolUsuario, ...RolUsuario[]])).optional(),
 }).refine(data => {
   // Password opcional: usuarios OAuth no necesitan contraseña
   if (data.id && data.password && data.password.length < 4) return false
@@ -224,6 +227,7 @@ function UserFormModal({ isOpen, onClose, user, onSuccess }: UserFormModalProps)
     name: '',
     password: '',
     role: 'comercial' as RolUsuario,
+    rolesExtra: [] as RolUsuario[],
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -239,9 +243,10 @@ function UserFormModal({ isOpen, onClose, user, onSuccess }: UserFormModalProps)
           name: user.name || '',
           password: '',
           role: user.role || 'comercial',
+          rolesExtra: user.rolesExtra ?? [],
         })
       } else {
-        setForm({ id: '', email: '', name: '', password: '', role: 'comercial' })
+        setForm({ id: '', email: '', name: '', password: '', role: 'comercial', rolesExtra: [] })
       }
       setError('')
       setFormErrors({})
@@ -249,10 +254,26 @@ function UserFormModal({ isOpen, onClose, user, onSuccess }: UserFormModalProps)
   }, [isOpen, user])
 
   const handleChange = (name: string, value: string) => {
-    setForm({ ...form, [name]: value })
+    setForm((prev) => {
+      const next = { ...prev, [name]: value }
+      // El rol principal nunca debe estar repetido en los extra.
+      if (name === 'role') {
+        next.rolesExtra = prev.rolesExtra.filter((r) => r !== value)
+      }
+      return next
+    })
     if (formErrors[name]) {
       setFormErrors({ ...formErrors, [name]: '' })
     }
+  }
+
+  const toggleRolExtra = (rol: RolUsuario) => {
+    setForm((prev) => ({
+      ...prev,
+      rolesExtra: prev.rolesExtra.includes(rol)
+        ? prev.rolesExtra.filter((r) => r !== rol)
+        : [...prev.rolesExtra, rol],
+    }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -421,6 +442,42 @@ function UserFormModal({ isOpen, onClose, user, onSuccess }: UserFormModalProps)
             {formErrors.role && (
               <p className="text-xs text-red-500">{formErrors.role}</p>
             )}
+          </div>
+
+          {/* Roles adicionales — los permisos son la unión con el rol principal */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-sm font-medium">
+              <Shield className="h-4 w-4 text-muted-foreground" />
+              Roles adicionales
+              <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+            </Label>
+            <div className="grid grid-cols-2 gap-1.5 rounded-md border p-2.5 max-h-52 overflow-y-auto">
+              {roles
+                .filter((rol) => rol !== form.role)
+                .map((rol) => {
+                  const activo = form.rolesExtra.includes(rol)
+                  return (
+                    <button
+                      key={rol}
+                      type="button"
+                      onClick={() => toggleRolExtra(rol)}
+                      aria-pressed={activo}
+                      className={`flex items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors ${
+                        activo
+                          ? 'bg-primary/10 ring-1 ring-primary/40 font-medium'
+                          : 'hover:bg-muted'
+                      }`}
+                    >
+                      <div className={`w-2 h-2 rounded-full shrink-0 ${getAvatarColor(rol)}`} />
+                      <span className="truncate">{roleDisplayMap[rol]?.label || rol}</span>
+                    </button>
+                  )
+                })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              El usuario tendrá los permisos del rol principal <strong>más</strong> los de cada rol
+              que marques aquí. Deja vacío para un solo rol.
+            </p>
           </div>
 
           {/* Error Alert */}
@@ -631,19 +688,36 @@ export default function UsuariosClient() {
                 </div>
               </TableCell>
               <TableCell>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge
-                      variant="outline"
-                      className={`${roleDisplayMap[usuario.role]?.bgColor} ${roleDisplayMap[usuario.role]?.color} border cursor-help`}
-                    >
-                      {roleDisplayMap[usuario.role]?.label || usuario.role}
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{roleDisplayMap[usuario.role]?.description}</p>
-                  </TooltipContent>
-                </Tooltip>
+                <div className="flex flex-wrap items-center gap-1">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge
+                        variant="outline"
+                        className={`${roleDisplayMap[usuario.role]?.bgColor} ${roleDisplayMap[usuario.role]?.color} border cursor-help`}
+                      >
+                        {roleDisplayMap[usuario.role]?.label || usuario.role}
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{roleDisplayMap[usuario.role]?.description}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  {(usuario.rolesExtra ?? []).map((rol) => (
+                    <Tooltip key={rol}>
+                      <TooltipTrigger asChild>
+                        <Badge
+                          variant="outline"
+                          className={`${roleDisplayMap[rol]?.bgColor} ${roleDisplayMap[rol]?.color} border cursor-help opacity-80 border-dashed`}
+                        >
+                          {roleDisplayMap[rol]?.label || rol}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Rol adicional · {roleDisplayMap[rol]?.description}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end gap-1">
@@ -752,19 +826,36 @@ export default function UsuariosClient() {
 
             <div className="flex items-center gap-3">
               {/* Role Badge with Tooltip */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge
-                    variant="outline"
-                    className={`${roleDisplayMap[usuario.role]?.bgColor} ${roleDisplayMap[usuario.role]?.color} border cursor-help`}
-                  >
-                    {roleDisplayMap[usuario.role]?.label || usuario.role}
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{roleDisplayMap[usuario.role]?.description}</p>
-                </TooltipContent>
-              </Tooltip>
+              <div className="flex flex-wrap items-center gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge
+                      variant="outline"
+                      className={`${roleDisplayMap[usuario.role]?.bgColor} ${roleDisplayMap[usuario.role]?.color} border cursor-help`}
+                    >
+                      {roleDisplayMap[usuario.role]?.label || usuario.role}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{roleDisplayMap[usuario.role]?.description}</p>
+                  </TooltipContent>
+                </Tooltip>
+                {(usuario.rolesExtra ?? []).map((rol) => (
+                  <Tooltip key={rol}>
+                    <TooltipTrigger asChild>
+                      <Badge
+                        variant="outline"
+                        className={`${roleDisplayMap[rol]?.bgColor} ${roleDisplayMap[rol]?.color} border cursor-help opacity-80 border-dashed`}
+                      >
+                        {roleDisplayMap[rol]?.label || rol}
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Rol adicional · {roleDisplayMap[rol]?.description}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
 
               {/* Actions */}
               <div className="flex gap-1">

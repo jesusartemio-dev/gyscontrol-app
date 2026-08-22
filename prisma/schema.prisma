@@ -2028,6 +2028,9 @@ model User {
   emailVerified                            DateTime?
   password                                 String?
   role                                     Role                                 @default(colaborador)
+  // Roles adicionales al principal. Los permisos son la UNIÓN de `role` y
+  // `rolesExtra`; vacío = comportamiento de un solo rol. Ver src/lib/auth/roles.ts.
+  rolesExtra                               Role[]                               @default([])
   image                                    String?
   lastLoginAt                              DateTime?
   lastActivityAt                           DateTime?

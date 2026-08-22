@@ -76,6 +76,7 @@ import {
   Images,
 } from 'lucide-react'
 import type { RolUsuario, SidebarSection, NotificationBadgeType } from '@/types/modelos'
+import { rolesDe } from '@/lib/auth/roles'
 
 /**
  * MobileSidebar - Drawer/Sheet que contiene la navegación en móvil
@@ -446,30 +447,37 @@ export default function MobileSidebar() {
   const role = session?.user.role as RolUsuario | undefined
   const sectionAccess = session?.user?.sectionAccess as string[] | undefined
 
+  // Multi-rol: los permisos son la unión de `role` + `rolesExtra`.
+  const roles = React.useMemo(() => rolesDe(session), [session])
+  const rolesKey = roles.join(',')
+
   const visibleSections = React.useMemo(() => allSections
     .filter((section) => {
       if (sectionAccess && sectionAccess.length > 0) {
         return sectionAccess.includes(section.key)
       }
-      return role ? section.roles.includes(role) : false
+      return roles.some(r => (section.roles as string[]).includes(r))
     })
     .map(section => ({
       ...section,
       links: section.links.filter(link => {
-        if (link.href === '/admin/actividad' && role !== 'admin') {
+        if (link.href === '/admin/actividad' && !roles.includes('admin')) {
           return false
         }
-        if (link.roles && role && !(link.roles as string[]).includes(role)) {
+        if (link.roles && !roles.some(r => (link.roles as string[]).includes(r))) {
           return false
         }
-        if (link.excludeRoles && role && (link.excludeRoles as string[]).includes(role)) {
+        // Denylist: solo oculta si TODOS sus roles están excluidos.
+        if (link.excludeRoles && roles.length > 0 &&
+            roles.every(r => (link.excludeRoles as string[]).includes(r))) {
           return false
         }
         return true
       })
     }))
     .filter(section => section.links.length > 0),
-    [role, sectionAccess]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rolesKey, sectionAccess]
   )
 
   // Auto-expand only the active section (accordion style)

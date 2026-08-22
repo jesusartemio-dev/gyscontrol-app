@@ -2,11 +2,27 @@ import { NextResponse } from 'next/server'
 import { hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { ALL_ROLES } from '@/lib/config/sections'
+
+/**
+ * Deja `rolesExtra` en una lista limpia: solo roles válidos, sin duplicados y
+ * sin repetir el rol principal (que ya cuenta por sí solo). Si no viene el
+ * campo devuelve undefined para no pisar lo que haya en BD.
+ */
+function normalizarRolesExtra(valor: unknown, rolPrincipal: string): string[] | undefined {
+  if (valor === undefined || valor === null) return undefined
+  if (!Array.isArray(valor)) return []
+  const validos = valor.filter(
+    (r): r is string => typeof r === 'string' && (ALL_ROLES as readonly string[]).includes(r),
+  )
+  return Array.from(new Set(validos)).filter((r) => r !== rolPrincipal)
+}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
     const { email, name, password, role } = body
+    const rolesExtra = normalizarRolesExtra(body.rolesExtra, role)
 
     // Validaciones básicas
     if (!email || !name || !role) {
@@ -29,7 +45,8 @@ export async function POST(request: Request) {
         email,
         name,
         password: hashedPassword,
-        role
+        role,
+        rolesExtra: (rolesExtra ?? []) as any,
       }
     })
 
@@ -48,6 +65,7 @@ export async function GET() {
         email: true,
         name: true,
         role: true,
+        rolesExtra: true,
         password: true,
         Account: {
           select: { provider: true },
@@ -89,12 +107,14 @@ export async function PUT(request: Request) {
   try {
     const body = await request.json()
     const { id, name, email, role, password } = body
+    const rolesExtra = normalizarRolesExtra(body.rolesExtra, role)
 
     if (!id || !name || !email || !role) {
       return NextResponse.json({ message: 'Campos incompletos' }, { status: 400 })
     }
 
     const dataToUpdate: any = { name, email, role }
+    if (rolesExtra !== undefined) dataToUpdate.rolesExtra = rolesExtra
 
     if (password && password.length >= 4) {
       const hashedPassword = await hash(password, 10)
