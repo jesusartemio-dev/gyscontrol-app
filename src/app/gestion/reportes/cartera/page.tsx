@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { HorasInternas } from './_components/HorasInternas'
 import {
   Home, ChevronRight, Loader2, AlertTriangle, LayoutGrid, Settings2,
   TrendingUp, PlusCircle, CalendarClock, ArrowUpRight, Wallet,
@@ -65,6 +66,8 @@ export default function CarteraAvancePage() {
   const [tipo, setTipo] = useState<Tipo>('cliente')
 
   useEffect(() => {
+    // La pestaña de internos tiene su propia vista (horas por centro de costo), pero se
+    // sigue pidiendo la cartera para tener los conteos del selector.
     setLoading(true); setError('')
     fetch(`/api/gestion/cartera-avance?tipo=${tipo}&incluirCerrados=${incluirCerrados ? 1 : 0}`)
       .then(async (r) => {
@@ -92,9 +95,9 @@ export default function CarteraAvancePage() {
         <div>
           <h1 className="text-xl font-bold tracking-tight">Avance de la cartera</h1>
           <p className="text-sm text-muted-foreground">
-            Una fila por proyecto: cuánto lleva, cuánto de eso está fechado, qué horas consumió
-            y cuánto trabajo va fuera del plan. Los proyectos internos son centros de costo para
-            imputar horas, no obras — por eso van aparte.
+            {tipo === 'interno'
+              ? 'Los proyectos internos son contenedores de horas de cada centro de costo, no obras.'
+              : 'Una fila por proyecto: cuánto lleva, cuánto de eso está fechado, qué horas consumió y cuánto trabajo va fuera del plan.'}
           </p>
         </div>
         <div className="flex flex-col items-start sm:items-end gap-2 shrink-0">
@@ -118,32 +121,36 @@ export default function CarteraAvancePage() {
               </button>
             ))}
           </div>
-          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-            <input
-              type="checkbox"
-              checked={incluirCerrados}
-              onChange={(e) => setIncluirCerrados(e.target.checked)}
-              className="accent-primary"
-            />
-            Incluir proyectos cerrados
-          </label>
+          {tipo !== 'interno' && (
+            <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+              <input
+                type="checkbox"
+                checked={incluirCerrados}
+                onChange={(e) => setIncluirCerrados(e.target.checked)}
+                className="accent-primary"
+              />
+              Incluir proyectos cerrados
+            </label>
+          )}
         </div>
       </div>
 
-      {loading && (
+      {tipo === 'interno' && <HorasInternas />}
+
+      {tipo !== 'interno' && loading && (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       )}
 
-      {error && !loading && (
+      {tipo !== 'interno' && error && !loading && (
         <Card><CardContent className="p-8 text-center">
           <AlertTriangle className="h-8 w-8 text-red-400 mx-auto mb-2" />
           <p className="text-sm text-red-600">{error}</p>
         </CardContent></Card>
       )}
 
-      {data && !loading && (
+      {tipo !== 'interno' && data && !loading && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Mini icon={LayoutGrid} color="text-blue-500" valor={`${data.resumen.listos} / ${data.resumen.total}`}
