@@ -78,14 +78,15 @@ interface JornadaFormModalProps {
 }
 
 const ROLE_TABS = [
-  { key: 'proyectos', label: 'Proyectos' },
-  { key: 'seguridad', label: 'Seguridad' },
-  { key: 'comercial', label: 'Comercial' },
-  { key: 'presupuestos', label: 'Presupuestos' },
-  { key: 'todos', label: 'Todos' },
+  { key: 'proyectos', label: 'Proyectos', roles: ['proyectos'] },
+  { key: 'gestion', label: 'Gestión', roles: ['gestor', 'coordinador', 'admin', 'gerente'] },
+  { key: 'seguridad', label: 'Seguridad', roles: ['seguridad'] },
+  { key: 'comercial', label: 'Comercial', roles: ['comercial'] },
+  { key: 'presupuestos', label: 'Presupuestos', roles: ['presupuestos'] },
+  { key: 'todos', label: 'Todos', roles: [] },
 ] as const
 
-const ROLES_PERMITIDOS = ['colaborador', 'coordinador', 'logistico', 'gestor', 'proyectos', 'comercial', 'seguridad', 'presupuestos']
+const ROLES_PERMITIDOS = ['colaborador', 'coordinador', 'logistico', 'coordinador_logistico', 'gestor', 'gerente', 'admin', 'proyectos', 'comercial', 'seguridad', 'presupuestos']
 
 export function JornadaFormModal({
   open,
@@ -357,9 +358,11 @@ export function JornadaFormModal({
     }
   }
 
+  const rolesDelTab = ROLE_TABS.find(t => t.key === filtroRol)?.roles ?? []
+
   const usuariosPorRol = filtroRol === 'todos'
     ? usuarios
-    : usuarios.filter(u => u.role === filtroRol)
+    : usuarios.filter(u => (rolesDelTab as readonly string[]).includes(u.role))
 
   const usuariosMostrados = usuariosPorRol.filter(u =>
     normalizeStr(u.name).includes(normalizeStr(busquedaPersonal)) ||
@@ -376,6 +379,8 @@ export function JornadaFormModal({
       coordinador_logistico: 'Coord. Logístico',
       logistico: 'Logístico',
       gestor: 'Gestor',
+      gerente: 'Gerente',
+      admin: 'Admin',
       proyectos: 'Proyectos',
       seguridad: 'Seguridad',
       presupuestos: 'Presupuestos'
@@ -557,7 +562,7 @@ export function JornadaFormModal({
                     {tab.label}
                     {tab.key !== 'todos' && (
                       <span className="ml-0.5 opacity-70">
-                        {usuarios.filter(u => u.role === tab.key).length}
+                        {usuarios.filter(u => (tab.roles as readonly string[]).includes(u.role)).length}
                       </span>
                     )}
                   </button>
