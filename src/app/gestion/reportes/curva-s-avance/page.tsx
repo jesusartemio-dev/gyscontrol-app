@@ -58,6 +58,7 @@ interface FueraDePlan {
   horasHombre: number
   horasReales: number
   porcentajeSobrePlan: number
+  sinAlcancePlanificado: boolean
 }
 interface JornadaAbierta { id: string; fechaTrabajo: string; semanaIso: string }
 interface ConsumoResumen {
@@ -357,7 +358,7 @@ export default function CurvaSAvancePage() {
               de lo que realmente se está haciendo en obra. */}
           {data.fueraDePlan.tareas > 0 && (
             <div className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${
-              data.fueraDePlan.porcentajeSobrePlan >= 50
+              data.fueraDePlan.sinAlcancePlanificado || data.fueraDePlan.porcentajeSobrePlan >= 50
                 ? 'bg-red-50 border-red-200 text-red-900'
                 : 'bg-violet-50 border-violet-200 text-violet-900'
             }`}>
@@ -365,15 +366,20 @@ export default function CurvaSAvancePage() {
               <div>
                 <span className="font-medium">
                   {data.fueraDePlan.tareas} tarea{data.fueraDePlan.tareas === 1 ? '' : 's'} fuera del plan
-                  {' '}({data.fueraDePlan.porcentajeSobrePlan.toFixed(0)}% sobre el alcance planificado).
+                  {' '}({data.fueraDePlan.sinAlcancePlanificado
+                    ? 'todo el trabajo del proyecto'
+                    : `${data.fueraDePlan.porcentajeSobrePlan.toFixed(0)}% sobre el alcance planificado`}).
                 </span>{' '}
                 No cuentan para el % de avance —{' '}
                 {data.fueraDePlan.horasReales.toLocaleString('es-PE')} h ya gastadas en ellas sí pesan
                 en el consumo.
-                {data.fueraDePlan.porcentajeSobrePlan >= 50 && (
+                {data.fueraDePlan.sinAlcancePlanificado ? (
+                  <> Este proyecto no tiene alcance planificado cargado, así que su % de avance
+                  no significa nada: hay que cargar las tareas del cronograma.</>
+                ) : data.fueraDePlan.porcentajeSobrePlan >= 50 ? (
                   <> Con este volumen, el % de avance del cronograma ya no representa lo que se
                   está ejecutando: conviene incorporar ese trabajo al alcance.</>
-                )}
+                ) : null}
               </div>
             </div>
           )}

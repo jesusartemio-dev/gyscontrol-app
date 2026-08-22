@@ -48,7 +48,7 @@ export async function calcularPesosFase(proyectoId: string): Promise<PesosFaseRe
     where: { proyectoId, tipo: 'ejecucion' },
     select: { id: true },
   })
-  const SIN_EXTRAS: ResumenFueraDePlan = { tareas: 0, horasHombre: 0, horasReales: 0, porcentajeSobrePlan: 0 }
+  const SIN_EXTRAS: ResumenFueraDePlan = { tareas: 0, horasHombre: 0, horasReales: 0, porcentajeSobrePlan: 0, sinAlcancePlanificado: false }
   if (!cronograma) {
     return { cronogramaId: null, horasTotal: 0, fases: [], avanceGlobal: 0, sumaPesos: 0, fueraDePlan: SIN_EXTRAS }
   }
@@ -125,6 +125,7 @@ export async function calcularPesosFase(proyectoId: string): Promise<PesosFaseRe
     horasHombre: Number(hhExtras.toFixed(1)),
     horasReales: Number(extras.reduce((s, t) => s + Number(t.horasReales ?? 0), 0).toFixed(1)),
     porcentajeSobrePlan: horasTotal > 0 ? Number(((hhExtras / horasTotal) * 100).toFixed(1)) : 0,
+    sinAlcancePlanificado: horasTotal <= 0 && extras.length > 0,
   }
 
   return { cronogramaId: cronograma.id, horasTotal, fases, avanceGlobal, sumaPesos, fueraDePlan }

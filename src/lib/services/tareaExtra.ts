@@ -35,4 +35,7 @@ export interface ResumenFueraDePlan {
   horasReales: number
   /** % que representan sobre las horas-hombre del alcance planificado. */
   porcentajeSobrePlan: number
+  /** No hay alcance planificado con el que comparar: TODO el trabajo está fuera del plan.
+   *  Sin esto, un proyecto sin plan mostraba "0 % fuera del plan", que dice lo contrario. */
+  sinAlcancePlanificado: boolean
 }

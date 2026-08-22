@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { hh } from './horasHombre'
-import { calcularPesosFase } from './pesoFase'
+import { calcularPesosFase, type PesosFaseResultado } from './pesoFase'
 import { esTareaExtra, SELECT_ES_EXTRA } from './tareaExtra'
 
 // Serie semanal de avance REAL derivada de ProyectoTareaAvance (el histórico fechado que
@@ -53,8 +53,13 @@ const VACIA: SerieAvanceReal = {
  * orden de FECHA DE EFECTO (no de captura). Devuelve un punto por cada semana en la que
  * hubo al menos un asiento; el arrastre entre semanas lo hace `construirCurvaAvance`.
  */
-export async function serieAvanceRealSemanal(proyectoId: string): Promise<SerieAvanceReal> {
-  const pesos = await calcularPesosFase(proyectoId)
+export async function serieAvanceRealSemanal(
+  proyectoId: string,
+  /** Pesos ya calculados, para no repetir el trabajo cuando quien llama también los necesita
+   *  (p. ej. el panel de cartera, que recorre todos los proyectos). */
+  pesosPrecalculados?: PesosFaseResultado,
+): Promise<SerieAvanceReal> {
+  const pesos = pesosPrecalculados ?? (await calcularPesosFase(proyectoId))
   if (!pesos.cronogramaId) return VACIA
 
   const todas = await prisma.proyectoTarea.findMany({

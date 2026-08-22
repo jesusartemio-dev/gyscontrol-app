@@ -6,15 +6,16 @@ import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
-  Home,
-  ChevronRight,
+  ArrowRight,
   BarChart3,
+  ChevronRight,
+  Clock,
+  DollarSign,
+  Home,
+  LayoutGrid,
   Package,
   PieChart,
   TrendingUp,
-  ArrowRight,
-  Clock,
-  DollarSign,
 } from 'lucide-react'
 
 export const metadata: Metadata = {
@@ -47,6 +48,14 @@ const reportes = [
     icono: TrendingUp,
     href: '/gestion/reportes/curva-s',
     color: 'bg-orange-100 text-orange-600',
+    roles: ['admin', 'gerente', 'gestor', 'coordinador'],
+  },
+  {
+    titulo: 'Avance de la cartera',
+    descripcion: 'Todos los proyectos en una tabla: avance real, horas consumidas, trabajo fuera del plan, eficiencia y qué le falta a cada uno para que su curva sea fiable.',
+    icono: LayoutGrid,
+    href: '/gestion/reportes/cartera',
+    color: 'bg-indigo-100 text-indigo-600',
     roles: ['admin', 'gerente', 'gestor', 'coordinador'],
   },
   {
