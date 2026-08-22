@@ -35,6 +35,13 @@ interface CurvaAvanceResponse {
     tareasConAvance: number
     tareasConHistorico: number
   }
+  preparacion: {
+    estado: string
+    listo: boolean
+    titulo: string
+    detalle: string
+    pasos: string[]
+  }
   jornadasAbiertas: { id: string; fechaTrabajo: string; semanaIso: string }[]
   consumo: {
     tieneDatos: boolean
@@ -102,16 +109,20 @@ export function CurvaSAvanceChart({ proyectoId, refreshKey }: { proyectoId: stri
         {data && !loading && (
           <>
             {/* Avisos de estado */}
-            {!data.hasBaseline && (
-              <div className="flex items-start gap-2 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+            {data.preparacion.estado !== 'listo' && (
+              <div className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${
+                data.preparacion.listo
+                  ? 'bg-yellow-50 border-yellow-200 text-yellow-900'
+                  : 'bg-slate-50 border-slate-300 text-slate-800'
+              }`}>
                 <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                 <div>
-                  <span className="font-medium">Sin baseline planificado para comparar.</span>{' '}
-                  Este proyecto no tiene cronograma de planificación marcado como línea base.
+                  <span className="font-medium">{data.preparacion.titulo}.</span>{' '}
+                  {data.preparacion.detalle}
                 </div>
               </div>
             )}
-            {!data.tieneSerieReal && (
+            {!data.tieneSerieReal && data.preparacion.listo && (
               <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
                 <Camera className="h-4 w-4 mt-0.5 shrink-0" />
                 <span>

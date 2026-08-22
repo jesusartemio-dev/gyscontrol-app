@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import {
   Home, ChevronRight, TrendingUp, Loader2, Activity, AlertTriangle,
-  Calendar, Camera, Target, Check, Trash2, Clock,
+  Calendar, Camera, Target, Check, Trash2, Clock, Settings2,
 } from 'lucide-react'
 import {
   ResponsiveContainer, ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine,
@@ -40,6 +40,19 @@ interface HistoricoResumen {
   tareasConAvance: number
   tareasConHistorico: number
 }
+interface PreparacionResumen {
+  estado: string
+  listo: boolean
+  puedeCompararConPlan: boolean
+  tienePlanificacion: boolean
+  tieneBaseline: boolean
+  tieneEjecucion: boolean
+  tareasEjecucion: number
+  tareasSinFase: number
+  titulo: string
+  detalle: string
+  pasos: string[]
+}
 interface JornadaAbierta { id: string; fechaTrabajo: string; semanaIso: string }
 interface ConsumoResumen {
   tieneDatos: boolean
@@ -55,6 +68,7 @@ interface CurvaAvanceResponse {
   cronogramaPlanId: string | null
   cronogramaEjecId: string | null
   proyecto: ProyectoLight
+  preparacion: PreparacionResumen
   historico: HistoricoResumen
   consumo: ConsumoResumen
   jornadasAbiertas: JornadaAbierta[]
@@ -280,17 +294,30 @@ export default function CurvaSAvancePage() {
       {data && !loading && (
         <>
           {/* Avisos */}
-          {!data.hasBaseline && (
-            <div className="flex items-start gap-2 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
-              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-              <div>
-                <span className="font-medium">Sin línea base.</span>{' '}
-                Este proyecto no tiene cronograma de planificación marcado como línea base,
-                por lo que no se puede dibujar la curva planeada.
+          {/* Preparación del cronograma. Distingue "el proyecto no está armado" de "el
+              registro va atrasado": se ven igual (curva vacía) pero los arregla gente
+              distinta. */}
+          {data.preparacion.estado !== 'listo' && (
+            <div className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${
+              data.preparacion.listo
+                ? 'bg-yellow-50 border-yellow-200 text-yellow-900'
+                : 'bg-slate-50 border-slate-300 text-slate-800'
+            }`}>
+              <Settings2 className="h-4 w-4 mt-0.5 shrink-0" />
+              <div className="space-y-1.5">
+                <div>
+                  <span className="font-medium">{data.preparacion.titulo}.</span>{' '}
+                  {data.preparacion.detalle}
+                </div>
+                {data.preparacion.pasos.length > 0 && (
+                  <ol className="list-decimal list-inside space-y-0.5 text-xs opacity-90">
+                    {data.preparacion.pasos.map((paso) => <li key={paso}>{paso}</li>)}
+                  </ol>
+                )}
               </div>
             </div>
           )}
-          {!data.tieneSerieReal && (
+          {!data.tieneSerieReal && data.preparacion.listo && (
             <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
               <Camera className="h-4 w-4 mt-0.5 shrink-0" />
               <div>

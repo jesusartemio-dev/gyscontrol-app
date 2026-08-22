@@ -166,7 +166,13 @@ export async function serieConsumoHorasSemanal(proyectoId: string): Promise<Seri
     prisma.registroHorasCampoMiembro.findMany({
       where: {
         registroHorasId: null,
-        registroCampoTarea: { proyectoTareaId: { in: ids } },
+        registroCampoTarea: {
+          proyectoTareaId: { in: ids },
+          // Una jornada abierta no aporta NADA todavía: ni avance ni horas. Es lo que dice
+          // el aviso de la pantalla, y es lo que hace horasReales (solo se incrementa al
+          // cerrar). Contarlas aquí descuadraba el consumo contra el resto de la app.
+          registroCampo: { estado: { not: 'iniciado' } },
+        },
       },
       select: {
         horas: true,

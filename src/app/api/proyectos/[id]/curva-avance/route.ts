@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { construirCurvaAvance } from '@/lib/utils/curvaAvance'
 import { calcularPesosFase } from '@/lib/services/pesoFase'
 import { serieAvanceRealSemanal, serieConsumoHorasSemanal } from '@/lib/services/avanceHistorico'
+import { diagnosticarPreparacion } from '@/lib/services/preparacionCronograma'
 import { formatearSemanaIso } from '@/lib/utils/isoWeek'
 
 const ROLES = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
@@ -64,7 +65,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         })
       : []
 
-    const [snapshots, pesos, serie, consumo] = await Promise.all([
+    const [snapshots, pesos, serie, consumo, preparacion] = await Promise.all([
       prisma.proyectoAvanceSnapshot.findMany({
         where: { proyectoId: id },
         orderBy: { semanaIso: 'asc' },
@@ -73,6 +74,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       calcularPesosFase(id),
       serieAvanceRealSemanal(id),
       serieConsumoHorasSemanal(id),
+      diagnosticarPreparacion(id),
     ])
 
     const baselineTareas = tareasPlan.map((t) => ({
@@ -109,6 +111,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       cronogramaPlanId: cronoPlan?.id ?? null,
       cronogramaEjecId: cronoEjec?.id ?? null,
       proyecto,
+      preparacion,
       historico: {
         porcentajeActual: serie.porcentajeActual,
         porcentajeDerivado: serie.porcentajeDerivado,
