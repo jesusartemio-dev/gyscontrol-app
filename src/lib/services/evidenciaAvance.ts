@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
-import { ROLES_PERMITIDOS, ROLES_BYPASS } from '@/lib/auth/rolesEvidenciaProyecto'
+import { ROLES_PERMITIDOS, ROLES_LECTURA, ROLES_BYPASS } from '@/lib/auth/rolesEvidenciaProyecto'
 
 export const EVIDENCIA_AVANCE_INCLUDE = {
   jornada: {
@@ -144,5 +144,5 @@ export function puedeEscribirEvidencia(
 
 export function puedeLeerEvidencia(role: string | undefined): boolean {
   if (!role) return false
-  return (ROLES_PERMITIDOS as readonly string[]).includes(role)
+  return (ROLES_LECTURA as readonly string[]).includes(role)
 }

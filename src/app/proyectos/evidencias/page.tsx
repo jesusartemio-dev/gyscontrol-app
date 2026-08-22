@@ -56,6 +56,7 @@ import {
 } from '@/components/ui/dialog'
 import { SelectorJornada, type JornadaActiva } from '@/components/proyectos/evidencias/SelectorJornada'
 import { TIPO_REGISTRO_AVANCE_LABELS, type TipoRegistroAvance } from '@/lib/validators/registroAvance'
+import { ROLES_PERMITIDOS } from '@/lib/auth/rolesEvidenciaProyecto'
 import { cn } from '@/lib/utils'
 
 interface JornadaResumen {
@@ -236,6 +237,9 @@ function EvidenciasAvanceListaContenido() {
   const { data: session } = useSession()
   const esAdmin = session?.user?.role === 'admin'
   const isBypass = ['admin', 'gerente', 'gestor'].includes(session?.user?.role ?? '')
+  // `seguridad` entra en solo lectura: consulta el avance técnico para
+  // contrastarlo con sus evidencias SSOMA, pero no abre ni captura evidencia.
+  const puedeCapturar = (ROLES_PERMITIDOS as readonly string[]).includes(session?.user?.role ?? '')
 
   // Deep-link params soportados: proyectoId, fechaDesde, fechaHasta, estado
   const proyectoIdParam = searchParams.get('proyectoId') ?? ''
@@ -385,14 +389,16 @@ function EvidenciasAvanceListaContenido() {
             Una evidencia por jornada de campo · agrupa el avance técnico del día
           </p>
         </div>
-        <Button
-          className="bg-orange-600 hover:bg-orange-700 shrink-0"
-          onClick={() => setDialogAbrir(true)}
-        >
-          <Plus className="h-4 w-4 sm:mr-1" />
-          <span className="hidden sm:inline">Nueva evidencia</span>
-          <span className="sr-only sm:hidden">Nueva evidencia</span>
-        </Button>
+        {puedeCapturar && (
+          <Button
+            className="bg-orange-600 hover:bg-orange-700 shrink-0"
+            onClick={() => setDialogAbrir(true)}
+          >
+            <Plus className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">Nueva evidencia</span>
+            <span className="sr-only sm:hidden">Nueva evidencia</span>
+          </Button>
+        )}
       </div>
 
       {/* ── Filtros ──────────────────────────────────────── */}
@@ -507,17 +513,19 @@ function EvidenciasAvanceListaContenido() {
                       <span className="text-amber-600">Sin evidencia</span>
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 border-orange-300 text-orange-700 hover:bg-orange-50 shrink-0"
-                    disabled={creandoEsta}
-                    onClick={() => abrirEvidenciaMutation.mutate(jornada.id)}
-                  >
-                    {creandoEsta
-                      ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Abriendo…</>
-                      : <><Plus className="h-3.5 w-3.5 mr-1" /> Crear evidencia</>}
-                  </Button>
+                  {puedeCapturar && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 border-orange-300 text-orange-700 hover:bg-orange-50 shrink-0"
+                      disabled={creandoEsta}
+                      onClick={() => abrirEvidenciaMutation.mutate(jornada.id)}
+                    >
+                      {creandoEsta
+                        ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Abriendo…</>
+                        : <><Plus className="h-3.5 w-3.5 mr-1" /> Crear evidencia</>}
+                    </Button>
+                  )}
                 </div>
               )
             }

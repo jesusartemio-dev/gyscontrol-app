@@ -60,6 +60,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useSession } from 'next-auth/react'
+import { ROLES_PERMITIDOS } from '@/lib/auth/rolesEvidenciaProyecto'
 import { cn } from '@/lib/utils'
 
 import { FotosUploader, type FotoLocal } from '@/components/proyectos/evidencias/FotosUploader'
@@ -478,7 +479,10 @@ export default function EvidenciaAvancePage({
   const isBypass = role === 'admin' || role === 'gerente' || role === 'gestor'
   const jornadaActiva = ['iniciado', 'pendiente'].includes(ev.jornada.estado)
   const evidenciaAbierta = ev.estado === 'abierta'
-  const puedeEscribir = isBypass || (jornadaActiva && evidenciaAbierta)
+  // `seguridad` consulta pero no captura evidencia técnica: sin este filtro la
+  // UI le ofrecería Agregar/Editar y la API respondería 403.
+  const puedeCapturar = (ROLES_PERMITIDOS as readonly string[]).includes(role ?? '')
+  const puedeEscribir = puedeCapturar && (isBypass || (jornadaActiva && evidenciaAbierta))
   const puedeCerrar = evidenciaAbierta && (isBypass || ev.creadoPor.id === session?.user?.id)
   const totalTrabajadores = new Set(
     ev.jornada.tareas.flatMap((t) => t.miembros.map((m) => m.usuarioId)),

@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { uploadFile, createFolder, getAdminDriveId } from '@/lib/services/googleDrive'
 import { puedeEscribirEvidencia } from '@/lib/services/evidenciaAvance'
-import { ROLES_PERMITIDOS } from '@/lib/auth/rolesEvidenciaProyecto'
+import { ROLES_PERMITIDOS, ROLES_LECTURA } from '@/lib/auth/rolesEvidenciaProyecto'
 
 const MAX_TAMANO_BYTES = 15 * 1024 * 1024 // 15MB
 /** Debe coincidir con MAX_FOTOS_REGISTRO en la página de la evidencia. */
@@ -30,7 +30,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!(ROLES_PERMITIDOS as readonly string[]).includes(session.user.role)) {
+    if (!(ROLES_LECTURA as readonly string[]).includes(session.user.role)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 

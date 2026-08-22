@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { estadoEvidenciaAvanceEnum } from '@/lib/validators/evidenciaAvance'
-import { ROLES_PERMITIDOS } from '@/lib/auth/rolesEvidenciaProyecto'
+import { ROLES_PERMITIDOS, ROLES_LECTURA } from '@/lib/auth/rolesEvidenciaProyecto'
 import type { Prisma } from '@prisma/client'
 
 /**
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    if (!(ROLES_PERMITIDOS as readonly string[]).includes(session.user.role))
+    if (!(ROLES_LECTURA as readonly string[]).includes(session.user.role))
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
     const { searchParams } = new URL(req.url)

@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { crearRegistroAvanceSchema, tipoRegistroAvanceEnum } from '@/lib/validators/registroAvance'
 import { REGISTRO_AVANCE_INCLUDE } from '@/lib/services/registroAvance'
-import { ROLES_PERMITIDOS, ROLES_BYPASS } from '@/lib/auth/rolesEvidenciaProyecto'
+import { ROLES_PERMITIDOS, ROLES_BYPASS, ROLES_LECTURA } from '@/lib/auth/rolesEvidenciaProyecto'
 import type { Prisma } from '@prisma/client'
 
 export async function GET(req: NextRequest) {
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!(ROLES_PERMITIDOS as readonly string[]).includes(session.user.role)) {
+    if (!(ROLES_LECTURA as readonly string[]).includes(session.user.role)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 

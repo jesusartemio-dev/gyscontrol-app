@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { obtenerEvidenciaPorJornada } from '@/lib/services/evidenciaAvance'
-import { ROLES_PERMITIDOS } from '@/lib/auth/rolesEvidenciaProyecto'
+import { ROLES_PERMITIDOS, ROLES_LECTURA } from '@/lib/auth/rolesEvidenciaProyecto'
 
 export async function GET(
   _req: NextRequest,
@@ -13,7 +13,7 @@ export async function GET(
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!(ROLES_PERMITIDOS as readonly string[]).includes(session.user.role)) {
+    if (!(ROLES_LECTURA as readonly string[]).includes(session.user.role)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 
