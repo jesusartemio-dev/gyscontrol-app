@@ -132,7 +132,7 @@ export default function ProductividadPage() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <div className="inline-flex rounded-md border border-input overflow-hidden">
-            {([['porcentaje', '% directo'], ['horas', 'Horas']] as const).map(([v, etiqueta]) => (
+            {([['porcentaje', '% a proyectos'], ['horas', 'Horas']] as const).map(([v, etiqueta]) => (
               <button
                 key={v}
                 onClick={() => setModo(v)}
@@ -189,12 +189,28 @@ export default function ProductividadPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold">Por persona</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                {modo === 'porcentaje'
-                  ? 'Las celdas mensuales muestran qué porcentaje de ese mes fue a proyectos de cliente.'
-                  : 'Las celdas mensuales muestran las horas totales de ese mes.'}
-                {' '}Haz clic en una fila para ver a dónde fue su tiempo.
-              </p>
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground">
+                  {modo === 'porcentaje'
+                    ? 'Cada celda mensual es el porcentaje de las horas de esa persona en ese mes que fueron a proyectos de cliente. El resto se fue a centros de costo internos.'
+                    : 'Cada celda mensual son las horas totales que registró esa persona en ese mes, directas más indirectas.'}
+                  {' '}Pasa el cursor por una celda para ver el desglose, o haz clic en la fila para ver a dónde fue su tiempo.
+                </p>
+                {modo === 'porcentaje' && (
+                  <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                    <span className="font-medium">Umbrales:</span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" /> 80 % o más
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="h-2 w-2 rounded-full bg-amber-500" /> entre 60 y 79 %
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="h-2 w-2 rounded-full bg-red-500" /> menos de 60 %
+                    </span>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -205,13 +221,24 @@ export default function ProductividadPage() {
                         Persona
                       </TableHead>
                       <TableHead className="text-xs text-right w-20">Total</TableHead>
-                      <TableHead className="text-xs w-40">Reparto</TableHead>
-                      <TableHead className="text-xs text-right w-20">% dir.</TableHead>
-                      <TableHead className="text-xs text-right w-20">% ind.</TableHead>
+                      <TableHead className="text-xs w-40" title="Verde: a proyectos de cliente. Rojo: a centros de costo internos.">
+                        Reparto
+                      </TableHead>
+                      <TableHead className="text-xs text-right w-20" title="Porcentaje del tiempo que fue a proyectos de cliente">
+                        % a proyectos
+                      </TableHead>
+                      <TableHead className="text-xs text-right w-20" title="Porcentaje del tiempo que fue a centros de costo internos">
+                        % interno
+                      </TableHead>
                       <TableHead className="text-xs text-right w-24">Costo dir.</TableHead>
                       <TableHead className="text-xs text-right w-24">Costo ind.</TableHead>
                       {data.meses.map((m) => (
-                        <TableHead key={m} className="text-xs text-right w-16">{etiquetaMes(m)}</TableHead>
+                        <TableHead key={m} className="text-xs text-right w-16">
+                          {etiquetaMes(m)}
+                          <span className="block text-[10px] font-normal opacity-70">
+                            {modo === 'porcentaje' ? '% dir.' : 'horas'}
+                          </span>
+                        </TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
@@ -254,7 +281,13 @@ export default function ProductividadPage() {
                             : p.costo.indirecto > 0 ? soles(p.costo.indirecto) : '—'}
                         </TableCell>
                         {p.porMes.map((m) => (
-                          <TableCell key={m.mes} className="text-right py-2 font-mono tabular-nums">
+                          <TableCell
+                            key={m.mes}
+                            className="text-right py-2 font-mono tabular-nums"
+                            title={m.total === 0
+                              ? `${etiquetaMes(m.mes)}: sin horas registradas`
+                              : `${etiquetaMes(m.mes)}: ${h(m.total)} h en total · ${h(m.directo)} h a proyectos de cliente (${m.porcentajeDirecto}%) · ${h(m.indirecto)} h a centros de costo internos`}
+                          >
                             {m.total === 0 ? <span className="opacity-30">·</span>
                               : modo === 'porcentaje'
                                 ? <span className={colorDirecto(m.porcentajeDirecto)}>{m.porcentajeDirecto}%</span>
