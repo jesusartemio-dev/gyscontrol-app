@@ -58,11 +58,11 @@ export type RoleKey = (typeof ALL_ROLES)[number]
 export const DEFAULT_ROLE_SECTIONS: Record<RoleKey, SectionKey[]> = {
   admin: ['comercial', 'crm', 'proyectos', 'documentos', 'mi-trabajo', 'supervision', 'logistica', 'aprovisionamiento', 'gastos', 'seguridad', 'administracion', 'gestion', 'configuracion'],
   gerente: ['comercial', 'crm', 'proyectos', 'documentos', 'mi-trabajo', 'supervision', 'logistica', 'aprovisionamiento', 'gastos', 'seguridad', 'administracion', 'gestion', 'configuracion'],
-  gestor: ['proyectos', 'documentos', 'mi-trabajo', 'supervision', 'aprovisionamiento', 'gastos', 'seguridad', 'gestion'],
+  gestor: ['proyectos', 'documentos', 'mi-trabajo', 'supervision', 'logistica', 'aprovisionamiento', 'gastos', 'seguridad', 'gestion'],
   coordinador: ['proyectos', 'documentos', 'mi-trabajo', 'supervision', 'gastos'],
   coordinador_logistico: ['logistica', 'documentos', 'mi-trabajo', 'supervision', 'gastos'],
   proyectos: ['proyectos', 'documentos', 'mi-trabajo', 'supervision', 'gastos'],
-  seguridad: ['proyectos', 'mi-trabajo', 'seguridad'],
+  seguridad: ['proyectos', 'documentos', 'mi-trabajo', 'gastos', 'seguridad'],
   comercial: ['comercial', 'crm', 'documentos', 'mi-trabajo'],
   presupuestos: ['comercial', 'mi-trabajo'],
   logistico: ['logistica', 'documentos', 'mi-trabajo', 'gastos'],

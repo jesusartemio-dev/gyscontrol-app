@@ -48,7 +48,10 @@ export async function GET(
     }
 
     // 🔐 Verificar permisos de acceso
-    const rolesConAccesoTotal = ['admin', 'gerente'];
+    // 'seguridad' entra en solo lectura: necesita el contexto del proyecto
+    // (cliente, alcance, fechas) para sus evidencias e informes SSOMA.
+    // La edición sigue restringida — ver rolesConAccesoTotal del PUT.
+    const rolesConAccesoTotal = ['admin', 'gerente', 'seguridad'];
     const esComercialDelProyecto = proyectoBasico.comercialId === session.user.id;
     const esGestorDelProyecto = proyectoBasico.gestorId === session.user.id;
 

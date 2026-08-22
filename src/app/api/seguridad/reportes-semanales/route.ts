@@ -33,10 +33,10 @@ export async function GET(req: NextRequest) {
       const parsed = estadoReporteSeguridadEnum.safeParse(estadoParam)
       if (parsed.success) where.estado = parsed.data
     }
+    // Los ingenieros de seguridad ven los reportes de todo el equipo: el
+    // informe semanal es material compartido del área, no privado del autor.
     if (ingenieroId) {
       where.ingenieroId = ingenieroId
-    } else if (session.user.role === 'seguridad') {
-      where.ingenieroId = session.user.id
     }
 
     // Paginación

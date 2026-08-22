@@ -184,7 +184,7 @@ export default function MobileSidebar() {
       title: 'Proyectos',
       icon: FolderOpen,
       color: 'text-purple-400',
-      roles: ['admin', 'gerente', 'proyectos', 'coordinador', 'gestor'],
+      roles: ['admin', 'gerente', 'proyectos', 'coordinador', 'gestor', 'seguridad'],
       links: [
         { href: '/proyectos', label: 'Ver Proyectos', icon: FolderOpen, badge: 'proyectos-activos' as NotificationBadgeType },
         { href: '/proyectos/equipos', label: 'Equipos', icon: Wrench },
@@ -200,7 +200,7 @@ export default function MobileSidebar() {
       title: 'Documentos',
       icon: HardDrive,
       color: 'text-indigo-400',
-      roles: ['admin', 'gerente', 'proyectos', 'coordinador', 'gestor', 'logistico', 'coordinador_logistico', 'comercial', 'administracion'],
+      roles: ['admin', 'gerente', 'proyectos', 'coordinador', 'gestor', 'logistico', 'coordinador_logistico', 'comercial', 'administracion', 'seguridad'],
       links: [
         { href: '/documentos', label: 'GYS.PROYECTOS', icon: FolderOpen },
         { href: '/documentos/administracion', label: 'GYS.ADMINISTRACION', icon: Building2 },
@@ -272,7 +272,7 @@ export default function MobileSidebar() {
       title: 'Logística',
       icon: Truck,
       color: 'text-orange-400',
-      roles: ['admin', 'gerente', 'logistico', 'coordinador_logistico'],
+      roles: ['admin', 'gerente', 'gestor', 'logistico', 'coordinador_logistico'],
       links: [
         { href: '/logistica/listas', label: 'Listas Técnicas', icon: FileText },
         { href: '/logistica/pedidos', label: 'Gestión de Pedidos', icon: Package, badge: 'pedidos-pendientes' as NotificationBadgeType },
