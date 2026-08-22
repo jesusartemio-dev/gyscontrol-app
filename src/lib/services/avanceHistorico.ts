@@ -104,12 +104,17 @@ export async function serieAvanceRealSemanal(proyectoId: string): Promise<SerieA
     puntos.push({ weekStart: semana, porcentaje: Number(global.toFixed(2)) })
   }
 
+  // La cobertura se mide SOLO sobre las tareas que hoy tienen avance: una tarea con
+  // histórico pero devuelta a 0% no debe inflar el numerador (daría "66 de 65").
+  const conHistorico = new Set(avances.map((a) => a.proyectoTareaId))
+  const conAvance = tareas.filter((t) => t.porcentajeCompletado > 0)
+
   return {
     puntos,
     tieneHistorico: puntos.length > 0,
     porcentajeActual: pesos.avanceGlobal,
     porcentajeDerivado: puntos.length > 0 ? puntos[puntos.length - 1].porcentaje : 0,
-    tareasConAvance: tareas.filter((t) => t.porcentajeCompletado > 0).length,
-    tareasConHistorico: new Set(avances.map((a) => a.proyectoTareaId)).size,
+    tareasConAvance: conAvance.length,
+    tareasConHistorico: conAvance.filter((t) => conHistorico.has(t.id)).length,
   }
 }
