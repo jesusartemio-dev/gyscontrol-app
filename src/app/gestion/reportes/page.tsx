@@ -16,6 +16,7 @@ import {
   Package,
   PieChart,
   TrendingUp,
+  Users,
 } from 'lucide-react'
 
 export const metadata: Metadata = {
@@ -48,6 +49,14 @@ const reportes = [
     icono: TrendingUp,
     href: '/gestion/reportes/curva-s',
     color: 'bg-orange-100 text-orange-600',
+    roles: ['admin', 'gerente', 'gestor', 'coordinador'],
+  },
+  {
+    titulo: 'Productividad del personal',
+    descripcion: 'En qué se va el tiempo de cada persona: proyectos de cliente (costo directo) contra centros de costo internos (costo indirecto), mes a mes y en soles.',
+    icono: Users,
+    href: '/gestion/reportes/productividad',
+    color: 'bg-teal-100 text-teal-600',
     roles: ['admin', 'gerente', 'gestor', 'coordinador'],
   },
   {
