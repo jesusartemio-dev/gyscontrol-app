@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { hh } from './horasHombre'
+import { esTareaExtra, SELECT_ES_EXTRA, type ResumenFueraDePlan } from './tareaExtra'
 
 // Peso por fase del cronograma de EJECUCIÓN.
 //  - Cada fase puede tener un `pesoManual` (escrito a mano). Si es null, su peso por defecto
@@ -8,6 +9,8 @@ import { hh } from './horasHombre'
 //    que cuadrar la suma).
 //  - Debajo de la fase, todo se reparte por horas: peso(nodo) = pesoEfectivo(fase) × horasNodo/horasFase.
 //  - avanceGlobal = Σ pesoEfectivo × avanceFase (avanceFase = % ponderado por horas).
+//  - Las tareas EXTRA quedan fuera de todo el cálculo: el % mide el alcance planificado.
+//    Su volumen se devuelve aparte en `fueraDePlan` (crecimiento de alcance).
 
 export interface PesoFaseItem {
   faseId: string
@@ -26,6 +29,8 @@ export interface PesosFaseResultado {
   fases: PesoFaseItem[]
   avanceGlobal: number // % 0-100, ponderado por pesoEfectivo
   sumaPesos: number // Σ pesoEfectivo (puede no dar 100; el UI lo indica)
+  /** Trabajo ejecutado fuera del alcance planificado. No entra en avanceGlobal. */
+  fueraDePlan: ResumenFueraDePlan
 }
 
 /** Peso de un nodo (EDT/actividad/tarea) dentro de su fase: reparto lineal por horas. */
@@ -43,8 +48,9 @@ export async function calcularPesosFase(proyectoId: string): Promise<PesosFaseRe
     where: { proyectoId, tipo: 'ejecucion' },
     select: { id: true },
   })
+  const SIN_EXTRAS: ResumenFueraDePlan = { tareas: 0, horasHombre: 0, horasReales: 0, porcentajeSobrePlan: 0 }
   if (!cronograma) {
-    return { cronogramaId: null, horasTotal: 0, fases: [], avanceGlobal: 0, sumaPesos: 0 }
+    return { cronogramaId: null, horasTotal: 0, fases: [], avanceGlobal: 0, sumaPesos: 0, fueraDePlan: SIN_EXTRAS }
   }
 
   const [fasesRaw, tareas] = await Promise.all([
@@ -56,18 +62,24 @@ export async function calcularPesosFase(proyectoId: string): Promise<PesosFaseRe
     prisma.proyectoTarea.findMany({
       where: { proyectoCronogramaId: cronograma.id },
       select: {
+        ...SELECT_ES_EXTRA,
         horasEstimadas: true,
         personasEstimadas: true,
         porcentajeCompletado: true,
+        horasReales: true,
         proyectoEdt: { select: { proyectoFaseId: true } },
       },
     }),
   ])
 
+  // Las extras se apartan ANTES de cualquier ponderación: no diluyen el avance del plan.
+  const extras = tareas.filter(esTareaExtra)
+  const planificadas = tareas.filter((t) => !esTareaExtra(t))
+
   // Horas-hombre y avance ponderado por fase. horasPorFase acumula hh = horasEstimadas × personasEstimadas.
   const horasPorFase = new Map<string, number>()
   const pondPorFase = new Map<string, number>() // Σ(% × hh)
-  for (const t of tareas) {
+  for (const t of planificadas) {
     const faseId = t.proyectoEdt?.proyectoFaseId
     if (!faseId) continue // tarea de un EDT sin fase: no se atribuye
     const h = hh(t)
@@ -107,5 +119,13 @@ export async function calcularPesosFase(proyectoId: string): Promise<PesosFaseRe
     fases.reduce((s, f) => s + (f.pesoEfectivo / 100) * f.avanceFase, 0).toFixed(2),
   )
 
-  return { cronogramaId: cronograma.id, horasTotal, fases, avanceGlobal, sumaPesos }
+  const hhExtras = extras.reduce((s, t) => s + hh(t), 0)
+  const fueraDePlan: ResumenFueraDePlan = {
+    tareas: extras.length,
+    horasHombre: Number(hhExtras.toFixed(1)),
+    horasReales: Number(extras.reduce((s, t) => s + Number(t.horasReales ?? 0), 0).toFixed(1)),
+    porcentajeSobrePlan: horasTotal > 0 ? Number(((hhExtras / horasTotal) * 100).toFixed(1)) : 0,
+  }
+
+  return { cronogramaId: cronograma.id, horasTotal, fases, avanceGlobal, sumaPesos, fueraDePlan }
 }

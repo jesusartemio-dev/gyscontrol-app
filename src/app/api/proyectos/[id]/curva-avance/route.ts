@@ -119,6 +119,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         tareasConAvance: serie.tareasConAvance,
         tareasConHistorico: serie.tareasConHistorico,
       },
+      // Trabajo ejecutado que no estaba en el alcance: no cuenta para el %, pero sus horas
+      // sí pesan en el consumo. Es el crecimiento de alcance del proyecto.
+      fueraDePlan: pesos.fueraDePlan,
       consumo: {
         tieneDatos: consumo.tieneDatos,
         horasPresupuestadas: Number(consumo.horasPresupuestadas.toFixed(1)),

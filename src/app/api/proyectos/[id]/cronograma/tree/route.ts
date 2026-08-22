@@ -450,7 +450,22 @@ export async function GET(
                     metadata: {
                       hasChildren: edt.proyectoTarea.length > 0,
                       totalChildren: edt.proyectoTarea.length,
-                      progressPercentage: 0,
+                      // Antes iba fijo en 0: el grupo mostraba 0% aunque sus tareas
+                      // estuvieran al 100%. Se pondera por horas-hombre, igual que el resto
+                      // del árbol; si no hay horas, promedio simple para no perder la señal.
+                      progressPercentage: (() => {
+                        const ts = edt.proyectoTarea || []
+                        if (ts.length === 0) return 0
+                        const h = ts.reduce((s: number, t: any) => s + hhDeTarea(t), 0)
+                        if (h > 0) {
+                          return Math.round(
+                            ts.reduce((s: number, t: any) => s + (t.porcentajeCompletado || 0) * hhDeTarea(t), 0) / h,
+                          )
+                        }
+                        return Math.round(
+                          ts.reduce((s: number, t: any) => s + (t.porcentajeCompletado || 0), 0) / ts.length,
+                        )
+                      })(),
                       status: 'en_progreso',
                     },
                     children: edt.proyectoTarea

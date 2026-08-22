@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import {
   Home, ChevronRight, TrendingUp, Loader2, Activity, AlertTriangle,
-  Calendar, Camera, Target, Check, Trash2, Clock, Settings2,
+  Calendar, Camera, Target, Check, Trash2, Clock, Settings2, PlusCircle,
 } from 'lucide-react'
 import {
   ResponsiveContainer, ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine,
@@ -53,6 +53,12 @@ interface PreparacionResumen {
   detalle: string
   pasos: string[]
 }
+interface FueraDePlan {
+  tareas: number
+  horasHombre: number
+  horasReales: number
+  porcentajeSobrePlan: number
+}
 interface JornadaAbierta { id: string; fechaTrabajo: string; semanaIso: string }
 interface ConsumoResumen {
   tieneDatos: boolean
@@ -69,6 +75,7 @@ interface CurvaAvanceResponse {
   cronogramaEjecId: string | null
   proyecto: ProyectoLight
   preparacion: PreparacionResumen
+  fueraDePlan: FueraDePlan
   historico: HistoricoResumen
   consumo: ConsumoResumen
   jornadasAbiertas: JornadaAbierta[]
@@ -341,6 +348,32 @@ export default function CurvaSAvancePage() {
                 Son {data.historico.brecha.toFixed(1)} puntos de avance sin fecha registrada:{' '}
                 {data.historico.tareasConHistorico} de {data.historico.tareasConAvance} tareas con
                 avance tienen histórico. El resto avanzó antes de que se registrara la fecha.
+              </div>
+            </div>
+          )}
+
+          {/* Trabajo fuera del alcance. No resta % (las extras están excluidas del cálculo),
+              pero sí consume horas — y si es mucho, el % de avance deja de ser representativo
+              de lo que realmente se está haciendo en obra. */}
+          {data.fueraDePlan.tareas > 0 && (
+            <div className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${
+              data.fueraDePlan.porcentajeSobrePlan >= 50
+                ? 'bg-red-50 border-red-200 text-red-900'
+                : 'bg-violet-50 border-violet-200 text-violet-900'
+            }`}>
+              <PlusCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <div>
+                <span className="font-medium">
+                  {data.fueraDePlan.tareas} tarea{data.fueraDePlan.tareas === 1 ? '' : 's'} fuera del plan
+                  {' '}({data.fueraDePlan.porcentajeSobrePlan.toFixed(0)}% sobre el alcance planificado).
+                </span>{' '}
+                No cuentan para el % de avance —{' '}
+                {data.fueraDePlan.horasReales.toLocaleString('es-PE')} h ya gastadas en ellas sí pesan
+                en el consumo.
+                {data.fueraDePlan.porcentajeSobrePlan >= 50 && (
+                  <> Con este volumen, el % de avance del cronograma ya no representa lo que se
+                  está ejecutando: conviene incorporar ese trabajo al alcance.</>
+                )}
               </div>
             </div>
           )}

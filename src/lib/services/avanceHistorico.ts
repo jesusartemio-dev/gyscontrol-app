@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { hh } from './horasHombre'
 import { calcularPesosFase } from './pesoFase'
+import { esTareaExtra, SELECT_ES_EXTRA } from './tareaExtra'
 
 // Serie semanal de avance REAL derivada de ProyectoTareaAvance (el histórico fechado que
 // escriben el cierre de jornada y la edición de tareas). Sustituye a los snapshots como
@@ -56,16 +57,20 @@ export async function serieAvanceRealSemanal(proyectoId: string): Promise<SerieA
   const pesos = await calcularPesosFase(proyectoId)
   if (!pesos.cronogramaId) return VACIA
 
-  const tareas = await prisma.proyectoTarea.findMany({
+  const todas = await prisma.proyectoTarea.findMany({
     where: { proyectoCronogramaId: pesos.cronogramaId },
     select: {
       id: true,
+      ...SELECT_ES_EXTRA,
       horasEstimadas: true,
       personasEstimadas: true,
       porcentajeCompletado: true,
       proyectoEdt: { select: { proyectoFaseId: true } },
     },
   })
+  // Las extras no puntúan en el avance (misma regla que pesoFase), así que tampoco entran
+  // en la serie: si entraran, la curva Real y el % del cronograma dirían cosas distintas.
+  const tareas = todas.filter((t) => !esTareaExtra(t))
   if (tareas.length === 0) return VACIA
 
   // Peso de cada tarea dentro del % global (mismo reparto que pesoFase.ts: por horas dentro
@@ -150,6 +155,8 @@ export async function serieConsumoHorasSemanal(proyectoId: string): Promise<Seri
   })
   if (!cronograma) return VACIO
 
+  // Aquí NO se filtran las extras: sus horas se gastaron de verdad y deben pesar en el
+  // consumo y en la eficiencia, aunque no cuenten para el % de avance.
   const tareas = await prisma.proyectoTarea.findMany({
     where: { proyectoCronogramaId: cronograma.id },
     select: { id: true, horasEstimadas: true, personasEstimadas: true },

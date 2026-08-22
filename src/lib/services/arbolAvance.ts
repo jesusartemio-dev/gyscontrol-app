@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { calcularPesosFase, pesoNodo, type PesoFaseItem } from './pesoFase'
 import { hh } from './horasHombre'
+import { esTareaExtra, SELECT_ES_EXTRA } from './tareaExtra'
 
 // Árbol jerárquico FASE → EDT → ACTIVIDAD → TAREA con horas, avance y pesos, para que el
 // generador de Excel (hoja Avance) y la curva consuman una sola fuente. Reutiliza
@@ -65,12 +66,13 @@ async function construirArbol(
     prisma.proyectoFase.findMany({ where: { proyectoCronogramaId: cronogramaId }, orderBy: { orden: 'asc' }, select: { id: true, nombre: true, orden: true } }),
     prisma.proyectoEdt.findMany({ where: { proyectoCronogramaId: cronogramaId }, orderBy: { orden: 'asc' }, select: { id: true, nombre: true, orden: true, proyectoFaseId: true } }),
     prisma.proyectoActividad.findMany({ where: { proyectoCronogramaId: cronogramaId }, orderBy: { orden: 'asc' }, select: { id: true, nombre: true, orden: true, proyectoEdtId: true } }),
-    prisma.proyectoTarea.findMany({ where: { proyectoCronogramaId: cronogramaId }, orderBy: { orden: 'asc' }, select: { id: true, nombre: true, orden: true, horasEstimadas: true, personasEstimadas: true, porcentajeCompletado: true, fechaInicio: true, fechaFin: true, proyectoActividadId: true, proyectoEdtId: true } }),
+    // Las extras quedan fuera del árbol ponderado: no miden avance del alcance planificado.
+    prisma.proyectoTarea.findMany({ where: { proyectoCronogramaId: cronogramaId }, orderBy: { orden: 'asc' }, select: { id: true, nombre: true, orden: true, horasEstimadas: true, personasEstimadas: true, porcentajeCompletado: true, fechaInicio: true, fechaFin: true, proyectoActividadId: true, proyectoEdtId: true, ...SELECT_ES_EXTRA } }),
   ])
 
   const tareasByAct = new Map<string, FilaTarea[]>()
   const tareasOrphanByEdt = new Map<string, FilaTarea[]>()
-  for (const t of tareas as FilaTarea[]) {
+  for (const t of (tareas as (FilaTarea & { esExtra?: boolean; descripcion?: string | null })[]).filter((t) => !esTareaExtra(t))) {
     if (t.proyectoActividadId) (tareasByAct.get(t.proyectoActividadId) ?? tareasByAct.set(t.proyectoActividadId, []).get(t.proyectoActividadId)!).push(t)
     else (tareasOrphanByEdt.get(t.proyectoEdtId) ?? tareasOrphanByEdt.set(t.proyectoEdtId, []).get(t.proyectoEdtId)!).push(t)
   }
