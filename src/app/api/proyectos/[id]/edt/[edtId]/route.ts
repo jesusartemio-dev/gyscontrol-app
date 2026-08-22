@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -157,7 +158,7 @@ export async function PUT(
       }
     });
 
-    if (!rolesPermitidos.includes(session.user.role) && !esResponsable) {
+    if (!tieneRol(session, rolesPermitidos) && !esResponsable) {
       return NextResponse.json(
         { error: 'Sin permisos para actualizar este EDT' },
         { status: 403 }
@@ -294,7 +295,7 @@ export async function DELETE(
     }
 
     // 🔐 Solo Admin y Gerente pueden eliminar
-    if (!['admin', 'gerente'].includes(session.user.role)) {
+    if (!tieneRol(session, ['admin', 'gerente'])) {
       return NextResponse.json(
         { error: 'Sin permisos para eliminar EDT' },
         { status: 403 }

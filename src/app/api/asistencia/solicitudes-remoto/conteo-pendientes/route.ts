@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -8,7 +9,7 @@ const ROLES_SUPERVISION = ['admin', 'gerente', 'coordinador', 'gestor']
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ count: 0 })
-  if (!ROLES_SUPERVISION.includes(session.user.role)) {
+  if (!tieneRol(session, ROLES_SUPERVISION)) {
     return NextResponse.json({ count: 0 })
   }
   const count = await prisma.solicitudTrabajoRemoto.count({ where: { estado: 'pendiente' } })

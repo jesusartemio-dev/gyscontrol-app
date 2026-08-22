@@ -5,6 +5,7 @@
 // Valida si hay OCs vinculadas antes de permitir el cambio
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
@@ -29,7 +30,7 @@ export async function PATCH(
 
     // Validar roles permitidos para seleccionar cotización
     const rolesPermitidos = ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador']
-    if (!rolesPermitidos.includes(userRole)) {
+    if (!tieneRol(session, rolesPermitidos)) {
       return NextResponse.json({ error: 'Sin permiso para seleccionar cotización' }, { status: 403 })
     }
 

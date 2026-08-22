@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -281,7 +282,7 @@ export default function SupervisionAusenciaDetallePage() {
 
   const userId = session?.user?.id
   const role = (session?.user as any)?.role as string | undefined
-  const isAdmin = role ? ['admin', 'administracion'].includes(role) : false
+  const isAdmin = role ? tieneRol(session, ['admin', 'administracion']) : false
 
   const n1Pendiente = solicitud?.estado === 'pendiente' && !solicitud.fechaAprobacion1
   const n2Pendiente = solicitud?.estado === 'pendiente' && Boolean(solicitud?.fechaAprobacion1)

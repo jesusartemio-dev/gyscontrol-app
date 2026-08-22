@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -174,7 +175,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     }
     const role = session.user.role
     const rolesPermitidos = ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'administracion']
-    if (existing.solicitanteId !== session.user.id && !rolesPermitidos.includes(role)) {
+    if (existing.solicitanteId !== session.user.id && !tieneRol(session, rolesPermitidos)) {
       return NextResponse.json({ error: 'Sin permisos para eliminar esta orden' }, { status: 403 })
     }
 

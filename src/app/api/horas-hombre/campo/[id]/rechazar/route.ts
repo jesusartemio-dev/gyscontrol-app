@@ -3,6 +3,7 @@
  * PUT /api/horas-hombre/campo/[id]/rechazar
  */
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -30,7 +31,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     // Solo gestores, gerentes y admins pueden rechazar
     const rolesPermitidos = ['admin', 'gerente', 'gestor']
-    if (!rolesPermitidos.includes(session.user.role || '')) {
+    if (!tieneRol(session, rolesPermitidos)) {
       return NextResponse.json(
         { error: 'No tiene permisos para rechazar registros' },
         { status: 403 }

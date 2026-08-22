@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -32,7 +33,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   }
 
   const esDueno = jornada.supervisorId === session.user.id
-  const esAdmin = ROLES_ADMIN.includes(session.user.role || '')
+  const esAdmin = tieneRol(session, ROLES_ADMIN)
   if (!esAdmin) {
     if (!esDueno) {
       return NextResponse.json({ error: 'No puedes eliminar esta asistencia' }, { status: 403 })

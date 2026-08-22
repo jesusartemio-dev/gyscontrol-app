@@ -5,6 +5,7 @@
  * DELETE /api/configuracion/duraciones-cronograma/[id] - Desactivar plantilla
  */
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -34,7 +35,7 @@ export async function PUT(
 
     // Verificar permisos de administrador
     const userRole = session.user.role
-    if (!['admin', 'gerente'].includes(userRole)) {
+    if (!tieneRol(session, ['admin', 'gerente'])) {
       return NextResponse.json({ error: 'No tiene permisos para actualizar configuraciones' }, { status: 403 })
     }
 
@@ -116,7 +117,7 @@ export async function DELETE(
 
     // Verificar permisos de administrador
     const userRole = session.user.role
-    if (!['admin', 'gerente'].includes(userRole)) {
+    if (!tieneRol(session, ['admin', 'gerente'])) {
       return NextResponse.json({ error: 'No tiene permisos para eliminar configuraciones' }, { status: 403 })
     }
 

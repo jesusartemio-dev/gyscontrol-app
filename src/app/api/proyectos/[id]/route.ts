@@ -6,6 +6,7 @@
 // 📅 Última actualización: 2025-01-15
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -57,7 +58,7 @@ export async function GET(
 
     // Check if user participates in any EDTs of this project
     let participaEnEdts = false;
-    if (!rolesConAccesoTotal.includes(session.user.role) && !esComercialDelProyecto && !esGestorDelProyecto) {
+    if (!tieneRol(session, rolesConAccesoTotal) && !esComercialDelProyecto && !esGestorDelProyecto) {
       const edtsUsuario = await prisma.proyectoEdt.findFirst({
         where: {
           proyectoId: proyectoId,
@@ -68,7 +69,7 @@ export async function GET(
       participaEnEdts = !!edtsUsuario;
     }
 
-    if (!rolesConAccesoTotal.includes(session.user.role) &&
+    if (!tieneRol(session, rolesConAccesoTotal) &&
         !esComercialDelProyecto && !esGestorDelProyecto && !participaEnEdts) {
       return NextResponse.json(
         { error: 'Sin permisos para acceder a este proyecto' },
@@ -237,7 +238,7 @@ export async function PUT(
     const esComercialDelProyecto = proyectoExistente.comercialId === session.user.id;
     const esGestorDelProyecto = proyectoExistente.gestorId === session.user.id;
 
-    if (!rolesConAccesoTotal.includes(session.user.role) &&
+    if (!tieneRol(session, rolesConAccesoTotal) &&
         !esComercialDelProyecto && !esGestorDelProyecto) {
       return NextResponse.json(
         { error: 'Sin permisos para editar este proyecto' },

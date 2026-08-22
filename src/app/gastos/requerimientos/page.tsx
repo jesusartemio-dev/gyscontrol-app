@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -132,7 +133,7 @@ export default function AprobarRequerimientosPage() {
     )
   }
 
-  if (!role || !ALLOWED_ROLES.includes(role)) {
+  if (!role || !tieneRol(session, ALLOWED_ROLES)) {
     return (
       <div className="container mx-auto p-6 text-center">
         <p className="text-muted-foreground">No tiene permisos para acceder a esta sección.</p>

@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -70,7 +71,7 @@ export async function POST(
 
       case 'aprobar': {
         const userRole = (session.user as any).role
-        if (!['admin', 'gerente'].includes(userRole)) {
+        if (!tieneRol(session, ['admin', 'gerente'])) {
           return NextResponse.json(
             { error: 'Solo admin o gerente pueden aprobar descuentos' },
             { status: 403 }
@@ -103,7 +104,7 @@ export async function POST(
 
       case 'rechazar': {
         const userRoleR = (session.user as any).role
-        if (!['admin', 'gerente'].includes(userRoleR)) {
+        if (!tieneRol(session, ['admin', 'gerente'])) {
           return NextResponse.json(
             { error: 'Solo admin o gerente pueden rechazar descuentos' },
             { status: 403 }

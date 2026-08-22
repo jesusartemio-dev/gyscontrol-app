@@ -5,6 +5,7 @@
 // ✅ GET: Obtener historial completo de proyectos del cliente
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -26,7 +27,7 @@ export async function GET(
 
     const userRole = (session.user as any).role || 'comercial'
     const rolesPermitidos = ['comercial', 'admin', 'gerente']
-    if (!rolesPermitidos.includes(userRole)) {
+    if (!tieneRol(session, rolesPermitidos)) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 

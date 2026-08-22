@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
@@ -125,9 +126,7 @@ const STORAGE_KEY = 'gys_asistencia_filtros'
 export default function SupervisionAsistencia() {
   const { data: session } = useSession()
   const esAdmin = session?.user?.role === 'admin' || session?.user?.role === 'gerente'
-  const puedeSupervisarDispositivos = ROLES_SUPERVISION_DISPOSITIVOS.includes(
-    session?.user?.role || '',
-  )
+  const puedeSupervisarDispositivos = tieneRol(session, ROLES_SUPERVISION_DISPOSITIVOS)
 
   const [data, setData] = useState<Fila[]>([])
   const [totalEnRango, setTotalEnRango] = useState(0)

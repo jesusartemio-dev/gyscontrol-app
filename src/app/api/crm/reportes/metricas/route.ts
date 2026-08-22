@@ -5,6 +5,7 @@
 // ✅ GET: Obtener métricas consolidadas y tendencias
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
 
     const userRole = (session.user as any).role || 'comercial'
     const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
-    const esComercial = !rolesConAccesoTotal.includes(userRole)
+    const esComercial = !tieneRol(session, rolesConAccesoTotal)
     const comercialFilter = esComercial ? { comercialId: session.user.id } : {}
     const usuarioFilter = esComercial ? { usuarioId: session.user.id } : {}
 

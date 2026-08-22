@@ -3,6 +3,7 @@
 // Endpoints para gestionar permisos específicos por usuario
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session || !['admin'].includes(session.user.role as RolUsuario)) {
+    if (!session || !tieneRol(session, ['admin'])) {
       return NextResponse.json({ message: 'No autorizado' }, { status: 403 })
     }
 
@@ -66,7 +67,7 @@ export async function DELETE(request: Request) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session || !['admin'].includes(session.user.role as RolUsuario)) {
+    if (!session || !tieneRol(session, ['admin'])) {
       return NextResponse.json({ message: 'No autorizado' }, { status: 403 })
     }
 

@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -54,7 +55,7 @@ export async function GET(req: NextRequest) {
 
     const userRole = (session.user as any).role || 'comercial'
     const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
-    const esComercial = !rolesConAccesoTotal.includes(userRole)
+    const esComercial = !tieneRol(session, rolesConAccesoTotal)
 
     const { searchParams } = new URL(req.url)
     const comercialId = searchParams.get('comercialId') || undefined

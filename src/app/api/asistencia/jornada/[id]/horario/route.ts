@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -30,7 +31,7 @@ export async function PATCH(
   if (!jornada) return NextResponse.json({ error: 'Jornada no encontrada' }, { status: 404 })
 
   // Solo el supervisor dueño o un admin pueden editar
-  const esAdmin = ['admin', 'gerente', 'coordinador_rrhh'].includes(session.user.role)
+  const esAdmin = tieneRol(session, ['admin', 'gerente', 'coordinador_rrhh'])
   if (jornada.supervisorId !== session.user.id && !esAdmin) {
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
   }

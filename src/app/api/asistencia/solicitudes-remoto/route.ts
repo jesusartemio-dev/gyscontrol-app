@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -17,7 +18,7 @@ export async function GET(req: Request) {
   if (scope === 'propias') {
     where.solicitanteId = session.user.id
   } else if (scope === 'equipo') {
-    if (!ROLES_SUPERVISION.includes(session.user.role)) {
+    if (!tieneRol(session, ROLES_SUPERVISION)) {
       return NextResponse.json({ message: 'No autorizado' }, { status: 403 })
     }
     // Por ahora supervisor ve todas las solicitudes (no hay relación supervisor-equipo formal)

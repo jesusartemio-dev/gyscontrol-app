@@ -4,6 +4,7 @@
  * @author GYS Team
  */
 
+import { tieneRol } from '@/lib/auth/roles'
 import React, { Suspense } from 'react'
 import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
@@ -35,7 +36,7 @@ const DashboardSkeleton = () => (
 // Validación de permisos
 const ValidarPermisos = ({ session, children }: { session: any; children: React.ReactNode }) => {
   const rolesPermitidos = ['admin', 'gerente', 'comercial', 'proyectos', 'logistica', 'logistico', 'coordinador_logistico', 'gestor']
-  const tienePermiso = session?.user?.role && rolesPermitidos.includes(session.user.role)
+  const tienePermiso = session?.user?.role && tieneRol(session, rolesPermitidos)
 
   if (!tienePermiso) {
     return (

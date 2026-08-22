@@ -5,6 +5,7 @@
  * Vista compacta y profesional (similar a CronogramaComercialTab)
  */
 
+import { tieneRol } from '@/lib/auth/roles'
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -117,7 +118,7 @@ export function ProyectoCronogramaTab({
   const { toast } = useToast()
   const { data: session } = useSession()
   const isAdmin = session?.user?.role === 'admin'
-  const canManageLock = ['admin', 'gerente', 'gestor', 'coordinador'].includes(session?.user?.role as string)
+  const canManageLock = tieneRol(session, ['admin', 'gerente', 'gestor', 'coordinador'])
   const canDeleteBaseline = canManageLock
 
   // Desbloquear/bloquear cronograma (solo toggle bloqueado, sin afectar baseline)

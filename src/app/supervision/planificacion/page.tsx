@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
@@ -1640,7 +1641,7 @@ export default function PlanificacionPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seleccionEnabled])
 
-  if (role && !ROLES_PERMITIDOS.includes(role)) {
+  if (role && !tieneRol(session, ROLES_PERMITIDOS)) {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-muted-foreground">No tienes acceso a esta sección.</p>

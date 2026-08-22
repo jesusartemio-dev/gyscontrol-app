@@ -5,6 +5,7 @@
  * incluyendo resumen de horas, progreso por elemento y métricas de avance
  */
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     // 🔐 Verificar permisos
     const rolesPermitidos = ['admin', 'gerente', 'proyectos', 'comercial']
-    if (!rolesPermitidos.includes(session.user.role)) {
+    if (!tieneRol(session, rolesPermitidos)) {
       return NextResponse.json(
         { error: 'Sin permisos para reportes' },
         { status: 403 }

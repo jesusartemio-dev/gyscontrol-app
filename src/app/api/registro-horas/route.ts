@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
     // Si se pide "soloMio", siempre filtrar por el usuario logueado (para /mi-trabajo/registros)
     if (searchParams.get('soloMio') === 'true') {
       whereClause.usuarioId = session.user.id;
-    } else if (!['admin', 'gerente'].includes(session.user.role)) {
+    } else if (!tieneRol(session, ['admin', 'gerente'])) {
       // Los usuarios normales solo ven sus propios registros
       whereClause.usuarioId = session.user.id;
     }
@@ -425,7 +426,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // 🔐 Solo Admin y Gerente pueden hacer actualizaciones masivas
-    if (!['admin', 'gerente'].includes(session.user.role)) {
+    if (!tieneRol(session, ['admin', 'gerente'])) {
       return NextResponse.json(
         { error: 'Sin permisos para actualización masiva' },
         { status: 403 }

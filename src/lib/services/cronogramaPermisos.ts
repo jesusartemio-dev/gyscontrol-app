@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -43,7 +44,7 @@ export async function validarPermisoCronograma(
     return { ok: false, response: NextResponse.json({ error: 'No autorizado' }, { status: 401 }) }
   }
 
-  if (!ROLES_CRONOGRAMA.includes(session.user.role as any)) {
+  if (!tieneRol(session, ROLES_CRONOGRAMA)) {
     return {
       ok: false,
       response: NextResponse.json(

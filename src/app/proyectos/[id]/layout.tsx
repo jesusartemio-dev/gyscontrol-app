@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useParams, useRouter, usePathname } from 'next/navigation'
@@ -62,7 +63,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
   const { data: session } = useSession()
-  const puedeVerCliente = ROLES_FINANCIERO_CLIENTE.includes(session?.user?.role ?? '')
+  const puedeVerCliente = tieneRol(session, ROLES_FINANCIERO_CLIENTE)
   const [proyecto, setProyecto] = useState<Proyecto | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)

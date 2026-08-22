@@ -5,6 +5,7 @@
 // ✅ GET: Obtener datos para dashboard CRM
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
 
     // RBAC: comercial users can only see their own data
     const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
-    const esComercial = !rolesConAccesoTotal.includes(userRole)
+    const esComercial = !tieneRol(session, rolesConAccesoTotal)
     const comercialFilter = esComercial ? { comercialId: session.user.id } : {}
 
     // Obtener métricas generales del embudo

@@ -7,6 +7,7 @@
 // 📅 Última actualización: 2025-09-23
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -554,7 +555,7 @@ export async function DELETE(
     if (cronograma.esBaseline) {
       const rolesPermitidos = ['admin', 'gerente', 'gestor', 'coordinador']
       const userRole = (session.user as any).role
-      if (!rolesPermitidos.includes(userRole)) {
+      if (!tieneRol(session, rolesPermitidos)) {
         return NextResponse.json(
           { error: 'No tiene permisos para eliminar el cronograma baseline.' },
           { status: 403 }

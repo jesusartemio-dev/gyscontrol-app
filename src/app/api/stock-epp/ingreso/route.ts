@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
     }
 
     const role = session.user.role
-    if (!['admin', 'gerente', 'seguridad', 'logistico', 'coordinador_logistico'].includes(role)) {
+    if (!tieneRol(session, ['admin', 'gerente', 'seguridad', 'logistico', 'coordinador_logistico'])) {
       return NextResponse.json({ error: 'Sin permisos para ingresar stock' }, { status: 403 })
     }
 

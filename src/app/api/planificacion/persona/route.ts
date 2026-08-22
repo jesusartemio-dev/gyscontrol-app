@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     // Solo admin/gerente pueden ver la agenda de otros
     const role = (session.user as any).role as string
-    const isAdmin = ROLES_ADMIN.includes(role)
+    const isAdmin = tieneRol(session, ROLES_ADMIN)
     if (!isAdmin && session.user.id !== targetUserId) {
       return NextResponse.json(
         { error: 'Solo puedes consultar tu propia agenda' },

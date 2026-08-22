@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { ReactNode } from 'react'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -8,7 +9,7 @@ export default async function SeguridadLayout({ children }: { children: ReactNod
   if (!session?.user) redirect('/login')
 
   const role = session.user.role
-  if (!['admin', 'gerente', 'gestor', 'seguridad'].includes(role)) {
+  if (!tieneRol(session, ['admin', 'gerente', 'gestor', 'seguridad'])) {
     redirect('/')
   }
 

@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { Suspense, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -236,10 +237,10 @@ function EvidenciasAvanceListaContenido() {
   const searchParams = useSearchParams()
   const { data: session } = useSession()
   const esAdmin = session?.user?.role === 'admin'
-  const isBypass = ['admin', 'gerente', 'gestor'].includes(session?.user?.role ?? '')
+  const isBypass = tieneRol(session, ['admin', 'gerente', 'gestor'])
   // `seguridad` entra en solo lectura: consulta el avance técnico para
   // contrastarlo con sus evidencias SSOMA, pero no abre ni captura evidencia.
-  const puedeCapturar = (ROLES_PERMITIDOS as readonly string[]).includes(session?.user?.role ?? '')
+  const puedeCapturar = tieneRol(session, ROLES_PERMITIDOS)
 
   // Deep-link params soportados: proyectoId, fechaDesde, fechaHasta, estado
   const proyectoIdParam = searchParams.get('proyectoId') ?? ''

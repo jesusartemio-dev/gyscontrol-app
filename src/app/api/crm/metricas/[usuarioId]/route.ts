@@ -5,6 +5,7 @@
 // ✅ GET: Obtener métricas detalladas de un usuario específico
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -29,7 +30,7 @@ export async function GET(
     // RBAC: comercial solo puede ver sus propias métricas
     const userRole = (session.user as any).role || 'comercial'
     const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
-    if (!rolesConAccesoTotal.includes(userRole) && usuarioId !== session.user.id) {
+    if (!tieneRol(session, rolesConAccesoTotal) && usuarioId !== session.user.id) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
     const { searchParams } = new URL(req.url)

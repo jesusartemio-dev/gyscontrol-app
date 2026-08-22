@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
@@ -19,7 +20,7 @@ export async function PATCH(_: NextRequest, context: Ctx) {
     }
 
     const role = (session.user as any).role as string
-    if (!(ADMIN_ROLES as readonly string[]).includes(role)) {
+    if (!tieneRol(session, ADMIN_ROLES)) {
       return NextResponse.json(
         { error: 'Solo admin/administración puede finalizar una ausencia' },
         { status: 403 },

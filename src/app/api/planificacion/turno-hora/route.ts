@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -40,7 +41,7 @@ export async function GET(req: Request) {
 // Fija (upsert) la hora de ingreso de un turno en un día. Hora vacía la borra.
 export async function PUT(req: Request) {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.id || !ROLES_PLANIFICADOR.includes(session.user.role || '')) {
+  if (!session?.user?.id || !tieneRol(session, ROLES_PLANIFICADOR)) {
     return NextResponse.json({ error: 'Sin permisos para planificar' }, { status: 403 })
   }
 

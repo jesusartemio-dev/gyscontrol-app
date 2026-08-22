@@ -4,6 +4,7 @@
 
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import React, { useState } from 'react'
 import {
   Loader2,
@@ -123,7 +124,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
       status = 'current'
     }
 
-    const isSuperUser = ['admin', 'gerente'].includes(userRole)
+    const isSuperUser = tieneRol(session, ['admin', 'gerente'])
     const isNext = est.orden === currentOrden + 1
     const contextoPermiteAvanzar = isSuperUser || (AVANZAR_POR_CONTEXTO[contexto] || []).includes(est.key)
     const canAdvance = !isCancelled && isNext && contextoPermiteAvanzar && puedeAvanzarA(est.key)
@@ -160,7 +161,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
           </div>
 
           {/* Rollback buttons */}
-          {estado === 'enviado' && ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico'].includes(userRole) && (
+          {estado === 'enviado' && tieneRol(session, ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico']) && (
             <RollbackButton
               entityType="pedidoEquipo"
               entityId={pedidoId}
@@ -170,7 +171,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
               onSuccess={() => onUpdated?.('borrador')}
             />
           )}
-          {estado === 'aprobado' && ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico'].includes(userRole) && (
+          {estado === 'aprobado' && tieneRol(session, ['admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico']) && (
             <RollbackButton
               entityType="pedidoEquipo"
               entityId={pedidoId}
@@ -180,7 +181,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
               onSuccess={() => onUpdated?.('enviado')}
             />
           )}
-          {contexto === 'logistica' && estado === 'atendido' && ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(userRole) && (
+          {contexto === 'logistica' && estado === 'atendido' && tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico']) && (
             <RollbackButton
               entityType="pedidoEquipo"
               entityId={pedidoId}
@@ -190,7 +191,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
               onSuccess={() => onUpdated?.('aprobado')}
             />
           )}
-          {contexto === 'logistica' && estado === 'parcial' && ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(userRole) && (
+          {contexto === 'logistica' && estado === 'parcial' && tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico']) && (
             <RollbackButton
               entityType="pedidoEquipo"
               entityId={pedidoId}
@@ -200,7 +201,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
               onSuccess={() => onUpdated?.('atendido')}
             />
           )}
-          {contexto === 'logistica' && estado === 'entregado' && ['admin', 'gerente'].includes(userRole) && (
+          {contexto === 'logistica' && estado === 'entregado' && tieneRol(session, ['admin', 'gerente']) && (
             <RollbackButton
               entityType="pedidoEquipo"
               entityId={pedidoId}
@@ -212,7 +213,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
           )}
 
           {/* Revertir cancelado → borrador */}
-          {estado === 'cancelado' && (esCreador || ['admin', 'gerente'].includes(userRole)) && (
+          {estado === 'cancelado' && (esCreador || tieneRol(session, ['admin', 'gerente'])) && (
             <RollbackButton
               entityType="pedidoEquipo"
               entityId={pedidoId}

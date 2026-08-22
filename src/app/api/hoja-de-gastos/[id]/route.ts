@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -101,7 +102,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     // Caso especial: activar anticipo en estado aprobado (solo admin/gerente/administracion)
     if (existing.estado === 'aprobado' && payload.activarAnticipo === true) {
-      if (!['admin', 'gerente', 'administracion'].includes(session.user.role)) {
+      if (!tieneRol(session, ['admin', 'gerente', 'administracion'])) {
         return NextResponse.json({ error: 'Sin permisos para activar anticipo' }, { status: 403 })
       }
       if (existing.requiereAnticipo) {

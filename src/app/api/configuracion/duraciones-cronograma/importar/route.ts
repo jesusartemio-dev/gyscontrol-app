@@ -4,6 +4,7 @@
  * POST /api/configuracion/duraciones-cronograma/importar
  */
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar permisos de administrador
     const userRole = session.user.role
-    if (!['admin', 'gerente'].includes(userRole)) {
+    if (!tieneRol(session, ['admin', 'gerente'])) {
       return NextResponse.json({ error: 'No tiene permisos para importar configuraciones' }, { status: 403 })
     }
 

@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -22,7 +23,7 @@ export async function POST(
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!ALLOWED_ROLES.includes(session.user.role)) {
+    if (!tieneRol(session, ALLOWED_ROLES)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 
@@ -145,7 +146,7 @@ export async function DELETE(
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!ALLOWED_ROLES.includes(session.user.role)) {
+    if (!tieneRol(session, ALLOWED_ROLES)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 

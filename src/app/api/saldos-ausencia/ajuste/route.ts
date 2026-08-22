@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { z } from 'zod'
@@ -23,7 +24,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const role = (session.user as any).role as string
-    if (!ROLES_ADMIN.includes(role)) {
+    if (!tieneRol(session, ROLES_ADMIN)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 

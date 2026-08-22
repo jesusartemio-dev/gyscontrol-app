@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -92,7 +93,7 @@ export default function ProyectoRecursosPage() {
   const [items, setItems] = useState([{ ...emptyItem }])
   const [guardando, setGuardando] = useState(false)
 
-  const canCreate = ['admin', 'gerente', 'gestor', 'coordinador', 'logistico', 'coordinador_logistico'].includes(role)
+  const canCreate = tieneRol(session, ['admin', 'gerente', 'gestor', 'coordinador', 'logistico', 'coordinador_logistico'])
 
   useEffect(() => {
     fetchSolicitudes()

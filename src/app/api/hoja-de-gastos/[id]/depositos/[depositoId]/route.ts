@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -32,7 +33,7 @@ export async function DELETE(
 
     // Validar permisos según tipo
     if (deposito.tipo === 'anticipo') {
-      if (!['admin', 'gerente', 'administracion'].includes(session.user.role)) {
+      if (!tieneRol(session, ['admin', 'gerente', 'administracion'])) {
         return NextResponse.json({ error: 'Sin permisos para eliminar este anticipo' }, { status: 403 })
       }
       if (!['aprobado', 'depositado', 'rendido'].includes(hoja.estado)) {
@@ -52,7 +53,7 @@ export async function DELETE(
         }
       }
     } else if (deposito.tipo === 'reembolso') {
-      if (!['admin', 'gerente', 'administracion'].includes(session.user.role)) {
+      if (!tieneRol(session, ['admin', 'gerente', 'administracion'])) {
         return NextResponse.json({ error: 'Sin permisos para eliminar este reembolso' }, { status: 403 })
       }
       if (hoja.estado !== 'validado') {
@@ -61,7 +62,7 @@ export async function DELETE(
         }, { status: 400 })
       }
     } else if (deposito.tipo === 'devolucion') {
-      if (hoja.empleadoId !== session.user.id && !['admin', 'gerente', 'administracion'].includes(session.user.role)) {
+      if (hoja.empleadoId !== session.user.id && !tieneRol(session, ['admin', 'gerente', 'administracion'])) {
         return NextResponse.json({ error: 'Sin permisos para eliminar esta devolución' }, { status: 403 })
       }
       if (hoja.estado !== 'validado') {

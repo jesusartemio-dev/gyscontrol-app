@@ -14,6 +14,7 @@
  *   Timesheet: timesheet-no-enviado, timesheet-rechazado, timesheet-pendientes-aprobacion
  */
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -38,10 +39,10 @@ export async function GET() {
 
     const userId = session.user.id
     const role = session.user.role || ''
-    const esAdminOrGerente = ['admin', 'gerente'].includes(role)
-    const esLogistico = ['logistico', 'coordinador_logistico', 'admin', 'gerente'].includes(role)
-    const esAprobadorTimesheet = ['admin', 'gerente', 'gestor', 'coordinador'].includes(role)
-    const esAprobadorAusencias = ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'].includes(role)
+    const esAdminOrGerente = tieneRol(session, ['admin', 'gerente'])
+    const esLogistico = tieneRol(session, ['logistico', 'coordinador_logistico', 'admin', 'gerente'])
+    const esAprobadorTimesheet = tieneRol(session, ['admin', 'gerente', 'gestor', 'coordinador'])
+    const esAprobadorAusencias = tieneRol(session, ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'])
 
     const ahora = new Date()
     const inicioHoy = new Date(ahora); inicioHoy.setHours(0, 0, 0, 0)
@@ -66,7 +67,7 @@ export async function GET() {
     }
 
     const pedidosWhere: any = { estado: { in: ['borrador', 'enviado'] } }
-    if (!esAdminOrGerente && !['logistico', 'coordinador_logistico'].includes(role)) {
+    if (!esAdminOrGerente && !tieneRol(session, ['logistico', 'coordinador_logistico'])) {
       pedidosWhere.responsableId = userId
     }
 

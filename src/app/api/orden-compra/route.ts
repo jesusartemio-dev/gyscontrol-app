@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -78,7 +79,7 @@ export async function GET(req: Request) {
     }
 
     const role = session.user.role
-    if (!['admin', 'gerente', 'logistico', 'coordinador_logistico', 'administracion'].includes(role)) {
+    if (!tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'administracion'])) {
       where.solicitanteId = session.user.id
     }
 
@@ -103,7 +104,7 @@ export async function POST(req: Request) {
     }
 
     const role = session.user.role
-    if (!['admin', 'gerente', 'logistico', 'coordinador_logistico', 'administracion'].includes(role)) {
+    if (!tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'administracion'])) {
       return NextResponse.json({ error: 'Sin permisos para crear órdenes de compra' }, { status: 403 })
     }
 

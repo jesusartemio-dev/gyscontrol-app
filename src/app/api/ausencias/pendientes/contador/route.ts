@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -13,7 +14,7 @@ export async function GET() {
     }
 
     const role = (session.user as any).role as string
-    if (!ROLES_APROBADOR.includes(role)) {
+    if (!tieneRol(session, ROLES_APROBADOR)) {
       return NextResponse.json({ count: 0 })
     }
 

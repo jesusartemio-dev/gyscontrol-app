@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -481,7 +482,7 @@ export default function EvidenciaAvancePage({
   const evidenciaAbierta = ev.estado === 'abierta'
   // `seguridad` consulta pero no captura evidencia técnica: sin este filtro la
   // UI le ofrecería Agregar/Editar y la API respondería 403.
-  const puedeCapturar = (ROLES_PERMITIDOS as readonly string[]).includes(role ?? '')
+  const puedeCapturar = tieneRol(session, ROLES_PERMITIDOS)
   const puedeEscribir = puedeCapturar && (isBypass || (jornadaActiva && evidenciaAbierta))
   const puedeCerrar = evidenciaAbierta && (isBypass || ev.creadoPor.id === session?.user?.id)
   const totalTrabajadores = new Set(

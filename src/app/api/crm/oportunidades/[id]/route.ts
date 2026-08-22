@@ -9,6 +9,7 @@
 // 📅 Última actualización: 2025-09-19
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -117,7 +118,7 @@ export async function GET(
 
     // RBAC: comercial solo puede ver sus propias oportunidades
     const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
-    if (!rolesConAccesoTotal.includes(session.user.role as string)) {
+    if (!tieneRol(session, rolesConAccesoTotal)) {
       if (oportunidad.comercialId !== session.user.id && oportunidad.responsableId !== session.user.id) {
         return NextResponse.json(
           { error: 'No tiene permisos para ver esta oportunidad' },
@@ -165,7 +166,7 @@ export async function PUT(
 
     // RBAC: comercial solo puede editar sus propias oportunidades
     const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
-    if (!rolesConAccesoTotal.includes(session.user.role as string)) {
+    if (!tieneRol(session, rolesConAccesoTotal)) {
       if (oportunidadExistente.comercialId !== session.user.id && oportunidadExistente.responsableId !== session.user.id) {
         return NextResponse.json(
           { error: 'No tiene permisos para editar esta oportunidad' },
@@ -469,7 +470,7 @@ export async function DELETE(
 
     // ✅ Verificar permisos (admin/gerente/coordinador pueden eliminar cualquiera, otros solo las suyas)
     const rolesConAccesoTotalDelete = ['admin', 'gerente', 'coordinador']
-    if (!rolesConAccesoTotalDelete.includes(session.user.role as string)) {
+    if (!tieneRol(session, rolesConAccesoTotalDelete)) {
       if (oportunidad.comercialId !== session.user.id && oportunidad.responsableId !== session.user.id) {
         return NextResponse.json(
           { error: 'No tiene permisos para eliminar esta oportunidad' },

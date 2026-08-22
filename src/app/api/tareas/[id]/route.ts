@@ -15,6 +15,7 @@
 // 📅 Creado: 2025-01-13
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
@@ -361,7 +362,7 @@ export async function DELETE(
     }
 
     const rolesPermitidosEliminar = ['admin', 'gestor', 'coordinador']
-    if (!rolesPermitidosEliminar.includes(session.user.role || '')) {
+    if (!tieneRol(session, rolesPermitidosEliminar)) {
       return NextResponse.json(
         { error: 'Solo administradores, gestores o coordinadores pueden eliminar tareas' },
         { status: 403 }

@@ -11,6 +11,7 @@
  * - supervisorId: string (opcional, filtrar por creador)
  */
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     // Verificar rol
     const userRole = (session.user as { role?: string }).role || ''
-    if (!ROLES_PERMITIDOS.includes(userRole)) {
+    if (!tieneRol(session, ROLES_PERMITIDOS)) {
       return NextResponse.json(
         { error: 'No tiene permisos para ver todas las jornadas' },
         { status: 403 }

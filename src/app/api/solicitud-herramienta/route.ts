@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -38,7 +39,7 @@ export async function GET(req: Request) {
   const incluirCanceladas = searchParams.get('incluirCanceladas') === 'true'
   const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 500)
 
-  const esLogistica = ROLES_LOGISTICA.includes(session.user.role)
+  const esLogistica = tieneRol(session, ROLES_LOGISTICA)
   const vistaTrabajador = !esLogistica || mias
 
   const where: any = {}

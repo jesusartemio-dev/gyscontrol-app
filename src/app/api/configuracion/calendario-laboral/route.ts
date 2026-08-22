@@ -2,6 +2,7 @@
 // 📅 API para Gestión de Calendarios Laborales
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar permisos (solo admin puede crear calendarios)
     const userRole = session.user.role
-    if (!['admin', 'gerente', 'comercial', 'presupuestos', 'proyectos', 'coordinador', 'coordinador_logistico', 'logistico', 'gestor'].includes(userRole)) {
+    if (!tieneRol(session, ['admin', 'gerente', 'comercial', 'presupuestos', 'proyectos', 'coordinador', 'coordinador_logistico', 'logistico', 'gestor'])) {
       return NextResponse.json({ error: `No tiene permisos para crear calendarios. Rol actual: ${userRole}` }, { status: 403 })
     }
 

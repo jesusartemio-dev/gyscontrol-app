@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -48,7 +49,7 @@ export async function PUT(
       )
     }
     const rolesBloquear = ['admin', 'gerente', 'gestor', 'coordinador']
-    if (nuevoEstado === true && !rolesBloquear.includes(userRole)) {
+    if (nuevoEstado === true && !tieneRol(session, rolesBloquear)) {
       return NextResponse.json(
         { error: 'No tiene permisos para bloquear cronogramas' },
         { status: 403 }

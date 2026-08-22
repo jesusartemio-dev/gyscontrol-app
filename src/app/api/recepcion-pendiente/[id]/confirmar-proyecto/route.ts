@@ -5,6 +5,7 @@
 // los pasos de recepción (que se autorizan por ROL), acá se autoriza por
 // PERTENENCIA: confirma quien hizo el pedido o el gestor de ese proyecto.
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -86,7 +87,7 @@ export async function POST(
     const userId = session.user.id
     const esSolicitante = pedido.responsableId === userId
     const esGestor = gestorId === userId
-    const esAdmin = ['admin', 'gerente'].includes(session.user.role)
+    const esAdmin = tieneRol(session, ['admin', 'gerente'])
 
     if (!esSolicitante && !esGestor && !esAdmin) {
       return NextResponse.json(

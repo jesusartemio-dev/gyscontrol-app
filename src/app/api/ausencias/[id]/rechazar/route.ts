@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
@@ -32,7 +33,7 @@ export async function PATCH(request: NextRequest, context: Ctx) {
 
     const role = session.user.role as string
     const userId = session.user.id
-    const isAdmin = (ADMIN_ROLES as readonly string[]).includes(role)
+    const isAdmin = tieneRol(session, ADMIN_ROLES)
 
     const puedeRechazar =
       isAdmin ||

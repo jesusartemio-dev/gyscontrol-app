@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -20,7 +21,7 @@ interface ResumenUsuario {
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
-  if (!session || !ROLES_VIEW.includes(session.user.role)) {
+  if (!session || !tieneRol(session, ROLES_VIEW)) {
     return NextResponse.json({ message: 'No autorizado' }, { status: 403 })
   }
 

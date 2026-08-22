@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -33,7 +34,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const esDueno = jornada.supervisorId === session.user.id
-  const esAdmin = ROLES_ADMIN.includes(session.user.role || '')
+  const esAdmin = tieneRol(session, ROLES_ADMIN)
   if (!esDueno && !esAdmin) {
     return NextResponse.json({ error: 'No puedes transferir esta asistencia' }, { status: 403 })
   }

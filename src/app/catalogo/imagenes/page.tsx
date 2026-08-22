@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
@@ -23,7 +24,7 @@ const CATEGORIA_LABEL: Record<string, string> = {
 
 export default function CatalogoImagenesPage() {
   const { data: session } = useSession()
-  const puedeEditar = Boolean(session?.user?.role && ROLES_EDICION.includes(session.user.role))
+  const puedeEditar = Boolean(session?.user?.role && tieneRol(session, ROLES_EDICION))
 
   const [imagenes, setImagenes] = useState<CatalogoImagen[]>([])
   const [loading, setLoading] = useState(true)

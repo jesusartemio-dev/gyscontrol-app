@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -61,7 +62,7 @@ export async function PATCH(
     const { id } = await params
     const body = await req.json()
     const role = session.user.role
-    const esLogistica = ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role)
+    const esLogistica = tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico'])
 
     const solicitud = await prisma.solicitudRecurso.findUnique({ where: { id } })
     if (!solicitud) {
@@ -136,7 +137,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 })
     }
 
-    if (solicitud.solicitanteId !== session.user.id && !['admin', 'gerente'].includes(session.user.role)) {
+    if (solicitud.solicitanteId !== session.user.id && !tieneRol(session, ['admin', 'gerente'])) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
     if (solicitud.estado !== 'borrador') {

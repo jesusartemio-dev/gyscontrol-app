@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -26,7 +27,7 @@ export async function POST(
     }
 
     const role = (session.user as any).role as string
-    if (!['admin', 'gerente'].includes(role)) {
+    if (!tieneRol(session, ['admin', 'gerente'])) {
       return NextResponse.json({ error: 'Solo admin o gerente pueden revertir entregas' }, { status: 403 })
     }
 

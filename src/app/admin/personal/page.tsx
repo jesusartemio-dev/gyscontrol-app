@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import React from 'react'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -10,7 +11,7 @@ const ALLOWED_ROLES: RolUsuario[] = ['admin', 'gerente']
 export default async function PersonalPage() {
   const session = await getServerSession(authOptions)
 
-  if (!session || !ALLOWED_ROLES.includes(session.user.role as RolUsuario)) {
+  if (!session || !tieneRol(session, ALLOWED_ROLES)) {
     redirect('/')
   }
 

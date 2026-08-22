@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(session.user.role)) {
+    if (!tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico'])) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 

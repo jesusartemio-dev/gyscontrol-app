@@ -6,6 +6,7 @@
  * Garantiza que el registro siempre esté asociado a un EDT válido
  */
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
     const rolesConAccesoTotal = ['admin', 'gerente']
     let proyectoAccessFilter: any = { id: proyectoId }
 
-    if (!rolesConAccesoTotal.includes(session.user.role)) {
+    if (!tieneRol(session, rolesConAccesoTotal)) {
       proyectoAccessFilter.OR = [
         { comercialId: session.user.id },
         { gestorId: session.user.id },

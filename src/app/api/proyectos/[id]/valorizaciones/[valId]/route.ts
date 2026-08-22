@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -47,7 +48,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!ROLES_ALLOWED.includes(session.user.role)) {
+    if (!tieneRol(session, ROLES_ALLOWED)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 
@@ -111,7 +112,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       }
       const claveRol = `${existing.estado}→${body.estado}`
       const rolesPermitidos = ROLES_TRANSICION[claveRol] || []
-      if (!rolesPermitidos.includes(session.user.role)) {
+      if (!tieneRol(session, rolesPermitidos)) {
         return NextResponse.json(
           { error: `Tu rol no puede realizar la transición ${existing.estado} → ${body.estado}` },
           { status: 403 }
@@ -420,7 +421,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!ROLES_ALLOWED.includes(session.user.role)) {
+    if (!tieneRol(session, ROLES_ALLOWED)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 

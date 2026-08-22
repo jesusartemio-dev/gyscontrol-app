@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -668,7 +669,7 @@ export default function CxCDetallePage() {
     && !cobro.abonos.some(a => a.tipo !== 'adelanto' && a.estado === 'recibido')
   // El rol para excedente se oculta, no se deshabilita (ver DISENO_UI_REVERSION_FACTORING.md,
   // punto 3a) — restricción de rol, no de estado, el usuario no puede resolverla desde acá.
-  const puedeRevertirExcedente = ['admin', 'gerente'].includes(userRole)
+  const puedeRevertirExcedente = tieneRol(session, ['admin', 'gerente'])
 
   const labelRow = (label: string, value: React.ReactNode) => (
     <div className="flex justify-between py-1.5 border-b border-gray-50 last:border-0">

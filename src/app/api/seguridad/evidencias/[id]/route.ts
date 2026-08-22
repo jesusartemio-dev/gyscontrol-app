@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -18,7 +19,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!ROLES_PERMITIDOS.includes(session.user.role)) {
+    if (!tieneRol(session, ROLES_PERMITIDOS)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 
@@ -41,7 +42,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!ROLES_PERMITIDOS.includes(session.user.role)) {
+    if (!tieneRol(session, ROLES_PERMITIDOS)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 
@@ -59,7 +60,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Evidencia no encontrada' }, { status: 404 })
     }
 
-    const isBypass = ROLES_BYPASS.includes(session.user.role)
+    const isBypass = tieneRol(session, ROLES_BYPASS)
     const isCreador = existente.creadoPorId === session.user.id
 
     const body = await req.json()
@@ -118,7 +119,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!ROLES_BYPASS.includes(session.user.role)) {
+    if (!tieneRol(session, ROLES_BYPASS)) {
       return NextResponse.json({ error: 'Solo admin, gerente o gestor pueden eliminar evidencias' }, { status: 403 })
     }
 

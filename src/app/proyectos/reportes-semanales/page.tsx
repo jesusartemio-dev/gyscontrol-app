@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -108,9 +109,9 @@ export default function ReportesAvanceListaPage() {
   const queryClient = useQueryClient()
   const { data: session } = useSession()
   const role = session?.user?.role ?? ''
-  const isBypass = ['admin', 'gerente', 'gestor'].includes(role)
+  const isBypass = tieneRol(session, ['admin', 'gerente', 'gestor'])
   // `seguridad` entra en solo lectura: no redacta reportes de avance técnico.
-  const puedeCapturar = (ROLES_PERMITIDOS as readonly string[]).includes(role)
+  const puedeCapturar = tieneRol(session, ROLES_PERMITIDOS)
 
   const [filtroProyectoId, setFiltroProyectoId] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')

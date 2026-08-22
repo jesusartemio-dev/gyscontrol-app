@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -7,7 +8,7 @@ const ROLES_APROBACION = ['admin', 'gerente', 'coordinador', 'gestor']
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
-  if (!session || !ROLES_APROBACION.includes(session.user.role)) {
+  if (!session || !tieneRol(session, ROLES_APROBACION)) {
     return NextResponse.json({ message: 'No autorizado' }, { status: 403 })
   }
   const { id } = await params

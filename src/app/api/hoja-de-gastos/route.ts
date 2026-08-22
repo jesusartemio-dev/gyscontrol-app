@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -65,7 +66,7 @@ export async function GET(req: Request) {
     } else {
       // Filtrar por permisos
       const role = session.user.role
-      if (!['admin', 'gerente', 'administracion', 'gestor', 'coordinador', 'coordinador_logistico'].includes(role)) {
+      if (!tieneRol(session, ['admin', 'gerente', 'administracion', 'gestor', 'coordinador', 'coordinador_logistico'])) {
         where.OR = [
           { empleadoId: session.user.id },
           // Hojas de proyecto: visible si eres gestor/supervisor/lider
@@ -104,7 +105,7 @@ export async function POST(req: Request) {
     // ─── Requerimiento de materiales ───────────────────────────────────────
     if (esCompra) {
       // Solo logística puede crear requerimientos de materiales
-      if (!['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(session.user.role)) {
+      if (!tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico'])) {
         return NextResponse.json({ error: 'Solo logística puede crear requerimientos de materiales' }, { status: 403 })
       }
 

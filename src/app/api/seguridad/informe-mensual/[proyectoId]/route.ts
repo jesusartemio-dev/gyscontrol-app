@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -17,7 +18,7 @@ export async function GET(
     }
 
     const role = (session.user as { role?: string }).role ?? ''
-    if (!ROLES_PERMITIDOS.includes(role)) {
+    if (!tieneRol(session, ROLES_PERMITIDOS)) {
       return NextResponse.json({ error: 'Sin permisos para ver informes de seguridad' }, { status: 403 })
     }
 

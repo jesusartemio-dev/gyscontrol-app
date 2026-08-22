@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { use, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -243,7 +244,7 @@ export default function DetalleRegistroSeguridadPage({
             fotos={r.fotos}
             editable={
               !!session?.user &&
-              (['admin', 'gerente', 'gestor'].includes(session.user.role) || session.user.id === r.ingenieroId)
+              (tieneRol(session, ['admin', 'gerente', 'gestor']) || session.user.id === r.ingenieroId)
             }
           />
         </CardContent>

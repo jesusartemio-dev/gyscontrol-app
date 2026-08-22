@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -39,7 +40,7 @@ const ROLES_INGRESO = ['admin', 'gerente', 'coordinador_logistico', 'logistico']
 
 export default function MaterialesAlmacen() {
   const { data: session } = useSession()
-  const puedeIngresar = ROLES_INGRESO.includes(session?.user?.role || '')
+  const puedeIngresar = tieneRol(session, ROLES_INGRESO)
 
   const [data, setData] = useState<StockRow[]>([])
   const [loading, setLoading] = useState(false)

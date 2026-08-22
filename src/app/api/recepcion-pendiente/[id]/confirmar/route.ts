@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -23,10 +24,10 @@ export async function POST(
 
     // Validar permisos por paso
     const role = session.user.role
-    if (paso === 'almacen' && !['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role)) {
+    if (paso === 'almacen' && !tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico'])) {
       return NextResponse.json({ error: 'Sin permisos para confirmar llegada a almacén' }, { status: 403 })
     }
-    if (paso === 'proyecto' && !['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador'].includes(role)) {
+    if (paso === 'proyecto' && !tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador'])) {
       return NextResponse.json({ error: 'Sin permisos para confirmar entrega a proyecto' }, { status: 403 })
     }
 

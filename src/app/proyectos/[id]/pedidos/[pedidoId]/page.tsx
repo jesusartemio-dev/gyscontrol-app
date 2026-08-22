@@ -6,6 +6,7 @@
 
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { notFound, useRouter } from 'next/navigation'
 import { getProyectoById } from '@/lib/services/proyecto'
@@ -370,7 +371,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
   }, [disconformidadDialog, disconformidadMotivo, reloadPedido])
 
   const userRole = session?.user?.role || ''
-  const puedeConfirmarRecepcion = ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador'].includes(userRole)
+  const puedeConfirmarRecepcion = tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador'])
 
   // Conformidad final: la autoriza la PERTENENCIA (soy quien pidió, o gestiono
   // el proyecto), no el rol. El API es la fuente de verdad; esto solo decide si
@@ -378,7 +379,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
   const puedeDarConformidad =
     !!pedido &&
     (pedido.responsableId === session?.user?.id
-      || ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos'].includes(userRole))
+      || tieneRol(session, ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']))
 
   const ESTADO_LABELS: Record<string, string> = {
     borrador: 'Borrador', enviado: 'Enviado', aprobado: 'Aprobado',
@@ -993,13 +994,13 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                         size="sm"
                         className="h-6 text-[10px] gap-1"
                         onClick={() => setShowItemDirectoModal(true)}
-                        disabled={!['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador', 'proyectos'].includes(userRole)}
+                        disabled={!tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador', 'proyectos'])}
                       >
                         + Item de Catálogo
                       </Button>
                     </span>
                   </TooltipTrigger>
-                  {!['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador', 'proyectos'].includes(userRole) && (
+                  {!tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador', 'proyectos']) && (
                     <TooltipContent>
                       <p className="text-xs">No tienes permiso para agregar ítems directos</p>
                     </TooltipContent>
@@ -1303,7 +1304,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                 </ul>
               </div>
               {/* Revertir rechazo — solo admin/gerente */}
-              {['admin', 'gerente'].includes(session?.user?.role || '') && (
+              {tieneRol(session, ['admin', 'gerente']) && (
                 <>
                   {!revertirRechazo.confirmando ? (
                     <Button

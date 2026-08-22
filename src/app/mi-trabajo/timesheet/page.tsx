@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import React, { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -97,7 +98,7 @@ function TimesheetContent() {
   const [activeTab, setActiveTab] = useState('semana')
 
   // Role check
-  const esSupervisor = session?.user?.role && ['admin', 'gerente', 'gestor', 'coordinador'].includes(session.user.role)
+  const esSupervisor = session?.user?.role && tieneRol(session, ['admin', 'gerente', 'gestor', 'coordinador'])
 
   // ── Shared state ──
   const [showWizard, setShowWizard] = useState(false)

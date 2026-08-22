@@ -5,6 +5,7 @@
  * Usa la misma lógica de acceso que el API principal de proyectos
  */
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
     // 🔐 Filtrar por rol del usuario (mismo patrón que /api/proyectos)
     const rolesConAccesoTotal = ['admin', 'gerente']
     let where: any = {}
-    let hasAccesoTotal = rolesConAccesoTotal.includes(session.user.role)
+    let hasAccesoTotal = tieneRol(session, rolesConAccesoTotal)
 
     logger.info('🎯 API PROYECTOS-USUARIO: Análisis de permisos', {
       userRole: session.user.role,

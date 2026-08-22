@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -15,7 +16,7 @@ export async function GET(req: Request) {
     const estado = searchParams.get('estado')
 
     const role = session.user.role
-    const esLogistica = ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role)
+    const esLogistica = tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico'])
 
     const solicitudes = await prisma.solicitudRecurso.findMany({
       where: {

@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { Metadata } from 'next'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -123,9 +124,9 @@ export default async function ReportesPage() {
 
   const userRole = (session.user?.role as string) || ''
   const allowedRoles = ['admin', 'gerente', 'gestor', 'comercial', 'proyectos', 'logistica', 'logistico', 'coordinador_logistico', 'coordinador', 'administracion']
-  if (!allowedRoles.includes(userRole)) notFound()
+  if (!tieneRol(session, allowedRoles)) notFound()
 
-  const reportesVisibles = reportes.filter(r => r.roles.includes(userRole))
+  const reportesVisibles = reportes.filter(r => tieneRol(session, r.roles))
 
   return (
     <div className="p-4 space-y-3">

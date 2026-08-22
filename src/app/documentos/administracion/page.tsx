@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { HardDrive, AlertCircle, Loader2 } from 'lucide-react'
@@ -40,7 +41,7 @@ export default function DocumentosAdministracionPage() {
     )
   }
 
-  if (!session?.user || !ROLES_ALLOWED.includes(session.user.role)) {
+  if (!session?.user || !tieneRol(session, ROLES_ALLOWED)) {
     return (
       <div className="p-4 md:p-6">
         <div className="flex items-center gap-2 text-red-600">

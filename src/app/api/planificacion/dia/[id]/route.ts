@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { z } from 'zod'
@@ -26,7 +27,7 @@ export async function PUT(request: NextRequest, context: Ctx) {
     }
 
     const role = (session.user as any).role as string
-    if (!ROLES_PLANIFICADOR.includes(role)) {
+    if (!tieneRol(session, ROLES_PLANIFICADOR)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 
@@ -108,7 +109,7 @@ export async function DELETE(_: NextRequest, context: Ctx) {
     }
 
     const role = (session.user as any).role as string
-    if (!ROLES_PLANIFICADOR.includes(role)) {
+    if (!tieneRol(session, ROLES_PLANIFICADOR)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 

@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
     }
 
     const rolesRequeridos = abonoExistente.tipo === 'excedente' ? ROLES_ALLOWED_EXCEDENTE : ROLES_ALLOWED
-    if (!rolesRequeridos.includes(session.user.role)) {
+    if (!tieneRol(session, rolesRequeridos)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 

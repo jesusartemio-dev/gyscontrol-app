@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -13,7 +14,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!(ROLES_LECTURA as readonly string[]).includes(session.user.role)) {
+    if (!tieneRol(session, ROLES_LECTURA)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 
@@ -39,7 +40,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!(ROLES_PERMITIDOS as readonly string[]).includes(session.user.role)) {
+    if (!tieneRol(session, ROLES_PERMITIDOS)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 
@@ -115,7 +116,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!(ROLES_PERMITIDOS as readonly string[]).includes(session.user.role)) {
+    if (!tieneRol(session, ROLES_PERMITIDOS)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 

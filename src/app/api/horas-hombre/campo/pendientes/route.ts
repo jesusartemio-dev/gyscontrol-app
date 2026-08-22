@@ -3,6 +3,7 @@
  * GET /api/horas-hombre/campo/pendientes
  */
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     // Solo gestores, gerentes y admins pueden ver pendientes
     const rolesPermitidos = ['admin', 'gerente', 'gestor', 'coordinador']
-    if (!rolesPermitidos.includes(session.user.role || '')) {
+    if (!tieneRol(session, rolesPermitidos)) {
       return NextResponse.json(
         { error: 'No tiene permisos para ver registros pendientes' },
         { status: 403 }

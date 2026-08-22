@@ -7,6 +7,7 @@
 // discrepancia entre lo que salió del almacén y lo que llegó a obra, así que la
 // OC no se toca — solo se revierte la entrega y el stock vuelve al almacén.
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -95,7 +96,7 @@ export async function POST(
     const userId = session.user.id
     const esSolicitante = pedido.responsableId === userId
     const esGestor = gestorId === userId
-    const esAdmin = ['admin', 'gerente'].includes(session.user.role)
+    const esAdmin = tieneRol(session, ['admin', 'gerente'])
 
     if (!esSolicitante && !esGestor && !esAdmin) {
       return NextResponse.json(

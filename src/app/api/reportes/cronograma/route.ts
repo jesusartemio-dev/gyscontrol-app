@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     // 🔐 Verificar permisos para reportes
     const rolesPermitidos = ['admin', 'gerente', 'proyectos', 'comercial'];
-    if (!rolesPermitidos.includes(session.user.role)) {
+    if (!tieneRol(session, rolesPermitidos)) {
       return NextResponse.json(
         { error: 'Sin permisos para generar reportes' },
         { status: 403 }

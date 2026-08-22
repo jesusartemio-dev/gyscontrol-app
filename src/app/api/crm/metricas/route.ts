@@ -5,6 +5,7 @@
 // ✅ GET: Obtener métricas generales del CRM calculadas on-the-fly
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
 
     const userRole = (session.user as any).role || 'comercial'
     const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
-    const esComercial = !rolesConAccesoTotal.includes(userRole)
+    const esComercial = !tieneRol(session, rolesConAccesoTotal)
 
     const { searchParams } = new URL(request.url)
     const periodo = searchParams.get('periodo') || new Date().toISOString().slice(0, 7)

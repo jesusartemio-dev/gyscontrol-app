@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!(ROLES_PERMITIDOS as readonly string[]).includes(session.user.role)) {
+    if (!tieneRol(session, ROLES_PERMITIDOS)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 

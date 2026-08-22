@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -117,9 +118,9 @@ export default function ReporteAvanceDetallePage({ params }: { params: Promise<{
   const queryClient = useQueryClient()
   const { data: session } = useSession()
   const role = session?.user?.role ?? ''
-  const isBypass = ['admin', 'gerente', 'gestor'].includes(role)
-  const isRevision = ROLES_REVISION.includes(role)
-  const puedeSnapshot = ROLES_SNAPSHOT.includes(role)
+  const isBypass = tieneRol(session, ['admin', 'gerente', 'gestor'])
+  const isRevision = tieneRol(session, ROLES_REVISION)
+  const puedeSnapshot = tieneRol(session, ROLES_SNAPSHOT)
 
   // Estado editable
   const [numero, setNumero] = useState('')
@@ -371,7 +372,7 @@ export default function ReporteAvanceDetallePage({ params }: { params: Promise<{
   // `seguridad` consulta el reporte de avance pero no lo redacta ni lo mueve
   // de estado: sin este filtro un borrador le mostraría el formulario editable
   // y "Enviar a revisión", y la API respondería 403.
-  const puedeCapturar = (ROLES_PERMITIDOS as readonly string[]).includes(role)
+  const puedeCapturar = tieneRol(session, ROLES_PERMITIDOS)
   const isEditable = puedeCapturar && (estado === 'borrador' || estado === 'rechazado' || isBypass)
   const puedeEnviar = puedeCapturar && (estado === 'borrador' || estado === 'rechazado')
   const semanaLabel = (() => {

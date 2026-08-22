@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!ROLES_PERMITIDOS.includes(session.user.role)) {
+    if (!tieneRol(session, ROLES_PERMITIDOS)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!ROLES_PERMITIDOS.includes(session.user.role)) {
+    if (!tieneRol(session, ROLES_PERMITIDOS)) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Evidencia no encontrada' }, { status: 404 })
     }
 
-    const isBypass = ROLES_BYPASS.includes(session.user.role)
+    const isBypass = tieneRol(session, ROLES_BYPASS)
     if (!isBypass) {
       if (evidencia.estado !== 'abierta') {
         return NextResponse.json(

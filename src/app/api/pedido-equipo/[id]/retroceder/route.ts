@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -70,7 +71,7 @@ export async function POST(
     const esCancelado = pedido.estado === 'cancelado' && targetEstado === 'borrador'
     const rolesPermitidos = ROLES_POR_TARGET[targetEstado]
     if (!esCancelado || !esCreador) {
-      if (!rolesPermitidos || !rolesPermitidos.includes(session.user.role)) {
+      if (!rolesPermitidos || !tieneRol(session, rolesPermitidos)) {
         return NextResponse.json({ error: 'Sin permisos para retroceder a este estado' }, { status: 403 })
       }
     }

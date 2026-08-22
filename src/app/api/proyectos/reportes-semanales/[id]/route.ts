@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -12,7 +13,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    if (!(ROLES_LECTURA as readonly string[]).includes(session.user.role))
+    if (!tieneRol(session, ROLES_LECTURA))
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
     const reporte = await prisma.reporteSemanalAvance.findUnique({
@@ -33,13 +34,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    if (!(ROLES_PERMITIDOS as readonly string[]).includes(session.user.role))
+    if (!tieneRol(session, ROLES_PERMITIDOS))
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
     const reporte = await prisma.reporteSemanalAvance.findUnique({ where: { id } })
     if (!reporte) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
 
-    const isBypass = (ROLES_BYPASS as readonly string[]).includes(session.user.role)
+    const isBypass = tieneRol(session, ROLES_BYPASS)
     const isEditable = reporte.estado === 'borrador' || reporte.estado === 'rechazado'
     if (!isEditable && !isBypass)
       return NextResponse.json(
@@ -87,7 +88,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    if (!(ROLES_BYPASS as readonly string[]).includes(session.user.role))
+    if (!tieneRol(session, ROLES_BYPASS))
       return NextResponse.json({ error: 'Solo admin, gerente o gestor pueden eliminar reportes' }, { status: 403 })
 
     const reporte = await prisma.reporteSemanalAvance.findUnique({ where: { id }, select: { id: true } })

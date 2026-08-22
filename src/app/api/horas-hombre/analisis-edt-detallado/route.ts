@@ -10,6 +10,7 @@
  * Solo para administradores/gestores
  */
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { ProyectoEstado } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     // Verificar permisos (admin, coordinador, gestor)
     const userRole = session.user.role
-    if (!['admin', 'coordinador', 'gestor'].includes(userRole)) {
+    if (!tieneRol(session, ['admin', 'coordinador', 'gestor'])) {
       console.log('❌ Análisis EDT: Sin permisos suficientes', { role: userRole })
       return NextResponse.json(
         { error: 'Permisos insuficientes. Se requiere rol de administrador, coordinador o gestor' },

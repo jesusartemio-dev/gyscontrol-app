@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
@@ -570,7 +571,7 @@ export default function RecepcionesPage() {
           </SelectContent>
         </Select>
         {activeTab === 'pendiente' && (counts['pendiente'] || 0) > 0 &&
-          ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role) && (
+          tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico']) && (
           <Button size="sm" variant="outline" className="h-9 gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
             onClick={() => openBulkModal('almacen')}>
             <ChevronsRight className="h-4 w-4" />
@@ -578,7 +579,7 @@ export default function RecepcionesPage() {
           </Button>
         )}
         {activeTab === 'en_almacen' && (counts['en_almacen'] || 0) > 0 &&
-          ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador'].includes(role) && (
+          tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador']) && (
           <Button size="sm" variant="outline" className="h-9 gap-1.5 text-green-600 border-green-200 hover:bg-green-50"
             onClick={() => openBulkModal('proyecto')}>
             <ChevronsRight className="h-4 w-4" />
@@ -723,7 +724,7 @@ export default function RecepcionesPage() {
                           const items: { label: string; icon: React.ReactNode; onClick: () => void; className?: string; separator?: boolean }[] = []
 
                           if (r.estado === 'pendiente') {
-                            if (['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role)) {
+                            if (tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico'])) {
                               items.push({
                                 label: 'Confirmar almacén',
                                 icon: <CheckCircle className="h-3.5 w-3.5" />,
@@ -749,7 +750,7 @@ export default function RecepcionesPage() {
                           }
 
                           if (r.estado === 'en_almacen') {
-                            if (['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador'].includes(role)) {
+                            if (tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor', 'coordinador'])) {
                               items.push({
                                 label: 'Entregar a proyecto',
                                 icon: <Truck className="h-3.5 w-3.5" />,
@@ -757,7 +758,7 @@ export default function RecepcionesPage() {
                                 className: 'text-green-600',
                               })
                             }
-                            if (['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor'].includes(role)) {
+                            if (tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor'])) {
                               items.push({
                                 label: 'Rechazar',
                                 icon: <XCircle className="h-3.5 w-3.5" />,
@@ -765,7 +766,7 @@ export default function RecepcionesPage() {
                                 className: 'text-red-600',
                               })
                             }
-                            if (['admin', 'gerente'].includes(role)) {
+                            if (tieneRol(session, ['admin', 'gerente'])) {
                               items.push({
                                 label: 'Retroceder a pendiente',
                                 icon: <RotateCcw className="h-3.5 w-3.5" />,
@@ -785,7 +786,7 @@ export default function RecepcionesPage() {
                           }
 
                           if (r.estado === 'rechazado') {
-                            if (['admin', 'gerente'].includes(role)) {
+                            if (tieneRol(session, ['admin', 'gerente'])) {
                               items.push({
                                 label: 'Revertir (reactivar)',
                                 icon: <RotateCcw className="h-3.5 w-3.5" />,
@@ -805,7 +806,7 @@ export default function RecepcionesPage() {
                           }
 
                           if (r.estado === 'entregado_proyecto') {
-                            if (['admin', 'gerente'].includes(role)) {
+                            if (tieneRol(session, ['admin', 'gerente'])) {
                               items.push({
                                 label: 'Retroceder a almacén',
                                 icon: <RotateCcw className="h-3.5 w-3.5" />,

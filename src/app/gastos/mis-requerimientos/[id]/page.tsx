@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import React, { useState, useEffect, use } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -610,19 +611,19 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
 
   const isEditable = !['rendido', 'revisado', 'validado', 'cerrado'].includes(hoja.estado)
   const canEnviar = ['borrador', 'rechazado'].includes(hoja.estado)
-  const canAprobar = hoja.estado === 'enviado' && ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'].includes(role || '')
-  const canDepositar = hoja.estado === 'aprobado' && hoja.requiereAnticipo && ['admin', 'gerente', 'administracion'].includes(role || '')
-  const canActivarAnticipo = hoja.estado === 'aprobado' && !hoja.requiereAnticipo && ['admin', 'gerente', 'administracion'].includes(role || '')
+  const canAprobar = hoja.estado === 'enviado' && tieneRol(session, ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'])
+  const canDepositar = hoja.estado === 'aprobado' && hoja.requiereAnticipo && tieneRol(session, ['admin', 'gerente', 'administracion'])
+  const canActivarAnticipo = hoja.estado === 'aprobado' && !hoja.requiereAnticipo && tieneRol(session, ['admin', 'gerente', 'administracion'])
   const canAvanzarDepositado = canDepositar && (hoja.depositos?.length ?? 0) > 0
   // Marcar "sin anticipo": solo en estado aprobado, sin depósitos registrados.
   // Cubre el caso donde el empleado gastó de su bolsillo (la empresa reembolsa al final).
-  const canMarcarSinAnticipo = hoja.estado === 'aprobado' && hoja.requiereAnticipo && (hoja.depositos?.length ?? 0) === 0 && ['admin', 'gerente', 'administracion'].includes(role || '')
+  const canMarcarSinAnticipo = hoja.estado === 'aprobado' && hoja.requiereAnticipo && (hoja.depositos?.length ?? 0) === 0 && tieneRol(session, ['admin', 'gerente', 'administracion'])
   const canRendir = (hoja.estado === 'aprobado' && !hoja.requiereAnticipo) || hoja.estado === 'depositado'
   const itemsPendientesRendicion = hoja.tipoPropósito === 'compra_materiales'
     ? (hoja.itemsMateriales || []).filter(i => i.precioReal == null).length
     : 0
   // Revisar (rendido → revisado): admin verifica conformidad documental
-  const canRevisarLineas = hoja.estado === 'rendido' && ['admin', 'gerente', 'administracion'].includes(role || '')
+  const canRevisarLineas = hoja.estado === 'rendido' && tieneRol(session, ['admin', 'gerente', 'administracion'])
   // Solo contar las líneas que tienen UI de conformidad (excluir las vinculadas a materiales en gastos)
   const lineasConformidad = hoja.tipoPropósito === 'compra_materiales'
     ? lineas.filter(l => !l.gastoComprobanteId && !l.requerimientoMaterialItemId)
@@ -636,19 +637,19 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
     itemsMaterialesConformidad.every(i => i.conformidad === 'conforme')
   const canRevisar = canRevisarLineas && allLineasConforme
   // Validar (revisado → validado): coordinador da conformidad final
-  const canValidar = hoja.estado === 'revisado' && ['admin', 'gerente', 'administracion', 'coordinador'].includes(role || '')
+  const canValidar = hoja.estado === 'revisado' && tieneRol(session, ['admin', 'gerente', 'administracion', 'coordinador'])
   const esEmpleado = session?.user?.id === hoja.empleadoId
   const saldoCuadrado = !hoja.requiereAnticipo || Math.abs(hoja.saldo) <= 0.01
-  const canCerrar = hoja.estado === 'validado' && saldoCuadrado && ['admin', 'gerente', 'administracion'].includes(role || '')
-  const canRechazar = ['enviado', 'rendido', 'revisado', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'].includes(role || '')
-  const canRetroceder = !['borrador', 'rechazado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
+  const canCerrar = hoja.estado === 'validado' && saldoCuadrado && tieneRol(session, ['admin', 'gerente', 'administracion'])
+  const canRechazar = ['enviado', 'rendido', 'revisado', 'validado'].includes(hoja.estado) && tieneRol(session, ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'])
+  const canRetroceder = !['borrador', 'rechazado'].includes(hoja.estado) && tieneRol(session, ['admin', 'gerente', 'administracion'])
   const canEliminar = hoja.estado === 'borrador' && role === 'admin'
-  const canVolverABorrador = hoja.estado === 'rechazado' && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
-  const canEditInfo = ['borrador', 'rechazado'].includes(hoja.estado) && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
+  const canVolverABorrador = hoja.estado === 'rechazado' && (esEmpleado || tieneRol(session, ['admin', 'gerente', 'administracion']))
+  const canEditInfo = ['borrador', 'rechazado'].includes(hoja.estado) && (esEmpleado || tieneRol(session, ['admin', 'gerente', 'administracion']))
   const anticipos = (hoja.depositos || []).filter((d: any) => d.tipo === 'anticipo' || (!d.tipo || d.tipo === null))
   const reembolsos = (hoja.depositos || []).filter((d: any) => d.tipo === 'reembolso')
   const devoluciones = (hoja.depositos || []).filter((d: any) => d.tipo === 'devolucion')
-  const esAdminGerente = ['admin', 'gerente', 'administracion'].includes(role || '')
+  const esAdminGerente = tieneRol(session, ['admin', 'gerente', 'administracion'])
   const estadosConSeccionPagos = ['aprobado', 'depositado', 'rendido', 'revisado', 'validado', 'cerrado']
   const estaEnSeccion = estadosConSeccionPagos.includes(hoja.estado)
 
@@ -862,7 +863,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                   Cerrar
                 </Button>
               )}
-              {hoja.estado === 'validado' && !saldoCuadrado && ['admin','gerente','administracion'].includes(role || '') && (
+              {hoja.estado === 'validado' && !saldoCuadrado && tieneRol(session, ['admin','gerente','administracion']) && (
                 <span className="text-xs text-amber-600">
                   Saldo pendiente: S/ {Math.abs(hoja.saldo).toFixed(2)} ({hoja.saldo > 0 ? 'devolución' : 'reembolso'})
                 </span>
@@ -1038,7 +1039,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                     <p className="text-xs text-muted-foreground italic">Sin reembolsos registrados.</p>
                   )}
                   {reembolsos.map((dep: any, idx: number) => {
-                    const canEliminarReemb = ['rendido', 'validado'].includes(hoja.estado) && ['admin', 'gerente', 'administracion'].includes(role || '')
+                    const canEliminarReemb = ['rendido', 'validado'].includes(hoja.estado) && tieneRol(session, ['admin', 'gerente', 'administracion'])
                     return (
                       <div key={dep.id} className="border border-orange-200 rounded-lg p-3 bg-orange-50/40">
                         <div className="flex items-center justify-between">
@@ -1106,7 +1107,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
                     <p className="text-xs text-muted-foreground italic">Sin devoluciones registradas.</p>
                   )}
                   {devoluciones.map((dep: any, idx: number) => {
-                    const canEliminarDev = ['depositado', 'rendido', 'validado'].includes(hoja.estado) && (esEmpleado || ['admin', 'gerente', 'administracion'].includes(role || ''))
+                    const canEliminarDev = ['depositado', 'rendido', 'validado'].includes(hoja.estado) && (esEmpleado || tieneRol(session, ['admin', 'gerente', 'administracion']))
                     return (
                       <div key={dep.id} className="border border-teal-200 rounded-lg p-3 bg-teal-50/40">
                         <div className="flex items-center justify-between">

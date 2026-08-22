@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import React, { useState, useEffect, use, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -114,7 +115,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   const router = useRouter()
   const { data: session } = useSession()
   const userRole = session?.user?.role || ''
-  const puedeVerCxP = ['admin', 'gerente', 'socio', 'administracion'].includes(userRole)
+  const puedeVerCxP = tieneRol(session, ['admin', 'gerente', 'socio', 'administracion'])
   const [oc, setOC] = useState<OrdenCompra | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -197,7 +198,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
 
   const esBorrador = oc?.estado === 'borrador'
   const esCancelada = oc?.estado === 'cancelada'
-  const puedeEditarAdmin = ['admin', 'gerente', 'administracion'].includes(userRole)
+  const puedeEditarAdmin = tieneRol(session, ['admin', 'gerente', 'administracion'])
   const puedeEditarFechaEmision = userRole === 'admin'
   const puedeEditarAdministrativo = !!oc && !esBorrador && !esCancelada && puedeEditarAdmin
   const cxpConPagos = ((oc as any)?.cuentasPorPagar || []).some(
@@ -892,7 +893,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
                 Completar OC
               </Button>
             )}
-            {['admin', 'gerente', 'coordinador_logistico'].includes(userRole) && (
+            {tieneRol(session, ['admin', 'gerente', 'coordinador_logistico']) && (
               <RollbackButton
                 entityType="ordenCompra"
                 entityId={oc.id}
@@ -904,7 +905,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
             )}
           </>
         )}
-        {oc.estado === 'completada' && ['admin', 'gerente'].includes(userRole) && (
+        {oc.estado === 'completada' && tieneRol(session, ['admin', 'gerente']) && (
           <RollbackButton
             entityType="ordenCompra"
             entityId={oc.id}
@@ -917,7 +918,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
         {['enviada', 'confirmada', 'parcial', 'completada'].includes(oc.estado) && (
           <DescargarOCPDFButton oc={oc} />
         )}
-        {oc.estado === 'cancelada' && ['admin', 'gerente', 'coordinador_logistico'].includes(userRole) && (
+        {oc.estado === 'cancelada' && tieneRol(session, ['admin', 'gerente', 'coordinador_logistico']) && (
           <RollbackButton
             entityType="ordenCompra"
             entityId={oc.id}
@@ -1245,7 +1246,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
         const totalFacturado = cxps.reduce((s, c) => s + (c.monto || 0), 0)
         const saldoPorFacturar = Math.round((oc.total - totalFacturado) * 100) / 100
         const faltaFacturar = saldoPorFacturar > 0.01
-        const puedeRegistrarFactura = ['admin', 'gerente', 'administracion'].includes(userRole)
+        const puedeRegistrarFactura = tieneRol(session, ['admin', 'gerente', 'administracion'])
 
         return (
           <Card className={cxps.length === 0 ? 'border-amber-200' : undefined}>

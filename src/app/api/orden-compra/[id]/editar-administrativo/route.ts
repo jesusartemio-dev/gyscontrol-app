@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -35,7 +36,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
-    if (!ROLES_ALLOWED.includes(session.user.role)) {
+    if (!tieneRol(session, ROLES_ALLOWED)) {
       return NextResponse.json(
         { error: 'Solo admin, gerente o administración pueden editar datos administrativos' },
         { status: 403 }
@@ -141,7 +142,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       }
     }
     if (payload.fechaEmision !== undefined) {
-      if (!ROLES_FECHA_EMISION.includes(session.user.role)) {
+      if (!tieneRol(session, ROLES_FECHA_EMISION)) {
         return NextResponse.json(
           { error: 'Solo el rol admin puede modificar la fecha de orden' },
           { status: 403 }

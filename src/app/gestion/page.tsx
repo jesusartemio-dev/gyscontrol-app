@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { Suspense } from 'react'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -20,7 +21,7 @@ export default async function GestionPage() {
   const allowedRoles = ['admin', 'gerente', 'gestor', 'comercial', 'proyectos', 'logistico', 'coordinador_logistico', 'coordinador']
   const userRole = (session.user?.role as string) || ''
 
-  if (!allowedRoles.includes(userRole)) notFound()
+  if (!tieneRol(session, allowedRoles)) notFound()
 
   return (
     <div className="p-4 space-y-3">

@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -119,7 +120,7 @@ export default function ResumenProyectosPage() {
     }
 
     const userRole = session.user.role
-    if (['admin', 'coordinador', 'gestor'].includes(userRole)) {
+    if (tieneRol(session, ['admin', 'coordinador', 'gestor'])) {
       setPermiso(true)
       cargarResumenProyectos()
     } else {
@@ -197,14 +198,14 @@ export default function ResumenProyectosPage() {
 
   // Cargar datos cuando cambie el filtro
   useEffect(() => {
-    if (session?.user?.role && ['admin', 'coordinador', 'gestor'].includes(session.user.role)) {
+    if (session?.user?.role && tieneRol(session, ['admin', 'coordinador', 'gestor'])) {
       cargarResumenProyectos()
     }
   }, [filtroEstado, filtroProyecto])
 
   // Cargar lista de proyectos al inicio
   useEffect(() => {
-    if (session?.user?.role && ['admin', 'coordinador', 'gestor'].includes(session.user.role)) {
+    if (session?.user?.role && tieneRol(session, ['admin', 'coordinador', 'gestor'])) {
       cargarListaProyectos()
     }
   }, [session])

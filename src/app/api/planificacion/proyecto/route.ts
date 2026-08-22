@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
     const role = (session.user as any).role as string
     const userId = session.user.id
     const tieneAcceso =
-      ROLES_ADMIN.includes(role) ||
+      tieneRol(session, ROLES_ADMIN) ||
       [proyecto.liderId, proyecto.supervisorId, proyecto.gestorId].includes(userId)
     if (!tieneAcceso) {
       return NextResponse.json({ error: 'Sin permisos para ver este proyecto' }, { status: 403 })

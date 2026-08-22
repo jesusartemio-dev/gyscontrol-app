@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -23,7 +24,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const { id } = await params
     const session = await getServerSession(authOptions)
     if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    if (!ROLES_PERMITIDOS.includes(session.user.role))
+    if (!tieneRol(session, ROLES_PERMITIDOS))
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
     const registro = await prisma.registroSeguridad.findUnique({

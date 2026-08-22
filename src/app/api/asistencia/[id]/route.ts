@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -13,7 +14,7 @@ export async function DELETE(
 ) {
   const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-  if (!ROLES_ADMIN.includes(session.user.role)) {
+  if (!tieneRol(session, ROLES_ADMIN)) {
     return NextResponse.json({ error: 'Solo admin/gerente pueden eliminar marcajes' }, { status: 403 })
   }
 

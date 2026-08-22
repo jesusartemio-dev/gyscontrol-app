@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -33,7 +34,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!solicitud) return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 })
 
   // Solo el solicitante o roles de logística pueden ver el detalle
-  const esLogistica = ROLES_LOGISTICA.includes(session.user.role)
+  const esLogistica = tieneRol(session, ROLES_LOGISTICA)
   if (!esLogistica && solicitud.solicitanteId !== session.user.id) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
   }

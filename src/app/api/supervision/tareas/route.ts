@@ -3,6 +3,7 @@
  * Permite ver todas las tareas de todos los proyectos, asignarlas y crear tareas extra
  */
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { ProgresoService } from '@/lib/services/progresoService'
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     const userRole = session.user.role
     const allowedRoles = ['admin', 'coordinador', 'gestor', 'proyectos']
-    if (!allowedRoles.includes(userRole || '')) {
+    if (!tieneRol(session, allowedRoles)) {
       return NextResponse.json({ error: 'No tiene permisos para gestionar tareas' }, { status: 403 })
     }
 
@@ -211,7 +212,7 @@ export async function PATCH(request: NextRequest) {
     if (!session?.user?.id) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
     const userRole = session.user.role
-    if (!['admin', 'coordinador', 'gestor', 'proyectos'].includes(userRole || '')) {
+    if (!tieneRol(session, ['admin', 'coordinador', 'gestor', 'proyectos'])) {
       return NextResponse.json({ error: 'No tiene permisos para asignar tareas' }, { status: 403 })
     }
 
@@ -289,7 +290,7 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
     const userRole = session.user.role
-    if (!['admin', 'coordinador', 'gestor', 'proyectos'].includes(userRole || '')) {
+    if (!tieneRol(session, ['admin', 'coordinador', 'gestor', 'proyectos'])) {
       return NextResponse.json({ error: 'No tiene permisos para crear tareas' }, { status: 403 })
     }
 

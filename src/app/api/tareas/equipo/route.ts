@@ -11,6 +11,7 @@
  * - Proyectos activos
  */
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -61,7 +62,7 @@ export async function GET(_request: NextRequest) {
     // Solo coordinadores, gestores y admin pueden ver el equipo
     const userRole = session.user.role
     const allowedRoles = ['admin', 'coordinador', 'gestor', 'proyectos']
-    if (!allowedRoles.includes(userRole || '')) {
+    if (!tieneRol(session, allowedRoles)) {
       return NextResponse.json(
         { error: 'No tiene permisos para ver el equipo' },
         { status: 403 }

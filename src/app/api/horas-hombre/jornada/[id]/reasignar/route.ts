@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -34,7 +35,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // Puede reasignar: el dueño actual de la jornada (desde Mi Jornada) o un rol
   // de supervisión (admin/gestor/coordinador).
   const esDueno = jornada.supervisorId === session.user.id
-  const esAdmin = ROLES_REASIGNAR.includes(session.user.role || '')
+  const esAdmin = tieneRol(session, ROLES_REASIGNAR)
   if (!esDueno && !esAdmin) {
     return NextResponse.json({ error: 'No tienes permiso para reasignar esta jornada' }, { status: 403 })
   }

@@ -6,6 +6,7 @@
 
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -751,10 +752,10 @@ export default function PedidoLogisticaDetailPage() {
 
   // Permisos para generar OCs
   const userRole = session?.user?.role || ''
-  const puedeGenerarOC = ['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(userRole)
+  const puedeGenerarOC = tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico'])
     && pedido !== null
     && ['aprobado', 'atendido', 'parcial'].includes(pedido?.estado || '')
-  const puedeConfirmarRecepcion = ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor'].includes(userRole)
+  const puedeConfirmarRecepcion = tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico', 'gestor'])
 
   // 🔄 Loading state
   if (loading) {
@@ -1798,12 +1799,12 @@ export default function PedidoLogisticaDetailPage() {
                           const tieneREQItem = itemTieneREQActivo(item as any)
                           const esEntregadoViaOC = tieneOCItem && item.estado === 'entregado'
                           const puedeAtender = !tieneOCItem && !tieneREQItem && item.estado !== 'entregado'
-                          const puedeRevertir = ['admin', 'gerente'].includes(userRole) &&
+                          const puedeRevertir = tieneRol(session, ['admin', 'gerente']) &&
                             ['atendido', 'parcial', 'entregado'].includes(item.estado) &&
                             !tieneOCItem &&
                             !tieneREQItem &&
                             !(item as any).recepcionesPendientes?.some((r: any) => ['en_almacen', 'entregado_proyecto'].includes(r.estado))
-                          const puedeEliminar = ['admin', 'gerente'].includes(userRole) &&
+                          const puedeEliminar = tieneRol(session, ['admin', 'gerente']) &&
                             (item.cantidadAtendida || 0) === 0 &&
                             !tieneOCItem &&
                             !tieneREQItem &&
@@ -2132,7 +2133,7 @@ export default function PedidoLogisticaDetailPage() {
             const tieneOC = ((editingItem.item as any).ordenCompraItems?.length ?? 0) > 0
             const ocNumero = tieneOC ? (editingItem.item as any).ordenCompraItems[0]?.ordenCompra?.numero : null
             const userRole = session?.user?.role || ''
-            const puedeEditarCosto = ['admin', 'gerente', 'socio'].includes(userRole)
+            const puedeEditarCosto = tieneRol(session, ['admin', 'gerente', 'socio'])
             const esServicio = (editingItem.item as any).tipoItem === 'servicio'
 
             return (
@@ -3062,7 +3063,7 @@ export default function PedidoLogisticaDetailPage() {
                 </ul>
               </div>
               {/* Revertir rechazo — solo admin/gerente */}
-              {['admin', 'gerente'].includes(session?.user?.role || '') && (
+              {tieneRol(session, ['admin', 'gerente']) && (
                 <>
                   {!revertirRechazo.confirmando ? (
                     <Button

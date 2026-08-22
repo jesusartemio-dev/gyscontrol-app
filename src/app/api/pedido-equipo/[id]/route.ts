@@ -8,6 +8,7 @@
 // 📅 Última actualización: 2025-07-16
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { PedidoEquipoUpdatePayload } from '@/types'
@@ -334,7 +335,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
       permPedido.estado === 'borrador' &&
       !!permPedido.ventaEquipoId &&
       (session.user.role === 'comercial' || permPedido.responsableId === session.user.id)
-    if (!rolesPermitidos.includes(session.user.role) && !esBorradorVentaComercial) {
+    if (!tieneRol(session, rolesPermitidos) && !esBorradorVentaComercial) {
       return NextResponse.json(
         { error: 'No tienes permiso para eliminar este pedido.' },
         { status: 403 }

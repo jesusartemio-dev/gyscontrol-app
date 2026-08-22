@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -132,7 +133,7 @@ export async function GET() {
     }
 
     const allowedRoles = ['admin', 'gerente', 'gestor', 'comercial', 'proyectos', 'logistico', 'coordinador_logistico', 'coordinador']
-    if (!allowedRoles.includes(session.user.role as string)) {
+    if (!tieneRol(session, allowedRoles)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

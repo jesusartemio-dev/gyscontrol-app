@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -121,7 +122,7 @@ export async function POST(
 
     // 🔐 Verificar permisos (Admin, Gerente, Proyectos)
     const rolesPermitidos = ['admin', 'gerente', 'proyectos'];
-    if (!rolesPermitidos.includes(session.user.role)) {
+    if (!tieneRol(session, rolesPermitidos)) {
       return NextResponse.json(
         { error: 'Sin permisos para crear EDT' },
         { status: 403 }
@@ -270,7 +271,7 @@ export async function PUT(
 
     // 🔐 Verificar permisos
     const rolesPermitidos = ['admin', 'gerente', 'proyectos'];
-    if (!rolesPermitidos.includes(session.user.role)) {
+    if (!tieneRol(session, rolesPermitidos)) {
       return NextResponse.json(
         { error: 'Sin permisos para actualizar EDT' },
         { status: 403 }
@@ -338,7 +339,7 @@ export async function DELETE(
     }
 
     // 🔐 Solo Admin y Gerente pueden eliminar
-    if (!['admin', 'gerente'].includes(session.user.role)) {
+    if (!tieneRol(session, ['admin', 'gerente'])) {
       return NextResponse.json(
         { error: 'Sin permisos para eliminar EDT' },
         { status: 403 }

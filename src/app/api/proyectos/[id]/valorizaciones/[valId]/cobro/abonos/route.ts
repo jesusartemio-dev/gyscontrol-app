@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    if (!ROLES_ALLOWED.includes(session.user.role)) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+    if (!tieneRol(session, ROLES_ALLOWED)) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
     const { valId } = await params
     const cobro = await prisma.cobroValorizacion.findUnique({ where: { valorizacionId: valId } })
@@ -50,7 +51,7 @@ export async function DELETE(request: NextRequest, { params }: Ctx) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    if (!ROLES_ALLOWED.includes(session.user.role)) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+    if (!tieneRol(session, ROLES_ALLOWED)) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
     const abonoId = new URL(request.url).searchParams.get('abonoId')
     if (!abonoId) return NextResponse.json({ error: 'Falta abonoId' }, { status: 400 })

@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { z } from 'zod'
@@ -55,7 +56,7 @@ export async function GET(_: NextRequest, context: Ctx) {
     }
 
     const role = (session.user as any).role as string
-    const esAdmin = ['admin', 'administracion'].includes(role)
+    const esAdmin = tieneRol(session, ['admin', 'administracion'])
     const esSolicitante = solicitud.solicitanteId === session.user.id
     const esAprobador =
       solicitud.aprobador1Id === session.user.id ||

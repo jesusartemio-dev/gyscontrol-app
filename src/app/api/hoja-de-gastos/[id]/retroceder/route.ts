@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -33,7 +34,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Hoja de gastos no encontrada' }, { status: 404 })
     }
 
-    const esAdmin = ['admin', 'gerente', 'administracion'].includes(session.user.role)
+    const esAdmin = tieneRol(session, ['admin', 'gerente', 'administracion'])
     const esDuenoRechazado = hoja.estado === 'rechazado' && session.user.id === hoja.empleadoId
 
     if (!esAdmin && !esDuenoRechazado) {

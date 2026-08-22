@@ -3,6 +3,7 @@
 // Crea jerarquía completa: Fases → EDTs → Actividades → Tareas
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { ROLES_CRONOGRAMA, validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
@@ -55,7 +56,7 @@ export async function POST(
     if (!session?.user) {
       return NextResponse.json({ message: 'No autorizado' }, { status: 401 })
     }
-    if (!ROLES_CRONOGRAMA.includes(session.user.role as any)) {
+    if (!tieneRol(session, ROLES_CRONOGRAMA)) {
       return NextResponse.json(
         { message: 'Sin permisos para modificar cronogramas. Solo admin, gerente, gestor y coordinador pueden hacerlo.' },
         { status: 403 }

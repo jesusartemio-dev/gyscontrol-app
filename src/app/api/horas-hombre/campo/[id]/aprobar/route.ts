@@ -9,6 +9,7 @@
  * 4. Envía notificaciones a los miembros
  */
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -35,7 +36,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     // Solo gestores, gerentes y admins pueden aprobar
     const rolesPermitidos = ['admin', 'gerente', 'gestor']
-    if (!rolesPermitidos.includes(session.user.role || '')) {
+    if (!tieneRol(session, rolesPermitidos)) {
       return NextResponse.json(
         { error: 'No tiene permisos para aprobar registros' },
         { status: 403 }

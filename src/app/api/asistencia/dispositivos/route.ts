@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -15,7 +16,7 @@ export async function GET(req: Request) {
 
   const where: any = {}
   if (scope === 'propios') where.userId = session.user.id
-  else if (!ROLES_SUPERVISION.includes(session.user.role))
+  else if (!tieneRol(session, ROLES_SUPERVISION))
     return NextResponse.json({ message: 'No autorizado' }, { status: 403 })
   if (soloPendientes) where.aprobado = false
 

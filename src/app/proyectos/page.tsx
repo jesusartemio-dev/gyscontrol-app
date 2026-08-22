@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -99,7 +100,7 @@ export default function ProyectosPage() {
   useEffect(() => {
     if (status === 'loading') return
     const role = session?.user.role
-    if (!role || !ALLOWED_ROLES.includes(role)) {
+    if (!role || !tieneRol(session, ALLOWED_ROLES)) {
       router.replace('/denied')
     }
   }, [session, status, router])

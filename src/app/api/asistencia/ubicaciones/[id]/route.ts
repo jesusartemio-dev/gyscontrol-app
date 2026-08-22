@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -7,7 +8,7 @@ const ROLES_ADMIN = ['admin', 'gerente']
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
-  if (!session || !ROLES_ADMIN.includes(session.user.role)) {
+  if (!session || !tieneRol(session, ROLES_ADMIN)) {
     return NextResponse.json({ message: 'No autorizado' }, { status: 403 })
   }
 
@@ -42,7 +43,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions)
-  if (!session || !ROLES_ADMIN.includes(session.user.role)) {
+  if (!session || !tieneRol(session, ROLES_ADMIN)) {
     return NextResponse.json({ message: 'No autorizado' }, { status: 403 })
   }
 

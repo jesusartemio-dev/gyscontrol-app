@@ -6,6 +6,7 @@
 // ✅ PUT: Actualizar duraciones
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar permisos
     const userRole = session.user.role
-    if (!['admin', 'gerente'].includes(userRole)) {
+    if (!tieneRol(session, ['admin', 'gerente'])) {
       return NextResponse.json({ error: 'No tiene permisos para crear duraciones' }, { status: 403 })
     }
 
@@ -144,7 +145,7 @@ export async function PUT(request: NextRequest) {
 
     // Solo admin y gerente pueden actualizar
     const userRole = session.user.role
-    if (!['admin', 'gerente'].includes(userRole)) {
+    if (!tieneRol(session, ['admin', 'gerente'])) {
       return NextResponse.json({ error: 'No tiene permisos para actualizar duraciones' }, { status: 403 })
     }
 

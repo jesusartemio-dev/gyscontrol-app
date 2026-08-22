@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -62,7 +63,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Validar permisos y estado según el tipo
     if (tipo === 'anticipo') {
-      if (!['admin', 'gerente', 'administracion'].includes(session.user.role)) {
+      if (!tieneRol(session, ['admin', 'gerente', 'administracion'])) {
         return NextResponse.json({ error: 'Sin permisos para registrar anticipo' }, { status: 403 })
       }
       if (!['aprobado', 'depositado', 'rendido'].includes(hoja.estado)) {
@@ -71,7 +72,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         }, { status: 400 })
       }
     } else if (tipo === 'reembolso') {
-      if (!['admin', 'gerente', 'administracion'].includes(session.user.role)) {
+      if (!tieneRol(session, ['admin', 'gerente', 'administracion'])) {
         return NextResponse.json({ error: 'Sin permisos para registrar reembolso' }, { status: 403 })
       }
       if (hoja.estado === 'cerrado') {
@@ -94,7 +95,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
     } else if (tipo === 'devolucion') {
       const esEmpleado = hoja.empleadoId === session.user.id
-      const esAdmin = ['admin', 'gerente', 'administracion'].includes(session.user.role)
+      const esAdmin = tieneRol(session, ['admin', 'gerente', 'administracion'])
       if (!esEmpleado && !esAdmin) {
         return NextResponse.json({ error: 'Sin permisos para registrar esta devolución' }, { status: 403 })
       }

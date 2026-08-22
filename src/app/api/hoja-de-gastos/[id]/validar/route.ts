@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -12,7 +13,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // El coordinador es quien valida la conformidad final. Admin/gerente/administracion
     // se mantienen como fallback para flexibilidad operativa.
-    if (!['admin', 'gerente', 'administracion', 'coordinador'].includes(session.user.role)) {
+    if (!tieneRol(session, ['admin', 'gerente', 'administracion', 'coordinador'])) {
       return NextResponse.json({ error: 'Sin permisos para validar' }, { status: 403 })
     }
 

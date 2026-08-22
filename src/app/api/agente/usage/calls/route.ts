@@ -2,6 +2,7 @@
 // Drill-down y export CSV de llamadas individuales a la API de IA.
 // Permite filtrar por tipo, usuario y mes, devolviendo JSON o CSV.
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
   const role = (session.user as { role?: string }).role
-  if (!['admin', 'gerente'].includes(role || '')) {
+  if (!tieneRol(session, ['admin', 'gerente'])) {
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
   }
 

@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
@@ -51,7 +52,7 @@ export function DescuentoTab({ cotizacion, onUpdated, isLocked = false }: Descue
   const [comentario, setComentario] = useState('')
 
   const userRole = (session?.user as any)?.role
-  const canApprove = ['admin', 'gerente'].includes(userRole)
+  const canApprove = tieneRol(session, ['admin', 'gerente'])
   const estado = cotizacion.descuentoEstado
 
   const totalFinal = cotizacion.totalCliente - monto

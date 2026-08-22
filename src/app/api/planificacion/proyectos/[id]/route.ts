@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { z } from 'zod'
@@ -15,7 +16,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const session = await getServerSession(authOptions)
     const role = (session?.user as any)?.role as string | undefined
-    if (!session?.user?.id || !role || !ROLES_PERMITIDOS.includes(role)) {
+    if (!session?.user?.id || !role || !tieneRol(session, ROLES_PERMITIDOS)) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 

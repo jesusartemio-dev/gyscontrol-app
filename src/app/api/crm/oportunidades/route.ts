@@ -8,6 +8,7 @@
 // 📅 Última actualización: 2025-09-19
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -170,7 +171,7 @@ export async function GET(request: NextRequest) {
 
     // RBAC: comercial solo ve sus propias oportunidades
     const rolesConAccesoTotal = ['admin', 'gerente', 'coordinador']
-    if (!rolesConAccesoTotal.includes(session.user.role as string)) {
+    if (!tieneRol(session, rolesConAccesoTotal)) {
       where.AND = [
         ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
         { OR: [{ comercialId: session.user.id }, { responsableId: session.user.id }] }
