@@ -5,16 +5,28 @@ import { prisma } from '@/lib/prisma'
 const mesDe = (d: Date) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
 
 async function main() {
-  const nMeses = Number(process.argv[2]) || 6
+  // arg numérico >= 2020 = año calendario; si no, número de meses de ventana móvil
+  const arg = Number(process.argv[2]) || 6
   const hoy = new Date()
-  const desde = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - (nMeses - 1), 1))
+  const esAnio = arg >= 2020
   const meses: string[] = []
-  for (let i = nMeses - 1; i >= 0; i--) {
-    meses.push(mesDe(new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - i, 1))))
+  let desde: Date, hasta: Date
+  if (esAnio) {
+    const ultimo = arg === hoy.getUTCFullYear() ? hoy.getUTCMonth() : 11
+    desde = new Date(Date.UTC(arg, 0, 1))
+    hasta = new Date(Date.UTC(arg, ultimo + 1, 1))
+    for (let m = 0; m <= ultimo; m++) meses.push(mesDe(new Date(Date.UTC(arg, m, 1))))
+  } else {
+    desde = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - (arg - 1), 1))
+    hasta = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() + 1, 1))
+    for (let i = arg - 1; i >= 0; i--) {
+      meses.push(mesDe(new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - i, 1))))
+    }
   }
+  console.log(esAnio ? `AÑO ${arg}` : `ventana móvil de ${arg} meses`)
 
   const registros = await prisma.registroHoras.findMany({
-    where: { fechaTrabajo: { gte: desde } },
+    where: { fechaTrabajo: { gte: desde, lt: hasta } },
     select: {
       usuarioId: true, fechaTrabajo: true, horasTrabajadas: true, costoHora: true,
       user: { select: { id: true, name: true } },

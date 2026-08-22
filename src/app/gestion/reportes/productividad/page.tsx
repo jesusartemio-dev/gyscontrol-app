@@ -35,6 +35,8 @@ interface Persona {
 }
 interface Respuesta {
   meses: string[]
+  periodo: { tipo: 'movil'; meses: number } | { tipo: 'anio'; anio: number }
+  aniosDisponibles: number[]
   personas: Persona[]
   total: {
     personas: number
@@ -80,13 +82,16 @@ export default function ProductividadPage() {
   const [data, setData] = useState<Respuesta | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [meses, setMeses] = useState('6')
+  // "m:N" = últimos N meses (ventana móvil) · "a:AAAA" = año calendario completo.
+  const [periodo, setPeriodo] = useState('m:6')
   const [modo, setModo] = useState<'porcentaje' | 'horas'>('porcentaje')
   const [abierta, setAbierta] = useState<string | null>(null)
 
   useEffect(() => {
     setLoading(true); setError('')
-    fetch(`/api/gestion/productividad-personal?meses=${meses}`)
+    const [tipo, valor] = periodo.split(':')
+    const query = tipo === 'a' ? `anio=${valor}` : `meses=${valor}`
+    fetch(`/api/gestion/productividad-personal?${query}`)
       .then(async (r) => {
         if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Error ${r.status}`)
         return r.json()
@@ -94,7 +99,7 @@ export default function ProductividadPage() {
       .then((d: Respuesta) => setData(d))
       .catch((e: Error) => setError(e.message || 'Error al cargar'))
       .finally(() => setLoading(false))
-  }, [meses])
+  }, [periodo])
 
   return (
     <div className="p-4 space-y-4">
@@ -116,6 +121,14 @@ export default function ProductividadPage() {
             <strong>costo directo</strong>, contra centros de costo internos, que son{' '}
             <strong>costo indirecto</strong> de la empresa.
           </p>
+          {data && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {data.periodo.tipo === 'anio'
+                ? `Año ${data.periodo.anio} completo · ${data.meses.length} meses`
+                : `Ventana móvil: los últimos ${data.periodo.meses} meses hasta hoy`}
+              {' · '}{etiquetaMes(data.meses[0])} – {etiquetaMes(data.meses[data.meses.length - 1])}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <div className="inline-flex rounded-md border border-input overflow-hidden">
@@ -131,12 +144,15 @@ export default function ProductividadPage() {
               </button>
             ))}
           </div>
-          <Select value={meses} onValueChange={setMeses}>
-            <SelectTrigger className="w-[150px] text-xs h-9"><SelectValue /></SelectTrigger>
+          <Select value={periodo} onValueChange={setPeriodo}>
+            <SelectTrigger className="w-[170px] text-xs h-9"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="3" className="text-xs">Últimos 3 meses</SelectItem>
-              <SelectItem value="6" className="text-xs">Últimos 6 meses</SelectItem>
-              <SelectItem value="12" className="text-xs">Últimos 12 meses</SelectItem>
+              <SelectItem value="m:3" className="text-xs">Últimos 3 meses</SelectItem>
+              <SelectItem value="m:6" className="text-xs">Últimos 6 meses</SelectItem>
+              <SelectItem value="m:12" className="text-xs">Últimos 12 meses</SelectItem>
+              {(data?.aniosDisponibles ?? []).map((a) => (
+                <SelectItem key={a} value={`a:${a}`} className="text-xs">Año {a}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -185,7 +201,9 @@ export default function ProductividadPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-xs pl-4">Persona</TableHead>
+                      <TableHead className="text-xs pl-4 sticky left-0 z-20 bg-background min-w-[11rem]">
+                        Persona
+                      </TableHead>
                       <TableHead className="text-xs text-right w-20">Total</TableHead>
                       <TableHead className="text-xs w-40">Reparto</TableHead>
                       <TableHead className="text-xs text-right w-20">% dir.</TableHead>
@@ -204,7 +222,7 @@ export default function ProductividadPage() {
                         className="text-xs cursor-pointer hover:bg-muted/50"
                         onClick={() => setAbierta(abierta === p.id ? null : p.id)}
                       >
-                        <TableCell className="pl-4 py-2 font-medium">
+                        <TableCell className="pl-4 py-2 font-medium sticky left-0 z-10 bg-background">
                           <span className="inline-flex items-center gap-1">
                             {abierta === p.id
                               ? <ChevronDown className="h-3 w-3 text-muted-foreground" />
@@ -304,7 +322,7 @@ export default function ProductividadPage() {
                       ] : []),
                     ])}
                     <TableRow className="text-xs border-t-2">
-                      <TableCell className="pl-4 py-2 font-medium">Total</TableCell>
+                      <TableCell className="pl-4 py-2 font-medium sticky left-0 z-10 bg-background">Total</TableCell>
                       <TableCell className="text-right py-2 font-mono tabular-nums font-medium">
                         {h(data.total.horas.total)}
                       </TableCell>

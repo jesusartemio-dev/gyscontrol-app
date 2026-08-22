@@ -35,16 +35,34 @@ export async function GET(req: NextRequest) {
     if (!ROLES.includes(session.user.role))
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
-    const pedidos = Number(req.nextUrl.searchParams.get('meses'))
-    const nMeses = Number.isFinite(pedidos) && pedidos >= 3 && pedidos <= 24
-      ? Math.trunc(pedidos)
-      : MESES_POR_DEFECTO
-
+    // Dos formas de acotar el periodo: ventana móvil (`meses=N`, termina en el mes actual)
+    // o año calendario (`anio=2026`, de enero a diciembre). La contabilidad razona por año
+    // cerrado; la gestión del día a día, por los últimos meses. Se ofrecen las dos.
+    const anioParam = Number(req.nextUrl.searchParams.get('anio'))
     const hoy = new Date()
-    const desde = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - (nMeses - 1), 1))
+    const anioActual = hoy.getUTCFullYear()
+
+    let desde: Date
+    let hasta: Date
     const meses: string[] = []
-    for (let i = nMeses - 1; i >= 0; i--) {
-      meses.push(mesDe(new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - i, 1))))
+
+    if (Number.isFinite(anioParam) && anioParam >= 2020 && anioParam <= anioActual) {
+      // Del año en curso solo tiene sentido hasta el mes actual: los meses futuros
+      // serían columnas vacías que solo estorban.
+      const ultimoMes = anioParam === anioActual ? hoy.getUTCMonth() : 11
+      desde = new Date(Date.UTC(anioParam, 0, 1))
+      hasta = new Date(Date.UTC(anioParam, ultimoMes + 1, 1))
+      for (let m = 0; m <= ultimoMes; m++) meses.push(mesDe(new Date(Date.UTC(anioParam, m, 1))))
+    } else {
+      const pedidos = Number(req.nextUrl.searchParams.get('meses'))
+      const nMeses = Number.isFinite(pedidos) && pedidos >= 3 && pedidos <= 24
+        ? Math.trunc(pedidos)
+        : MESES_POR_DEFECTO
+      desde = new Date(Date.UTC(anioActual, hoy.getUTCMonth() - (nMeses - 1), 1))
+      hasta = new Date(Date.UTC(anioActual, hoy.getUTCMonth() + 1, 1))
+      for (let i = nMeses - 1; i >= 0; i--) {
+        meses.push(mesDe(new Date(Date.UTC(anioActual, hoy.getUTCMonth() - i, 1))))
+      }
     }
 
     // Fuente principal: RegistroHoras (timesheet + jornadas de campo ya convertidas). Trae
@@ -62,7 +80,7 @@ export async function GET(req: NextRequest) {
     const fichaPorUsuario = new Map(empleados.map((e) => [e.userId, e]))
 
     const registros = await prisma.registroHoras.findMany({
-      where: { fechaTrabajo: { gte: desde } },
+      where: { fechaTrabajo: { gte: desde, lt: hasta } },
       select: {
         usuarioId: true, fechaTrabajo: true, horasTrabajadas: true, costoHora: true,
         user: { select: { id: true, name: true, email: true } },
@@ -80,7 +98,7 @@ export async function GET(req: NextRequest) {
       where: {
         registroHorasId: null,
         registroCampoTarea: {
-          registroCampo: { estado: { not: 'iniciado' }, fechaTrabajo: { gte: desde } },
+          registroCampo: { estado: { not: 'iniciado' }, fechaTrabajo: { gte: desde, lt: hasta } },
         },
       },
       select: {
@@ -224,8 +242,23 @@ export async function GET(req: NextRequest) {
     const tIndirecto = sum((p) => p.horas.indirecto)
     const tTotal = tDirecto + tIndirecto
 
+    // Años con horas registradas, para que el selector no ofrezca años vacíos.
+    const rango = await prisma.registroHoras.aggregate({
+      _min: { fechaTrabajo: true }, _max: { fechaTrabajo: true },
+    })
+    const aniosDisponibles: number[] = []
+    if (rango._min.fechaTrabajo && rango._max.fechaTrabajo) {
+      for (let a = rango._max.fechaTrabajo.getUTCFullYear(); a >= rango._min.fechaTrabajo.getUTCFullYear(); a--) {
+        aniosDisponibles.push(a)
+      }
+    }
+
     return NextResponse.json({
       meses,
+      periodo: Number.isFinite(anioParam) && anioParam >= 2020 && anioParam <= anioActual
+        ? { tipo: 'anio' as const, anio: anioParam }
+        : { tipo: 'movil' as const, meses: meses.length },
+      aniosDisponibles,
       personas,
       total: {
         personas: personas.length,
