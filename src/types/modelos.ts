@@ -62,7 +62,10 @@ export interface SidebarLink {
   icon: any // Lucide icon component
   badge?: NotificationBadgeType
   submenu?: SidebarLink[] // ✅ Submenú opcional para enlaces anidados
-  roles?: RolUsuario[] // Filtro por rol a nivel de link individual
+  roles?: RolUsuario[] // Filtro por rol a nivel de link individual (allowlist)
+  excludeRoles?: RolUsuario[] // Oculta el link solo para estos roles (denylist).
+                              // Útil cuando un rol entra a la sección por una
+                              // parte concreta y el resto de links no le aplica.
 }
 
 // ✅ Tipo para secciones del sidebar

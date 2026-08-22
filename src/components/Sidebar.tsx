@@ -195,14 +195,17 @@ export default function Sidebar() {
       icon: FolderOpen,
       color: 'text-purple-400',
       roles: ['admin', 'gerente', 'proyectos', 'coordinador', 'gestor', 'seguridad'],
+      // `seguridad` entra a esta sección solo por el detalle del proyecto:
+      // ahí viven el Plan de Trabajo, IPERC, PETS y MPP. El resto de links es
+      // procura (costos) o evidencia técnica, que su rol no puede consumir.
       links: [
         { href: '/proyectos', label: 'Ver Proyectos', icon: FolderOpen, badge: 'proyectos-activos' as NotificationBadgeType },
-        { href: '/proyectos/equipos', label: 'Equipos', icon: Wrench },
-        { href: '/proyectos/listas', label: 'Listas', icon: FileText },
-        { href: '/proyectos/pedidos', label: 'Pedidos', icon: ShoppingCart, badge: 'pedidos-pendientes' as NotificationBadgeType },
-        { href: '/proyectos/evidencias', label: 'Evidencias técnicas', icon: ClipboardCheck },
-        { href: '/proyectos/reportes-semanales', label: 'Reportes de avance', icon: FileBarChart },
-        { href: '/proyectos/catalogo', label: 'Catálogo', icon: Wrench },
+        { href: '/proyectos/equipos', label: 'Equipos', icon: Wrench, excludeRoles: ['seguridad'] as any },
+        { href: '/proyectos/listas', label: 'Listas', icon: FileText, excludeRoles: ['seguridad'] as any },
+        { href: '/proyectos/pedidos', label: 'Pedidos', icon: ShoppingCart, badge: 'pedidos-pendientes' as NotificationBadgeType, excludeRoles: ['seguridad'] as any },
+        { href: '/proyectos/evidencias', label: 'Evidencias técnicas', icon: ClipboardCheck, excludeRoles: ['seguridad'] as any },
+        { href: '/proyectos/reportes-semanales', label: 'Reportes de avance', icon: FileBarChart, excludeRoles: ['seguridad'] as any },
+        { href: '/proyectos/catalogo', label: 'Catálogo', icon: Wrench, excludeRoles: ['seguridad'] as any },
       ],
     },
     // 2.5. Documentos - Google Drive
@@ -510,6 +513,9 @@ export default function Sidebar() {
         }
         // Per-link role filtering
         if (link.roles && role && !(link.roles as string[]).includes(role)) {
+          return false
+        }
+        if (link.excludeRoles && role && (link.excludeRoles as string[]).includes(role)) {
           return false
         }
         return true

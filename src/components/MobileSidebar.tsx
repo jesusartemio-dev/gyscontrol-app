@@ -187,12 +187,12 @@ export default function MobileSidebar() {
       roles: ['admin', 'gerente', 'proyectos', 'coordinador', 'gestor', 'seguridad'],
       links: [
         { href: '/proyectos', label: 'Ver Proyectos', icon: FolderOpen, badge: 'proyectos-activos' as NotificationBadgeType },
-        { href: '/proyectos/equipos', label: 'Equipos', icon: Wrench },
-        { href: '/proyectos/listas', label: 'Listas', icon: FileText },
-        { href: '/proyectos/pedidos', label: 'Pedidos', icon: Package, badge: 'pedidos-pendientes' as NotificationBadgeType },
-        { href: '/proyectos/evidencias', label: 'Evidencias técnicas', icon: ClipboardCheck },
-        { href: '/proyectos/reportes-semanales', label: 'Reportes de avance', icon: FileBarChart },
-        { href: '/proyectos/catalogo', label: 'Catálogo', icon: Wrench },
+        { href: '/proyectos/equipos', label: 'Equipos', icon: Wrench, excludeRoles: ['seguridad'] as any },
+        { href: '/proyectos/listas', label: 'Listas', icon: FileText, excludeRoles: ['seguridad'] as any },
+        { href: '/proyectos/pedidos', label: 'Pedidos', icon: Package, badge: 'pedidos-pendientes' as NotificationBadgeType, excludeRoles: ['seguridad'] as any },
+        { href: '/proyectos/evidencias', label: 'Evidencias técnicas', icon: ClipboardCheck, excludeRoles: ['seguridad'] as any },
+        { href: '/proyectos/reportes-semanales', label: 'Reportes de avance', icon: FileBarChart, excludeRoles: ['seguridad'] as any },
+        { href: '/proyectos/catalogo', label: 'Catálogo', icon: Wrench, excludeRoles: ['seguridad'] as any },
       ],
     },
     {
@@ -460,6 +460,9 @@ export default function MobileSidebar() {
           return false
         }
         if (link.roles && role && !(link.roles as string[]).includes(role)) {
+          return false
+        }
+        if (link.excludeRoles && role && (link.excludeRoles as string[]).includes(role)) {
           return false
         }
         return true
