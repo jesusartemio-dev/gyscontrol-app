@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import {
   Home, ChevronRight, TrendingUp, Loader2, Activity, AlertTriangle,
-  Calendar, Camera, Target, Check, Trash2,
+  Calendar, Camera, Target, Check, Trash2, Clock,
 } from 'lucide-react'
 import {
   ResponsiveContainer, ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine,
@@ -30,6 +30,7 @@ interface AvanceWeek {
   planificadoAcum: number | null
   realAcum: number | null
   reportado: number | null
+  consumoAcum: number | null
 }
 interface SnapshotResumen { semanaIso: string; progresoGeneral: number }
 interface HistoricoResumen {
@@ -40,6 +41,12 @@ interface HistoricoResumen {
   tareasConHistorico: number
 }
 interface JornadaAbierta { id: string; fechaTrabajo: string; semanaIso: string }
+interface ConsumoResumen {
+  tieneDatos: boolean
+  horasPresupuestadas: number
+  horasConsumidas: number
+  eficiencia: number | null
+}
 interface CurvaAvanceResponse {
   weeks: AvanceWeek[]
   hasBaseline: boolean
@@ -49,6 +56,7 @@ interface CurvaAvanceResponse {
   cronogramaEjecId: string | null
   proyecto: ProyectoLight
   historico: HistoricoResumen
+  consumo: ConsumoResumen
   jornadasAbiertas: JornadaAbierta[]
   snapshots: SnapshotResumen[]
 }
@@ -344,7 +352,9 @@ export default function CurvaSAvancePage() {
                         data.weeks.length > 30 ? (idx % 4 === 0 ? val : '') : val}
                     />
                     <YAxis
-                      domain={[0, 100]}
+                      // El consumo de horas puede superar el 100%: el eje debe crecer con él,
+                      // si no el sobrecosto queda cortado justo cuando importa verlo.
+                      domain={[0, (dataMax: number) => Math.max(100, Math.ceil(dataMax / 10) * 10)]}
                       tickFormatter={(v: number) => `${v}%`}
                       width={48}
                       tick={{ fontSize: 11 }}
@@ -369,6 +379,9 @@ export default function CurvaSAvancePage() {
                       connectNulls={false}
                       isAnimationActive={false}
                     />
+                    {/* Consumo de horas: NO es avance, es cuánto del presupuesto se gastó.
+                        Si va por encima del Real, el trabajo está costando de más. */}
+                    <Line type="monotone" dataKey="consumoAcum" name="Horas consumidas" stroke="#C2410C" strokeWidth={2} strokeDasharray="2 3" dot={false} connectNulls />
                     <ReferenceLine y={100} stroke="#9CA3AF" strokeDasharray="4 2" label={{ value: 'Meta 100%', position: 'insideTopRight', fill: '#6B7280', fontSize: 11 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -390,6 +403,24 @@ export default function CurvaSAvancePage() {
             <SummaryCard icon={TrendingUp} iconColor="text-emerald-500" label="Real a la fecha" value={pct(refReal)} />
             <IndiceCard indice={indice} />
           </div>
+
+          {data.consumo.tieneDatos && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <SummaryCard
+                icon={Clock}
+                iconColor="text-orange-600"
+                label="Horas consumidas"
+                value={`${data.consumo.horasConsumidas.toLocaleString('es-PE')} h`}
+              />
+              <SummaryCard
+                icon={Target}
+                iconColor="text-slate-500"
+                label="Horas presupuestadas"
+                value={`${data.consumo.horasPresupuestadas.toLocaleString('es-PE')} h`}
+              />
+              <EficienciaCard eficiencia={data.consumo.eficiencia} />
+            </div>
+          )}
 
           {/* ─── Tabla: Real derivado (lectura) + Reportado congelado (editable) ─── */}
           {data.weeks.length > 0 && (
@@ -583,6 +614,38 @@ function IndiceCard({ indice }: { indice: number | null }) {
         {indice != null && (
           <p className={`text-xs ${c.text}`}>
             {indice >= 1.0 ? 'En tiempo o adelantado' : indice >= 0.9 ? 'Leve retraso' : 'Retraso significativo'}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// Avance logrado por cada punto de presupuesto de horas gastado. Por debajo de 1 el trabajo
+// está costando más horas de las previstas — la señal que la curva de avance sola no da.
+function EficienciaCard({ eficiencia }: { eficiencia: number | null }) {
+  const c = eficiencia == null
+    ? { bg: '', text: 'text-gray-400' }
+    : eficiencia >= 1 ? { bg: 'bg-green-50', text: 'text-green-700' }
+    : eficiencia >= 0.8 ? { bg: 'bg-yellow-50', text: 'text-yellow-700' }
+    : { bg: 'bg-red-50', text: 'text-red-700' }
+  return (
+    <Card className={c.bg}>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Activity className={`h-4 w-4 ${c.text}`} />
+          <span className="text-xs text-muted-foreground">Eficiencia (avance / horas)</span>
+        </div>
+        <p className={`text-2xl font-bold font-mono ${c.text}`}>
+          {eficiencia != null ? eficiencia.toFixed(2) : '—'}
+        </p>
+        {eficiencia != null && (
+          <p className={`text-xs ${c.text}`}>
+            {eficiencia >= 1
+              ? 'Rinde igual o mejor que lo presupuestado'
+              : eficiencia >= 0.8
+                ? 'Consume más horas de las previstas'
+                : 'Sobrecosto de horas significativo'}
           </p>
         )}
       </CardContent>

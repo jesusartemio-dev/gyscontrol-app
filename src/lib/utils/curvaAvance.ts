@@ -41,6 +41,7 @@ export interface AvanceWeek {
   planificadoAcum: number | null // % 0-100 (null si no hay baseline)
   realAcum: number | null // % 0-100 (null antes del primer asiento del histórico)
   reportado: number | null // % 0-100, solo en las semanas con snapshot congelado
+  consumoAcum: number | null // % de las horas presupuestadas ya gastadas (puede pasar de 100)
 }
 
 export interface CurvaAvanceResult {
@@ -66,15 +67,17 @@ export function construirCurvaAvance(
   serieReal: PuntoSemanalInput[],
   pesosFase: PesoFaseInput[],
   reportados: PuntoSemanalInput[] = [],
+  serieConsumo: PuntoSemanalInput[] = [],
 ): CurvaAvanceResult {
   const hasBaseline = baselineTareas.length > 0
   const tieneSerieReal = serieReal.length > 0
   const tieneReportados = reportados.length > 0
 
-  // Rango temporal = min/max de fechas del baseline + semanas con dato real o reportado.
+  // Rango temporal = min/max de fechas del baseline + semanas con dato real, reportado o
+  // consumo de horas.
   const fechas: number[] = []
   for (const t of baselineTareas) fechas.push(t.fechaInicio.getTime(), t.fechaFin.getTime())
-  for (const p of [...serieReal, ...reportados]) {
+  for (const p of [...serieReal, ...reportados, ...serieConsumo]) {
     const ms = Date.parse(`${p.weekStart}T00:00:00.000Z`)
     if (!Number.isNaN(ms)) fechas.push(ms)
   }
@@ -123,8 +126,13 @@ export function construirCurvaAvance(
   // ── REPORTADO: snapshots congelados, sin arrastre (puntos sueltos) ──
   const reportadoPorSemana = new Map(reportados.map((p) => [p.weekStart, p.porcentaje]))
 
+  // ── CONSUMO: % de horas presupuestadas gastadas; también se arrastra ──
+  const consumoPorSemana = new Map(serieConsumo.map((p) => [p.weekStart, p.porcentaje]))
+
   let ultimoReal: number | null = null
   let realIniciado = false
+  let ultimoConsumo: number | null = null
+  let consumoIniciado = false
   const weeks: AvanceWeek[] = buckets.map((b, i) => {
     const planificadoAcum = hayPlan ? Math.min(100, Number(plannedAcum[i].toFixed(2))) : null
     if (realPorSemana.has(b.weekStart)) {
@@ -135,7 +143,13 @@ export function construirCurvaAvance(
     const reportado = reportadoPorSemana.has(b.weekStart)
       ? Number(reportadoPorSemana.get(b.weekStart)!.toFixed(2))
       : null
-    return { weekStart: b.weekStart, weekLabel: b.weekLabel, planificadoAcum, realAcum, reportado }
+    if (consumoPorSemana.has(b.weekStart)) {
+      ultimoConsumo = consumoPorSemana.get(b.weekStart)!
+      consumoIniciado = true
+    }
+    // El consumo NO se topa a 100: pasarse del presupuesto es justo lo que hay que ver.
+    const consumoAcum = consumoIniciado ? Number((ultimoConsumo as number).toFixed(2)) : null
+    return { weekStart: b.weekStart, weekLabel: b.weekLabel, planificadoAcum, realAcum, reportado, consumoAcum }
   })
 
   return { weeks, hasBaseline, tieneSerieReal, tieneReportados }

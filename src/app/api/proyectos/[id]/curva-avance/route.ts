@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { construirCurvaAvance } from '@/lib/utils/curvaAvance'
 import { calcularPesosFase } from '@/lib/services/pesoFase'
-import { serieAvanceRealSemanal } from '@/lib/services/avanceHistorico'
+import { serieAvanceRealSemanal, serieConsumoHorasSemanal } from '@/lib/services/avanceHistorico'
 import { formatearSemanaIso } from '@/lib/utils/isoWeek'
 
 const ROLES = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
@@ -64,7 +64,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         })
       : []
 
-    const [snapshots, pesos, serie] = await Promise.all([
+    const [snapshots, pesos, serie, consumo] = await Promise.all([
       prisma.proyectoAvanceSnapshot.findMany({
         where: { proyectoId: id },
         orderBy: { semanaIso: 'asc' },
@@ -72,6 +72,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       }),
       calcularPesosFase(id),
       serieAvanceRealSemanal(id),
+      serieConsumoHorasSemanal(id),
     ])
 
     const baselineTareas = tareasPlan.map((t) => ({
@@ -86,7 +87,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       porcentaje: s.progresoGeneral,
     }))
 
-    const curva = construirCurvaAvance(baselineTareas, serie.puntos, pesosFase, reportados)
+    const curva = construirCurvaAvance(baselineTareas, serie.puntos, pesosFase, reportados, consumo.puntos)
 
     // Si el histórico se queda muy por debajo del avance actual es que hay tareas que
     // avanzaron antes de que existiera el registro fechado: la curva arranca demasiado
@@ -114,6 +115,20 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         brecha: brechaHistorico,
         tareasConAvance: serie.tareasConAvance,
         tareasConHistorico: serie.tareasConHistorico,
+      },
+      consumo: {
+        tieneDatos: consumo.tieneDatos,
+        horasPresupuestadas: Number(consumo.horasPresupuestadas.toFixed(1)),
+        horasConsumidas: Number(consumo.horasConsumidas.toFixed(1)),
+        // Eficiencia: puntos de avance por punto de horas gastado. < 1 = se está gastando
+        // más rápido de lo que se avanza.
+        eficiencia:
+          consumo.horasPresupuestadas > 0 && consumo.horasConsumidas > 0
+            ? Number(
+                (serie.porcentajeActual /
+                  ((consumo.horasConsumidas / consumo.horasPresupuestadas) * 100)).toFixed(2),
+              )
+            : null,
       },
       jornadasAbiertas: jornadasAbiertas.map((j) => ({
         id: j.id,

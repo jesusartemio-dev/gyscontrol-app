@@ -118,3 +118,78 @@ export async function serieAvanceRealSemanal(proyectoId: string): Promise<SerieA
     tareasConHistorico: conAvance.filter((t) => conHistorico.has(t.id)).length,
   }
 }
+
+export interface SerieConsumoHoras {
+  puntos: PuntoSemanal[] // % del presupuesto de horas consumido, acumulado
+  horasPresupuestadas: number
+  horasConsumidas: number
+  tieneDatos: boolean
+}
+
+/**
+ * Serie semanal de CONSUMO de horas: `Σ horas registradas hasta la semana / Σ horas-hombre
+ * presupuestadas`.
+ *
+ * Es deliberadamente una magnitud distinta del avance físico. Puestas una al lado de la otra
+ * son la señal de sobrecosto que no existía en ningún reporte: avance 40 % con 80 % de las
+ * horas gastadas significa que el trabajo va a costar el doble de lo presupuestado.
+ *
+ * Las horas se fechan con su `fechaTrabajo`, igual que el avance. Se suman dos fuentes sin
+ * solaparlas (mismo criterio que ProgresoService): `RegistroHoras` (timesheet + jornadas ya
+ * aprobadas) y los miembros de jornadas cerradas todavía sin aprobar (`registroHorasId` nulo,
+ * que aún no se convirtieron en RegistroHoras).
+ */
+export async function serieConsumoHorasSemanal(proyectoId: string): Promise<SerieConsumoHoras> {
+  const VACIO: SerieConsumoHoras = {
+    puntos: [], horasPresupuestadas: 0, horasConsumidas: 0, tieneDatos: false,
+  }
+
+  const cronograma = await prisma.proyectoCronograma.findFirst({
+    where: { proyectoId, tipo: 'ejecucion' },
+    select: { id: true },
+  })
+  if (!cronograma) return VACIO
+
+  const tareas = await prisma.proyectoTarea.findMany({
+    where: { proyectoCronogramaId: cronograma.id },
+    select: { id: true, horasEstimadas: true, personasEstimadas: true },
+  })
+  const horasPresupuestadas = tareas.reduce((s, t) => s + hh(t), 0)
+  if (horasPresupuestadas <= 0) return VACIO
+  const ids = tareas.map((t) => t.id)
+
+  const [registros, miembros] = await Promise.all([
+    prisma.registroHoras.findMany({
+      where: { proyectoTareaId: { in: ids } },
+      select: { fechaTrabajo: true, horasTrabajadas: true },
+    }),
+    prisma.registroHorasCampoMiembro.findMany({
+      where: {
+        registroHorasId: null,
+        registroCampoTarea: { proyectoTareaId: { in: ids } },
+      },
+      select: {
+        horas: true,
+        registroCampoTarea: { select: { registroCampo: { select: { fechaTrabajo: true } } } },
+      },
+    }),
+  ])
+
+  const porSemana = new Map<string, number>()
+  const suma = (fecha: Date, horas: number) => {
+    const k = lunesUTC(fecha)
+    porSemana.set(k, (porSemana.get(k) ?? 0) + horas)
+  }
+  for (const r of registros) suma(r.fechaTrabajo, Number(r.horasTrabajadas) || 0)
+  for (const m of miembros) suma(m.registroCampoTarea.registroCampo.fechaTrabajo, m.horas || 0)
+  if (porSemana.size === 0) return { ...VACIO, horasPresupuestadas }
+
+  let acum = 0
+  const puntos: PuntoSemanal[] = []
+  for (const semana of [...porSemana.keys()].sort()) {
+    acum += porSemana.get(semana)!
+    puntos.push({ weekStart: semana, porcentaje: Number(((acum / horasPresupuestadas) * 100).toFixed(2)) })
+  }
+
+  return { puntos, horasPresupuestadas, horasConsumidas: acum, tieneDatos: true }
+}

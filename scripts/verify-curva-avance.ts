@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { serieAvanceRealSemanal } from '@/lib/services/avanceHistorico'
+import { serieAvanceRealSemanal, serieConsumoHorasSemanal } from '@/lib/services/avanceHistorico'
 import { calcularPesosFase } from '@/lib/services/pesoFase'
 import { construirCurvaAvance } from '@/lib/utils/curvaAvance'
 
@@ -37,7 +37,7 @@ async function main() {
         })
       : []
 
-    const [snapshots, pesos, serie] = await Promise.all([
+    const [snapshots, pesos, serie, consumo] = await Promise.all([
       prisma.proyectoAvanceSnapshot.findMany({
         where: { proyectoId: p.id },
         orderBy: { semanaIso: 'asc' },
@@ -45,6 +45,7 @@ async function main() {
       }),
       calcularPesosFase(p.id),
       serieAvanceRealSemanal(p.id),
+      serieConsumoHorasSemanal(p.id),
     ])
 
     const curva = construirCurvaAvance(
@@ -57,6 +58,7 @@ async function main() {
       serie.puntos,
       pesos.fases.map((f) => ({ faseNombre: f.nombre, pesoEfectivo: f.pesoEfectivo })),
       snapshots.map((s) => ({ weekStart: lunesUTC(s.fechaCorte), porcentaje: s.progresoGeneral })),
+      consumo.puntos,
     )
 
     const conReal = curva.weeks.filter((w) => w.realAcum != null)
@@ -71,6 +73,13 @@ async function main() {
       `derivado ${serie.porcentajeDerivado.toFixed(2)}% vs actual ${serie.porcentajeActual.toFixed(2)}% ` +
       `→ brecha ${brecha.toFixed(2)} pts | histórico en ${serie.tareasConHistorico}/${serie.tareasConAvance} tareas`,
     )
+    if (consumo.tieneDatos) {
+      const efic = serie.porcentajeActual / ((consumo.horasConsumidas / consumo.horasPresupuestadas) * 100)
+      console.log(
+        `horas: ${consumo.horasConsumidas.toFixed(0)} de ${consumo.horasPresupuestadas.toFixed(0)} ` +
+        `(${((consumo.horasConsumidas / consumo.horasPresupuestadas) * 100).toFixed(1)}%) → eficiencia ${efic.toFixed(2)}`,
+      )
+    } else console.log('horas: sin registros fechados')
     if (serie.puntos.length === 0) { console.log('  (sin histórico fechado)'); continue }
 
     // Solo las semanas donde cambia algo, para que quepa.
@@ -81,6 +90,7 @@ async function main() {
       semana: w.weekStart,
       plan: w.planificadoAcum == null ? '—' : `${w.planificadoAcum.toFixed(1)}%`,
       real: w.realAcum == null ? '—' : `${w.realAcum.toFixed(1)}%`,
+      horas: w.consumoAcum == null ? '—' : `${w.consumoAcum.toFixed(1)}%`,
       reportado: w.reportado == null ? '—' : `${w.reportado.toFixed(1)}%`,
     })))
   }

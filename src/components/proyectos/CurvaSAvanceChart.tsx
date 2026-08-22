@@ -17,6 +17,7 @@ interface AvanceWeek {
   planificadoAcum: number | null
   realAcum: number | null
   reportado: number | null
+  consumoAcum: number | null
 }
 
 interface CurvaAvanceResponse {
@@ -35,6 +36,12 @@ interface CurvaAvanceResponse {
     tareasConHistorico: number
   }
   jornadasAbiertas: { id: string; fechaTrabajo: string; semanaIso: string }[]
+  consumo: {
+    tieneDatos: boolean
+    horasPresupuestadas: number
+    horasConsumidas: number
+    eficiencia: number | null
+  }
 }
 
 const pct = (n: number | null | undefined) => (n == null ? '—' : `${n.toFixed(1)}%`)
@@ -149,7 +156,8 @@ export function CurvaSAvanceChart({ proyectoId, refreshKey }: { proyectoId: stri
                       data.weeks.length > 30 ? (idx % 4 === 0 ? val : '') : val}
                   />
                   <YAxis
-                    domain={[0, 100]}
+                    // El consumo de horas puede superar el 100%: el eje crece con él.
+                    domain={[0, (dataMax: number) => Math.max(100, Math.ceil(dataMax / 10) * 10)]}
                     tickFormatter={(v: number) => `${v}%`}
                     width={48}
                     tick={{ fontSize: 11 }}
@@ -193,6 +201,17 @@ export function CurvaSAvanceChart({ proyectoId, refreshKey }: { proyectoId: stri
                     connectNulls={false}
                     isAnimationActive={false}
                   />
+                  {/* Consumo de horas: cuánto del presupuesto se gastó, no cuánto se avanzó */}
+                  <Line
+                    type="monotone"
+                    dataKey="consumoAcum"
+                    name="Horas consumidas"
+                    stroke="#C2410C"
+                    strokeWidth={2}
+                    strokeDasharray="2 3"
+                    dot={false}
+                    connectNulls
+                  />
                   {/* Meta 100% */}
                   <ReferenceLine
                     y={100}
@@ -216,6 +235,14 @@ export function CurvaSAvanceChart({ proyectoId, refreshKey }: { proyectoId: stri
               <SummaryCard icon={TrendingUp} iconColor="text-emerald-500" label="Real a la fecha" value={pct(refReal)} />
               <IndiceCard indice={indice} />
             </div>
+
+            {data.consumo.tieneDatos && data.consumo.eficiencia != null && (
+              <p className="text-xs text-muted-foreground">
+                Horas: {data.consumo.horasConsumidas.toLocaleString('es-PE')} de{' '}
+                {data.consumo.horasPresupuestadas.toLocaleString('es-PE')} presupuestadas ·
+                eficiencia {data.consumo.eficiencia.toFixed(2)} (avance por punto de horas gastado)
+              </p>
+            )}
           </>
         )}
 

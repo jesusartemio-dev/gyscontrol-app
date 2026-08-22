@@ -101,6 +101,17 @@ export function ProgresoHorasModal({ tarea, open, onClose, userId, onActualizado
   const [progresoEdit, setProgresoEdit] = useState(0)
   const [guardandoProgreso, setGuardandoProgreso] = useState(false)
   const [marcarCompletada, setMarcarCompletada] = useState(false)
+  // Fecha de efecto del avance: a qué día pertenece, no cuándo se teclea.
+  const [fechaAvance, setFechaAvance] = useState('')
+
+  const hoyStr = format(new Date(), 'yyyy-MM-dd')
+  // Último día en que ESTA persona imputó horas a la tarea: la mejor pista de cuándo
+  // ocurrió el avance que está por registrar.
+  const fechaSugerida = registros
+    .filter(r => r.usuarioId === userId)
+    .map(r => r.fecha.slice(0, 10))
+    .sort()
+    .pop() ?? null
 
   const esOwner = !!tarea && !!tarea.responsableId && tarea.responsableId === userId
   const sinRegistros = registros.length === 0
@@ -163,9 +174,16 @@ export function ProgresoHorasModal({ tarea, open, onClose, userId, onActualizado
       setHorasMes({})
       setFechaSeleccionada(hoy)
       setMesCalendario(hoy)
+      setFechaAvance(format(hoy, 'yyyy-MM-dd'))
       cargarHoras()
     }
   }, [open, tarea, cargarHoras])
+
+  // Cuando llegan los registros de horas, proponer su última fecha (el usuario puede
+  // cambiarla). Solo mientras siga en el default de hoy: no pisar una elección manual.
+  useEffect(() => {
+    if (fechaSugerida && fechaAvance === hoyStr) setFechaAvance(fechaSugerida)
+  }, [fechaSugerida, fechaAvance, hoyStr])
 
   // Cargar horas del mes cuando se abre el form o cambia el mes
   useEffect(() => {
@@ -191,13 +209,21 @@ export function ProgresoHorasModal({ tarea, open, onClose, userId, onActualizado
       } else {
         body.progreso = progresoEdit
       }
+      // Fecha de efecto: el backend la usa para colocar el avance en su semana.
+      if (fechaAvance) body.fechaAvance = fechaAvance
       const res = await fetch('/api/tareas/mis-asignadas', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       })
       if (!res.ok) throw new Error()
-      toast({ title: 'Avance actualizado', description: marcarCompletada ? 'Tarea marcada como completada' : `${progresoEdit}%` })
+      const cuando = fechaAvance && fechaAvance !== hoyStr
+        ? ` · registrado al ${format(new Date(`${fechaAvance}T12:00:00`), "d 'de' MMMM", { locale: es })}`
+        : ''
+      toast({
+        title: 'Avance actualizado',
+        description: (marcarCompletada ? 'Tarea marcada como completada' : `${progresoEdit}%`) + cuando,
+      })
       onActualizado()
       onClose()
     } catch {
@@ -564,6 +590,32 @@ export function ProgresoHorasModal({ tarea, open, onClose, userId, onActualizado
                   <CheckCircle className="h-3.5 w-3.5" />
                   Marcar como completada (100%)
                 </label>
+
+                {/* Fecha a la que pertenece el avance. Va prellenada con el último día en
+                    que esta persona imputó horas a la tarea: si actualizas el jueves lo que
+                    hiciste el martes, el avance debe contar en la semana del martes. */}
+                <div className="pt-2 border-t border-emerald-200/60 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="fecha-avance" className="text-xs text-emerald-900">
+                      ¿De qué día es este avance?
+                    </Label>
+                    <Input
+                      id="fecha-avance"
+                      type="date"
+                      max={format(new Date(), 'yyyy-MM-dd')}
+                      value={fechaAvance}
+                      onChange={e => setFechaAvance(e.target.value)}
+                      className="h-7 w-36 text-xs"
+                    />
+                  </div>
+                  <p className="text-[11px] text-emerald-800/80">
+                    {fechaSugerida && fechaAvance === fechaSugerida && fechaSugerida !== hoyStr
+                      ? `Sugerida: es el último día que registraste horas en esta tarea.`
+                      : fechaAvance === hoyStr
+                        ? 'Hoy. Cámbialo si el trabajo se hizo otro día.'
+                        : 'Determina en qué semana entra el avance en la curva S.'}
+                  </p>
+                </div>
               </div>
             ) : (
               <p className="text-xs text-gray-500">Solo el responsable puede modificar el avance.</p>
