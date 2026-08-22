@@ -455,6 +455,9 @@ export function JornadaActiva({
         proyectoEdtId={jornada.proyectoEdt?.id}
         fechaTrabajo={jornada.fechaTrabajo}
         personalPlanificado={jornada.personalPlanificado as PersonalPlanificado[]}
+        tareasYaAgregadasIds={jornada.tareas
+          .map(t => t.proyectoTarea?.id)
+          .filter((id): id is string => !!id)}
         onSuccess={onRefresh}
       />
 

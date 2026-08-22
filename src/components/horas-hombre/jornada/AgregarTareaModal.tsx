@@ -1,12 +1,17 @@
 'use client'
 
 /**
- * AgregarTareaModal - Modal para agregar una tarea a una jornada activa
+ * AgregarTareaModal - Modal para agregar tareas a una jornada activa
  *
  * Permite seleccionar:
  * - Actividad EDT (para filtrar tareas)
- * - Tarea del cronograma o tarea extra (existente o nueva)
+ * - Una o varias tareas del cronograma (lista con checkbox y % de avance), o
+ *   una tarea extra (existente o nueva)
  * - Miembros del equipo (horas se registran al cerrar la jornada)
+ *
+ * Las tareas del cronograma son multi-selección: el mismo grupo de miembros se
+ * agrega a cada tarea marcada. El API solo acepta una tarea por request, así que
+ * el envío es un POST por tarea, secuencial y con reporte de fallos parciales.
  */
 
 import React, { useState, useEffect } from 'react'
@@ -37,6 +42,9 @@ import { useToast } from '@/hooks/use-toast'
 interface TareaDelCronograma {
   id: string
   nombre: string
+  /** porcentajeCompletado de ProyectoTarea (el API lo expone como `progreso`) */
+  progreso?: number | null
+  estado?: string
 }
 
 interface Actividad {
@@ -72,6 +80,8 @@ interface AgregarTareaModalProps {
   proyectoEdtId?: string | null
   fechaTrabajo?: string
   personalPlanificado: PersonalPlanificado[]
+  /** IDs de ProyectoTarea que ya están en la jornada — se muestran deshabilitados */
+  tareasYaAgregadasIds?: string[]
   onSuccess: () => void
 }
 
@@ -83,6 +93,7 @@ export function AgregarTareaModal({
   proyectoEdtId,
   fechaTrabajo,
   personalPlanificado,
+  tareasYaAgregadasIds = [],
   onSuccess
 }: AgregarTareaModalProps) {
   const { toast } = useToast()
@@ -106,7 +117,8 @@ export function AgregarTareaModal({
   // Formulario
   const [tipoTarea, setTipoTarea] = useState<'cronograma' | 'extra'>('cronograma')
   const [actividadId, setActividadId] = useState('')
-  const [tareaId, setTareaId] = useState('')
+  // Multi-selección: el mismo equipo se agrega a todas las tareas marcadas
+  const [tareaIds, setTareaIds] = useState<string[]>([])
   // Extra: puede estar en modo "seleccionar existente" o "crear nueva"
   const [creandoNuevaExtra, setCreandoNuevaExtra] = useState(false)
   const [extraSeleccion, setExtraSeleccion] = useState('') // id del extra existente seleccionado
@@ -122,7 +134,7 @@ export function AgregarTareaModal({
     if (open) {
       setTipoTarea('cronograma')
       setActividadId('')
-      setTareaId('')
+      setTareaIds([])
       setCreandoNuevaExtra(false)
       setExtraSeleccion('')
       setNombreTareaExtra('')
@@ -157,8 +169,14 @@ export function AgregarTareaModal({
     } else {
       setTareas([])
     }
-    setTareaId('')
+    setTareaIds([])
   }, [actividadId, actividades])
+
+  // Si el EDT tiene una sola actividad, seleccionarla sola: la lista de tareas
+  // queda visible de entrada en vez de exigir un clic que no aporta nada.
+  useEffect(() => {
+    if (actividades.length === 1 && !actividadId) setActividadId(actividades[0].id)
+  }, [actividades, actividadId])
 
   const cargarActividades = async (edtId: string) => {
     if (!edtId) return
@@ -263,6 +281,18 @@ export function AgregarTareaModal({
     }
   }
 
+  // Tareas que todavía se pueden marcar (las ya agregadas a la jornada quedan fuera)
+  const tareasSeleccionables = tareas.filter(t => !tareasYaAgregadasIds.includes(t.id))
+  const todasMarcadas = tareasSeleccionables.length > 0 && tareaIds.length === tareasSeleccionables.length
+
+  const toggleTarea = (id: string) => {
+    setTareaIds(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id])
+  }
+
+  const toggleTodasLasTareas = () => {
+    setTareaIds(todasMarcadas ? [] : tareasSeleccionables.map(t => t.id))
+  }
+
   const toggleMiembro = (userId: string, nombre: string) => {
     setMiembrosSeleccionados(prev => {
       const existe = prev.find(m => m.usuarioId === userId)
@@ -282,13 +312,8 @@ export function AgregarTareaModal({
     )
   }
 
-  // Determinar qué se envía al API
-  const getSubmitPayload = () => {
-    if (tipoTarea === 'cronograma') {
-      // Si la jornada no tenía EDT, se manda el elegido para fijarlo en ella.
-      return { proyectoTareaId: tareaId, proyectoEdtId: proyectoEdtId ? undefined : (edtLocal || undefined) }
-    }
-    // Extra: crear nueva vs seleccionar existente
+  // Payload de la rama "extra" (la de cronograma se arma por tarea en handleSubmit)
+  const getExtraPayload = () => {
     if (creandoNuevaExtra) {
       const personas = miembrosSeleccionados.length || 1
       const horasPP = extraHorasPorPersona || undefined
@@ -309,10 +334,26 @@ export function AgregarTareaModal({
     return extraSeleccion.length > 0
   }
 
+  // Un POST por tarea (el API acepta una sola por request). Devuelve los IDs que
+  // fallaron para poder dejarlos marcados y no re-enviar los que sí entraron.
+  const enviarTarea = async (payload: Record<string, unknown>) => {
+    const response = await fetch(`/api/horas-hombre/jornada/${jornadaId}/agregar-tarea`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...payload,
+        miembros: miembrosSeleccionados.map(m => ({ usuarioId: m.usuarioId }))
+      })
+    })
+    const data = await response.json().catch(() => null)
+    if (!response.ok) throw new Error(data?.error || 'Error agregando tarea')
+    return data
+  }
+
   const handleSubmit = async () => {
     // Validaciones
-    if (tipoTarea === 'cronograma' && !tareaId) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Selecciona una tarea del cronograma' })
+    if (tipoTarea === 'cronograma' && tareaIds.length === 0) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Selecciona al menos una tarea del cronograma' })
       return
     }
     if (tipoTarea === 'extra' && !isExtraValid()) {
@@ -326,31 +367,50 @@ export function AgregarTareaModal({
 
     try {
       setSubmitting(true)
-      const payload = getSubmitPayload()
-      const response = await fetch(`/api/horas-hombre/jornada/${jornadaId}/agregar-tarea`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...payload,
-          miembros: miembrosSeleccionados.map(m => ({
-            usuarioId: m.usuarioId
-          }))
-        })
-      })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error agregando tarea')
+      if (tipoTarea === 'extra') {
+        const data = await enviarTarea(getExtraPayload())
+        toast({ title: 'Tarea agregada', description: data?.message })
+        onSuccess()
+        onOpenChange(false)
+        return
       }
 
-      toast({
-        title: 'Tarea agregada',
-        description: data.message
-      })
+      // Cronograma: secuencial para no competir por fijar el EDT de la jornada.
+      // Si la jornada no tenía EDT, se manda el elegido para fijarlo en ella.
+      const edtAFijar = proyectoEdtId ? undefined : (edtLocal || undefined)
+      const fallidas: string[] = []
+      let exitosas = 0
 
-      onSuccess()
-      onOpenChange(false)
+      for (const id of tareaIds) {
+        try {
+          await enviarTarea({ proyectoTareaId: id, proyectoEdtId: edtAFijar })
+          exitosas++
+        } catch (error) {
+          console.error(`Error agregando tarea ${id}:`, error)
+          fallidas.push(id)
+        }
+      }
+
+      if (exitosas > 0) onSuccess()
+
+      if (fallidas.length === 0) {
+        toast({
+          title: exitosas === 1 ? 'Tarea agregada' : `${exitosas} tareas agregadas`,
+          description: `${miembrosSeleccionados.length} miembro(s) por tarea`
+        })
+        onOpenChange(false)
+      } else {
+        // Deja marcadas solo las que fallaron: reintentar no duplica las que entraron.
+        setTareaIds(fallidas)
+        toast({
+          variant: 'destructive',
+          title: exitosas > 0 ? 'Algunas tareas no se agregaron' : 'No se pudo agregar',
+          description: `${fallidas.length} de ${exitosas + fallidas.length} fallaron: ${fallidas
+            .map(id => tareas.find(t => t.id === id)?.nombre || id)
+            .join(', ')}`
+        })
+      }
 
     } catch (error) {
       console.error('Error:', error)
@@ -364,14 +424,17 @@ export function AgregarTareaModal({
     }
   }
 
-  const tareaSeleccionada = tareas.find(t => t.id === tareaId)
   const extraExistenteSeleccionada = tareasExtra.find(t => t.id === extraSeleccion)
 
   // Nombre para el resumen
   const getNombreResumen = () => {
-    if (tipoTarea === 'cronograma' && tareaSeleccionada) return tareaSeleccionada.nombre
-    if (tipoTarea === 'extra' && extraExistenteSeleccionada) return extraExistenteSeleccionada.nombre
-    if (tipoTarea === 'extra' && nombreTareaExtra) return nombreTareaExtra
+    if (tipoTarea === 'cronograma') {
+      if (tareaIds.length === 0) return 'Selecciona una tarea'
+      if (tareaIds.length === 1) return tareas.find(t => t.id === tareaIds[0])?.nombre || '1 tarea'
+      return `${tareaIds.length} tareas seleccionadas`
+    }
+    if (extraExistenteSeleccionada) return extraExistenteSeleccionada.nombre
+    if (nombreTareaExtra) return nombreTareaExtra
     return 'Selecciona una tarea'
   }
 
@@ -441,38 +504,97 @@ export function AgregarTareaModal({
                       <SelectContent position="popper" className="max-h-[250px] max-w-[calc(100vw-4rem)]">
                         {actividades.map(a => (
                           <SelectItem key={a.id} value={a.id}>
-                            {a.nombre}
-                            {a.tareas.length === 0 && (
-                              <span className="text-gray-400 text-xs ml-1">(sin tareas disponibles)</span>
-                            )}
+                            <span className="flex items-center gap-1.5">
+                              <span>{a.nombre}</span>
+                              <span className={`text-[11px] shrink-0 px-1.5 py-0 rounded-full ${
+                                a.tareas.length === 0
+                                  ? 'bg-gray-100 text-gray-400'
+                                  : 'bg-blue-50 text-blue-600'
+                              }`}>
+                                {a.tareas.length === 0
+                                  ? 'sin tareas'
+                                  : `${a.tareas.length} ${a.tareas.length === 1 ? 'tarea' : 'tareas'}`}
+                              </span>
+                            </span>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {/* Tarea - inline */}
+                  {/* Tareas - lista visible con checkbox y % de avance.
+                      Antes era un segundo Select: al elegir actividad no se veía
+                      nada y parecía que no había tareas. */}
                   {actividadId && (
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
-                      <Label className="text-xs text-gray-600 shrink-0 sm:w-16">Tarea</Label>
-                      <Select value={tareaId} onValueChange={setTareaId} disabled={loading || tareas.length === 0}>
-                        <SelectTrigger className="h-auto min-h-8 py-1 !whitespace-normal [&_[data-slot=select-value]]:!line-clamp-2 text-sm flex-1">
-                          <SelectValue placeholder={tareas.length === 0 ? 'No hay tareas disponibles' : 'Seleccionar tarea'} />
-                        </SelectTrigger>
-                        <SelectContent position="popper" className="max-h-[250px] max-w-[calc(100vw-4rem)]">
-                          {tareas.length === 0 ? (
-                            <div className="px-2 py-2 text-xs text-gray-400 text-center">
-                              No hay tareas disponibles (completadas o al 100%)
-                            </div>
-                          ) : (
-                            tareas.map(t => (
-                              <SelectItem key={t.id} value={t.id}>
-                                {t.nombre}
-                              </SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-gray-600">
+                          Tareas ({tareaIds.length} de {tareasSeleccionables.length})
+                        </Label>
+                        {tareasSeleccionables.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={toggleTodasLasTareas}
+                            className="text-[11px] text-blue-600 hover:underline"
+                          >
+                            {todasMarcadas ? 'Ninguna' : 'Todas'}
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="border rounded-lg max-h-52 overflow-y-auto">
+                        {loading ? (
+                          <div className="p-3 flex items-center justify-center text-gray-400 text-xs gap-1.5">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Cargando tareas...
+                          </div>
+                        ) : tareas.length === 0 ? (
+                          <div className="p-3 text-center text-gray-500 text-xs">
+                            Esta actividad no tiene tareas pendientes (todas completadas). Usa &quot;Tarea extra&quot;.
+                          </div>
+                        ) : (
+                          <div className="divide-y">
+                            {tareas.map(t => {
+                              const yaAgregada = tareasYaAgregadasIds.includes(t.id)
+                              const pct = Math.max(0, Math.min(100, t.progreso ?? 0))
+                              return (
+                                <label
+                                  key={t.id}
+                                  className={`flex items-center gap-2.5 px-2.5 py-1.5 ${
+                                    yaAgregada ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer'
+                                  }`}
+                                >
+                                  <Checkbox
+                                    checked={tareaIds.includes(t.id)}
+                                    disabled={yaAgregada}
+                                    onCheckedChange={() => toggleTarea(t.id)}
+                                  />
+                                  <span className="flex-1 min-w-0 text-sm">{t.nombre}</span>
+                                  {yaAgregada ? (
+                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0">
+                                      Ya agregada
+                                    </Badge>
+                                  ) : (
+                                    <span className="flex items-center gap-1.5 shrink-0">
+                                      <span className="w-10 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                                        <span
+                                          className={`block h-full rounded-full ${
+                                            pct >= 100 ? 'bg-green-500' : pct > 0 ? 'bg-blue-500' : 'bg-gray-300'
+                                          }`}
+                                          style={{ width: `${pct}%` }}
+                                        />
+                                      </span>
+                                      <span className="text-[11px] tabular-nums w-9 text-right text-gray-500">
+                                        {pct}%
+                                      </span>
+                                    </span>
+                                  )}
+                                </label>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </>
@@ -662,8 +784,10 @@ export function AgregarTareaModal({
               <span className="text-xs text-blue-800 truncate mr-2">
                 {getNombreResumen()}
               </span>
-              <Badge variant="secondary" className="text-[11px] px-1.5 py-0">
-                {miembrosSeleccionados.length} pers.
+              <Badge variant="secondary" className="text-[11px] px-1.5 py-0 shrink-0">
+                {tipoTarea === 'cronograma' && tareaIds.length > 1
+                  ? `${tareaIds.length} × ${miembrosSeleccionados.length} pers.`
+                  : `${miembrosSeleccionados.length} pers.`}
               </Badge>
             </div>
           )}
@@ -684,7 +808,7 @@ export function AgregarTareaModal({
               disabled={
                 submitting ||
                 miembrosSeleccionados.length === 0 ||
-                (tipoTarea === 'cronograma' && !tareaId) ||
+                (tipoTarea === 'cronograma' && tareaIds.length === 0) ||
                 (tipoTarea === 'extra' && !isExtraValid())
               }
               className="flex-1 sm:flex-none"
@@ -697,7 +821,9 @@ export function AgregarTareaModal({
               ) : (
                 <>
                   <Plus className="h-4 w-4 mr-1.5" />
-                  Agregar
+                  {tipoTarea === 'cronograma' && tareaIds.length > 1
+                    ? `Agregar ${tareaIds.length} tareas`
+                    : 'Agregar'}
                 </>
               )}
             </Button>
