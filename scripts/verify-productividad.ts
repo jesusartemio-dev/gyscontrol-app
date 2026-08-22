@@ -68,7 +68,8 @@ async function main() {
     const fila: Record<string, unknown> = {
       persona: p.nombre.slice(0, 24),
       total: Math.round(t),
-      '% directo': t > 0 ? `${Math.round((p.directo / t) * 100)}%` : '—',
+      '% dir': t > 0 ? `${Math.round((p.directo / t) * 100)}%` : '—',
+      '% ind': t > 0 ? `${Math.round((p.indirecto / t) * 100)}%` : '—',
       'S/ directo': Math.round(p.cDirecto),
       'S/ indirecto': Math.round(p.cIndirecto),
     }

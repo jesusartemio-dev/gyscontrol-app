@@ -11,7 +11,8 @@ import {
 } from 'lucide-react'
 
 interface Destino {
-  codigo: string; nombre: string; esInterno: boolean; centroCosto: string | null; horas: number
+  codigo: string; nombre: string; esInterno: boolean; centroCosto: string | null
+  horas: number; porMes: number[]
 }
 interface Mes {
   mes: string; total: number; directo: number; indirecto: number; porcentajeDirecto: number | null
@@ -23,7 +24,12 @@ interface Persona {
   horasSinCosto: number
   costoHora: number
   costoNoConfigurado: boolean
+  cargo: string | null
+  activo: boolean | null
+  tieneFicha: boolean
+  tieneSueldo: boolean
   porcentajeDirecto: number | null
+  porcentajeIndirecto: number | null
   porMes: Mes[]
   destinos: Destino[]
 }
@@ -37,7 +43,12 @@ interface Respuesta {
     horasSinCosto: number
     personasSinCosto: number
     horasSinTarifa: number
+    sinCostoDetalle: {
+      nombre: string; cargo: string | null; activo: boolean | null
+      horas: number; tieneFicha: boolean
+    }[]
     porcentajeDirecto: number | null
+    porcentajeIndirecto: number | null
     porMes: Mes[]
   }
 }
@@ -176,7 +187,9 @@ export default function ProductividadPage() {
                     <TableRow>
                       <TableHead className="text-xs pl-4">Persona</TableHead>
                       <TableHead className="text-xs text-right w-20">Total</TableHead>
-                      <TableHead className="text-xs w-44">Directo / indirecto</TableHead>
+                      <TableHead className="text-xs w-40">Reparto</TableHead>
+                      <TableHead className="text-xs text-right w-20">% dir.</TableHead>
+                      <TableHead className="text-xs text-right w-20">% ind.</TableHead>
                       <TableHead className="text-xs text-right w-24">Costo dir.</TableHead>
                       <TableHead className="text-xs text-right w-24">Costo ind.</TableHead>
                       {data.meses.map((m) => (
@@ -201,15 +214,17 @@ export default function ProductividadPage() {
                         </TableCell>
                         <TableCell className="text-right py-2 font-mono tabular-nums">{h(p.horas.total)}</TableCell>
                         <TableCell className="py-2">
-                          <div className="flex items-center gap-2">
-                            <div className="h-2 flex-1 min-w-16 rounded-full overflow-hidden bg-red-200 flex">
-                              <div className={fondoDirecto(p.porcentajeDirecto)}
-                                style={{ width: `${p.porcentajeDirecto ?? 0}%` }} />
-                            </div>
-                            <span className={`font-mono tabular-nums w-9 text-right font-medium ${colorDirecto(p.porcentajeDirecto)}`}>
-                              {p.porcentajeDirecto == null ? '—' : `${p.porcentajeDirecto}%`}
-                            </span>
+                          <div className="h-2 rounded-full overflow-hidden bg-red-200 flex"
+                            title={`${h(p.horas.directo)} h directas · ${h(p.horas.indirecto)} h indirectas`}>
+                            <div className={fondoDirecto(p.porcentajeDirecto)}
+                              style={{ width: `${p.porcentajeDirecto ?? 0}%` }} />
                           </div>
+                        </TableCell>
+                        <TableCell className={`text-right py-2 font-mono tabular-nums font-medium ${colorDirecto(p.porcentajeDirecto)}`}>
+                          {p.porcentajeDirecto == null ? '—' : `${p.porcentajeDirecto}%`}
+                        </TableCell>
+                        <TableCell className="text-right py-2 font-mono tabular-nums text-red-600">
+                          {p.porcentajeIndirecto == null ? '—' : `${p.porcentajeIndirecto}%`}
                         </TableCell>
                         <TableCell className="text-right py-2 font-mono tabular-nums text-emerald-700">
                           {p.costoNoConfigurado
@@ -231,20 +246,52 @@ export default function ProductividadPage() {
                       </TableRow>,
                       ...(abierta === p.id ? [
                         <TableRow key={`${p.id}-detalle`} className="text-xs bg-muted/30">
-                          <TableCell colSpan={5 + data.meses.length} className="py-3 px-4">
-                            <p className="text-xs font-medium mb-2">A dónde fue su tiempo</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {p.destinos.map((d) => (
-                                <span
-                                  key={d.codigo}
-                                  title={d.esInterno ? `${d.nombre} · centro de costo ${d.centroCosto ?? '—'}` : d.nombre}
-                                  className={`inline-flex items-center gap-1.5 rounded px-2 py-1 ${
-                                    d.esInterno ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}`}
-                                >
-                                  <span className="font-mono font-medium">{d.codigo}</span>
-                                  <span className="tabular-nums opacity-80">{h(d.horas)} h</span>
-                                </span>
-                              ))}
+                          <TableCell colSpan={7 + data.meses.length} className="py-3 px-4">
+                            <p className="text-xs font-medium mb-2">
+                              A dónde fue su tiempo, mes a mes
+                            </p>
+                            <div className="overflow-x-auto">
+                              <table className="text-xs w-full">
+                                <thead>
+                                  <tr className="text-muted-foreground">
+                                    <th className="text-left font-medium pb-1 pr-3">Destino</th>
+                                    <th className="text-right font-medium pb-1 px-2">Total</th>
+                                    {data.meses.map((m) => (
+                                      <th key={m} className="text-right font-medium pb-1 px-2 w-14">
+                                        {etiquetaMes(m)}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {p.destinos.map((d) => (
+                                    <tr key={d.codigo} className="border-t border-border/50">
+                                      <td className="py-1 pr-3">
+                                        <span className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 ${
+                                          d.esInterno ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                          <span className="font-mono font-medium">{d.codigo}</span>
+                                          {d.esInterno && (
+                                            <span className="opacity-75">
+                                              {d.centroCosto ? `· ${d.centroCosto}` : '· interno'}
+                                            </span>
+                                          )}
+                                        </span>
+                                        <span className="block text-[10px] text-muted-foreground truncate max-w-[18rem] mt-0.5">
+                                          {d.nombre}
+                                        </span>
+                                      </td>
+                                      <td className="text-right py-1 px-2 font-mono tabular-nums font-medium">
+                                        {h(d.horas)}
+                                      </td>
+                                      {d.porMes.map((hh, i) => (
+                                        <td key={i} className="text-right py-1 px-2 font-mono tabular-nums text-muted-foreground">
+                                          {hh > 0 ? h(hh) : <span className="opacity-30">·</span>}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
                             </div>
                             {p.horasSinCosto > 0 && (
                               <p className="text-[11px] text-muted-foreground mt-2">
@@ -262,15 +309,16 @@ export default function ProductividadPage() {
                         {h(data.total.horas.total)}
                       </TableCell>
                       <TableCell className="py-2">
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 flex-1 min-w-16 rounded-full overflow-hidden bg-red-200 flex">
-                            <div className={fondoDirecto(data.total.porcentajeDirecto)}
-                              style={{ width: `${data.total.porcentajeDirecto ?? 0}%` }} />
-                          </div>
-                          <span className={`font-mono tabular-nums w-9 text-right font-medium ${colorDirecto(data.total.porcentajeDirecto)}`}>
-                            {data.total.porcentajeDirecto}%
-                          </span>
+                        <div className="h-2 rounded-full overflow-hidden bg-red-200 flex">
+                          <div className={fondoDirecto(data.total.porcentajeDirecto)}
+                            style={{ width: `${data.total.porcentajeDirecto ?? 0}%` }} />
                         </div>
+                      </TableCell>
+                      <TableCell className={`text-right py-2 font-mono tabular-nums font-medium ${colorDirecto(data.total.porcentajeDirecto)}`}>
+                        {data.total.porcentajeDirecto}%
+                      </TableCell>
+                      <TableCell className="text-right py-2 font-mono tabular-nums font-medium text-red-600">
+                        {data.total.porcentajeIndirecto}%
                       </TableCell>
                       <TableCell className="text-right py-2 font-mono tabular-nums font-medium text-emerald-700">
                         {soles(data.total.costo.directo)}
@@ -293,18 +341,44 @@ export default function ProductividadPage() {
           </Card>
 
           {data.total.personasSinCosto > 0 && (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-              <div>
-                <span className="font-medium">
-                  {data.total.personasSinCosto} persona{data.total.personasSinCosto === 1 ? '' : 's'} sin
-                  costo por hora configurado
-                </span>{' '}
-                ({h(data.total.horasSinTarifa)} h del periodo). Sus horas cuentan en el reparto
-                directo/indirecto, pero no en los importes: el total en soles es un piso. Se
-                configura en el maestro de personal.
-              </div>
-            </div>
+            <Card className="border-amber-200 bg-amber-50/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-amber-900">
+                  <AlertTriangle className="h-4 w-4" />
+                  Falta cargar el sueldo de {data.total.personasSinCosto} persona
+                  {data.total.personasSinCosto === 1 ? '' : 's'}
+                </CardTitle>
+                <p className="text-xs text-amber-900/80">
+                  Sus {h(data.total.horasSinTarifa)} h cuentan en el reparto directo/indirecto,
+                  pero no en los importes: el total en soles es un piso, no el gasto real. Se
+                  corrige cargando el sueldo en el maestro de personal.
+                </p>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="flex flex-wrap gap-2">
+                  {data.total.sinCostoDetalle.map((s) => (
+                    <span
+                      key={s.nombre}
+                      className={`inline-flex items-center gap-2 rounded border px-2 py-1 text-xs ${
+                        s.activo === false
+                          ? 'border-border bg-background text-muted-foreground'
+                          : 'border-amber-300 bg-white text-amber-900'
+                      }`}
+                    >
+                      <span className="font-medium">{s.nombre}</span>
+                      {s.cargo && <span className="opacity-70">{s.cargo}</span>}
+                      <span className="font-mono tabular-nums opacity-70">{h(s.horas)} h</span>
+                      {s.activo === false && <span className="opacity-60">· cesado</span>}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-[11px] text-amber-900/70 mt-2">
+                  Todas tienen ficha de empleado y cargo asignado: lo que falta es el sueldo. El
+                  sistema no distingue hoy al personal externo, así que si alguna de estas
+                  personas es subcontratada, no hay dónde registrarlo.
+                </p>
+              </CardContent>
+            </Card>
           )}
 
           {data.total.horasSinCosto > 0 && (

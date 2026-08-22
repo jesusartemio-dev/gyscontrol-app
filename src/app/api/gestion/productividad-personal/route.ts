@@ -49,6 +49,18 @@ export async function GET(req: NextRequest) {
 
     // Fuente principal: RegistroHoras (timesheet + jornadas de campo ya convertidas). Trae
     // costoHora, así que es la única que permite expresar el reparto en dinero.
+    // Ficha de empleado de quien registró horas: sirve para distinguir "a esta persona le
+    // falta cargar el sueldo" de "esta persona ya cesó". No hay campo de personal externo en
+    // el modelo, así que eso hoy no se puede diferenciar — todos los que no tienen costo son
+    // empleados con cargo y sin sueldo cargado.
+    const empleados = await prisma.empleado.findMany({
+      select: {
+        userId: true, activo: true, sueldoPlanilla: true, sueldoHonorarios: true,
+        cargo: { select: { nombre: true } },
+      },
+    })
+    const fichaPorUsuario = new Map(empleados.map((e) => [e.userId, e]))
+
     const registros = await prisma.registroHoras.findMany({
       where: { fechaTrabajo: { gte: desde } },
       select: {
@@ -93,7 +105,10 @@ export async function GET(req: NextRequest) {
     })
 
     interface Destino {
-      codigo: string; nombre: string; esInterno: boolean; centroCosto: string | null; horas: number
+      codigo: string; nombre: string; esInterno: boolean; centroCosto: string | null
+      horas: number
+      /** Horas de ese destino en cada mes del periodo. */
+      porMes: Map<string, number>
     }
     interface Persona {
       id: string; nombre: string; email: string | null
@@ -139,9 +154,10 @@ export async function GET(req: NextRequest) {
       if (proyecto) {
         const d = p.destinos.get(proyecto.id) ?? {
           codigo: proyecto.codigo, nombre: proyecto.nombre, esInterno: proyecto.esInterno,
-          centroCosto: proyecto.centroCosto?.nombre ?? null, horas: 0,
+          centroCosto: proyecto.centroCosto?.nombre ?? null, horas: 0, porMes: new Map(),
         }
         d.horas += horas
+        d.porMes.set(m, (d.porMes.get(m) ?? 0) + horas)
         p.destinos.set(proyecto.id, d)
       }
       gente.set(user.id, p)
@@ -171,9 +187,16 @@ export async function GET(req: NextRequest) {
           // Horas sin costoHora (jornadas sin convertir): el dinero las subestima.
           horasSinCosto: r1(p.sinCosto),
           costoHora: r1(p.costoHoraMax),
+          cargo: fichaPorUsuario.get(p.id)?.cargo?.nombre ?? null,
+          activo: fichaPorUsuario.get(p.id)?.activo ?? null,
+          tieneFicha: fichaPorUsuario.has(p.id),
+          tieneSueldo: Boolean(
+            fichaPorUsuario.get(p.id)?.sueldoPlanilla || fichaPorUsuario.get(p.id)?.sueldoHonorarios,
+          ),
           // Si ni el máximo llega al mínimo creíble, a esta persona no se le configuró tarifa.
           costoNoConfigurado: p.costoHoraMax < COSTO_HORA_MINIMO_CREIBLE,
           porcentajeDirecto: total > 0 ? Math.round((p.directo / total) * 100) : null,
+          porcentajeIndirecto: total > 0 ? Math.round((p.indirecto / total) * 100) : null,
           porMes: meses.map((m) => {
             const v = p.porMes.get(m) ?? { directo: 0, indirecto: 0 }
             const t = v.directo + v.indirecto
@@ -187,7 +210,11 @@ export async function GET(req: NextRequest) {
           }),
           destinos: [...p.destinos.values()]
             .sort((a, b) => b.horas - a.horas)
-            .map((d) => ({ ...d, horas: r1(d.horas) })),
+            .map((d) => ({
+              codigo: d.codigo, nombre: d.nombre, esInterno: d.esInterno,
+              centroCosto: d.centroCosto, horas: r1(d.horas),
+              porMes: meses.map((m) => r1(d.porMes.get(m) ?? 0)),
+            })),
         }
       })
       .sort((a, b) => b.horas.total - a.horas.total)
@@ -211,7 +238,15 @@ export async function GET(req: NextRequest) {
         horasSinCosto: sum((p) => p.horasSinCosto),
         personasSinCosto: personas.filter((p) => p.costoNoConfigurado).length,
         horasSinTarifa: sum((p) => (p.costoNoConfigurado ? p.horas.total : 0)),
+        // Quién exactamente, para poder ir a arreglarlo sin buscar.
+        sinCostoDetalle: personas
+          .filter((p) => p.costoNoConfigurado)
+          .map((p) => ({
+            nombre: p.nombre, cargo: p.cargo, activo: p.activo,
+            horas: p.horas.total, tieneFicha: p.tieneFicha,
+          })),
         porcentajeDirecto: tTotal > 0 ? Math.round((tDirecto / tTotal) * 100) : null,
+        porcentajeIndirecto: tTotal > 0 ? Math.round((tIndirecto / tTotal) * 100) : null,
         porMes: meses.map((m, i) => {
           const d = r1(personas.reduce((s, p) => s + p.porMes[i].directo, 0))
           const ind = r1(personas.reduce((s, p) => s + p.porMes[i].indirecto, 0))
