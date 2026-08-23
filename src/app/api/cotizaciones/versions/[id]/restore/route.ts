@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -41,7 +42,7 @@ export async function POST(
     // Permission check
     const userRole = (session.user as any).role
     const isOwner = version.cotizacion?.comercialId === session.user.id
-    const hasPermission = userRole === 'admin' || userRole === 'gerente' || isOwner
+    const hasPermission = tieneRol(session, ['admin', 'gerente']) || isOwner
 
     if (!hasPermission) {
       return NextResponse.json({ error: 'No tiene permisos' }, { status: 403 })

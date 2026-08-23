@@ -310,7 +310,10 @@ export interface User {
   email: string
   emailVerified?: string | null
   password: string
+  /** Rol principal. Para decidir permisos combina con `rolesExtra` — ver combinarRoles(). */
   role: RolUsuario
+  /** Roles adicionales al principal. */
+  rolesExtra?: RolUsuario[]
   image?: string | null
 
   // Relaciones

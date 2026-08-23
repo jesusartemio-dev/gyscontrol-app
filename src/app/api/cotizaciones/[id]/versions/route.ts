@@ -5,6 +5,7 @@
 // ✅ GET: Obtener versiones de una cotización
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -41,7 +42,7 @@ export async function GET(
     // Verificar permisos (usuario debe ser el comercial o admin)
     const userRole = session.user.role
     const isOwner = cotizacion.comercialId === session.user.id
-    const hasPermission = userRole === 'admin' || userRole === 'gerente' || isOwner
+    const hasPermission = tieneRol(session, ['admin', 'gerente']) || isOwner
 
     if (!hasPermission) {
       return NextResponse.json({ error: 'No tiene permisos para ver las versiones' }, { status: 403 })

@@ -5,6 +5,7 @@
 // ✅ POST: Importar tareas seleccionadas a una actividad
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -43,7 +44,7 @@ export async function POST(
 
     const userRole = session.user.role
     const isOwner = cotizacion.comercialId === session.user.id
-    const hasPermission = userRole === 'admin' || userRole === 'gerente' || userRole === 'comercial' || isOwner
+    const hasPermission = tieneRol(session, ['admin', 'gerente', 'comercial']) || isOwner
 
     if (!hasPermission) {
       return NextResponse.json({ error: 'No tiene permisos para modificar el cronograma' }, { status: 403 })
@@ -179,7 +180,7 @@ export async function GET(
 
     const userRole = session.user.role
     const isOwner = cotizacion.comercialId === session.user.id
-    const hasPermission = userRole === 'admin' || userRole === 'gerente' || userRole === 'comercial' || isOwner
+    const hasPermission = tieneRol(session, ['admin', 'gerente', 'comercial']) || isOwner
 
     if (!hasPermission) {
       return NextResponse.json({ error: 'No tiene permisos para ver el cronograma' }, { status: 403 })

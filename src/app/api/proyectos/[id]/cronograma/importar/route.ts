@@ -16,6 +16,7 @@
  * 7. Establecer dependencias básicas
  */
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -88,7 +89,7 @@ export async function POST(
     const userRole = session.user.role
     const isComercial = proyecto.comercialId === session.user.id
     const isGestor = proyecto.gestorId === session.user.id
-    const hasPermission = userRole === 'admin' || userRole === 'gerente' || isComercial || isGestor
+    const hasPermission = tieneRol(session, ['admin', 'gerente']) || isComercial || isGestor
 
     if (!hasPermission) {
       return NextResponse.json({ error: 'No tiene permisos para importar cronogramas' }, { status: 403 })

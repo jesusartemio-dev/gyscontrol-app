@@ -345,7 +345,7 @@ export async function DELETE(
     }
 
     // 🔐 Solo admin puede eliminar proyectos
-    if (session.user.role !== 'admin') {
+    if (!tieneRol(session, ['admin'])) {
       return NextResponse.json(
         { error: 'Sin permisos para eliminar proyectos' },
         { status: 403 }

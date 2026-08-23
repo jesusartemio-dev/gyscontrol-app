@@ -117,7 +117,7 @@ export function ProyectoCronogramaTab({
 
   const { toast } = useToast()
   const { data: session } = useSession()
-  const isAdmin = session?.user?.role === 'admin'
+  const isAdmin = tieneRol(session, ['admin'])
   const canManageLock = tieneRol(session, ['admin', 'gerente', 'gestor', 'coordinador'])
   const canDeleteBaseline = canManageLock
 

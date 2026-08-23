@@ -61,14 +61,14 @@ export async function GET(request: NextRequest) {
 
     if (!hasAccesoTotal) {
       // Comerciales solo ven sus proyectos
-      if (session.user.role === 'comercial') {
+      if (tieneRol(session, ['comercial'])) {
         where.comercialId = session.user.id
         logger.info('👤 API PROYECTOS-USUARIO: Usuario comercial, filtrando por comercialId', {
           comercialId: session.user.id
         })
       }
       // Gestores solo ven proyectos asignados
-      else if (session.user.role === 'gestor') {
+      else if (tieneRol(session, ['gestor'])) {
         where.gestorId = session.user.id
         logger.info('👤 API PROYECTOS-USUARIO: Usuario gestor, filtrando por gestorId', {
           gestorId: session.user.id

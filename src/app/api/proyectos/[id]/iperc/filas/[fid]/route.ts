@@ -1,3 +1,4 @@
+import { rolesDe } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -11,9 +12,7 @@ const ROLES_CON_ACCESO = ['admin', 'gerente', 'gestor', 'seguridad', 'comercial'
 async function verificarAccesoFila(
   proyectoId: string,
   filaId: string,
-  userId: string,
-  role: string
-) {
+  userId: string, roles: readonly string[]) {
   const proy = await prisma.proyecto.findUnique({
     where: { id: proyectoId },
     select: {
@@ -33,7 +32,7 @@ async function verificarAccesoFila(
     proy.liderId === userId ||
     proy.comercialId === userId
 
-  if (!ROLES_CON_ACCESO.includes(role) && !esAsignado) {
+  if (!roles.some(r => ROLES_CON_ACCESO.includes(r)) && !esAsignado) {
     return { ok: false as const, status: 403, error: 'Sin acceso a este proyecto' }
   }
 
@@ -51,7 +50,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   if (!session?.user?.id) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const { id: proyectoId, fid } = await params
-  const result = await verificarAccesoFila(proyectoId, fid, session.user.id, session.user.role)
+  const result = await verificarAccesoFila(proyectoId, fid, session.user.id, rolesDe(session))
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status })
 
   return NextResponse.json({ data: result.fila })
@@ -63,7 +62,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (!session?.user?.id) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const { id: proyectoId, fid } = await params
-  const result = await verificarAccesoFila(proyectoId, fid, session.user.id, session.user.role)
+  const result = await verificarAccesoFila(proyectoId, fid, session.user.id, rolesDe(session))
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status })
 
   const body = await req.json()
@@ -87,7 +86,7 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
   if (!session?.user?.id) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const { id: proyectoId, fid } = await params
-  const result = await verificarAccesoFila(proyectoId, fid, session.user.id, session.user.role)
+  const result = await verificarAccesoFila(proyectoId, fid, session.user.id, rolesDe(session))
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status })
 
   const { fila, ipercId } = result

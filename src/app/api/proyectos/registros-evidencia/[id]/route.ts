@@ -1,4 +1,4 @@
-import { tieneRol } from '@/lib/auth/roles'
+import { tieneRol, rolesDe } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -57,7 +57,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     if (
       !puedeEscribirEvidencia(
-        session.user.role,
+        rolesDe(session),
         existente.evidencia.jornada.estado,
         existente.evidencia.estado,
       )
@@ -132,7 +132,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     }
     if (
       !puedeEscribirEvidencia(
-        session.user.role,
+        rolesDe(session),
         existente.evidencia.jornada.estado,
         existente.evidencia.estado,
       )

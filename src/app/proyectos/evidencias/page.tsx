@@ -236,7 +236,7 @@ function EvidenciasAvanceListaContenido() {
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
   const { data: session } = useSession()
-  const esAdmin = session?.user?.role === 'admin'
+  const esAdmin = tieneRol(session, ['admin'])
   const isBypass = tieneRol(session, ['admin', 'gerente', 'gestor'])
   // `seguridad` entra en solo lectura: consulta el avance técnico para
   // contrastarlo con sus evidencias SSOMA, pero no abre ni captura evidencia.

@@ -5,6 +5,7 @@
 // ✅ POST: Crear cronograma comercial con EDTs y actividades desde servicios
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -61,7 +62,7 @@ export async function POST(
     // Verificar permisos
     const userRole = session.user.role
     const isOwner = proyecto.comercialId === session.user.id
-    const hasPermission = userRole === 'admin' || userRole === 'gerente' || userRole === 'comercial' || isOwner
+    const hasPermission = tieneRol(session, ['admin', 'gerente', 'comercial']) || isOwner
 
     if (!hasPermission) {
       return NextResponse.json({ error: 'No tiene permisos para crear cronograma' }, { status: 403 })

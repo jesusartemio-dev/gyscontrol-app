@@ -5,6 +5,7 @@
 // ✅ DELETE: Eliminar todas las fases, EDTs, actividades, tareas y dependencias
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -40,7 +41,7 @@ export async function DELETE(
     }
 
     const userRole = session.user.role
-    const hasPermission = userRole === 'admin' || userRole === 'gerente' || userRole === 'proyectos'
+    const hasPermission = tieneRol(session, ['admin', 'gerente', 'proyectos'])
 
     if (!hasPermission) {
       return NextResponse.json({ error: 'No tiene permisos para eliminar el cronograma' }, { status: 403 })

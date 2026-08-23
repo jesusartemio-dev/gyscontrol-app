@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { use, useState } from 'react'
 import Link from 'next/link'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -392,7 +393,7 @@ export default function EvidenciaSeguridadPage({
 
   const ev = query.data
   const role = session?.user?.role
-  const isBypass = role === 'admin' || role === 'gerente' || role === 'gestor'
+  const isBypass = tieneRol(session, ['admin', 'gerente', 'gestor'])
   const jornadaActiva = ['iniciado', 'pendiente'].includes(ev.jornada.estado)
   const evidenciaAbierta = ev.estado === 'abierta'
   const puedeEscribir = isBypass || (jornadaActiva && evidenciaAbierta)

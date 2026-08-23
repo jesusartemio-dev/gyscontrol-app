@@ -9,6 +9,7 @@
 
 'use client'
 
+import { combinarRoles } from '@/lib/auth/roles'
 import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -115,7 +116,7 @@ export function ProyectoEdtForm({
       if (usuariosResponse.ok) {
         const usuariosData = await usuariosResponse.json()
         const ROLES_RESPONSABLE = ['proyectos', 'seguridad', 'coordinador', 'gestor']
-        setUsuarios((usuariosData.data || []).filter((u: any) => ROLES_RESPONSABLE.includes(u.role)))
+        setUsuarios((usuariosData.data || []).filter((u: any) => combinarRoles(u.role, u.rolesExtra).some(r => ROLES_RESPONSABLE.includes(r))))
       }
     } catch (error) {
       console.error('Error cargando datos iniciales:', error)

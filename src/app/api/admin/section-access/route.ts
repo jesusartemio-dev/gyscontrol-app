@@ -4,6 +4,7 @@
 // PUT - Actualizar acceso individual
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -16,7 +17,7 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session || session.user.role !== 'admin') {
+    if (!session || !tieneRol(session, ['admin'])) {
       return NextResponse.json({ message: 'No autorizado' }, { status: 403 })
     }
 
@@ -33,7 +34,7 @@ export async function POST() {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session || session.user.role !== 'admin') {
+    if (!session || !tieneRol(session, ['admin'])) {
       return NextResponse.json({ message: 'No autorizado' }, { status: 403 })
     }
 
@@ -50,7 +51,7 @@ export async function PUT(request: Request) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session || session.user.role !== 'admin') {
+    if (!session || !tieneRol(session, ['admin'])) {
       return NextResponse.json({ message: 'No autorizado' }, { status: 403 })
     }
 

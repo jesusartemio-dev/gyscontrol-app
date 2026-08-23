@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -51,7 +52,7 @@ export async function GET(
 
     const userRole = session.user.role
     const isOwner = version.cotizacion?.comercialId === session.user.id
-    const hasPermission = userRole === 'admin' || userRole === 'gerente' || isOwner
+    const hasPermission = tieneRol(session, ['admin', 'gerente']) || isOwner
 
     if (!hasPermission) {
       return NextResponse.json({ error: 'No tiene permisos para ver esta versión' }, { status: 403 })
@@ -94,7 +95,7 @@ export async function PUT(
 
     const userRole = session.user.role
     const isOwner = versionExistente.cotizacion?.comercialId === session.user.id
-    const hasPermission = userRole === 'admin' || userRole === 'gerente' || isOwner
+    const hasPermission = tieneRol(session, ['admin', 'gerente']) || isOwner
 
     if (!hasPermission) {
       return NextResponse.json({ error: 'No tiene permisos para actualizar esta versión' }, { status: 403 })

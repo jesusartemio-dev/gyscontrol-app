@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     proyecto.supervisorId === userId ||
     proyecto.liderId === userId ||
     proyecto.comercialId === userId
-  if (!ROLES_CON_ACCESO.includes(role) && !esAsignado) {
+  if (!tieneRol(session, ROLES_CON_ACCESO) && !esAsignado) {
     return NextResponse.json({ error: 'Sin acceso a este proyecto' }, { status: 403 })
   }
 

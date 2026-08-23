@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import mammoth from 'mammoth'
@@ -62,7 +63,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     proyecto.supervisorId === userId ||
     proyecto.liderId === userId ||
     proyecto.comercialId === userId
-  if (!rolesConAccesoTotal.includes(role) && !esGestorODirectivo) {
+  if (!tieneRol(session, rolesConAccesoTotal) && !esGestorODirectivo) {
     return NextResponse.json({ error: 'Sin acceso a este proyecto' }, { status: 403 })
   }
 

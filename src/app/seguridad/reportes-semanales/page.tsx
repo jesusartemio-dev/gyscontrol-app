@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { useState } from 'react'
 import Link from 'next/link'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -37,7 +38,7 @@ const PAGE_SIZE = 20
 
 export default function ReportesSemanalesPage() {
   const { data: session } = useSession()
-  const esAdmin = session?.user?.role === 'admin'
+  const esAdmin = tieneRol(session, ['admin'])
   const queryClient = useQueryClient()
 
   const [filtroEstado, setFiltroEstado] = useState<string>('')

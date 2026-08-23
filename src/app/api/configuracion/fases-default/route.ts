@@ -5,6 +5,7 @@
 // ✅ GET: Retornar lista de fases por defecto
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -25,7 +26,7 @@ export async function GET(
 
     // Verificar permisos (solo usuarios autenticados pueden ver fases)
     const userRole = session.user.role
-    const hasPermission = userRole === 'admin' || userRole === 'gerente' || userRole === 'comercial'
+    const hasPermission = tieneRol(session, ['admin', 'gerente', 'comercial'])
 
     if (!hasPermission) {
       return NextResponse.json({ error: 'No tiene permisos para ver fases' }, { status: 403 })

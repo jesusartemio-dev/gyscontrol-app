@@ -15,6 +15,7 @@
  * 6. Crear actividades y tareas comerciales
  */
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -101,7 +102,7 @@ export async function POST(
     // Verificar permisos
     const userRole = session.user.role
     const isComercial = cotizacion.comercialId === session.user.id
-    const hasPermission = userRole === 'admin' || userRole === 'gerente' || isComercial
+    const hasPermission = tieneRol(session, ['admin', 'gerente']) || isComercial
 
     if (!hasPermission) {
       return NextResponse.json({ error: 'No tiene permisos para importar cronogramas' }, { status: 403 })

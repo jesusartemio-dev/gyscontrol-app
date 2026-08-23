@@ -1,4 +1,4 @@
-import { tieneRol } from '@/lib/auth/roles'
+import { tieneRol, rolesDe } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
     if (
       !puedeEscribirEvidencia(
-        session.user.role,
+        rolesDe(session),
         registro.evidencia.jornada.estado,
         registro.evidencia.estado,
       )

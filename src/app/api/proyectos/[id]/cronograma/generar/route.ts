@@ -5,6 +5,7 @@
 // ✅ POST: Generar estructura jerárquica (Fases > EDTs > Actividades > Tareas)
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -137,7 +138,7 @@ export async function POST(
 
     // Verificar permisos
     const userRole = session.user.role
-    const hasPermission = userRole === 'admin' || userRole === 'gerente' || userRole === 'proyectos'
+    const hasPermission = tieneRol(session, ['admin', 'gerente', 'proyectos'])
 
     if (!hasPermission) {
       return NextResponse.json({ error: 'No tiene permisos para generar cronograma' }, { status: 403 })

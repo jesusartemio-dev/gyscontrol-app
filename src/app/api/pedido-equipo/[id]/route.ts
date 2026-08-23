@@ -205,7 +205,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
       // Excepción: el área comercial puede aprobar (enviado → aprobado) los pedidos
       // que provienen de una venta de equipos, sin pasar por el área de proyectos.
       const comercialApruebaVenta =
-        userRole === 'comercial' &&
+        tieneRol(session, ['comercial']) &&
         !!pedidoActual.ventaEquipoId &&
         pedidoActual.estado === 'enviado' &&
         body.estado === 'aprobado'
@@ -334,7 +334,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     const esBorradorVentaComercial =
       permPedido.estado === 'borrador' &&
       !!permPedido.ventaEquipoId &&
-      (session.user.role === 'comercial' || permPedido.responsableId === session.user.id)
+      (tieneRol(session, ['comercial']) || permPedido.responsableId === session.user.id)
     if (!tieneRol(session, rolesPermitidos) && !esBorradorVentaComercial) {
       return NextResponse.json(
         { error: 'No tienes permiso para eliminar este pedido.' },

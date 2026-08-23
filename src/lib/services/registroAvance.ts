@@ -16,8 +16,8 @@ function finDelDia(fecha: Date): Date {
 
 export interface ListarJornadasActivasOpts {
   userId?: string
-  /** Rol global (enum Role). Decide el alcance: ROLES_BYPASS ven todo; el resto, solo asignados. */
-  role?: string
+  /** Roles efectivos del usuario. Decide el alcance: si alguno está en ROLES_BYPASS ve todo; el resto, solo asignados. */
+  roles?: readonly string[]
   soloAsignadas?: boolean
   fecha?: Date
   /** Si se pasan, filtra por rango (ignora `fecha`). Útil para backfill de reportes pasados. */
@@ -52,7 +52,7 @@ export async function listarJornadasActivasDelDia(opts: ListarJornadasActivasOpt
   }
 
   // --- Alcance por proyecto según rol ---
-  const isBypass = !!opts.role && (ROLES_BYPASS as readonly string[]).includes(opts.role)
+  const isBypass = !!opts.roles?.some(r => (ROLES_BYPASS as readonly string[]).includes(r))
 
   if (isBypass) {
     // admin/gerente/gestor: proyectoId libre; soloAsignadas (opcional) restringe a sus asignaciones.

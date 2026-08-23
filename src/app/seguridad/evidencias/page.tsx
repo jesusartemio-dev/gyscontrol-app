@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -220,7 +221,7 @@ export default function EvidenciasListaPage() {
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
   const { data: session } = useSession()
-  const esAdmin = session?.user?.role === 'admin'
+  const esAdmin = tieneRol(session, ['admin'])
 
   // Query params (de reporte semanal): proyectoId, semanaIso, tipo, reporteId
   const proyectoIdParam = searchParams.get('proyectoId') ?? ''

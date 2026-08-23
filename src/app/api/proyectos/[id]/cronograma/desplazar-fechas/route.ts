@@ -4,6 +4,7 @@
 // Cuando cambia fechaInicio, desplaza todas las fechas del cronograma
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -65,7 +66,7 @@ export async function POST(
     // Verificar permisos
     const userRole = session.user.role
     const isOwner = proyecto.gestorId === session.user.id || proyecto.comercialId === session.user.id
-    const hasPermission = userRole === 'admin' || userRole === 'gerente' || userRole === 'proyectos' || isOwner
+    const hasPermission = tieneRol(session, ['admin', 'gerente', 'proyectos']) || isOwner
 
     if (!hasPermission) {
       return NextResponse.json({ error: 'No tiene permisos' }, { status: 403 })

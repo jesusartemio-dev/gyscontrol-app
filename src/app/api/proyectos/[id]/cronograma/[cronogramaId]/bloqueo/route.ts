@@ -42,7 +42,7 @@ export async function PUT(
     const nuevoEstado = !cronograma.bloqueado
 
     // Desbloquear: solo admin | Bloquear: admin, gerente, gestor, coordinador
-    if (nuevoEstado === false && userRole !== 'admin') {
+    if (nuevoEstado === false && !tieneRol(session, ['admin'])) {
       return NextResponse.json(
         { error: 'Solo el administrador puede desbloquear cronogramas' },
         { status: 403 }

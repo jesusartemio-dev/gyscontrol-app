@@ -6,6 +6,7 @@
 
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -49,7 +50,7 @@ function LogisticaPedidosContent() {
   const router = useRouter()
   const { data: session } = useSession()
   const userRole = session?.user?.role || ''
-  const puedeEliminar = userRole !== 'logistico'
+  const puedeEliminar = !tieneRol(session, ['logistico'])
   const [pedidos, setPedidos] = useState<PedidoEquipo[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)

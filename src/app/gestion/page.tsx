@@ -1,4 +1,4 @@
-import { tieneRol } from '@/lib/auth/roles'
+import { tieneRol, rolesDe } from '@/lib/auth/roles'
 import { Suspense } from 'react'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -38,7 +38,7 @@ export default async function GestionPage() {
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       }>
-        <KpiDashboard userRole={userRole} />
+        <KpiDashboard userRoles={rolesDe(session)} />
       </Suspense>
     </div>
   )

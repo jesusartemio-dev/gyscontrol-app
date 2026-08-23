@@ -1,5 +1,6 @@
 'use client'
 
+import { combinarRoles } from '@/lib/auth/roles'
 import { normalizeStr } from '@/lib/utils'
 
 import React, { useState, useEffect } from 'react'
@@ -53,6 +54,7 @@ interface Usuario {
   name: string | null
   email: string
   role: string
+  rolesExtra?: string[]
 }
 
 interface PersonalPlanificado {
@@ -208,13 +210,17 @@ export function JornadaFormModal({
     }
   }
 
+/** Roles efectivos del usuario listado (principal + extra). */
+const rolesDeUsuario = (u: { role: string; rolesExtra?: string[] }) =>
+  combinarRoles(u.role, u.rolesExtra)
+
   const cargarUsuarios = async () => {
     try {
       const response = await fetch('/api/admin/usuarios')
       if (response.ok) {
         const data = await response.json()
         const usuariosFiltrados = data.filter((u: Usuario) =>
-          ROLES_PERMITIDOS.includes(u.role)
+          rolesDeUsuario(u).some(r => ROLES_PERMITIDOS.includes(r))
         )
         setUsuarios(usuariosFiltrados)
 
@@ -362,7 +368,7 @@ export function JornadaFormModal({
 
   const usuariosPorRol = filtroRol === 'todos'
     ? usuarios
-    : usuarios.filter(u => (rolesDelTab as readonly string[]).includes(u.role))
+    : usuarios.filter(u => rolesDeUsuario(u).some(r => (rolesDelTab as readonly string[]).includes(r)))
 
   const usuariosMostrados = usuariosPorRol.filter(u =>
     normalizeStr(u.name).includes(normalizeStr(busquedaPersonal)) ||
@@ -562,7 +568,7 @@ export function JornadaFormModal({
                     {tab.label}
                     {tab.key !== 'todos' && (
                       <span className="ml-0.5 opacity-70">
-                        {usuarios.filter(u => (tab.roles as readonly string[]).includes(u.role)).length}
+                        {usuarios.filter(u => rolesDeUsuario(u).some(r => (tab.roles as readonly string[]).includes(r))).length}
                       </span>
                     )}
                   </button>

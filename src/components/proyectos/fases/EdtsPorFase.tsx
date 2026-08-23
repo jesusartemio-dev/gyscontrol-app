@@ -1,5 +1,6 @@
 'use client'
 
+import { combinarRoles } from '@/lib/auth/roles'
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -75,7 +76,7 @@ export function EdtsPorFase({ fases, proyectoId, onRefresh }: EdtsPorFaseProps) 
       ])
       setEdtsCatalogo(categoriasData || [])
       const ROLES_RESPONSABLE = ['proyectos', 'seguridad', 'coordinador', 'gestor']
-      const filtrados = (usuariosData || []).filter((u: User) => ROLES_RESPONSABLE.includes(u.role))
+      const filtrados = (usuariosData || []).filter((u: User) => combinarRoles(u.role, u.rolesExtra).some(r => ROLES_RESPONSABLE.includes(r)))
       setUsuarios(filtrados)
     } catch (error) {
       console.error('Error al cargar datos adicionales:', error)

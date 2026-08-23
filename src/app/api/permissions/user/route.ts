@@ -1,4 +1,5 @@
 // API endpoint for getting user permissions
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth/next'
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId') || session.user.id
 
     // Only allow admins to view other users' permissions
-    if (userId !== session.user.id && session.user.role !== 'admin') {
+    if (userId !== session.user.id && !tieneRol(session, ['admin'])) {
       return NextResponse.json(
         { error: 'Forbidden: Can only view own permissions' },
         { status: 403 }

@@ -1,4 +1,4 @@
-import { tieneRol } from '@/lib/auth/roles'
+import { tieneRol, rolesDe } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
     const jornadas = await listarJornadasActivasDelDia({
       userId: session.user.id,
-      role: session.user.role,
+      roles: rolesDe(session),
       soloAsignadas,
       proyectoId,
       fechaDesde,

@@ -59,7 +59,7 @@ interface KpiData {
 }
 
 interface KpiDashboardProps {
-  userRole: string
+  userRoles: string[]
 }
 
 // Semaphore color helper
@@ -110,7 +110,7 @@ function InfoTooltip({ text }: { text: string }) {
   )
 }
 
-export function KpiDashboard({ userRole }: KpiDashboardProps) {
+export function KpiDashboard({ userRoles }: KpiDashboardProps) {
   const [data, setData] = useState<KpiData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -135,7 +135,7 @@ export function KpiDashboard({ userRole }: KpiDashboardProps) {
 
   // Load cartas fianza alerts for admin/gerente
   useEffect(() => {
-    if (!['admin', 'gerente', 'gestor'].includes(userRole)) return
+    if (!userRoles.some(r => ['admin', 'gerente', 'gestor'].includes(r))) return
     fetch('/api/cartas-fianza')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
@@ -144,7 +144,7 @@ export function KpiDashboard({ userRole }: KpiDashboardProps) {
         }
       })
       .catch(() => {})
-  }, [userRole])
+  }, [userRoles])
 
   if (loading && !data) {
     return (

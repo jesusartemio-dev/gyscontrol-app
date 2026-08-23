@@ -477,7 +477,7 @@ export default function EvidenciaAvancePage({
 
   const ev = query.data
   const role = session?.user?.role
-  const isBypass = role === 'admin' || role === 'gerente' || role === 'gestor'
+  const isBypass = tieneRol(session, ['admin', 'gerente', 'gestor'])
   const jornadaActiva = ['iniciado', 'pendiente'].includes(ev.jornada.estado)
   const evidenciaAbierta = ev.estado === 'abierta'
   // `seguridad` consulta pero no captura evidencia técnica: sin este filtro la

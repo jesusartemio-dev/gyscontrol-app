@@ -4,6 +4,7 @@
  * DELETE /api/horas-hombre/campo/[id] - Eliminar (solo si pendiente y es el supervisor)
  */
 
+import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -149,7 +150,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     // Solo el supervisor puede eliminar
-    if (registro.supervisorId !== session.user.id && session.user.role !== 'admin') {
+    if (registro.supervisorId !== session.user.id && !tieneRol(session, ['admin'])) {
       return NextResponse.json(
         { error: 'Solo el supervisor que creó el registro puede eliminarlo' },
         { status: 403 }

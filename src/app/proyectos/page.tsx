@@ -95,7 +95,7 @@ export default function ProyectosPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; proyecto?: Proyecto }>({ show: false })
   const { page, limit, handlePageChange, handleLimitChange, reset: resetPagination } = usePagination(1, 12)
 
-  const isAdmin = session?.user.role === 'admin'
+  const isAdmin = tieneRol(session, ['admin'])
 
   useEffect(() => {
     if (status === 'loading') return

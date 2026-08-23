@@ -1,4 +1,4 @@
-import { tieneRol } from '@/lib/auth/roles'
+import { tieneRol, rolesDe } from '@/lib/auth/roles'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -13,7 +13,10 @@ export const ROLES_CRONOGRAMA = ['admin', 'gerente', 'gestor', 'coordinador'] as
 interface ValidacionExitosa {
   ok: true
   userId: string
+  /** Rol principal. Para decidir permisos usa `roles`, no este campo. */
   role: string
+  /** Roles efectivos (principal + extra), para chequeos de permiso. */
+  roles: string[]
   cronogramaId: string
   cronogramaTipo: string
   proyectoId: string
@@ -87,6 +90,7 @@ export async function validarPermisoCronograma(
     ok: true,
     userId: session.user.id,
     role: session.user.role,
+    roles: rolesDe(session),
     cronogramaId: cronograma.id,
     cronogramaTipo: cronograma.tipo,
     proyectoId: cronograma.proyectoId,

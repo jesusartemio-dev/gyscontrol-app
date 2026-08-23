@@ -1,3 +1,4 @@
+import { rolesDe } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -15,7 +16,7 @@ const EVALUADORES_DEFAULT = [
   { nombre: 'Ing. Carlos Sihuayro Ancco',     cargo: 'Especialista SSOMA' },
 ]
 
-async function verificarAcceso(proyectoId: string, userId: string, role: string) {
+async function verificarAcceso(proyectoId: string, userId: string, roles: readonly string[]) {
   const proy = await prisma.proyecto.findUnique({
     where: { id: proyectoId },
     select: { gestorId: true, supervisorId: true, liderId: true, comercialId: true },
@@ -28,7 +29,7 @@ async function verificarAcceso(proyectoId: string, userId: string, role: string)
     proy.liderId === userId ||
     proy.comercialId === userId
 
-  if (!ROLES_CON_ACCESO.includes(role) && !esAsignado) {
+  if (!roles.some(r => ROLES_CON_ACCESO.includes(r)) && !esAsignado) {
     return { ok: false as const, status: 403, error: 'Sin acceso a este proyecto' }
   }
 
@@ -42,7 +43,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   if (!session?.user?.id) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const { id: proyectoId } = await params
-  const acceso = await verificarAcceso(proyectoId, session.user.id, session.user.role)
+  const acceso = await verificarAcceso(proyectoId, session.user.id, rolesDe(session))
   if (!acceso.ok) return NextResponse.json({ error: acceso.error }, { status: acceso.status })
 
   const iperc = await prisma.iperc.findUnique({
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   if (!session?.user?.id) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const { id: proyectoId } = await params
-  const acceso = await verificarAcceso(proyectoId, session.user.id, session.user.role)
+  const acceso = await verificarAcceso(proyectoId, session.user.id, rolesDe(session))
   if (!acceso.ok) return NextResponse.json({ error: acceso.error }, { status: acceso.status })
 
   const prereqs = await validarPreRequisitos(proyectoId)
@@ -110,7 +111,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (!session?.user?.id) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const { id: proyectoId } = await params
-  const acceso = await verificarAcceso(proyectoId, session.user.id, session.user.role)
+  const acceso = await verificarAcceso(proyectoId, session.user.id, rolesDe(session))
   if (!acceso.ok) return NextResponse.json({ error: acceso.error }, { status: acceso.status })
 
   const existing = await prisma.iperc.findUnique({ where: { proyectoId }, select: { id: true } })
@@ -144,7 +145,7 @@ export async function DELETE(_req: NextRequest, { params }: Ctx) {
   if (!session?.user?.id) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const { id: proyectoId } = await params
-  const acceso = await verificarAcceso(proyectoId, session.user.id, session.user.role)
+  const acceso = await verificarAcceso(proyectoId, session.user.id, rolesDe(session))
   if (!acceso.ok) return NextResponse.json({ error: acceso.error }, { status: acceso.status })
 
   const existing = await prisma.iperc.findUnique({ where: { proyectoId }, select: { id: true } })

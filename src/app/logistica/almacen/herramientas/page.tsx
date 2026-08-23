@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -79,7 +80,7 @@ const ESTADO_UNIDAD_COLORS: Record<string, string> = {
 export default function HerramientasPage() {
   const { data: session } = useSession()
   const role = session?.user?.role as string | undefined
-  const puedeBaja = role === 'admin' || role === 'gerente'
+  const puedeBaja = tieneRol(session, ['admin', 'gerente'])
 
   const [data, setData] = useState<Herramienta[]>([])
   const [loading, setLoading] = useState(false)

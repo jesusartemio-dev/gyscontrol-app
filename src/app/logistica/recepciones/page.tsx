@@ -738,7 +738,7 @@ export default function RecepcionesPage() {
                                 className: 'text-red-600',
                               })
                             }
-                            if (role === 'admin') {
+                            if (tieneRol(session, ['admin'])) {
                               items.push({
                                 label: 'Eliminar',
                                 icon: <Trash2 className="h-3.5 w-3.5" />,
@@ -774,7 +774,7 @@ export default function RecepcionesPage() {
                                 className: 'text-orange-600',
                               })
                             }
-                            if (role === 'admin') {
+                            if (tieneRol(session, ['admin'])) {
                               items.push({
                                 label: 'Eliminar',
                                 icon: <Trash2 className="h-3.5 w-3.5" />,
@@ -794,7 +794,7 @@ export default function RecepcionesPage() {
                                 className: 'text-amber-600',
                               })
                             }
-                            if (role === 'admin') {
+                            if (tieneRol(session, ['admin'])) {
                               items.push({
                                 label: 'Eliminar',
                                 icon: <Trash2 className="h-3.5 w-3.5" />,

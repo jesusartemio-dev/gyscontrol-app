@@ -1,4 +1,4 @@
-import { tieneRol } from '@/lib/auth/roles'
+import { tieneRol, rolesDe } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -39,7 +39,7 @@ export async function DELETE(
     }
     if (
       !puedeEscribirEvidencia(
-        session.user.role,
+        rolesDe(session),
         foto.registro.evidencia.jornada.estado,
         foto.registro.evidencia.estado,
       )

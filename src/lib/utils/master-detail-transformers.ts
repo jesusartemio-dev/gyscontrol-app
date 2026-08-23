@@ -208,14 +208,14 @@ export const transformItemToDetail = (item: ListaEquipoItem): ListaEquipoItemDet
  */
 export const calculateAvailableActions: ActionsCalculator = (
   lista: ListaEquipo,
-  userRole: string
+  userRoles: readonly string[]
 ): ListaEquipoActions => {
   const estado = lista.estado
-  const isAdmin = userRole === 'admin'
-  const isGerente = userRole === 'gerente'
-  const isGestor = userRole === 'gestor'
-  const isCoordinador = userRole === 'coordinador'
-  const isProyectos = userRole === 'proyectos'
+  const isAdmin = userRoles.includes('admin')
+  const isGerente = userRoles.includes('gerente')
+  const isGestor = userRoles.includes('gestor')
+  const isCoordinador = userRoles.includes('coordinador')
+  const isProyectos = userRoles.includes('proyectos')
   
   // 🔐 Permisos base por rol
   const canManage = isAdmin || isGerente || isGestor

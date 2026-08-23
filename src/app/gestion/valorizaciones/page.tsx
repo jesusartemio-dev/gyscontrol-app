@@ -1,5 +1,6 @@
 'use client'
 
+import { tieneRol } from '@/lib/auth/roles'
 import React, { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -115,7 +116,7 @@ export default function ValorizacionesPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const userRole = session?.user?.role ?? ''
-  const esAdmin = userRole === 'administracion'
+  const esAdmin = tieneRol(session, ['administracion'])
   const [items, setItems] = useState<Valorizacion[]>([])
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
   const [loading, setLoading] = useState(true)

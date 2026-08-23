@@ -5,6 +5,7 @@
 // GET: Obtener alertas activas de oportunidades
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     // Role-based filtering: comercial users can only see their own alerts
     const userRole = (session.user as any).role
-    if (userRole === 'comercial') {
+    if (tieneRol(session, ['comercial'])) {
       comercialId = session.user.id
     }
 

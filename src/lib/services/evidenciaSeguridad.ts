@@ -125,18 +125,18 @@ const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'seguridad'] as const
  * admin/gerente bypassan los locks (jornada cerrada, evidencia cerrada).
  */
 export function puedeEscribirEvidencia(
-  role: string | undefined,
+  roles: readonly string[] | undefined,
   jornadaEstado: string,
   evidenciaEstado: string,
 ): boolean {
-  if (!role) return false
-  if (!(ROLES_PERMITIDOS as readonly string[]).includes(role)) return false
-  if ((ROLES_EDICION_TOTAL as readonly string[]).includes(role)) return true
+  if (!roles || roles.length === 0) return false
+  if (!roles.some(r => (ROLES_PERMITIDOS as readonly string[]).includes(r))) return false
+  if (roles.some(r => (ROLES_EDICION_TOTAL as readonly string[]).includes(r))) return true
   // seguridad: requiere ambos estados activos
   return esJornadaActiva(jornadaEstado) && evidenciaEstado === 'abierta'
 }
 
-export function puedeLeerEvidencia(role: string | undefined): boolean {
-  if (!role) return false
-  return (ROLES_PERMITIDOS as readonly string[]).includes(role)
+export function puedeLeerEvidencia(roles: readonly string[] | undefined): boolean {
+  if (!roles || roles.length === 0) return false
+  return roles.some(r => (ROLES_PERMITIDOS as readonly string[]).includes(r))
 }

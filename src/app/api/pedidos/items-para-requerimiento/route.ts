@@ -1,3 +1,4 @@
+import { tieneRol } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -25,7 +26,7 @@ export async function GET(req: Request) {
 
     // Solo logística y coordinador_logístico pueden crear requerimientos de materiales
     const { role } = session.user
-    if (!['admin', 'gerente', 'logistico', 'coordinador_logistico'].includes(role)) {
+    if (!tieneRol(session, ['admin', 'gerente', 'logistico', 'coordinador_logistico'])) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
     }
 

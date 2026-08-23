@@ -18,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const reporte = await prisma.reporteSemanalSeguridad.findUnique({ where: { id } })
     if (!reporte) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
 
-    if (session.user.role === 'seguridad' && reporte.ingenieroId !== session.user.id)
+    if (tieneRol(session, ['seguridad']) && reporte.ingenieroId !== session.user.id)
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
     if (reporte.estado !== 'borrador' && reporte.estado !== 'rechazado')

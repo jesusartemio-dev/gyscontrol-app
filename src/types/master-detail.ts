@@ -315,4 +315,4 @@ export type StatsCalculator = (items: ListaEquipoItem[]) => ListaEquipoMaster['s
 /**
  * Función para determinar acciones disponibles
  */
-export type ActionsCalculator = (lista: ListaEquipo, userRole: string) => ListaEquipoActions
+export type ActionsCalculator = (lista: ListaEquipo, userRoles: readonly string[]) => ListaEquipoActions

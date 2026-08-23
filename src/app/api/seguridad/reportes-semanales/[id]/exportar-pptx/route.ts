@@ -23,7 +23,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!agregado) return NextResponse.json({ error: 'No encontrado' }, { status: 404 })
 
     if (
-      session.user.role === 'seguridad' &&
+      tieneRol(session, ['seguridad']) &&
       agregado.reporte.ingenieroId !== session.user.id
     ) {
       return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })

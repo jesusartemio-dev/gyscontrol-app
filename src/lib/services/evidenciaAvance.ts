@@ -131,18 +131,18 @@ export async function reabrirEvidencia(id: string) {
  * ROLES_BYPASS (admin/gerente/gestor) bypassan los locks (jornada/evidencia cerrada).
  */
 export function puedeEscribirEvidencia(
-  role: string | undefined,
+  roles: readonly string[] | undefined,
   jornadaEstado: string,
   evidenciaEstado: string,
 ): boolean {
-  if (!role) return false
-  if (!(ROLES_PERMITIDOS as readonly string[]).includes(role)) return false
-  if ((ROLES_BYPASS as readonly string[]).includes(role)) return true
+  if (!roles || roles.length === 0) return false
+  if (!roles.some(r => (ROLES_PERMITIDOS as readonly string[]).includes(r))) return false
+  if (roles.some(r => (ROLES_BYPASS as readonly string[]).includes(r))) return true
   // resto: requiere ambos estados activos
   return esJornadaActiva(jornadaEstado) && evidenciaEstado === 'abierta'
 }
 
-export function puedeLeerEvidencia(role: string | undefined): boolean {
-  if (!role) return false
-  return (ROLES_LECTURA as readonly string[]).includes(role)
+export function puedeLeerEvidencia(roles: readonly string[] | undefined): boolean {
+  if (!roles || roles.length === 0) return false
+  return roles.some(r => (ROLES_LECTURA as readonly string[]).includes(r))
 }

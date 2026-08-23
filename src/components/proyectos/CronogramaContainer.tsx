@@ -1,5 +1,6 @@
 'use client';
 
+import { combinarRoles } from '@/lib/auth/roles'
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -120,7 +121,7 @@ export function CronogramaContainer({ proyectoId, proyecto }: CronogramaContaine
       setComercialEdts(comercialEdtsData);
       setEdtsCatalogo(categoriasData);
       const ROLES_RESPONSABLE = ['proyectos', 'seguridad', 'coordinador', 'gestor']
-      setUsuarios((usuariosData || []).filter((u: User) => ROLES_RESPONSABLE.includes(u.role)));
+      setUsuarios((usuariosData || []).filter((u: User) => combinarRoles(u.role, u.rolesExtra).some(r => ROLES_RESPONSABLE.includes(r))));
 
       // Cargar analytics si hay EDT
       if (edtsData.length > 0) {

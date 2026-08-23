@@ -5,6 +5,7 @@
 // ✅ Corregido para evitar warning de "params should be awaited"
 // ===================================================
 
+import { tieneRol } from '@/lib/auth/roles'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
@@ -77,7 +78,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
     ) {
       const session = await getServerSession(authOptions)
       const role = (session?.user as any)?.role as string | undefined
-      if (role === 'admin' || role === 'gerente') {
+      if (tieneRol(session, ['admin', 'gerente'])) {
         await prisma.catalogoEquipo.update({
           where: { id: actualizado.catalogoEquipoId },
           data: { precioGerencia: data.precioGerencia }

@@ -73,7 +73,7 @@ export async function POST(
     }
 
     // Retroceder desde aprobada requiere rol admin
-    if (lista.estado === 'aprobada' && session.user.role !== 'admin') {
+    if (lista.estado === 'aprobada' && !tieneRol(session, ['admin'])) {
       return NextResponse.json({ error: 'Solo administradores pueden retroceder una lista aprobada' }, { status: 403 })
     }
 

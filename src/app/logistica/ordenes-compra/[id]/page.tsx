@@ -199,7 +199,7 @@ export default function OrdenCompraDetallePage({ params }: { params: Promise<{ i
   const esBorrador = oc?.estado === 'borrador'
   const esCancelada = oc?.estado === 'cancelada'
   const puedeEditarAdmin = tieneRol(session, ['admin', 'gerente', 'administracion'])
-  const puedeEditarFechaEmision = userRole === 'admin'
+  const puedeEditarFechaEmision = tieneRol(session, ['admin'])
   const puedeEditarAdministrativo = !!oc && !esBorrador && !esCancelada && puedeEditarAdmin
   const cxpConPagos = ((oc as any)?.cuentasPorPagar || []).some(
     (c: any) => c.saldoPendiente != null && c.saldoPendiente < c.monto

@@ -643,7 +643,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
   const canCerrar = hoja.estado === 'validado' && saldoCuadrado && tieneRol(session, ['admin', 'gerente', 'administracion'])
   const canRechazar = ['enviado', 'rendido', 'revisado', 'validado'].includes(hoja.estado) && tieneRol(session, ['admin', 'gerente', 'gestor', 'coordinador', 'administracion'])
   const canRetroceder = !['borrador', 'rechazado'].includes(hoja.estado) && tieneRol(session, ['admin', 'gerente', 'administracion'])
-  const canEliminar = hoja.estado === 'borrador' && role === 'admin'
+  const canEliminar = hoja.estado === 'borrador' && tieneRol(session, ['admin'])
   const canVolverABorrador = hoja.estado === 'rechazado' && (esEmpleado || tieneRol(session, ['admin', 'gerente', 'administracion']))
   const canEditInfo = ['borrador', 'rechazado'].includes(hoja.estado) && (esEmpleado || tieneRol(session, ['admin', 'gerente', 'administracion']))
   const anticipos = (hoja.depositos || []).filter((d: any) => d.tipo === 'anticipo' || (!d.tipo || d.tipo === null))

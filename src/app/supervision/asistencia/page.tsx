@@ -125,7 +125,7 @@ const STORAGE_KEY = 'gys_asistencia_filtros'
 
 export default function SupervisionAsistencia() {
   const { data: session } = useSession()
-  const esAdmin = session?.user?.role === 'admin' || session?.user?.role === 'gerente'
+  const esAdmin = tieneRol(session, ['admin', 'gerente'])
   const puedeSupervisarDispositivos = tieneRol(session, ROLES_SUPERVISION_DISPOSITIVOS)
 
   const [data, setData] = useState<Fila[]>([])

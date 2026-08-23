@@ -239,7 +239,7 @@ export async function DELETE(
     }
 
     const rolesPermitidosEliminar = ['admin', 'gestor', 'coordinador']
-    if (!rolesPermitidosEliminar.includes(permiso.role)) {
+    if (!permiso.roles.some(r => rolesPermitidosEliminar.includes(r))) {
       return NextResponse.json(
         { error: 'Solo administradores, gestores o coordinadores pueden eliminar tareas' },
         { status: 403 }
