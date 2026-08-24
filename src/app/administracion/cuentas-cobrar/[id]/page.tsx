@@ -136,6 +136,7 @@ const formatCurrency = (n: number, moneda: string) =>
   new Intl.NumberFormat('es-PE', { style: 'currency', currency: moneda }).format(n)
 
 const n = (v: string) => parseFloat(v) || 0
+const round2 = (v: number) => Math.round(v * 100) / 100
 
 /**
  * Señal de "lleva pendiente" para un cobro esperado. El excedente compara
@@ -279,6 +280,13 @@ export default function CxCDetallePage() {
   const [motivoRevertir, setMotivoRevertir] = useState('')
   const [savingRevertir, setSavingRevertir] = useState(false)
 
+  // Anular un PagoCobro individual (cobro, detracción o retención) registrado
+  // por error — mismo patrón de "anular con rastro" que revertirTarget arriba,
+  // pero para la tabla plana de Historial de Pagos (no factoring).
+  const [pagoAnulando, setPagoAnulando] = useState<PagoCobro | null>(null)
+  const [motivoAnularPago, setMotivoAnularPago] = useState('')
+  const [savingAnularPago, setSavingAnularPago] = useState(false)
+
   // ── Load ──────────────────────────────────────────────────────────────────
   // silent=true evita el spinner de pantalla completa (loading) — se usa al
   // refrescar después de una acción (pago, marcar recibido, revertir, etc.),
@@ -402,6 +410,39 @@ export default function CxCDetallePage() {
     base.setDate(base.getDate() + dias)
     setCobroFechaVencimiento(base.toISOString().split('T')[0])
     setFechaVencimientoEsSugerida(true)
+  }
+
+  // Llenar la hoja de liquidación con valores de ejemplo, editables antes de
+  // guardar — para pruebas rápidas (o como punto de partida de Administración
+  // mientras espera los datos reales de la financiera). Interés usa la
+  // fórmula real ya verificada; Comisión, Gastos, IGV Gastos y Adelanto NO
+  // tienen ninguna fórmula comprobada — son solo porcentajes de ejemplo
+  // razonables, nunca se presentan como un dato confirmado.
+  const handleLlenarEjemplo = () => {
+    const base = cxc?.monto ?? 0
+    const detPctV = n(cobroDetraccionPct)
+    const detMonto = n(cobroDetraccionMonto) || (base * detPctV / 100)
+    const valorNeto = base - detMonto
+    const excPctV = n(cobroExcedentePct)
+    const excMonto = n(cobroExcedenteMonto) || (valorNeto * excPctV / 100)
+    const aFinanciar = n(cobroValorAFinanciar) || (valorNeto - excMonto)
+
+    const tasa = n(cobroTasa)
+    const dias = parseInt(cobroDias) || 0
+    const interes = tasa > 0 && dias > 0 ? round2(aFinanciar * (tasa / 100 / 30) * dias) : 0
+    const comision = round2(aFinanciar * 0.01)   // 1% de ejemplo
+    const gastos = round2(aFinanciar * 0.005)    // 0.5% de ejemplo
+    const igv = round2(gastos * 0.18)            // 18% IGV Perú sobre los gastos
+    const totalCostos = interes + comision + gastos + igv
+    const aDesembolsar = aFinanciar - totalCostos
+    const adelanto = round2(aDesembolsar * 0.95) // 95% de ejemplo, el resto queda como saldo a girar
+
+    setCobroInteres(interes.toFixed(2))
+    setInteresEsSugerido(true)
+    setCobroComision(comision.toFixed(2))
+    setCobroGastos(gastos.toFixed(2))
+    setCobroIgvGastos(igv.toFixed(2))
+    setCobroAdelantoBanpro(adelanto.toFixed(2))
   }
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -555,6 +596,31 @@ export default function CxCDetallePage() {
       toast.error(e.message || 'Error al revertir')
     } finally {
       setSavingRevertir(false)
+    }
+  }
+
+  const abrirAnularPago = (pago: PagoCobro) => {
+    setPagoAnulando(pago)
+    setMotivoAnularPago('')
+  }
+
+  const handleConfirmarAnularPago = async () => {
+    if (!cxc || !pagoAnulando || motivoAnularPago.trim().length < 10) return
+    setSavingAnularPago(true)
+    try {
+      const res = await fetch(
+        `/api/administracion/cuentas-cobrar/${cxc.id}/pagos/${pagoAnulando.id}/anular`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ motivo: motivoAnularPago.trim() }) }
+      )
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
+      toast.success('Pago anulado — ya puedes registrar el correcto')
+      setPagoAnulando(null)
+      load(true)
+    } catch (e: any) {
+      toast.error(e.message || 'Error al anular el pago')
+    } finally {
+      setSavingAnularPago(false)
     }
   }
 
@@ -917,7 +983,17 @@ export default function CxCDetallePage() {
 
                         {/* Hoja de liquidación */}
                         <div className="border rounded-lg overflow-hidden">
-                          <div className="bg-gray-800 text-white text-xs px-3 py-2 font-semibold">Hoja de Liquidación</div>
+                          <div className="bg-gray-800 text-white text-xs px-3 py-2 font-semibold flex items-center justify-between">
+                            <span>Hoja de Liquidación</span>
+                            <button
+                              type="button"
+                              onClick={handleLlenarEjemplo}
+                              className="text-[11px] font-normal text-gray-300 hover:text-white underline underline-offset-2"
+                              title="Llena Comisión, Gastos, IGV Gastos y Adelanto con valores de ejemplo (editables) — Interés usa la fórmula real"
+                            >
+                              Llenar valores de ejemplo
+                            </button>
+                          </div>
                           <table className="w-full text-sm">
                             <tbody>
                               <tr className="border-b">
@@ -1202,6 +1278,7 @@ export default function CxCDetallePage() {
                       <TableHead>Medio</TableHead>
                       <TableHead>N° Operación</TableHead>
                       <TableHead className="text-right">Monto</TableHead>
+                      <TableHead className="w-10" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1230,6 +1307,18 @@ export default function CxCDetallePage() {
                         <TableCell className={`capitalize ${p.anulado ? 'line-through' : ''}`}>{p.medioPago}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{p.numeroOperacion || '—'}</TableCell>
                         <TableCell className={`text-right font-medium ${p.anulado ? 'line-through' : ''}`}>{formatCurrency(p.monto, cxc.moneda)}</TableCell>
+                        <TableCell>
+                          {!p.anulado && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => abrirAnularPago(p)}>
+                                  <Ban className="h-3.5 w-3.5 text-red-500" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Anular pago (se registró con error)</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1412,6 +1501,54 @@ export default function CxCDetallePage() {
             <Button variant="destructive" onClick={handleConfirmarRevertir} disabled={savingRevertir || motivoRevertir.trim().length < 10}>
               {savingRevertir && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {revertirTarget?.tipo === 'desembolso' ? 'Revertir desembolso' : 'Revertir pago'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog Anular Pago (fila de Historial de Pagos) ── */}
+      <Dialog open={!!pagoAnulando} onOpenChange={open => { if (!open) setPagoAnulando(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <AlertTriangle className="h-5 w-5" />
+              Anular pago
+            </DialogTitle>
+            <DialogDescription>Esta acción anula un movimiento ya registrado — no es parte del flujo normal.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {pagoAnulando && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 space-y-1">
+                <p className="text-xs font-semibold text-red-700 mb-1">Esto va a anular:</p>
+                <p className="text-sm">
+                  {pagoAnulando.esDetraccion ? `Detracción ${pagoAnulando.detraccionPorcentaje}%`
+                    : pagoAnulando.esRetencion ? `Retención ${pagoAnulando.retencionPorcentaje}%`
+                    : 'Cobro'}
+                  {' · '}{formatCurrency(pagoAnulando.monto, cxc.moneda)}{' · '}
+                  {formatDate(pagoAnulando.fechaPago)}
+                </p>
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground border-l-2 border-amber-300 pl-3">
+              El pago se anula (no se borra) y queda en el historial marcado como anulado, con el motivo que escribas abajo. El saldo pendiente de la CxC se recalcula al instante — después registra el pago correcto.
+            </p>
+
+            <div>
+              <Label>Motivo de la anulación * (mínimo 10 caracteres)</Label>
+              <Textarea value={motivoAnularPago} onChange={e => setMotivoAnularPago(e.target.value)} rows={2} placeholder="Ej: se registró el monto neto en vez del bruto" />
+              <p className={`text-xs mt-1 ${motivoAnularPago.trim().length >= 10 ? 'text-muted-foreground' : 'text-red-600'}`}>
+                {motivoAnularPago.trim().length}/10 caracteres mínimos
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPagoAnulando(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleConfirmarAnularPago} disabled={savingAnularPago || motivoAnularPago.trim().length < 10}>
+              {savingAnularPago && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Anular pago
             </Button>
           </DialogFooter>
         </DialogContent>
