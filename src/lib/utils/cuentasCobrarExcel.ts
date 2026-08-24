@@ -44,7 +44,7 @@ interface ProyectoRef {
 
 interface CxCExportRow {
   numeroDocumento: string | null
-  cliente?: { nombre: string; ruc: string | null }
+  cliente?: { nombre: string; ruc: string | null; diasPagoProgramados?: number[] | null }
   proyecto?: { codigo: string; nombre: string }
   monto: number
   moneda: string
@@ -74,6 +74,7 @@ interface CxCAdminPagoRow {
   retencionMonto?: number | null
   retencionNumeroConstancia?: string | null
   cuentaBancaria?: { nombreBanco: string; numeroCuenta: string } | null
+  anulado?: boolean
 }
 
 export interface CxCAdminExportRow extends CxCExportRow {
@@ -593,13 +594,11 @@ export async function exportarCxCFormatoAdmin(items: CxCAdminExportRow[]) {
     const fechaRecepcion = item.fechaRecepcion ? new Date(item.fechaRecepcion) : null
     const fechaVencimiento = item.fechaVencimiento ? new Date(item.fechaVencimiento) : null
 
-    // Fecha estimada de pago: prioriza fechaRecepcion + diasCredito (real); si no hay recepción, usa emisión
-    let fechaEstimada: Date | null = null
-    const baseEstimada = fechaRecepcion || fechaEmision
-    if (baseEstimada && item.diasCredito) {
-      fechaEstimada = new Date(baseEstimada)
-      fechaEstimada.setDate(fechaEstimada.getDate() + item.diasCredito)
-    }
+    // Fecha estimada de pago: prioriza fechaRecepcion + diasCredito (real); si no hay
+    // recepción, usa emisión; redondea al próximo día de pago fijo del cliente si aplica.
+    const fechaEstimada = calcularFechaEstimadaPagoDesde(
+      item.fechaRecepcion, item.fechaEmision, item.diasCredito, item.cliente?.diasPagoProgramados
+    )
 
     // Base Imponible / IGV (asume IGV 18% — Perú estándar)
     const IGV_RATE = 0.18
@@ -633,14 +632,14 @@ export async function exportarCxCFormatoAdmin(items: CxCAdminExportRow[]) {
     // Negociado: SI si bancoFinanciera o formaPago=factura_negociable
     const negociado = (item.bancoFinanciera || item.formaPago === 'factura_negociable') ? 'SI' : 'NO'
 
-    // Detracción: tomar la primera detracción registrada (esDetraccion=true)
-    const detraccion = item.pagos?.find(p => p.esDetraccion)
+    // Detracción: tomar la primera detracción registrada (esDetraccion=true), sin contar anuladas
+    const detraccion = item.pagos?.find(p => p.esDetraccion && !p.anulado)
 
-    // Retención: tomar la primera retención (esRetencion=true)
-    const retencion = item.pagos?.find(p => p.esRetencion)
+    // Retención: tomar la primera retención (esRetencion=true), sin contar anuladas
+    const retencion = item.pagos?.find(p => p.esRetencion && !p.anulado)
 
-    // Pagos comerciales (cobros netos, sin detracción ni retención)
-    const pagoCobro = item.pagos?.find(p => !p.esDetraccion && !p.esRetencion)
+    // Pagos comerciales (cobros netos, sin detracción ni retención, sin contar anulados)
+    const pagoCobro = item.pagos?.find(p => !p.esDetraccion && !p.esRetencion && !p.anulado)
 
     const row = ws.getRow(dataRow)
     row.getCell(1).value = i + 1                                                      // A
@@ -798,7 +797,7 @@ export interface CxCRichRow {
   numeroNegociacion?: string | null
   estado: string
   observaciones: string | null
-  cliente?: { nombre: string; ruc: string | null } | null
+  cliente?: { nombre: string; ruc: string | null; diasPagoProgramados?: number[] | null } | null
   proyecto?: { codigo: string; nombre: string } | null
   valorizacion?: {
     codigo: string
@@ -820,6 +819,7 @@ export interface CxCRichRow {
     retencionMonto?: number | null
     retencionNumeroConstancia?: string | null
     cuentaBancaria?: { nombreBanco: string; numeroCuenta: string } | null
+    anulado?: boolean
   }>
 }
 
@@ -834,31 +834,70 @@ export interface CxCRichRow {
  */
 export function calcularMontoNetoContable(cxc: CxCRichRow): number {
   const totalDetraccion = cxc.pagos
-    ?.filter(p => p.esDetraccion)
+    ?.filter(p => p.esDetraccion && !p.anulado)
     .reduce((s, p) => s + (p.detraccionMonto ?? p.monto), 0) ?? 0
   const totalRetencion = cxc.pagos
-    ?.filter(p => p.esRetencion)
+    ?.filter(p => p.esRetencion && !p.anulado)
     .reduce((s, p) => s + (p.retencionMonto ?? p.monto), 0) ?? 0
   return cxc.monto - totalDetraccion - totalRetencion
 }
 
 /** Fecha del último PagoCobro (pagos ya ordenados desc por fechaPago desde la API). */
 export function obtenerFechaUltimoPago(cxc: CxCRichRow): Date | null {
-  const pagosNetos = cxc.pagos?.filter(p => !p.esDetraccion && !p.esRetencion)
+  const pagosNetos = cxc.pagos?.filter(p => !p.esDetraccion && !p.esRetencion && !p.anulado)
   if (!pagosNetos?.length) return null
   const raw = pagosNetos[0].fechaPago
   const d = new Date(raw)
   return isNaN(d.getTime()) ? null : d
 }
 
-/** Fecha estimada de pago: base (recepción o emisión) + días crédito. */
-function calcularFechaEstimadaPago(cxc: CxCRichRow): Date | null {
-  const base = cxc.fechaRecepcion ?? cxc.fechaEmision
-  if (!base || !cxc.diasCredito) return null
+/**
+ * Redondea `fecha` hacia adelante al primer día del mes que aparezca en `diasPago`
+ * (ej. [7, 22]) — si ninguno de este mes alcanza, pasa al primero del mes siguiente.
+ * Clampea al último día del mes si el día programado no existe en ese mes (ej. 31 en febrero).
+ */
+function proximoDiaDePago(fecha: Date, diasPago: number[]): Date {
+  const dias = [...diasPago].sort((a, b) => a - b)
+  const year = fecha.getFullYear()
+  const month = fecha.getMonth()
+  const day = fecha.getDate()
+
+  const clamp = (y: number, m: number, d: number) => {
+    const ultimoDiaMes = new Date(y, m + 1, 0).getDate()
+    return new Date(y, m, Math.min(d, ultimoDiaMes))
+  }
+
+  const candidatoEsteMes = dias.find(d => d >= day)
+  if (candidatoEsteMes != null) return clamp(year, month, candidatoEsteMes)
+  return clamp(year, month + 1, dias[0])
+}
+
+/**
+ * Fecha estimada de pago: base (recepción o emisión) + días crédito, redondeada
+ * hacia adelante al próximo día de pago fijo del cliente si lo tiene configurado
+ * (ej. Nexa paga los 7 y 22 de cada mes — ver Cliente.diasPagoProgramados).
+ * Función pura (sin dependencias del DOM) para poder reutilizarla también en la
+ * pantalla de detalle de CxC.
+ */
+export function calcularFechaEstimadaPagoDesde(
+  fechaRecepcion: string | null | undefined,
+  fechaEmision: string | null | undefined,
+  diasCredito: number | null | undefined,
+  diasPagoProgramados?: number[] | null,
+): Date | null {
+  const base = fechaRecepcion ?? fechaEmision
+  if (!base || !diasCredito) return null
   const d = new Date(base)
   if (isNaN(d.getTime())) return null
-  d.setDate(d.getDate() + cxc.diasCredito)
+  d.setDate(d.getDate() + diasCredito)
+  if (diasPagoProgramados && diasPagoProgramados.length > 0) {
+    return proximoDiaDePago(d, diasPagoProgramados)
+  }
   return d
+}
+
+function calcularFechaEstimadaPago(cxc: CxCRichRow): Date | null {
+  return calcularFechaEstimadaPagoDesde(cxc.fechaRecepcion, cxc.fechaEmision, cxc.diasCredito, cxc.cliente?.diasPagoProgramados)
 }
 
 /** "Servicio" si hay HES, "Bien" si hay guía de remisión, "" si ninguno. */
@@ -902,7 +941,7 @@ function obtenerEntidadFinanciera(cxc: CxCRichRow): string {
  */
 export function calcularCobradoEfectivo(cxc: CxCRichRow): number {
   return cxc.pagos
-    ?.filter(p => !p.esDetraccion && !p.esRetencion)
+    ?.filter(p => !p.esDetraccion && !p.esRetencion && !p.anulado)
     .reduce((s, p) => s + p.monto, 0) ?? 0
 }
 
@@ -918,7 +957,7 @@ export function calcularCobradoEfectivo(cxc: CxCRichRow): number {
  * sin convertir (el valor vendrá en USD pero es lo mejor que podemos mostrar).
  */
 export function detraccionEnSoles(cxc: CxCRichRow): number | null {
-  const pago = cxc.pagos?.find(p => p.esDetraccion) ?? null
+  const pago = cxc.pagos?.find(p => p.esDetraccion && !p.anulado) ?? null
   if (!pago) return null
   const monto = pago.detraccionMonto ?? pago.monto
   // SUNAT RS 183-2004: depósito de detracciones siempre en enteros (sin decimales)
@@ -933,7 +972,7 @@ export function detraccionEnSoles(cxc: CxCRichRow): number | null {
  * Monto de RETENCIÓN convertido a soles (PEN). Mismo criterio que detraccionEnSoles.
  */
 export function retencionEnSoles(cxc: CxCRichRow): number | null {
-  const pago = cxc.pagos?.find(p => p.esRetencion) ?? null
+  const pago = cxc.pagos?.find(p => p.esRetencion && !p.anulado) ?? null
   if (!pago) return null
   const monto = pago.retencionMonto ?? pago.monto
   if (cxc.moneda === 'PEN') return monto
@@ -941,6 +980,56 @@ export function retencionEnSoles(cxc: CxCRichRow): number | null {
     return Math.round(monto * cxc.tipoCambio * 100) / 100
   }
   return monto // fallback: sin tipo de cambio disponible
+}
+
+/**
+ * Base Imponible / IGV a partir del monto total del comprobante.
+ * SUPUESTO: IGV 18% sobre el 100% del monto (mismo supuesto que exportarCxCFormatoAdmin).
+ * No aplica a facturas exoneradas, de exportación (0%) o con otra tasa — confirmar con
+ * Administración si hace falta un caso especial.
+ */
+export function calcularBaseImponibleIGV(monto: number, igvRate = 0.18): { baseImponible: number; igv: number } {
+  const baseImponible = monto / (1 + igvRate)
+  return { baseImponible, igv: monto - baseImponible }
+}
+
+/**
+ * Convierte `monto` de `monedaOrigen` a `monedaDestino` usando el TC SUNAT venta
+ * (USD->PEN) de la fecha de la factura. Si ya está en la moneda destino, lo
+ * devuelve tal cual (sin tocarlo) — así lo pidió Administración explícitamente
+ * para el caso "factura en soles, reporte en soles". Si falta la tasa (fecha sin
+ * cotización o falla la consulta), devuelve null — el llamador lo deja en blanco.
+ */
+export function convertirMonedaSunat(
+  monto: number,
+  monedaOrigen: string,
+  monedaDestino: 'USD' | 'PEN',
+  tasaVenta: number | null | undefined,
+): number | null {
+  if (monedaOrigen === monedaDestino) return monto
+  if (tasaVenta == null || tasaVenta <= 0) return null
+  if (monedaOrigen === 'PEN' && monedaDestino === 'USD') return monto / tasaVenta
+  if (monedaOrigen === 'USD' && monedaDestino === 'PEN') return monto * tasaVenta
+  return null // combinación de monedas no soportada (solo PEN/USD)
+}
+
+/**
+ * Detracción + Retención combinadas, en dólares.
+ *
+ * Solo se calcula para facturas en USD, donde el monto ya está guardado en la moneda
+ * de la factura (no hace falta convertir). Para facturas en PEN devuelve null —
+ * convertir a USD requiere un tipo de cambio confiable por factura, que hoy no está
+ * garantizado (ver detraccionEnSoles/retencionEnSoles); pendiente de definir con
+ * Administración antes de completar este caso.
+ */
+export function detraccionMasRetencionUSD(cxc: CxCRichRow): number | null {
+  const detraccion = cxc.pagos?.find(p => p.esDetraccion && !p.anulado) ?? null
+  const retencion  = cxc.pagos?.find(p => p.esRetencion && !p.anulado)  ?? null
+  if (!detraccion && !retencion) return null
+  if (cxc.moneda !== 'USD') return null // pendiente: definir TC con Administración
+  const detMonto = detraccion ? (detraccion.detraccionMonto ?? detraccion.monto) : 0
+  const retMonto = retencion  ? (retencion.retencionMonto  ?? retencion.monto)  : 0
+  return Math.round((detMonto + retMonto) * 100) / 100
 }
 
 // Constantes de estilo compartidas (misma paleta que exportarCxCFormatoAdmin)
@@ -999,72 +1088,90 @@ async function downloadBuffer(buffer: ArrayBuffer | Uint8Array, filename: string
 }
 
 // ============================================
-// EXPORTAR FORMATO CONTABLE (25 columnas, 2 filas de cabecera + hoja Detalle)
+// EXPORTAR FORMATO CONTABLE (27 columnas, 2 filas de cabecera + hoja Detalle)
 // ============================================
 /**
  * Genera el reporte Contable de CxC — libro con dos hojas:
  *
- * Hoja 1 "CxC Contable" (25 col):
- *   A–R: columnas individuales (merge vertical fila 1+2)
- *   S–U: Grupo Detracción (Nro. Constancia | Monto (S/) | Fecha)
- *   V–X: Grupo Retención  (Nro. Retención  | Monto (S/) | Fecha)
- *   Y:   Observaciones (merge vertical)
+ * Hoja 1 "CxC Contable" (27 col):
+ *   A–U: columnas individuales (merge vertical fila 1+2)
+ *   V–X: Grupo Detracción (Nro. Constancia | Monto (S/) | Fecha)
+ *   Y–AA: Grupo Retención  (Nro. Retención  | Monto (S/) | Fecha)
  *
+ *   • Base Imponible / IGV → calculados sobre Monto Factura (asume IGV 18%, ver calcularBaseImponibleIGV)
  *   • Monto Neto  = monto − detracción − retención (en moneda de factura)
  *   • Cobrado     = Σ PagoCobro sin detrac/retenc (efectivo recibido, moneda factura)
+ *   • Detracción/Retención (US$) → combinada, solo para facturas en USD (ver detraccionMasRetencionUSD)
  *   • Pagado      = montoPagado (total liquidado incl. detrac/retenc, moneda factura)
- *   • Detracción Monto / Retención Monto → siempre en soles (S/)
- *   • Totales: Monto Factura, Monto Neto, Cobrado, Pagado, Saldo
+ *   • Detracción Monto (S/) / Retención Monto (S/) → siempre en soles
+ *   • Totales: Base Imponible, IGV, Monto Factura, Monto Neto, Cobrado, Detracción/Retención (US$), Pagado, Saldo
  *
  * Hoja 2 "Detalle de Pagos": una fila por PagoCobro, ordenada N°Doc → FechaPago asc.
+ *
+ * `opciones.monedaReporte` ('USD' | 'PEN'): si se indica, Base Imponible/IGV/Monto
+ * Factura se muestran unificados en esa moneda (usando `opciones.tasasPorFecha`,
+ * tipo de cambio SUNAT venta indexado por fecha de emisión YYYY-MM-DD — ver
+ * /api/administracion/tipo-cambio-sunat). Sin este parámetro, el comportamiento
+ * es el de siempre (cada factura en su propia moneda, columna Moneda visible).
  */
-export async function exportarCxCContable(items: CxCRichRow[]): Promise<void> {
+export async function exportarCxCContable(
+  items: CxCRichRow[],
+  opciones?: { monedaReporte?: 'USD' | 'PEN'; tasasPorFecha?: Record<string, number | null> },
+): Promise<void> {
+  const monedaReporte = opciones?.monedaReporte
+  const tasasPorFecha = opciones?.tasasPorFecha ?? {}
   const ExcelJS = (await import('exceljs')).default
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('CxC Contable')
 
-  // ── Layout: 24 columnas ───────────────────────────────────────────────────────
+  // ── Layout: 27 columnas ───────────────────────────────────────────────────────
   // A(1)  N° Documento    B(2)  Cliente         C(3)  RUC
-  // D(4)  Proyecto        E(5)  Valorización     F(6)  Monto Factura
-  // G(7)  Moneda          H(8)  Monto Neto       I(9)  Cobrado
-  // J(10) Pagado          K(11) Saldo            L(12) Fecha Emisión
-  // M(13) Fecha Venc.     N(14) Fecha Est. Pago  O(15) Fecha de Pago
-  // P(16) Estado          Q(17) Descripción      R(18) Clasificación
-  // Grupo Detracción: S(19) Nro. Constancia | T(20) Monto (S/) | U(21) Fecha
-  // Grupo Retención:  V(22) Nro. Retención  | W(23) Monto (S/) | X(24) Fecha
+  // D(4)  Proyecto        E(5)  Valorización     F(6)  Base Imponible
+  // G(7)  IGV             H(8)  Monto Factura    I(9)  Moneda
+  // J(10) Monto Neto      K(11) Cobrado          L(12) Detracción/Retención (US$)
+  // M(13) Pagado          N(14) Saldo            O(15) Fecha Emisión
+  // P(16) Fecha Venc.     Q(17) Fecha Est. Pago  R(18) Fecha de Pago
+  // S(19) Estado          T(20) Descripción      U(21) Clasificación
+  // Grupo Detracción: V(22) Nro. Constancia | W(23) Monto (S/) | X(24) Fecha
+  // Grupo Retención:  Y(25) Nro. Retención  | Z(26) Monto (S/) | AA(27) Fecha
   const colWidths = [
     16, // A  N° Documento
     35, // B  Cliente
     14, // C  RUC
     14, // D  Proyecto
     16, // E  Valorización
-    14, // F  Monto Factura
-    8,  // G  Moneda
-    14, // H  Monto Neto
-    14, // I  Cobrado
-    14, // J  Pagado
-    14, // K  Saldo
-    12, // L  Fecha Emisión
-    12, // M  Fecha Vencimiento
-    14, // N  Fecha Estimada de Pago
-    12, // O  Fecha de Pago
-    12, // P  Estado
-    30, // Q  Descripción
-    12, // R  Clasificación
-    16, // S  Detracción – Nro. Constancia
-    14, // T  Detracción – Monto (S/)
-    12, // U  Detracción – Fecha
-    16, // V  Retención – Nro. Retención
-    14, // W  Retención – Monto (S/)
-    12, // X  Retención – Fecha
+    14, // F  Base Imponible
+    12, // G  IGV
+    14, // H  Monto Factura
+    8,  // I  Moneda
+    14, // J  Monto Neto
+    14, // K  Cobrado
+    18, // L  Detracción/Retención (US$)
+    14, // M  Pagado
+    14, // N  Saldo
+    12, // O  Fecha Emisión
+    12, // P  Fecha Vencimiento
+    14, // Q  Fecha Estimada de Pago
+    12, // R  Fecha de Pago
+    12, // S  Estado
+    30, // T  Descripción
+    12, // U  Clasificación
+    16, // V  Detracción – Nro. Constancia
+    14, // W  Detracción – Monto (S/)
+    12, // X  Detracción – Fecha
+    16, // Y  Retención – Nro. Retención
+    14, // Z  Retención – Monto (S/)
+    12, // AA Retención – Fecha
   ]
   ws.columns = colWidths.map(w => ({ width: w }))
 
   // ── Cabecera (2 filas) ────────────────────────────────────────────────────────
-  const SOLO_COLS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R']
+  const SOLO_COLS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U']
+  const sufijoMoneda = monedaReporte ? ` (${monedaReporte})` : ''
   const SOLO_HDRS = [
     'N° Documento','Cliente','RUC','Proyecto','Valorización',
-    'Monto\nFactura','Moneda','Monto\nNeto','Cobrado','Pagado','Saldo',
+    `Base\nImponible${sufijoMoneda}`, `IGV${sufijoMoneda}`, `Monto\nFactura${sufijoMoneda}`, 'Moneda','Monto\nNeto','Cobrado',
+    'Detracción/\nRetención (US$)','Pagado','Saldo',
     'Fecha\nEmisión','Fecha\nVencimiento','Fecha Estimada\nde Pago','Fecha\nde Pago',
     'Estado','Descripción','Clasificación',
   ]
@@ -1073,37 +1180,41 @@ export async function exportarCxCContable(items: CxCRichRow[]): Promise<void> {
     ws.mergeCells(`${SOLO_COLS[i]}1:${SOLO_COLS[i]}2`)
   }
 
-  ws.mergeCells('S1:U1'); ws.getCell('S1').value = 'Detracción'
-  ws.getCell('S2').value = 'Nro. Constancia'
-  ws.getCell('T2').value = 'Monto (S/)'
-  ws.getCell('U2').value = 'Fecha'
-
-  ws.mergeCells('V1:X1'); ws.getCell('V1').value = 'Retención'
-  ws.getCell('V2').value = 'Nro. Retención'
+  ws.mergeCells('V1:X1'); ws.getCell('V1').value = 'Detracción'
+  ws.getCell('V2').value = 'Nro. Constancia'
   ws.getCell('W2').value = 'Monto (S/)'
   ws.getCell('X2').value = 'Fecha'
 
-  applyHeaderStyle(ws, 2, ['S1', 'V1'])
+  ws.mergeCells('Y1:AA1'); ws.getCell('Y1').value = 'Retención'
+  ws.getCell('Y2').value = 'Nro. Retención'
+  ws.getCell('Z2').value = 'Monto (S/)'
+  ws.getCell('AA2').value = 'Fecha'
+
+  applyHeaderStyle(ws, 2, ['V1', 'Y1'])
   ws.getRow(1).height = 28
   ws.getRow(2).height = 22
 
   // ── Datos ─────────────────────────────────────────────────────────────────────
   const DATA_START = 3
+  let sinTasaCount = 0 // filas que necesitaban conversión y no encontraron TC SUNAT para su fecha
 
   // índices de columna para la fila de totales
-  const COL_MONTO   = 6  // F
-  const COL_NETO    = 8  // H
-  const COL_COBRADO = 9  // I
-  const COL_PAGADO  = 10 // J
-  const COL_SALDO   = 11 // K
+  const COL_BASE    = 6  // F
+  const COL_IGV     = 7  // G
+  const COL_MONTO   = 8  // H
+  const COL_NETO    = 10 // J
+  const COL_COBRADO = 11 // K
+  const COL_DETRET  = 12 // L
+  const COL_PAGADO  = 13 // M
+  const COL_SALDO   = 14 // N
 
   for (let i = 0; i < items.length; i++) {
     const cxc     = items[i]
     const rowNum  = DATA_START + i
     const row     = ws.getRow(rowNum)
 
-    const detraccion   = cxc.pagos?.find(p => p.esDetraccion) ?? null
-    const retencion    = cxc.pagos?.find(p => p.esRetencion)  ?? null
+    const detraccion   = cxc.pagos?.find(p => p.esDetraccion && !p.anulado) ?? null
+    const retencion    = cxc.pagos?.find(p => p.esRetencion && !p.anulado)  ?? null
     const fechaEmision = cxc.fechaEmision     ? new Date(cxc.fechaEmision)     : null
     const fechaVenc    = cxc.fechaVencimiento ? new Date(cxc.fechaVencimiento) : null
     const fechaEst     = calcularFechaEstimadaPago(cxc)
@@ -1113,12 +1224,26 @@ export async function exportarCxCContable(items: CxCRichRow[]): Promise<void> {
     const clasificac   = calcularClasificacion(cxc)
     const detSoles     = detraccionEnSoles(cxc)
     const retSoles     = retencionEnSoles(cxc)
+    const detRetUSD    = detraccionMasRetencionUSD(cxc)
+
+    // Monto Factura / Base Imponible / IGV: en moneda original salvo que se pida
+    // un reporte unificado (monedaReporte) — ahí se convierte con el TC SUNAT
+    // venta de la fecha de emisión; si no hay tasa disponible, queda en blanco.
+    const fechaEmisionKey = cxc.fechaEmision ? cxc.fechaEmision.slice(0, 10) : null
+    const montoFactura = monedaReporte
+      ? convertirMonedaSunat(cxc.monto, cxc.moneda, monedaReporte, fechaEmisionKey ? tasasPorFecha[fechaEmisionKey] : null)
+      : cxc.monto
+    const monedaMostrada = monedaReporte ?? cxc.moneda
+    const { baseImponible, igv } = montoFactura != null
+      ? calcularBaseImponibleIGV(montoFactura)
+      : { baseImponible: null, igv: null }
+    if (monedaReporte && cxc.moneda !== monedaReporte && montoFactura == null) sinTasaCount++
 
     // ── Validación de cuadre en moneda de factura ──────────────────────────────
     // montoNeto = monto − Σdetrac_fact − Σretenc_fact, por lo que la suma siempre
     // debería ser 0. Cualquier diferencia indica datos inconsistentes en BD.
-    const totalDetFact = cxc.pagos?.filter(p => p.esDetraccion).reduce((s, p) => s + (p.detraccionMonto ?? p.monto), 0) ?? 0
-    const totalRetFact = cxc.pagos?.filter(p => p.esRetencion).reduce((s, p) => s + (p.retencionMonto ?? p.monto), 0) ?? 0
+    const totalDetFact = cxc.pagos?.filter(p => p.esDetraccion && !p.anulado).reduce((s, p) => s + (p.detraccionMonto ?? p.monto), 0) ?? 0
+    const totalRetFact = cxc.pagos?.filter(p => p.esRetencion && !p.anulado).reduce((s, p) => s + (p.retencionMonto ?? p.monto), 0) ?? 0
     const cuadreDiff   = Math.abs(cxc.monto - (montoNeto + totalDetFact + totalRetFact))
     if (cuadreDiff >= 0.01) {
       console.warn(`[CxC Contable] Cuadre fallido para "${cxc.numeroDocumento ?? 'S/N'}": monto=${cxc.monto}, neto=${montoNeto}, detrac=${totalDetFact}, retenc=${totalRetFact}, diff=${cuadreDiff.toFixed(2)}`)
@@ -1130,27 +1255,30 @@ export async function exportarCxCContable(items: CxCRichRow[]): Promise<void> {
       [3,  cxc.cliente?.ruc ?? ''],
       [4,  cxc.proyecto?.codigo ?? ''],
       [5,  cxc.valorizacion?.codigo ?? ''],
-      [6,  cxc.monto,            FMT_MONEY],
-      [7,  cxc.moneda],
-      [8,  montoNeto,            FMT_MONEY],
-      [9,  cobrado,              FMT_MONEY],  // Cobrado: efectivo neto
-      [10, cxc.montoPagado,      FMT_MONEY],  // Pagado: total incl. detrac+retenc
-      [11, cxc.saldoPendiente,   FMT_MONEY],
-      [12, fechaEmision,         FMT_DATE],
-      [13, fechaVenc,            FMT_DATE],
-      [14, fechaEst,             FMT_DATE],
-      [15, fechaPago,            FMT_DATE],
-      [16, cxc.estado],
-      [17, cxc.descripcion ?? ''],
-      [18, clasificac],
+      [6,  baseImponible,        FMT_MONEY],
+      [7,  igv,                  FMT_MONEY],
+      [8,  montoFactura,         FMT_MONEY],
+      [9,  monedaMostrada],
+      [10, montoNeto,            FMT_MONEY],
+      [11, cobrado,              FMT_MONEY],  // Cobrado: efectivo neto
+      [12, detRetUSD,            FMT_MONEY],  // Detracción+Retención combinada (US$) — null si la factura es PEN
+      [13, cxc.montoPagado,      FMT_MONEY],  // Pagado: total incl. detrac+retenc
+      [14, cxc.saldoPendiente,   FMT_MONEY],
+      [15, fechaEmision,         FMT_DATE],
+      [16, fechaVenc,            FMT_DATE],
+      [17, fechaEst,             FMT_DATE],
+      [18, fechaPago,            FMT_DATE],
+      [19, cxc.estado],
+      [20, cxc.descripcion ?? ''],
+      [21, clasificac],
       // Detracción
-      [19, detraccion?.numeroConstanciaBN ?? ''],
-      [20, detSoles,             FMT_INT],    // SUNAT: detracción sin decimales (S/)
-      [21, detraccion?.detraccionFechaPago ? new Date(detraccion.detraccionFechaPago) : null, FMT_DATE],
+      [22, detraccion?.numeroConstanciaBN ?? ''],
+      [23, detSoles,             FMT_INT],    // SUNAT: detracción sin decimales (S/)
+      [24, detraccion?.detraccionFechaPago ? new Date(detraccion.detraccionFechaPago) : null, FMT_DATE],
       // Retención
-      [22, retencion?.retencionNumeroConstancia ?? ''],
-      [23, retSoles,             FMT_MONEY],  // Siempre en S/
-      [24, retencion?.fechaPago ? new Date(retencion.fechaPago) : null, FMT_DATE],
+      [25, retencion?.retencionNumeroConstancia ?? ''],
+      [26, retSoles,             FMT_MONEY],  // Siempre en S/
+      [27, retencion?.fechaPago ? new Date(retencion.fechaPago) : null, FMT_DATE],
     ]
 
     for (const [col, val, fmt] of cells) {
@@ -1160,7 +1288,7 @@ export async function exportarCxCContable(items: CxCRichRow[]): Promise<void> {
       setBorderData(cell)
     }
 
-    for (const col of [1, 2, 3, 4, 5, 7, 16, 17, 18, 19, 22]) {
+    for (const col of [1, 2, 3, 4, 5, 9, 19, 20, 21, 22, 25]) {
       row.getCell(col).alignment = ALIGN_LEFT
     }
   }
@@ -1174,12 +1302,17 @@ export async function exportarCxCContable(items: CxCRichRow[]): Promise<void> {
     tr.getCell(1).value = 'TOTALES'
     tr.getCell(1).font  = { bold: true }
 
-    tr.getCell(2).value = items.some(x => x.moneda !== items[0].moneda)
-      ? '⚠ Mix PEN/USD — totales brutos por columna'
-      : ''
+    const notas: string[] = []
+    if (monedaReporte) {
+      notas.push(`Base Imponible/IGV/Monto Factura unificados en ${monedaReporte} (TC SUNAT venta por fecha de emisión) — el resto de columnas de monto sigue en la moneda original de cada factura`)
+      if (sinTasaCount > 0) notas.push(`${sinTasaCount} factura(s) sin tipo de cambio disponible para su fecha — quedaron en blanco, excluidas del total`)
+    } else if (items.some(x => x.moneda !== items[0].moneda)) {
+      notas.push('⚠ Mix PEN/USD — totales brutos por columna')
+    }
+    tr.getCell(2).value = notas.join(' · ')
     tr.getCell(2).font = { italic: true, color: { argb: 'FF6B7280' }, size: 9 }
 
-    for (const col of [COL_MONTO, COL_NETO, COL_COBRADO, COL_PAGADO, COL_SALDO]) {
+    for (const col of [COL_BASE, COL_IGV, COL_MONTO, COL_NETO, COL_COBRADO, COL_DETRET, COL_PAGADO, COL_SALDO]) {
       const colLetter = ws.getColumn(col).letter
       const cell = tr.getCell(col)
       cell.value = { formula: `SUM(${colLetter}${DATA_START}:${colLetter}${lastData})` }
@@ -1190,7 +1323,7 @@ export async function exportarCxCContable(items: CxCRichRow[]): Promise<void> {
   }
 
   ws.views = [{ state: 'frozen', ySplit: 2 }]
-  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: 24 } }
+  ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: 27 } }
 
   // ── Hoja 2: Detalle de Pagos ─────────────────────────────────────────────────
   const wsDet = wb.addWorksheet('Detalle de Pagos')
@@ -1227,7 +1360,8 @@ export async function exportarCxCContable(items: CxCRichRow[]): Promise<void> {
   for (const cxc of items) {
     if (!cxc.pagos?.length) continue
     for (const p of cxc.pagos) {
-      const tipo = p.esDetraccion ? 'Detracción' : p.esRetencion ? 'Retención' : 'Efectivo'
+      const tipoBase = p.esDetraccion ? 'Detracción' : p.esRetencion ? 'Retención' : 'Efectivo'
+      const tipo = p.anulado ? `${tipoBase} (anulado)` : tipoBase
       const fechaPagoDate = p.fechaPago ? new Date(p.fechaPago) : null
       detalles.push({
         numeroDoc:    cxc.numeroDocumento ?? '',
@@ -1285,7 +1419,8 @@ export async function exportarCxCContable(items: CxCRichRow[]): Promise<void> {
   // ── Descarga ─────────────────────────────────────────────────────────────────
   const now     = new Date()
   const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
-  await downloadBuffer(await wb.xlsx.writeBuffer(), `CuentasPorCobrar_Contable_${dateStr}.xlsx`)
+  const sufijoArchivo = monedaReporte ? `_${monedaReporte}` : ''
+  await downloadBuffer(await wb.xlsx.writeBuffer(), `CuentasPorCobrar_Contable${sufijoArchivo}_${dateStr}.xlsx`)
 }
 
 // ============================================
@@ -1403,7 +1538,7 @@ export async function exportarCxCFinanciero(items: CxCRichRow[]): Promise<void> 
     const montoNeto       = calcularMontoNetoContable(cxc)
 
     // Banco desembolso = primer pago neto (cuentaBancaria) o vacío
-    const pagoNeto = cxc.pagos?.find(p => !p.esDetraccion && !p.esRetencion) ?? null
+    const pagoNeto = cxc.pagos?.find(p => !p.esDetraccion && !p.esRetencion && !p.anulado) ?? null
 
     // Tasa: almacenada como 1.38 (= 1.38%); para Excel % dividir /100
     const tasaPct = cobro?.tasaDescuentoPct != null ? cobro.tasaDescuentoPct / 100 : null

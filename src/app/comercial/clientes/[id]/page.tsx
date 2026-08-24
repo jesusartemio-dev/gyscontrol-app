@@ -672,6 +672,7 @@ export default function ClienteDetailPage() {
                 direccion: cliente.direccion,
                 telefono: cliente.telefono,
                 correo: cliente.correo,
+                diasPagoProgramados: cliente.diasPagoProgramados,
                 createdAt: cliente.createdAt,
                 updatedAt: cliente.updatedAt,
               } as Cliente}

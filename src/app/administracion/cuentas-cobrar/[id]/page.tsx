@@ -19,6 +19,7 @@ import toast from 'react-hot-toast'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { ESTADO_COBRO_FACTORING_LABEL, TIPO_EVENTO_FACTORING_LABEL } from '@/lib/utils/factoringEstado'
+import { calcularFechaEstimadaPagoDesde } from '@/lib/utils/cuentasCobrarExcel'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -115,7 +116,7 @@ interface CxCDetalle {
   estado: string
   observaciones: string | null
   proyecto: { id: string; codigo: string; nombre: string }
-  cliente: { id: string; nombre: string; ruc: string | null }
+  cliente: { id: string; nombre: string; ruc: string | null; diasPagoProgramados?: number[] | null }
   valorizacion: { id: string; codigo: string; numero: number; proyectoId: string; cobro: CobroValorizacion | null } | null
   pagos: PagoCobro[]
 }
@@ -829,12 +830,17 @@ export default function CxCDetallePage() {
               {labelRow('N° Guía Remisión', cxc.numeroGuiaRemision)}
               {labelRow('Descripción', cxc.descripcion)}
               {labelRow('Fecha Emisión', cxc.fechaEmision ? formatDate(cxc.fechaEmision) : null)}
-              {labelRow('Fecha Recepción', cxc.fechaRecepcion ? formatDate(cxc.fechaRecepcion) : null)}
               {labelRow('Fecha Vencimiento',
                 <span className={cxc.estado === 'vencida' ? 'text-red-600 font-semibold' : ''}>
                   {formatDate(cxc.fechaVencimiento)}
                 </span>
               )}
+              {(() => {
+                const fechaEstimada = calcularFechaEstimadaPagoDesde(
+                  cxc.fechaRecepcion, cxc.fechaEmision, cxc.diasCredito, cxc.cliente.diasPagoProgramados
+                )
+                return labelRow('Fecha Estimada de Pago', fechaEstimada ? formatDate(fechaEstimada.toISOString()) : null)
+              })()}
               {labelRow('Días Crédito', cxc.diasCredito != null ? `${cxc.diasCredito} días` : null)}
               {labelRow('Condición Pago', cxc.condicionPago)}
               {labelRow('Tipo Cambio', cxc.tipoCambio != null ? cxc.tipoCambio.toFixed(3) : null)}

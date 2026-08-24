@@ -369,6 +369,9 @@ export interface Cliente {
   direccion?: string
   telefono?: string
   correo?: string
+  // Días fijos del mes en que el cliente paga (ej. [7, 22] para Nexa). Vacío
+  // = sin calendario fijo — ver Cliente.diasPagoProgramados en el schema.
+  diasPagoProgramados?: number[]
   createdAt: string
   updatedAt: string
   cotizaciones?: Cotizacion[]

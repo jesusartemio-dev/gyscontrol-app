@@ -84,18 +84,21 @@ export default function ClienteModal({
     sector: '', tamanoEmpresa: '', sitioWeb: '', potencialAnual: 0,
     frecuenciaCompra: '', estadoRelacion: 'prospecto', calificacion: 3
   })
+  const [diasPagoStr, setDiasPagoStr] = useState('')
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (initial) {
       setFormData({ ...initial, codigo: initial.codigo || '', potencialAnual: initial.potencialAnual || 0, calificacion: initial.calificacion || 3 })
+      setDiasPagoStr(initial.diasPagoProgramados?.join(', ') ?? '')
     } else {
       setFormData({
         codigo: '', nombre: '', ruc: '', direccion: '', telefono: '', correo: '',
         sector: '', tamanoEmpresa: '', sitioWeb: '', potencialAnual: 0,
         frecuenciaCompra: '', estadoRelacion: 'prospecto', calificacion: 3
       })
+      setDiasPagoStr('')
     }
     setErrors({})
   }, [initial, isOpen])
@@ -129,6 +132,10 @@ export default function ClienteModal({
         frecuenciaCompra: formData.frecuenciaCompra || '',
         estadoRelacion: formData.estadoRelacion || 'prospecto',
         calificacion: formData.calificacion || 3,
+        diasPagoProgramados: diasPagoStr
+          .split(',')
+          .map(s => parseInt(s.trim(), 10))
+          .filter(n => !isNaN(n) && n >= 1 && n <= 31),
       }
 
       let clienteData: ClienteCRM
@@ -236,8 +243,8 @@ export default function ClienteModal({
               {/* spacer for alignment */}
             </div>
 
-            {/* Dirección full width */}
-            <div className="col-span-6">
+            {/* Dirección - 4 cols */}
+            <div className="col-span-4">
               <Field id="direccion" label="Dirección">
                 <Input
                   id="direccion"
@@ -245,6 +252,19 @@ export default function ClienteModal({
                   onChange={(e) => set('direccion', e.target.value)}
                   placeholder="Dirección del cliente"
                   className="h-8 text-sm"
+                />
+              </Field>
+            </div>
+            {/* Días de Pago Fijos - 2 cols */}
+            <div className="col-span-2">
+              <Field id="diasPago" label="Días de Pago Fijos">
+                <Input
+                  id="diasPago"
+                  value={diasPagoStr}
+                  onChange={(e) => setDiasPagoStr(e.target.value)}
+                  placeholder="Ej: 7, 22"
+                  className="h-8 text-sm"
+                  title="Días del mes en que el cliente paga habitualmente (ej. Nexa: 7 y 22). Se usa para la Fecha Estimada de Pago en Cuentas por Cobrar."
                 />
               </Field>
             </div>

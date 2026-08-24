@@ -18,7 +18,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       where: { id },
       include: {
         proyecto: { select: { id: true, codigo: true, nombre: true } },
-        cliente: { select: { id: true, nombre: true, ruc: true } },
+        cliente: { select: { id: true, nombre: true, ruc: true, diasPagoProgramados: true } },
         valorizacion: {
           select: {
             id: true, codigo: true, numero: true, proyectoId: true,

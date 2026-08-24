@@ -572,6 +572,35 @@ export default function CuentasCobrarPage() {
     setConfirmDialog({ tipo: 'anular', cuenta })
   }
 
+  // Exportar Contable unificado a una sola moneda: primero trae el TC SUNAT
+  // venta (Decolecta) de cada fecha de emisión distinta que lo necesite, luego
+  // genera el Excel con esas tasas ya resueltas (ver exportarCxCContable).
+  const handleExportarContableMoneda = async (moneda: 'USD' | 'PEN') => {
+    const fechas = [...new Set(
+      filtered.filter(c => c.moneda !== moneda).map(c => c.fechaEmision?.slice(0, 10)).filter(Boolean)
+    )] as string[]
+
+    let tasasPorFecha: Record<string, number | null> = {}
+    if (fechas.length > 0) {
+      const toastId = toast.loading(`Consultando tipo de cambio SUNAT (${fechas.length} fecha${fechas.length !== 1 ? 's' : ''})...`)
+      try {
+        const res = await fetch('/api/administracion/tipo-cambio-sunat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fechas }),
+        })
+        if (!res.ok) throw new Error('Error al consultar tipo de cambio')
+        tasasPorFecha = await res.json()
+        toast.dismiss(toastId)
+      } catch (e) {
+        toast.dismiss(toastId)
+        toast.error('No se pudo consultar el tipo de cambio SUNAT — las facturas sin conversión quedarán en blanco')
+      }
+    }
+
+    await exportarCxCContable(filtered, { monedaReporte: moneda, tasasPorFecha })
+  }
+
   const executeAnular = async (cuenta: CuentaPorCobrar) => {
     setSaving(true)
     try {
@@ -736,6 +765,12 @@ export default function CuentasCobrarPage() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => exportarCxCContable(filtered)}>
                 Formato contable
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportarContableMoneda('USD')}>
+                Formato contable — todo en USD
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportarContableMoneda('PEN')}>
+                Formato contable — todo en PEN
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => exportarCxCFinanciero(filtered)}>
                 Formato financiero

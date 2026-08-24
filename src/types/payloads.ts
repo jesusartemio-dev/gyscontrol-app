@@ -664,6 +664,7 @@ export interface ClientePayload {
   direccion?: string
   telefono?: string
   correo?: string
+  diasPagoProgramados?: number[]
 }
 export interface ClienteUpdatePayload extends Partial<ClientePayload> {}
 

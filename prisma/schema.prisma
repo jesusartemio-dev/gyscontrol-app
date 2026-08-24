@@ -207,6 +207,10 @@ model Cliente {
   calificacionSatisfaccion   Int?                   @default(3)
   frecuenciaCompraMeses      Int?
   logoUrl                    String?
+  /// Días fijos del mes en que el cliente paga (ej. [7, 22] para Nexa). Vacío
+  /// (default) = sin calendario fijo, "Fecha Estimada de Pago" de sus CxC no se
+  /// redondea a ningún día — ver calcularFechaEstimadaPagoDesde.
+  diasPagoProgramados        Int[]                  @default([])
   cotizacion                 Cotizacion[]
   proyecto                   Proyecto[]
   ventasEquipo               VentaEquipo[]

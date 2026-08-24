@@ -25,6 +25,53 @@ export interface ConsultaRucResult {
   alertaTipo: 'warning' | 'info' | null
 }
 
+// ── Tipo de cambio SUNAT (venta) vía Decolecta ──────────
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+/**
+ * Tipo de cambio SUNAT venta (USD -> PEN) para una fecha específica.
+ * `fecha` en formato YYYY-MM-DD. Devuelve null si falta el token, la fecha no
+ * tiene cotización publicada (ej. muy antigua) o falla la consulta — el
+ * llamador decide el fallback (ej. dejar la columna en blanco).
+ *
+ * Reintenta con backoff ante 429 (Decolecta tiene rate-limit estricto: pedir
+ * varias fechas en simultáneo hace fallar la mayoría con "Too Many Requests").
+ */
+export async function obtenerTipoCambioSunatVenta(fecha: string): Promise<number | null> {
+  const token = process.env.DECOLECTA_API_TOKEN
+  if (!token || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return null
+
+  const REINTENTOS = 3
+  for (let intento = 0; intento < REINTENTOS; intento++) {
+    try {
+      const res = await fetch(
+        `https://api.decolecta.com/v1/tipo-cambio/sunat?date=${fecha}`,
+        {
+          headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(8000),
+        }
+      )
+      if (res.status === 429) {
+        await sleep(500 * (intento + 1))
+        continue
+      }
+      if (!res.ok) {
+        console.warn(`Decolecta tipo-cambio error: HTTP ${res.status} for date ${fecha}`)
+        return null
+      }
+      const data = await res.json()
+      const venta = parseFloat(data.sell_price)
+      return isNaN(venta) ? null : venta
+    } catch (error) {
+      console.warn(`Decolecta tipo-cambio error for date ${fecha}:`, error instanceof Error ? error.message : error)
+      return null
+    }
+  }
+  console.warn(`Decolecta tipo-cambio: rate-limit persistente para date ${fecha}`)
+  return null
+}
+
 // ── Consulta SUNAT vía Decolecta (apis.net.pe) ─────────
 
 export async function consultarSunat(ruc: string): Promise<SunatResult> {

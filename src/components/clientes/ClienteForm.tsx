@@ -8,17 +8,18 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
-import { 
-  User, 
-  Building, 
-  MapPin, 
-  Phone, 
-  Mail, 
-  Save, 
-  X, 
+import {
+  User,
+  Building,
+  MapPin,
+  Phone,
+  Mail,
+  Save,
+  X,
   Loader2,
   FileText,
-  Hash
+  Hash,
+  CalendarClock
 } from 'lucide-react'
 import type { Cliente } from '@/types'
 import type { ClientePayload } from '@/types/payloads'
@@ -51,12 +52,14 @@ interface Props {
 
 export default function ClienteForm({ onSaved, initial, onCancel }: Props) {
   const [form, setForm] = useState<Partial<Cliente>>(initial || {})
+  const [diasPagoInput, setDiasPagoInput] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     setForm(initial || {})
+    setDiasPagoInput(initial?.diasPagoProgramados?.join(', ') ?? '')
     setFormErrors({})
     setError(null)
   }, [initial])
@@ -99,13 +102,20 @@ export default function ClienteForm({ onSaved, initial, onCancel }: Props) {
 
     setLoading(true)
 
+    const diasPagoProgramados = diasPagoInput
+      .split(',')
+      .map(s => parseInt(s.trim(), 10))
+      .filter(n => !isNaN(n) && n >= 1 && n <= 31)
+    const payload = { ...form, diasPagoProgramados }
+
     try {
       const cliente = form.id
-        ? await updateCliente(form.id, form)
-        : await createCliente(form as Omit<Cliente, 'id'>)
+        ? await updateCliente(form.id, payload)
+        : await createCliente(payload as Omit<Cliente, 'id'>)
       onSaved(cliente)
       if (!form.id) {
         setForm({})
+        setDiasPagoInput('')
       }
     } catch (err) {
       setError('Error al guardar el cliente')
@@ -253,6 +263,24 @@ export default function ClienteForm({ onSaved, initial, onCancel }: Props) {
         {formErrors.correo && (
           <p className="text-sm text-red-500">{formErrors.correo}</p>
         )}
+      </div>
+
+      {/* Días de Pago Fijos Field */}
+      <div className="space-y-2">
+        <Label htmlFor="diasPago" className="flex items-center gap-2">
+          <CalendarClock className="h-4 w-4" />
+          Días de Pago Fijos
+        </Label>
+        <Input
+          id="diasPago"
+          placeholder="Ej: 7, 22"
+          value={diasPagoInput}
+          onChange={(e) => setDiasPagoInput(e.target.value)}
+        />
+        <p className="text-sm text-gray-500">
+          Días del mes en que el cliente paga habitualmente (ej. Nexa: 7 y 22), separados por coma.
+          Se usa para calcular la &quot;Fecha Estimada de Pago&quot; en Cuentas por Cobrar. Déjalo vacío si no tiene un calendario fijo.
+        </p>
       </div>
 
       {/* Error Alert */}
