@@ -1087,7 +1087,6 @@ export default function CuentasPagarPage() {
                             condicionPago: cond,
                             formaPago: (oc as any).formaPago || '',
                             diasCredito: diasStr,
-                            descripcion: `OC ${oc.numero}`,
                             fechaVencimiento: calcularFechaVencimiento(fechaRec, cond, diasStr),
                           }))
                           cargarItemsOc(oc.id)
@@ -1472,7 +1471,6 @@ export default function CuentasPagarPage() {
                         condicionPago: cond,
                         formaPago: (oc as any).formaPago || '',
                         diasCredito: diasStr,
-                        descripcion: f.descripcion || `OC ${oc.numero}`,
                         fechaVencimiento: calcularFechaVencimiento(f.fechaRecepcion, cond, diasStr),
                       }))
                       cargarItemsOc(ocId)

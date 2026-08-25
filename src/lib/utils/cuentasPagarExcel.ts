@@ -462,8 +462,18 @@ const ESTADO_LABEL_CXP: Record<string, string> = {
   pendiente_documentos: 'Pend. Documentos',
 }
 
-function formaPagoLabel(formaPago?: string | null, diasCredito?: number | null): string {
-  if (!formaPago && !diasCredito) return ''
+/**
+ * "CONTADO" si la condición de pago es al contado (el medio con el que
+ * efectivamente se pagó, transferencia/efectivo/etc., no aplica acá).
+ * Si es a crédito, arma el texto completo "{MEDIO} {DÍAS} DÍAS" (ej.
+ * "FACTURA 30 DÍAS", "CHEQUE 30 DÍAS") — Administración lo pidió así
+ * explícitamente para poder identificar el medio y el plazo de un vistazo.
+ * Soporta tanto diasCredito explícito como el legacy "credito_NN" en condicionPago.
+ */
+function formaPagoLabel(condicionPago: string | null | undefined, formaPago?: string | null, diasCredito?: number | null): string {
+  if (condicionPago === 'contado') return 'CONTADO'
+  if (condicionPago === 'adelanto') return 'ADELANTO'
+
   const labels: Record<string, string> = {
     transferencia: 'Transferencia',
     cheque: 'Cheque',
@@ -472,11 +482,15 @@ function formaPagoLabel(formaPago?: string | null, diasCredito?: number | null):
     factura_negociable: 'Factura Negociable',
     otro: 'Otro',
   }
-  const fp = formaPago ? (labels[formaPago] || formaPago) : ''
-  if (fp && diasCredito) return `${fp} ${diasCredito} días`
+  const fp = formaPago ? (labels[formaPago] || formaPago).toUpperCase() : ''
+
+  const diasLegacy = condicionPago?.match(/^credito_(\d+)$/)?.[1]
+  const dias = diasCredito ?? (diasLegacy ? parseInt(diasLegacy, 10) : null)
+
+  if (fp && dias) return `${fp} ${dias} DÍAS`
   if (fp) return fp
-  if (diasCredito) return `${diasCredito} días`
-  return ''
+  if (dias) return `${dias} DÍAS`
+  return condicionPago ? condicionPago.toUpperCase() : ''
 }
 
 function centroCostoCxP(item: CxPAdminExportRow): string {
@@ -601,14 +615,15 @@ export async function exportarCxPFormatoAdmin(items: CxPAdminExportRow[]) {
     const detraccion        = (item.pagos ?? []).find(p => p.esDetraccion)
 
 
-    // T: Detracción pendiente
+    // T: Detracción pendiente — SUNAT RS 183-2004: depósito de detracciones
+    // siempre en soles enteros, sin decimales (mismo criterio que CxC).
     let detraccionPendiente: number | null = null
     if (item.detraccionPorcentaje && item.detraccionPorcentaje > 0) {
-      const esperada = Math.round(item.monto * item.detraccionPorcentaje / 100 * 100) / 100
+      const esperada = Math.round(item.monto * item.detraccionPorcentaje / 100)
       const pagada   = (item.pagos ?? [])
         .filter(p => p.esDetraccion)
         .reduce((sum, p) => sum + (p.detraccionMonto ?? p.monto ?? 0), 0)
-      detraccionPendiente = Math.max(0, Math.round((esperada - pagada) * 100) / 100)
+      detraccionPendiente = Math.max(0, Math.round(esperada - pagada))
     }
 
     // V: Monto detracción pagado en S/
@@ -637,7 +652,7 @@ export async function exportarCxPFormatoAdmin(items: CxPAdminExportRow[]) {
     row.getCell(11).value = item.moneda                                             // K
     row.getCell(12).value = ESTADO_LABEL_CXP[item.estado] ?? item.estado            // L
     row.getCell(13).value = item.registroContador ?? ''                             // M
-    row.getCell(14).value = formaPagoLabel(item.formaPago, item.diasCredito)        // N
+    row.getCell(14).value = formaPagoLabel(item.condicionPago, item.formaPago, item.diasCredito)  // N
     row.getCell(15).value = pagoNoDetraccion?.fechaPago ? new Date(pagoNoDetraccion.fechaPago) : null  // O
     row.getCell(16).value = item.numeroCheque ?? ''                                 // P
     row.getCell(17).value = item.numeroLetra ?? ''                                  // Q
@@ -687,14 +702,18 @@ export async function exportarCxPFormatoAdmin(items: CxPAdminExportRow[]) {
   }
 
   // ===== Formatos numéricos =====
+  // OJO: C/G/O/T son fechas; U/V son texto (Nro. Constancia / Observación) — no
+  // llevan formato de fecha ni de monto (antes estaban cruzados con T/U).
   const lastDataRow = dataRow - 1
   if (lastDataRow >= 2) {
-    for (const col of ['C', 'G', 'O', 'U']) {
+    for (const col of ['C', 'G', 'O', 'T']) {
       for (let r = 2; r <= lastDataRow; r++) ws.getCell(`${col}${r}`).numFmt = 'dd/mm/yyyy'
     }
-    for (const col of ['I', 'J', 'T', 'V']) {
+    for (const col of ['I', 'J']) {
       for (let r = 2; r <= lastDataRow; r++) ws.getCell(`${col}${r}`).numFmt = '#,##0.00'
     }
+    // S: Monto Detracción — SUNAT RS 183-2004, siempre entero (sin decimales)
+    for (let r = 2; r <= lastDataRow; r++) ws.getCell(`S${r}`).numFmt = '#,##0'
   }
 
   // Congelar bajo cabecera y autoFilter
