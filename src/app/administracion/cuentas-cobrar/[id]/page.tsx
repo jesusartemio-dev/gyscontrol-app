@@ -836,10 +836,21 @@ export default function CxCDetallePage() {
                 </span>
               )}
               {(() => {
+                const diasPago = cxc.cliente.diasPagoProgramados
                 const fechaEstimada = calcularFechaEstimadaPagoDesde(
-                  cxc.fechaRecepcion, cxc.fechaEmision, cxc.diasCredito, cxc.cliente.diasPagoProgramados
+                  cxc.fechaRecepcion, cxc.fechaEmision, cxc.diasCredito, diasPago
                 )
-                return labelRow('Fecha Estimada de Pago', fechaEstimada ? formatDate(fechaEstimada.toISOString()) : null)
+                if (!fechaEstimada) return labelRow('Fecha Estimada de Pago', null)
+                return labelRow('Fecha Estimada de Pago',
+                  <div>
+                    <div>{formatDate(fechaEstimada.toISOString())}</div>
+                    <div className="text-[11px] font-normal text-muted-foreground">
+                      {diasPago && diasPago.length > 0
+                        ? `Recepción + ${cxc.diasCredito}d, redondeado a días de pago de ${cxc.cliente.nombre}: ${diasPago.join(', ')}`
+                        : `${cxc.fechaRecepcion ? 'Recepción' : 'Emisión'} + ${cxc.diasCredito} días de crédito`}
+                    </div>
+                  </div>
+                )
               })()}
               {labelRow('Días Crédito', cxc.diasCredito != null ? `${cxc.diasCredito} días` : null)}
               {labelRow('Condición Pago', cxc.condicionPago)}
