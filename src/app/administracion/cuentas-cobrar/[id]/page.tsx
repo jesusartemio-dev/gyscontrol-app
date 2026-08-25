@@ -846,7 +846,7 @@ export default function CxCDetallePage() {
                     <div>{formatDate(fechaEstimada.toISOString())}</div>
                     <div className="text-[11px] font-normal text-muted-foreground">
                       {diasPago && diasPago.length > 0
-                        ? `Recepción + ${cxc.diasCredito}d, redondeado a días de pago de ${cxc.cliente.nombre}: ${diasPago.join(', ')}`
+                        ? `Recepción + ${cxc.diasCredito}d, redondeado a días de pago de ${cxc.cliente.nombre}: ${diasPago.join(', ')} (si cae fin de semana, pasa al siguiente día hábil)`
                         : `${cxc.fechaRecepcion ? 'Recepción' : 'Emisión'} + ${cxc.diasCredito} días de crédito`}
                     </div>
                   </div>

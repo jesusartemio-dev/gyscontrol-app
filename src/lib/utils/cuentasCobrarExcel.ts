@@ -856,6 +856,19 @@ export function obtenerFechaUltimoPago(cxc: CxCRichRow): Date | null {
  * (ej. [7, 22]) — si ninguno de este mes alcanza, pasa al primero del mes siguiente.
  * Clampea al último día del mes si el día programado no existe en ese mes (ej. 31 en febrero).
  */
+/**
+ * Si `fecha` cae sábado o domingo, la corre al lunes siguiente. No contempla
+ * feriados — solo fin de semana, que es lo que pidió Administración
+ * explícitamente (ej. el cliente paga el 7 y 22, pero si cae sábado/domingo
+ * el pago real se corre al día hábil siguiente).
+ */
+function siguienteDiaHabil(fecha: Date): Date {
+  const diaSemana = fecha.getDay() // 0 = domingo, 6 = sábado
+  if (diaSemana === 6) return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate() + 2)
+  if (diaSemana === 0) return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate() + 1)
+  return fecha
+}
+
 function proximoDiaDePago(fecha: Date, diasPago: number[]): Date {
   const dias = [...diasPago].sort((a, b) => a - b)
   const year = fecha.getFullYear()
@@ -868,14 +881,18 @@ function proximoDiaDePago(fecha: Date, diasPago: number[]): Date {
   }
 
   const candidatoEsteMes = dias.find(d => d >= day)
-  if (candidatoEsteMes != null) return clamp(year, month, candidatoEsteMes)
-  return clamp(year, month + 1, dias[0])
+  const resultado = candidatoEsteMes != null
+    ? clamp(year, month, candidatoEsteMes)
+    : clamp(year, month + 1, dias[0])
+  return siguienteDiaHabil(resultado)
 }
 
 /**
  * Fecha estimada de pago: base (recepción o emisión) + días crédito, redondeada
  * hacia adelante al próximo día de pago fijo del cliente si lo tiene configurado
- * (ej. Nexa paga los 7 y 22 de cada mes — ver Cliente.diasPagoProgramados).
+ * (ej. Nexa paga los 7 y 22 de cada mes — ver Cliente.diasPagoProgramados). Si
+ * ese día cae sábado o domingo, se corre al lunes siguiente (ver
+ * siguienteDiaHabil) — no contempla feriados.
  * Función pura (sin dependencias del DOM) para poder reutilizarla también en la
  * pantalla de detalle de CxC.
  */
