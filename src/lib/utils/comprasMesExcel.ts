@@ -12,6 +12,9 @@ export interface CxPRow {
   proyecto?: { codigo: string; nombre: string } | null
   estado: string
   observaciones?: string | null
+  // % de detracción SUNAT de esta factura (4, 10, 12...). Retención no aplica a
+  // CxP — confirmado con Administración.
+  detraccionPorcentaje?: number | null
 }
 
 export interface GastoRow {
@@ -111,7 +114,7 @@ export async function exportarComprasMes(
   const FONT_HEADER = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
   const FONT_NC     = { color: { argb: 'FFDC2626' } }
   const FONT_ANULADA = { color: { argb: 'FF9CA3AF' }, italic: true }
-  const NCOLS = 13
+  const NCOLS = 14
 
   ws.columns = [
     { width: 13 }, // A Fecha
@@ -124,9 +127,10 @@ export async function exportarComprasMes(
     { width: 14 }, // H Base Imponible (S/)
     { width: 12 }, // I IGV (S/)
     { width: 14 }, // J Monto (S/)
-    { width: 10 }, // K Moneda
-    { width: 18 }, // L Estado
-    { width: 12 }, // M Origen
+    { width: 13 }, // K Detracción (S/)
+    { width: 10 }, // L Moneda
+    { width: 18 }, // M Estado
+    { width: 12 }, // N Origen
   ]
 
   // Título
@@ -137,7 +141,7 @@ export async function exportarComprasMes(
   titleCell.alignment = { horizontal: 'center' }
 
   // Cabecera
-  const headers = ['Fecha', 'Tipo Documento', 'N° Comprobante', 'Proveedor / Empleado', 'RUC', 'Descripción', 'Proyecto', 'Base Imponible (S/)', 'IGV (S/)', 'Monto (S/)', 'Moneda', 'Estado', 'Origen']
+  const headers = ['Fecha', 'Tipo Documento', 'N° Comprobante', 'Proveedor / Empleado', 'RUC', 'Descripción', 'Proyecto', 'Base Imponible (S/)', 'IGV (S/)', 'Monto (S/)', 'Detracción (S/)', 'Moneda', 'Estado', 'Origen']
   headers.forEach((h, i) => {
     const cell = ws.getCell(2, i + 1)
     cell.value = h
@@ -152,6 +156,7 @@ export async function exportarComprasMes(
   let totalPEN = 0
   let totalUSD = 0
   let totalEUR = 0
+  let totalDetraccion = 0
   let sinTcCount = 0
 
   // Separador sección facturas
@@ -180,6 +185,13 @@ export async function exportarComprasMes(
 
     const { baseImponible, igv } = calcularBaseImponibleIGV(montoFinal)
 
+    // Detracción: SUNAT RS 183-2004, siempre entero (sin decimales). Solo CxP —
+    // no aplica a Gastos Operativos ni Retención (confirmado con Administración).
+    const detraccionMonto = (item.detraccionPorcentaje && item.detraccionPorcentaje > 0)
+      ? Math.round(montoFinal * item.detraccionPorcentaje / 100)
+      : null
+    if (detraccionMonto) totalDetraccion += detraccionMonto
+
     const row = ws.getRow(dataRow)
     row.getCell(1).value = fmtDate(item.fechaRecepcion as string)
     row.getCell(1).numFmt = 'dd/mm/yyyy'
@@ -195,9 +207,11 @@ export async function exportarComprasMes(
     row.getCell(9).numFmt = '#,##0.00'
     row.getCell(10).value = montoFinal
     row.getCell(10).numFmt = '#,##0.00'
-    row.getCell(11).value = monedaMostrada
-    row.getCell(12).value = ESTADO_CXP[item.estado] ?? item.estado
-    row.getCell(13).value = 'Factura'
+    row.getCell(11).value = detraccionMonto
+    row.getCell(11).numFmt = '#,##0'
+    row.getCell(12).value = monedaMostrada
+    row.getCell(13).value = ESTADO_CXP[item.estado] ?? item.estado
+    row.getCell(14).value = 'Factura'
 
     const fillRow = esNC ? FILL_NC : esAnulada ? FILL_ANULADA : undefined
     const fontRow = esNC ? FONT_NC : esAnulada ? FONT_ANULADA : undefined
@@ -211,7 +225,7 @@ export async function exportarComprasMes(
         right:  { style: 'thin', color: { argb: 'FFE5E7EB' } },
       }
     }
-    if (!convertido) row.getCell(11).fill = FILL_SIN_TC // marca la moneda no convertida, para revisar a mano
+    if (!convertido) row.getCell(12).fill = FILL_SIN_TC // marca la moneda no convertida, para revisar a mano
     dataRow++
   }
 
@@ -254,9 +268,10 @@ export async function exportarComprasMes(
     row.getCell(9).numFmt = '#,##0.00'
     row.getCell(10).value = montoFinal
     row.getCell(10).numFmt = '#,##0.00'
-    row.getCell(11).value = monedaMostrada
-    row.getCell(12).value = ESTADO_GASTO[item.hojaDeGastos?.estado ?? ''] ?? (item.hojaDeGastos?.estado ?? '')
-    row.getCell(13).value = 'Gasto'
+    // 11: Detracción — no aplica a Gastos Operativos, queda en blanco.
+    row.getCell(12).value = monedaMostrada
+    row.getCell(13).value = ESTADO_GASTO[item.hojaDeGastos?.estado ?? ''] ?? (item.hojaDeGastos?.estado ?? '')
+    row.getCell(14).value = 'Gasto'
 
     for (let c = 1; c <= NCOLS; c++) {
       row.getCell(c).fill = FILL_GASTO
@@ -267,7 +282,7 @@ export async function exportarComprasMes(
         right:  { style: 'thin', color: { argb: 'FFE5E7EB' } },
       }
     }
-    if (!convertido) row.getCell(11).fill = FILL_SIN_TC
+    if (!convertido) row.getCell(12).fill = FILL_SIN_TC
     dataRow++
   }
 
@@ -297,6 +312,15 @@ export async function exportarComprasMes(
     tEUR.getCell(10).value = totalEUR
     tEUR.getCell(10).numFmt = '#,##0.00'
     tEUR.getCell(10).font = { bold: true }
+  }
+  if (totalDetraccion > 0) {
+    dataRow++
+    const tDet = ws.getRow(dataRow)
+    tDet.getCell(9).value = 'TOTAL DETRACCIÓN'
+    tDet.getCell(9).font = { bold: true }
+    tDet.getCell(11).value = totalDetraccion
+    tDet.getCell(11).numFmt = '#,##0'
+    tDet.getCell(11).font = { bold: true }
   }
   if (sinTcCount > 0) {
     dataRow++

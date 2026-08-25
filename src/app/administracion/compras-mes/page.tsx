@@ -36,6 +36,7 @@ interface CxPItem {
   proyecto?: { codigo: string; nombre: string } | null
   estado: string
   ordenCompra?: { id: string; numero: string; tipoCompraOverride?: string | null } | null
+  detraccionPorcentaje?: number | null
 }
 
 /** 'nacional' | 'extranjero' | null. El override de la OC manda sobre el proveedor. */
