@@ -179,6 +179,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         tareaUpdate.descripcion = descripcion || null
       }
 
+      // Editar la tarea placeholder de asistencia (esAutoAsistencia=true) para
+      // asignarle una tarea real del cronograma o un nombre la convierte en una
+      // tarea real: deja de contar como placeholder para que cuente en
+      // cantidadTareas y se pueda cerrar la jornada.
+      if ((proyectoTareaId !== undefined || nombreTareaExtra !== undefined) && tarea.esAutoAsistencia) {
+        tareaUpdate.esAutoAsistencia = false
+      }
+
       if (Object.keys(tareaUpdate).length > 0) {
         await tx.registroHorasCampoTarea.update({
           where: { id: tareaId },
