@@ -329,8 +329,8 @@ function UserFormModal({ isOpen, onClose, user, onSuccess }: UserFormModalProps)
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md flex flex-col max-h-[90vh]">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             {isEditing ? (
               <>
@@ -351,7 +351,7 @@ function UserFormModal({ isOpen, onClose, user, onSuccess }: UserFormModalProps)
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 py-4">
+        <form onSubmit={handleSubmit} className="space-y-4 py-4 overflow-y-auto px-1 -mx-1">
           {/* Email Field */}
           <div className="space-y-2">
             <Label htmlFor="email" className="flex items-center gap-2 text-sm font-medium">
@@ -488,7 +488,7 @@ function UserFormModal({ isOpen, onClose, user, onSuccess }: UserFormModalProps)
           )}
         </form>
 
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter className="gap-2 sm:gap-0 shrink-0">
           <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
             Cancelar
           </Button>
