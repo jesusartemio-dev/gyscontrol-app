@@ -148,8 +148,25 @@ export default function ComprasMesPage() {
   const handleExport = async () => {
     setExporting(true)
     try {
+      // Todos los montos deben salir en soles — traer el TC SUNAT venta de
+      // cada fecha con un comprobante en USD antes de armar el Excel.
+      const fechas = [...new Set([
+        ...cxp.filter(c => c.moneda === 'USD').map(c => c.fechaRecepcion?.slice(0, 10)),
+        ...gastos.filter(g => g.moneda === 'USD').map(g => g.fecha?.slice(0, 10)),
+      ].filter(Boolean))] as string[]
+
+      let tasasPorFecha: Record<string, number | null> = {}
+      if (fechas.length > 0) {
+        const res = await fetch('/api/administracion/tipo-cambio-sunat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fechas }),
+        })
+        if (res.ok) tasasPorFecha = await res.json()
+      }
+
       const { exportarComprasMes } = await import('@/lib/utils/comprasMesExcel')
-      const buf = await exportarComprasMes(mesParam, cxp as any, gastos as any)
+      const buf = await exportarComprasMes(mesParam, cxp as any, gastos as any, tasasPorFecha)
       const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')

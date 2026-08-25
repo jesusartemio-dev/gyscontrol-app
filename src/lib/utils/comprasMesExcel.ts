@@ -1,3 +1,5 @@
+import { calcularBaseImponibleIGV, convertirMonedaSunat } from './cuentasCobrarExcel'
+
 export interface CxPRow {
   fechaRecepcion: string
   tipoDocumento: string
@@ -67,10 +69,33 @@ function tipoComprobanteLabel(tipo: string | null) {
   return map[tipo] || tipo
 }
 
+/**
+ * Convierte `monto` a PEN: prioriza el tipoCambio ya guardado en el comprobante
+ * (dato real de esa operación); si no hay, usa el TC SUNAT venta de `tasasPorFecha`
+ * para la fecha del comprobante. Si ninguno está disponible, devuelve el monto
+ * sin convertir y `convertido: false` — el llamador lo deja en su moneda
+ * original y lo marca, en vez de mostrar un monto en soles inventado.
+ */
+function convertirASolesCompra(
+  monto: number,
+  moneda: string,
+  fechaKey: string,
+  tipoCambioGuardado: number | null | undefined,
+  tasasPorFecha: Record<string, number | null>,
+): { monto: number; convertido: boolean } {
+  if (moneda === 'PEN') return { monto, convertido: true }
+  if (moneda !== 'USD') return { monto, convertido: false } // EUR: sin fuente de TC automática
+  const tc = (tipoCambioGuardado && tipoCambioGuardado > 0) ? tipoCambioGuardado : tasasPorFecha[fechaKey]
+  const convertido = convertirMonedaSunat(monto, 'USD', 'PEN', tc)
+  if (convertido == null) return { monto, convertido: false }
+  return { monto: Math.round(convertido * 100) / 100, convertido: true }
+}
+
 export async function exportarComprasMes(
   mes: string, // "2026-06"
   cxpRows: CxPRow[],
   gastoRows: GastoRow[],
+  tasasPorFecha: Record<string, number | null> = {},
 ) {
   const ExcelJS = (await import('exceljs')).default
   const wb = new ExcelJS.Workbook()
@@ -82,10 +107,11 @@ export async function exportarComprasMes(
   const FILL_NC     = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFEE2E2' } }
   const FILL_ANULADA = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFF3F4F6' } }
   const FILL_GASTO  = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFFFBEB' } }
+  const FILL_SIN_TC = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFED7AA' } }
   const FONT_HEADER = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
   const FONT_NC     = { color: { argb: 'FFDC2626' } }
   const FONT_ANULADA = { color: { argb: 'FF9CA3AF' }, italic: true }
-  const NCOLS = 11
+  const NCOLS = 13
 
   ws.columns = [
     { width: 13 }, // A Fecha
@@ -95,10 +121,12 @@ export async function exportarComprasMes(
     { width: 14 }, // E RUC
     { width: 30 }, // F Descripción
     { width: 20 }, // G Proyecto
-    { width: 12 }, // H Monto
-    { width: 8  }, // I Moneda
-    { width: 18 }, // J Estado
-    { width: 12 }, // K Origen
+    { width: 14 }, // H Base Imponible (S/)
+    { width: 12 }, // I IGV (S/)
+    { width: 14 }, // J Monto (S/)
+    { width: 10 }, // K Moneda
+    { width: 18 }, // L Estado
+    { width: 12 }, // M Origen
   ]
 
   // Título
@@ -109,7 +137,7 @@ export async function exportarComprasMes(
   titleCell.alignment = { horizontal: 'center' }
 
   // Cabecera
-  const headers = ['Fecha', 'Tipo Documento', 'N° Comprobante', 'Proveedor / Empleado', 'RUC', 'Descripción', 'Proyecto', 'Monto', 'Moneda', 'Estado', 'Origen']
+  const headers = ['Fecha', 'Tipo Documento', 'N° Comprobante', 'Proveedor / Empleado', 'RUC', 'Descripción', 'Proyecto', 'Base Imponible (S/)', 'IGV (S/)', 'Monto (S/)', 'Moneda', 'Estado', 'Origen']
   headers.forEach((h, i) => {
     const cell = ws.getCell(2, i + 1)
     cell.value = h
@@ -124,6 +152,7 @@ export async function exportarComprasMes(
   let totalPEN = 0
   let totalUSD = 0
   let totalEUR = 0
+  let sinTcCount = 0
 
   // Separador sección facturas
   const sepCxP = ws.getRow(dataRow)
@@ -136,11 +165,20 @@ export async function exportarComprasMes(
   for (const item of cxpRows) {
     const esNC = item.tipoDocumento === 'nota_credito'
     const esAnulada = item.estado === 'anulada'
-    const montoFinal = esNC ? -Math.abs(item.monto) : item.monto
+    const montoOriginal = esNC ? -Math.abs(item.monto) : item.monto
 
-    if (item.moneda === 'USD') totalUSD += montoFinal
-    else if (item.moneda === 'EUR') totalEUR += montoFinal
+    const fechaKey = (item.fechaRecepcion as string).slice(0, 10)
+    const { monto: montoFinal, convertido } = convertirASolesCompra(
+      montoOriginal, item.moneda, fechaKey, item.tipoCambio, tasasPorFecha
+    )
+    const monedaMostrada = convertido ? 'PEN' : item.moneda
+    if (!convertido) sinTcCount++
+
+    if (monedaMostrada === 'USD') totalUSD += montoFinal
+    else if (monedaMostrada === 'EUR') totalEUR += montoFinal
     else totalPEN += montoFinal
+
+    const { baseImponible, igv } = calcularBaseImponibleIGV(montoFinal)
 
     const row = ws.getRow(dataRow)
     row.getCell(1).value = fmtDate(item.fechaRecepcion as string)
@@ -151,11 +189,15 @@ export async function exportarComprasMes(
     row.getCell(5).value = item.proveedor?.ruc ?? ''
     row.getCell(6).value = item.descripcion ?? ''
     row.getCell(7).value = item.proyecto ? `${item.proyecto.codigo} – ${item.proyecto.nombre}` : ''
-    row.getCell(8).value = montoFinal
+    row.getCell(8).value = baseImponible
     row.getCell(8).numFmt = '#,##0.00'
-    row.getCell(9).value = item.moneda
-    row.getCell(10).value = ESTADO_CXP[item.estado] ?? item.estado
-    row.getCell(11).value = 'Factura'
+    row.getCell(9).value = igv
+    row.getCell(9).numFmt = '#,##0.00'
+    row.getCell(10).value = montoFinal
+    row.getCell(10).numFmt = '#,##0.00'
+    row.getCell(11).value = monedaMostrada
+    row.getCell(12).value = ESTADO_CXP[item.estado] ?? item.estado
+    row.getCell(13).value = 'Factura'
 
     const fillRow = esNC ? FILL_NC : esAnulada ? FILL_ANULADA : undefined
     const fontRow = esNC ? FONT_NC : esAnulada ? FONT_ANULADA : undefined
@@ -169,6 +211,7 @@ export async function exportarComprasMes(
         right:  { style: 'thin', color: { argb: 'FFE5E7EB' } },
       }
     }
+    if (!convertido) row.getCell(11).fill = FILL_SIN_TC // marca la moneda no convertida, para revisar a mano
     dataRow++
   }
 
@@ -181,10 +224,18 @@ export async function exportarComprasMes(
   dataRow++
 
   for (const item of gastoRows) {
-    const montoFinal = item.monto
-    if (item.moneda === 'USD') totalUSD += montoFinal
-    else if (item.moneda === 'EUR') totalEUR += montoFinal
+    const fechaKey = (item.fecha as string).slice(0, 10)
+    const { monto: montoFinal, convertido } = convertirASolesCompra(
+      item.monto, item.moneda, fechaKey, null, tasasPorFecha
+    )
+    const monedaMostrada = convertido ? 'PEN' : item.moneda
+    if (!convertido) sinTcCount++
+
+    if (monedaMostrada === 'USD') totalUSD += montoFinal
+    else if (monedaMostrada === 'EUR') totalEUR += montoFinal
     else totalPEN += montoFinal
+
+    const { baseImponible, igv } = calcularBaseImponibleIGV(montoFinal)
 
     const row = ws.getRow(dataRow)
     row.getCell(1).value = fmtDate(item.fecha as string)
@@ -197,11 +248,15 @@ export async function exportarComprasMes(
     row.getCell(7).value = item.hojaDeGastos?.proyecto
       ? `${item.hojaDeGastos.proyecto.codigo} – ${item.hojaDeGastos.proyecto.nombre}`
       : ''
-    row.getCell(8).value = montoFinal
+    row.getCell(8).value = baseImponible
     row.getCell(8).numFmt = '#,##0.00'
-    row.getCell(9).value = item.moneda
-    row.getCell(10).value = ESTADO_GASTO[item.hojaDeGastos?.estado ?? ''] ?? (item.hojaDeGastos?.estado ?? '')
-    row.getCell(11).value = 'Gasto'
+    row.getCell(9).value = igv
+    row.getCell(9).numFmt = '#,##0.00'
+    row.getCell(10).value = montoFinal
+    row.getCell(10).numFmt = '#,##0.00'
+    row.getCell(11).value = monedaMostrada
+    row.getCell(12).value = ESTADO_GASTO[item.hojaDeGastos?.estado ?? ''] ?? (item.hojaDeGastos?.estado ?? '')
+    row.getCell(13).value = 'Gasto'
 
     for (let c = 1; c <= NCOLS; c++) {
       row.getCell(c).fill = FILL_GASTO
@@ -212,34 +267,43 @@ export async function exportarComprasMes(
         right:  { style: 'thin', color: { argb: 'FFE5E7EB' } },
       }
     }
+    if (!convertido) row.getCell(11).fill = FILL_SIN_TC
     dataRow++
   }
 
-  // Totales
+  // Totales — Monto ahora vive en J (10); todo lo que se pudo convertir cae en
+  // TOTAL PEN, USD/EUR solo quedan filas con fondo naranja (sin TC disponible).
   dataRow++
   const tRow = ws.getRow(dataRow)
-  tRow.getCell(7).value = 'TOTAL PEN'
-  tRow.getCell(7).font = { bold: true }
-  tRow.getCell(8).value = totalPEN
-  tRow.getCell(8).numFmt = '#,##0.00'
-  tRow.getCell(8).font = { bold: true }
+  tRow.getCell(9).value = 'TOTAL PEN'
+  tRow.getCell(9).font = { bold: true }
+  tRow.getCell(10).value = totalPEN
+  tRow.getCell(10).numFmt = '#,##0.00'
+  tRow.getCell(10).font = { bold: true }
   if (totalUSD !== 0) {
     dataRow++
     const tUSD = ws.getRow(dataRow)
-    tUSD.getCell(7).value = 'TOTAL USD'
-    tUSD.getCell(7).font = { bold: true }
-    tUSD.getCell(8).value = totalUSD
-    tUSD.getCell(8).numFmt = '#,##0.00'
-    tUSD.getCell(8).font = { bold: true }
+    tUSD.getCell(9).value = 'TOTAL USD (sin convertir)'
+    tUSD.getCell(9).font = { bold: true }
+    tUSD.getCell(10).value = totalUSD
+    tUSD.getCell(10).numFmt = '#,##0.00'
+    tUSD.getCell(10).font = { bold: true }
   }
   if (totalEUR !== 0) {
     dataRow++
     const tEUR = ws.getRow(dataRow)
-    tEUR.getCell(7).value = 'TOTAL EUR'
-    tEUR.getCell(7).font = { bold: true }
-    tEUR.getCell(8).value = totalEUR
-    tEUR.getCell(8).numFmt = '#,##0.00'
-    tEUR.getCell(8).font = { bold: true }
+    tEUR.getCell(9).value = 'TOTAL EUR (sin convertir)'
+    tEUR.getCell(9).font = { bold: true }
+    tEUR.getCell(10).value = totalEUR
+    tEUR.getCell(10).numFmt = '#,##0.00'
+    tEUR.getCell(10).font = { bold: true }
+  }
+  if (sinTcCount > 0) {
+    dataRow++
+    const note = ws.getRow(dataRow)
+    ws.mergeCells(dataRow, 1, dataRow, NCOLS)
+    note.getCell(1).value = `⚠ ${sinTcCount} comprobante(s) resaltado(s) en naranja no se pudieron convertir a soles (sin tipo de cambio disponible para su fecha) — quedaron en su moneda original.`
+    note.getCell(1).font = { italic: true, color: { argb: 'FF9A3412' }, size: 9 }
   }
 
   // Freeze header

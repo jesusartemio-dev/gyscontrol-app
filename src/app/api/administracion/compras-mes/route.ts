@@ -33,7 +33,12 @@ export async function GET(req: Request) {
         orderBy: { fechaRecepcion: 'asc' },
       }),
       prisma.gastoLinea.findMany({
-        where: { fecha: { gte: desde, lt: hasta } },
+        // Gastos sin comprobante real (tipoComprobante null o 'sin_comprobante')
+        // no deben figurar en Compras del Mes — Administración lo pidió explícito.
+        where: {
+          fecha: { gte: desde, lt: hasta },
+          NOT: [{ tipoComprobante: null }, { tipoComprobante: 'sin_comprobante' }],
+        },
         include: {
           hojaDeGastos: {
             select: {
