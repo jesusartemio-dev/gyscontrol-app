@@ -771,6 +771,12 @@ export interface CxCCobroData {
   saldoAGirar: number | null           // = montoADesembolsar - adelantoBanpro
   numeroFacturaInteres: string | null  // N° factura financiera por el interés
   numeroFacturaGastos: string | null   // N° factura financiera por comisión/gastos
+  /** "Cobros esperados" del factoring — de acá sale la fecha real de Saldo/Retenido. */
+  abonos?: Array<{
+    tipo: string | null // 'adelanto' | 'saldo_girar' | 'detraccion' | 'excedente'
+    estado: string      // 'pendiente' | 'recibido'
+    fechaReal: string | null
+  }>
   [key: string]: unknown               // permite campos extra del modelo Prisma
 }
 
@@ -1091,6 +1097,62 @@ function setBorderData(cell: any): void {
   cell.border = BORDER_DATA
 }
 
+/**
+ * Hoja de referencia simple para CxC anuladas — solo consulta/auditoría, sin
+ * fórmulas de totales, para que no se sumen dos veces montos ya anulados
+ * (usada por exportarCxCContable y exportarCxCFinanciero). No incluye desglose
+ * financiero (detracción, factoring, etc.) a propósito: si se necesita el
+ * detalle completo de una CxC anulada, se revisa su ficha en el sistema.
+ */
+function agregarHojaAnuladas(wb: any, anuladas: CxCRichRow[]): void {
+  if (anuladas.length === 0) return
+  const ws = wb.addWorksheet('CxC Anuladas')
+  const encabezados = ['N° Documento', 'Cliente', 'RUC', 'Proyecto', 'Valorización', 'Monto', 'Moneda', 'Fecha Emisión', 'Descripción']
+  const anchos = [16, 35, 14, 14, 16, 14, 8, 12, 40]
+  ws.columns = anchos.map(w => ({ width: w }))
+
+  const hdr = ws.getRow(1)
+  encabezados.forEach((h, i) => {
+    const cell = hdr.getCell(i + 1)
+    cell.value = h
+    cell.fill = HDR_FILL_PRIMARY
+    cell.font = HDR_FONT_WHITE
+    cell.alignment = ALIGN_CENTER
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FFFFFFFF' } }, bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+      left: { style: 'thin', color: { argb: 'FFFFFFFF' } }, right: { style: 'thin', color: { argb: 'FFFFFFFF' } },
+    }
+  })
+  hdr.height = 24
+
+  let r = 2
+  for (const cxc of anuladas) {
+    const row = ws.getRow(r)
+    const cells: [number, any, string?][] = [
+      [1, cxc.numeroDocumento ?? ''],
+      [2, cxc.cliente?.nombre ?? ''],
+      [3, cxc.cliente?.ruc ?? ''],
+      [4, cxc.proyecto?.codigo ?? ''],
+      [5, cxc.valorizacion?.codigo ?? ''],
+      [6, cxc.monto, FMT_MONEY],
+      [7, cxc.moneda],
+      [8, cxc.fechaEmision ? new Date(cxc.fechaEmision) : null, FMT_DATE],
+      [9, cxc.descripcion ?? ''],
+    ]
+    for (const [col, val, fmt] of cells) {
+      const cell = row.getCell(col)
+      cell.value = val ?? null
+      if (fmt) cell.numFmt = fmt
+      setBorderData(cell)
+    }
+    for (const col of [1, 2, 3, 4, 5, 7, 9]) row.getCell(col).alignment = ALIGN_LEFT
+    r++
+  }
+
+  ws.views = [{ state: 'frozen', ySplit: 1 }]
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: encabezados.length } }
+}
+
 /** Descarga el buffer como .xlsx en el browser (mismo patrón que los exports existentes). */
 async function downloadBuffer(buffer: ArrayBuffer | Uint8Array, filename: string): Promise<void> {
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
@@ -1123,7 +1185,11 @@ async function downloadBuffer(buffer: ArrayBuffer | Uint8Array, filename: string
  *   • Detracción Monto (S/) / Retención Monto (S/) → siempre en soles
  *   • Totales: Base Imponible, IGV, Monto Factura, Monto Neto, Cobrado, Detracción/Retención (US$), Pagado, Saldo
  *
- * Hoja 2 "Detalle de Pagos": una fila por PagoCobro, ordenada N°Doc → FechaPago asc.
+ * Hoja 2 "Detalle de Pagos": una fila por PagoCobro (solo CxC activas), ordenada
+ * N°Doc → FechaPago asc.
+ * Hoja 3 "CxC Anuladas": referencia simple de las CxC con estado='anulada' —
+ * quedan fuera de la Hoja 1 y de sus Totales para no duplicar montos ya
+ * anulados en la suma general (ver también exportarCxCFinanciero, mismo criterio).
  *
  * `opciones.monedaReporte` ('USD' | 'PEN'): si se indica, Base Imponible/IGV/Monto
  * Factura se muestran unificados en esa moneda (usando `opciones.tasasPorFecha`,
@@ -1132,11 +1198,13 @@ async function downloadBuffer(buffer: ArrayBuffer | Uint8Array, filename: string
  * es el de siempre (cada factura en su propia moneda, columna Moneda visible).
  */
 export async function exportarCxCContable(
-  items: CxCRichRow[],
+  itemsSinFiltrar: CxCRichRow[],
   opciones?: { monedaReporte?: 'USD' | 'PEN'; tasasPorFecha?: Record<string, number | null> },
 ): Promise<void> {
   const monedaReporte = opciones?.monedaReporte
   const tasasPorFecha = opciones?.tasasPorFecha ?? {}
+  const items = itemsSinFiltrar.filter(c => c.estado !== 'anulada')
+  const anuladas = itemsSinFiltrar.filter(c => c.estado === 'anulada')
   const ExcelJS = (await import('exceljs')).default
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('CxC Contable')
@@ -1433,6 +1501,9 @@ export async function exportarCxCContable(
   wsDet.views = [{ state: 'frozen', ySplit: 1 }]
   wsDet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 10 } }
 
+  // ── Hoja 3: CxC Anuladas (referencia, fuera de los Totales) ────────────────────
+  agregarHojaAnuladas(wb, anuladas)
+
   // ── Descarga ─────────────────────────────────────────────────────────────────
   const now     = new Date()
   const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
@@ -1453,8 +1524,14 @@ export async function exportarCxCContable(
  *
  * Si una CxC no tiene CobroValorizacion, las columnas de factoring van vacías (no 0).
  * Totales: Monto Factura (F), Monto Neto (G), Interés (X), Comisión (Z), Gastos (AA).
+ *
+ * Hoja 2 "CxC Anuladas": las CxC con estado='anulada' quedan afuera de la Hoja 1
+ * y de sus Totales (evita duplicar Interés/Comisión/Adelanto de una operación de
+ * factoring ya anulada en la suma general — ver agregarHojaAnuladas).
  */
-export async function exportarCxCFinanciero(items: CxCRichRow[]): Promise<void> {
+export async function exportarCxCFinanciero(itemsSinFiltrar: CxCRichRow[]): Promise<void> {
+  const items = itemsSinFiltrar.filter(c => c.estado !== 'anulada')
+  const anuladas = itemsSinFiltrar.filter(c => c.estado === 'anulada')
   const ExcelJS = (await import('exceljs')).default
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('CxC Financiero')
@@ -1563,6 +1640,13 @@ export async function exportarCxCFinanciero(items: CxCRichRow[]): Promise<void> 
     // Comisión + Gastos en un solo campo
     const comGastos = (cobro?.comisionEstructuracion ?? 0) + (cobro?.gastosAdicionales ?? 0)
 
+    // Fecha real del abono de Saldo/Retenido — en blanco si todavía no se recibió
+    // (no se muestra la fecha esperada/estimada para no confundirla con una real).
+    const abonoSaldo = cobro?.abonos?.find(a => a.tipo === 'saldo_girar' && a.estado === 'recibido')
+    const abonoRetenido = cobro?.abonos?.find(a => a.tipo === 'excedente' && a.estado === 'recibido')
+    const fechaSaldo = abonoSaldo?.fechaReal ? new Date(abonoSaldo.fechaReal) : null
+    const fechaRetenido = abonoRetenido?.fechaReal ? new Date(abonoRetenido.fechaReal) : null
+
     const cells: [number, any, string?][] = [
       [1,  cxc.numeroDocumento ?? ''],
       [2,  cxc.cliente?.nombre ?? ''],
@@ -1585,10 +1669,10 @@ export async function exportarCxCFinanciero(items: CxCRichRow[]): Promise<void> 
       [18, cobro?.fechaDesembolso ? new Date(cobro.fechaDesembolso as string) : null, FMT_DATE],
       // Saldo
       [19, cobro?.saldoAGirar ?? null,          FMT_MONEY],
-      [20, null],
+      [20, fechaSaldo,                          FMT_DATE],
       // Retenido
       [21, cobro?.excedenteMonto != null ? Number(cobro.excedenteMonto) : null, FMT_MONEY],
-      [22, null],
+      [22, fechaRetenido,                       FMT_DATE],
       // Costos
       [23, tasaPct,                             FMT_RATE],
       [24, cobro?.interesMonto ?? null,         FMT_MONEY],
@@ -1634,6 +1718,9 @@ export async function exportarCxCFinanciero(items: CxCRichRow[]): Promise<void> 
   // ── Freeze y autoFilter ────────────────────────────────────────────────────────
   ws.views = [{ state: 'frozen', ySplit: 2 }]
   ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2, column: 25 } }
+
+  // ── Hoja 2: CxC Anuladas (referencia, fuera de los Totales) ────────────────────
+  agregarHojaAnuladas(wb, anuladas)
 
   const today2 = new Date()
   const dateStr = `${today2.getFullYear()}-${String(today2.getMonth()+1).padStart(2,'0')}-${String(today2.getDate()).padStart(2,'0')}`

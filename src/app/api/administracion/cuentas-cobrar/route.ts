@@ -14,7 +14,7 @@ const includeRelations = {
       id: true,
       codigo: true,
       numero: true,
-      cobro: true,
+      cobro: { include: { abonos: true } },
     },
   },
   pagos: {
