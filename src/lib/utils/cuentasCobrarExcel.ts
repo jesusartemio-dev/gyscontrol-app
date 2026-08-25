@@ -1185,11 +1185,10 @@ async function downloadBuffer(buffer: ArrayBuffer | Uint8Array, filename: string
  *   • Detracción Monto (S/) / Retención Monto (S/) → siempre en soles
  *   • Totales: Base Imponible, IGV, Monto Factura, Monto Neto, Cobrado, Detracción/Retención (US$), Pagado, Saldo
  *
- * Hoja 2 "Detalle de Pagos": una fila por PagoCobro (solo CxC activas), ordenada
- * N°Doc → FechaPago asc.
- * Hoja 3 "CxC Anuladas": referencia simple de las CxC con estado='anulada' —
- * quedan fuera de la Hoja 1 y de sus Totales para no duplicar montos ya
- * anulados en la suma general (ver también exportarCxCFinanciero, mismo criterio).
+ * Hoja 2 "Detalle de Pagos": una fila por PagoCobro, ordenada N°Doc → FechaPago
+ * asc. Las CxC anuladas SÍ se incluyen en la Hoja 1 y sus Totales (a diferencia
+ * de exportarCxCFinanciero, que las separa a su propia hoja) — Administración
+ * confirmó que ese tratamiento aparte es solo para el reporte Financiero.
  *
  * `opciones.monedaReporte` ('USD' | 'PEN'): si se indica, Base Imponible/IGV/Monto
  * Factura se muestran unificados en esa moneda (usando `opciones.tasasPorFecha`,
@@ -1198,13 +1197,11 @@ async function downloadBuffer(buffer: ArrayBuffer | Uint8Array, filename: string
  * es el de siempre (cada factura en su propia moneda, columna Moneda visible).
  */
 export async function exportarCxCContable(
-  itemsSinFiltrar: CxCRichRow[],
+  items: CxCRichRow[],
   opciones?: { monedaReporte?: 'USD' | 'PEN'; tasasPorFecha?: Record<string, number | null> },
 ): Promise<void> {
   const monedaReporte = opciones?.monedaReporte
   const tasasPorFecha = opciones?.tasasPorFecha ?? {}
-  const items = itemsSinFiltrar.filter(c => c.estado !== 'anulada')
-  const anuladas = itemsSinFiltrar.filter(c => c.estado === 'anulada')
   const ExcelJS = (await import('exceljs')).default
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('CxC Contable')
@@ -1500,9 +1497,6 @@ export async function exportarCxCContable(
 
   wsDet.views = [{ state: 'frozen', ySplit: 1 }]
   wsDet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 10 } }
-
-  // ── Hoja 3: CxC Anuladas (referencia, fuera de los Totales) ────────────────────
-  agregarHojaAnuladas(wb, anuladas)
 
   // ── Descarga ─────────────────────────────────────────────────────────────────
   const now     = new Date()
