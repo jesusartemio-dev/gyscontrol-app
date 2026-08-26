@@ -85,10 +85,11 @@ const ROLE_TABS = [
   { key: 'seguridad', label: 'Seguridad', roles: ['seguridad'] },
   { key: 'comercial', label: 'Comercial', roles: ['comercial'] },
   { key: 'presupuestos', label: 'Presupuestos', roles: ['presupuestos'] },
+  { key: 'terceros', label: 'Terceros', roles: ['terceros'] },
   { key: 'todos', label: 'Todos', roles: [] },
 ] as const
 
-const ROLES_PERMITIDOS = ['colaborador', 'coordinador', 'logistico', 'coordinador_logistico', 'gestor', 'gerente', 'admin', 'proyectos', 'comercial', 'seguridad', 'presupuestos']
+const ROLES_PERMITIDOS = ['colaborador', 'coordinador', 'logistico', 'coordinador_logistico', 'gestor', 'gerente', 'admin', 'proyectos', 'comercial', 'seguridad', 'presupuestos', 'terceros']
 
 export function JornadaFormModal({
   open,

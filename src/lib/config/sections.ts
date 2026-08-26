@@ -50,6 +50,7 @@ export const ALL_ROLES = [
   'logistico',
   'administracion',
   'colaborador',
+  'terceros',
 ] as const
 
 export type RoleKey = (typeof ALL_ROLES)[number]
@@ -68,6 +69,9 @@ export const DEFAULT_ROLE_SECTIONS: Record<RoleKey, SectionKey[]> = {
   logistico: ['logistica', 'documentos', 'mi-trabajo', 'gastos'],
   administracion: ['mi-trabajo', 'gastos', 'administracion', 'gestion'],
   colaborador: ['mi-trabajo', 'gastos'],
+  // Personal eventual: solo marcaje de asistencia. Sin `gastos` — no
+  // registran requerimientos, sus pagos van por la liquidación de terceros.
+  terceros: ['mi-trabajo'],
 }
 
 // Mapeo de prefijos de ruta a sectionKey (para middleware)

@@ -75,8 +75,25 @@ import { Button } from '@/components/ui/button'
 import LogoutButton from './LogoutButton'
 import NotificacionesBell from './NotificacionesBell'
 import { useNotifications } from '@/lib/hooks/useNotifications'
-import type { RolUsuario, SidebarSection, NotificationBadgeType } from '@/types/modelos'
+import type { RolUsuario, SidebarSection, SidebarLink, NotificationBadgeType } from '@/types/modelos'
 import { rolesDe } from '@/lib/auth/roles'
+
+/**
+ * ¿Este link (o sublink) es visible para alguno de los roles del usuario?
+ * `roles` allowlist: basta con UNO. `excludeRoles` denylist: solo oculta si
+ * TODOS los roles del usuario están excluidos — así un rol extra legítimo
+ * no pierde el link por culpa de otro rol restringido.
+ */
+function esLinkVisible(link: SidebarLink, roles: string[]): boolean {
+  if (link.roles && !roles.some(r => (link.roles as string[]).includes(r))) {
+    return false
+  }
+  if (link.excludeRoles && roles.length > 0 &&
+      roles.every(r => (link.excludeRoles as string[]).includes(r))) {
+    return false
+  }
+  return true
+}
 
 export default function Sidebar() {
   const { data: session, update: updateSession } = useSession()
@@ -227,7 +244,9 @@ export default function Sidebar() {
       title: 'Mi Trabajo',
       icon: Clock,
       color: 'text-emerald-400',
-      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'comercial', 'seguridad', 'presupuestos', 'logistico', 'coordinador_logistico'],
+      roles: ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'colaborador', 'comercial', 'seguridad', 'presupuestos', 'logistico', 'coordinador_logistico', 'terceros'],
+      // `terceros` (personal eventual) solo marca asistencia: ver el submenu
+      // de Asistencia y los excludeRoles de cada link/sublink de abajo.
       links: [
         {
           href: '#asistencia-mi-trabajo',
@@ -235,20 +254,20 @@ export default function Sidebar() {
           icon: ClipboardList,
           submenu: [
             { href: '/mi-trabajo/marcar', label: 'Marcar Asistencia', icon: MapPin },
-            { href: '/mi-trabajo/asistencia-campo', label: 'Abrir Asistencia de Campo', icon: QrCode },
+            { href: '/mi-trabajo/asistencia-campo', label: 'Abrir Asistencia de Campo', icon: QrCode, excludeRoles: ['terceros'] as any },
             { href: '/mi-trabajo/mi-asistencia', label: 'Mi Asistencia', icon: Clock, badge: 'asistencia-abierta' as NotificationBadgeType },
-            { href: '/mi-trabajo/sede-remota', label: 'Mi Sede Remota', icon: Home },
-            { href: '/mi-trabajo/solicitudes-remoto', label: 'Solicitudes Remoto', icon: Home },
+            { href: '/mi-trabajo/sede-remota', label: 'Mi Sede Remota', icon: Home, excludeRoles: ['terceros'] as any },
+            { href: '/mi-trabajo/solicitudes-remoto', label: 'Solicitudes Remoto', icon: Home, excludeRoles: ['terceros'] as any },
           ],
         },
-        { href: '/mi-trabajo/ausencias', label: 'Mis Ausencias', icon: CalendarOff },
-        { href: '/mi-trabajo/mi-planificacion', label: 'Mi planificación', icon: CalendarRange },
-        { href: '/mi-trabajo/timesheet', label: 'Mi Timesheet', icon: Calendar, badge: 'timesheet-no-enviado' as NotificationBadgeType },
-        { href: '/mi-trabajo/mi-jornada', label: 'Mi Jornada', icon: HardHat },
-        { href: '/mi-trabajo/tareas', label: 'Mis Tareas', icon: CheckSquare, badge: 'tareas-vencidas' as NotificationBadgeType },
-        { href: '/mi-trabajo/mis-pedidos', label: 'Mis Pedidos', icon: ShoppingCart, badge: 'recepciones-por-confirmar' as NotificationBadgeType },
-        { href: '/mi-trabajo/progreso', label: 'Mi Progreso', icon: TrendingUp },
-        { href: '/mi-trabajo/herramientas', label: 'Mis Herramientas', icon: Wrench },
+        { href: '/mi-trabajo/ausencias', label: 'Mis Ausencias', icon: CalendarOff, excludeRoles: ['terceros'] as any },
+        { href: '/mi-trabajo/mi-planificacion', label: 'Mi planificación', icon: CalendarRange, excludeRoles: ['terceros'] as any },
+        { href: '/mi-trabajo/timesheet', label: 'Mi Timesheet', icon: Calendar, badge: 'timesheet-no-enviado' as NotificationBadgeType, excludeRoles: ['terceros'] as any },
+        { href: '/mi-trabajo/mi-jornada', label: 'Mi Jornada', icon: HardHat, excludeRoles: ['terceros'] as any },
+        { href: '/mi-trabajo/tareas', label: 'Mis Tareas', icon: CheckSquare, badge: 'tareas-vencidas' as NotificationBadgeType, excludeRoles: ['terceros'] as any },
+        { href: '/mi-trabajo/mis-pedidos', label: 'Mis Pedidos', icon: ShoppingCart, badge: 'recepciones-por-confirmar' as NotificationBadgeType, excludeRoles: ['terceros'] as any },
+        { href: '/mi-trabajo/progreso', label: 'Mi Progreso', icon: TrendingUp, excludeRoles: ['terceros'] as any },
+        { href: '/mi-trabajo/herramientas', label: 'Mis Herramientas', icon: Wrench, excludeRoles: ['terceros'] as any },
       ]
     },
     // 2.2. Supervisión - Vista de equipo y análisis (solo supervisores)
@@ -510,23 +529,21 @@ export default function Sidebar() {
     })
     .map(section => ({
       ...section,
-      links: section.links.filter(link => {
-        // Filtrar links específicos por rol
-        if (link.href === '/admin/actividad' && !roles.includes('admin')) {
-          return false
-        }
-        // Per-link role filtering: basta que UNO de sus roles lo permita
-        if (link.roles && !roles.some(r => (link.roles as string[]).includes(r))) {
-          return false
-        }
-        // Denylist: solo oculta si TODOS sus roles están excluidos. Si tiene
-        // otro rol al que el link sí le corresponde, se muestra.
-        if (link.excludeRoles && roles.length > 0 &&
-            roles.every(r => (link.excludeRoles as string[]).includes(r))) {
-          return false
-        }
-        return true
-      })
+      links: section.links
+        .filter(link => {
+          // Filtrar links específicos por rol
+          if (link.href === '/admin/actividad' && !roles.includes('admin')) {
+            return false
+          }
+          if (!esLinkVisible(link, roles)) return false
+          return true
+        })
+        // Filtrar también dentro de cada submenú (p.ej. "Asistencia" queda
+        // visible como link, pero un tercero solo ve Marcar/Mi Asistencia).
+        .map(link => link.submenu
+          ? { ...link, submenu: link.submenu.filter(s => esLinkVisible(s, roles)) }
+          : link
+        )
     }))
     .filter(section => section.links.length > 0), // Remover secciones sin links
     // eslint-disable-next-line react-hooks/exhaustive-deps

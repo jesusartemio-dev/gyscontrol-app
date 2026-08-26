@@ -4180,6 +4180,10 @@ enum Role {
   seguridad
   admin
   administracion
+  // Personal eventual/tercero: solo marcaje de asistencia y ser agregado a
+  // jornadas de campo. Distinto de Empleado.tipoPersonal='tercero' (que
+  // decide cómo se costea la hora) — este es el rol de acceso al sistema.
+  terceros
 }
 
 enum TipoDependencia {
