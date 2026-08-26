@@ -67,6 +67,12 @@ const categoriaLabel: Record<string, string> = {
 function getAsignadoA(hoja: HojaDeGastos): string {
   if (hoja.proyecto) return `${hoja.proyecto.codigo} - ${hoja.proyecto.nombre}`
   if (hoja.centroCosto) return hoja.centroCosto.nombre
+  // Sin proyecto en la cabecera (p.ej. pago a terceros: se deja así a propósito
+  // para no duplicar costo en los reportes) — se deriva de las líneas, que sí
+  // llevan su propio proyecto.
+  const codigos = Array.from(new Set((hoja.lineas ?? []).map((l) => l.proyecto?.codigo).filter((c): c is string => !!c)))
+  if (codigos.length === 1) return codigos[0]
+  if (codigos.length > 1) return `${codigos[0]} +${codigos.length - 1}`
   return '-'
 }
 
