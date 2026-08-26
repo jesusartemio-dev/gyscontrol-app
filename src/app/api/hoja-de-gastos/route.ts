@@ -9,6 +9,7 @@ const includeRelations = {
   proyecto: { select: { id: true, codigo: true, nombre: true } },
   centroCosto: { select: { id: true, nombre: true, tipo: true } },
   empleado: { select: { id: true, name: true, email: true } },
+  creadoPor: { select: { id: true, name: true, email: true } },
   aprobador: { select: { id: true, name: true, email: true } },
   lineas: {
     include: {
@@ -60,9 +61,12 @@ export async function GET(req: Request) {
     if (empleadoId) where.empleadoId = empleadoId
     if (tipoProposito) where['tipoPropósito'] = tipoProposito
 
-    // scope=propios: solo hojas del usuario actual (ignora filtro de roles)
+    // scope=propios: hojas del usuario actual — como beneficiario (empleadoId)
+    // O como quien las generó (creadoPorId, p.ej. una liquidación de terceros
+    // donde el dinero fue a otra persona pero tú la creaste). Ignora filtro de roles.
     if (scope === 'propios') {
-      where.empleadoId = session.user.id
+      delete where.empleadoId
+      where.OR = [{ empleadoId: session.user.id }, { creadoPorId: session.user.id }]
     } else {
       // Filtrar por permisos
       const role = session.user.role

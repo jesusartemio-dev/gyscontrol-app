@@ -2101,6 +2101,7 @@ model User {
   cotizacionDescuentosAprobados            Cotizacion[]                         @relation("CotizacionDescuentoAprobador")
   // Hojas de gastos
   hojasComoEmpleado                        HojaDeGastos[]                       @relation("HojaEmpleado")
+  hojasCreadas                              HojaDeGastos[]                       @relation("HojaCreadoPor")
   hojasComoAprobador                       HojaDeGastos[]                       @relation("HojaAprobador")
   hojasEventos                             HojaDeGastosEvento[]                 @relation("HojaEventoUsuario")
   depositosCreados                         DepositoHoja[]                       @relation("DepositoCreadoPor")
@@ -4334,6 +4335,11 @@ model HojaDeGastos {
   centroCostoId           String?
   categoriaCosto          CategoriaCosto @default(gastos)
   empleadoId              String
+  // Quién generó la hoja, si es distinto de quién la recibe (empleadoId).
+  // Caso de uso: pago a terceros — el supervisor la crea, pero el dinero va
+  // a la cuenta del tercero, no a la del supervisor. Null = los normales,
+  // donde el creador y el beneficiario son la misma persona.
+  creadoPorId             String?
   aprobadorId             String?
   motivo                  String
   observaciones           String?
@@ -4364,6 +4370,7 @@ model HojaDeGastos {
   proyecto            Proyecto?                   @relation(fields: [proyectoId], references: [id])
   centroCosto         CentroCosto?                @relation(fields: [centroCostoId], references: [id])
   empleado            User                        @relation("HojaEmpleado", fields: [empleadoId], references: [id])
+  creadoPor           User?                       @relation("HojaCreadoPor", fields: [creadoPorId], references: [id])
   aprobador           User?                       @relation("HojaAprobador", fields: [aprobadorId], references: [id])
   origenRegistroCampo RegistroHorasCampo?         @relation("HojaDeGastosOrigenRegistroCampo", fields: [origenRegistroCampoId], references: [id])
   lineas              GastoLinea[]

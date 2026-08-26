@@ -10,7 +10,7 @@ const ROLES_PERMITIDOS = ['admin', 'gerente', 'gestor', 'coordinador', 'proyecto
 
 const CATEGORIA_GASTO_HONORARIOS = 'Honorarios Terceros'
 
-interface LineaPayload {
+interface DiaPayload {
   usuarioId: string
   proyectoId: string
   /** YYYY-MM-DD — un día específico, no todo el periodo. */
@@ -23,17 +23,32 @@ interface PagoTercerosPayload {
   fechaDesde: string
   fechaHasta: string
   proyectoId?: string
-  lineas: LineaPayload[]
+  dias: DiaPayload[]
+  /** Descripción editada por el usuario, por persona+proyecto — clave `usuarioId::proyectoId`. */
+  descripciones?: Record<string, string>
 }
 
-function formatFechaCorta(d: Date) {
-  return d.toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+function formatFechaCorta(fecha: string) {
+  const [y, m, d] = fecha.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+function claveGrupo(usuarioId: string, proyectoId: string) {
+  return `${usuarioId}::${proyectoId}`
 }
 
 // POST /api/hoja-de-gastos/pago-terceros — liquida las horas de terceros del
-// periodo. Vuelve a calcular los grupos server-side (no confía en lo que
-// mandó el cliente) para no liquidar dos veces horas ya pagadas ni horas que
-// dejaron de calificar entre que se abrió el preview y se confirmó.
+// periodo. El dinero va DIRECTO a la cuenta de cada tercero, nunca a quien
+// genera la hoja — por eso se crea UNA HojaDeGastos POR PERSONA (empleadoId
+// = el tercero, no session.user.id), con una línea por cada proyecto en el
+// que trabajó ese periodo (agregando sus días). requiereAnticipo: true para
+// que siga el flujo normal de aprobar → depositar → rendir (con el Recibo
+// por Honorarios como adjunto de esa línea), no el camino de "reembolso a
+// quien creó la hoja" que aplicaría con requiereAnticipo: false.
+//
+// Vuelve a calcular los días server-side (no confía en lo que mandó el
+// cliente) para no liquidar dos veces horas ya pagadas ni horas que dejaron
+// de calificar entre que se abrió el preview y se confirmó.
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions)
@@ -48,8 +63,8 @@ export async function POST(req: Request) {
     if (!payload.fechaDesde || !payload.fechaHasta) {
       return NextResponse.json({ error: 'fechaDesde y fechaHasta son requeridos' }, { status: 400 })
     }
-    if (!Array.isArray(payload.lineas) || payload.lineas.length === 0) {
-      return NextResponse.json({ error: 'Debe incluir al menos una línea' }, { status: 400 })
+    if (!Array.isArray(payload.dias) || payload.dias.length === 0) {
+      return NextResponse.json({ error: 'Debe incluir al menos un día' }, { status: 400 })
     }
 
     const fechaDesde = new Date(`${payload.fechaDesde}T00:00:00`)
@@ -74,108 +89,135 @@ export async function POST(req: Request) {
       fechaHasta,
       proyectoId: payload.proyectoId,
     })
-    const disponiblesPorClave = new Map(disponibles.map((g) => [`${g.usuarioId}::${g.proyectoId}::${g.fecha}`, g]))
+    const disponiblesPorClave = new Map(disponibles.map((d) => [`${d.usuarioId}::${d.proyectoId}::${d.fecha}`, d]))
 
-    const lineasValidas: Array<{ grupo: (typeof disponibles)[number]; monto: number }> = []
+    type DiaValido = (typeof disponibles)[number] & { monto: number }
+    const diasValidos: DiaValido[] = []
     const omitidas: string[] = []
 
-    for (const l of payload.lineas) {
-      const grupo = disponiblesPorClave.get(`${l.usuarioId}::${l.proyectoId}::${l.fecha}`)
-      if (!grupo) {
+    for (const l of payload.dias) {
+      const dia = disponiblesPorClave.get(`${l.usuarioId}::${l.proyectoId}::${l.fecha}`)
+      if (!dia) {
         omitidas.push(`${l.usuarioId} / proyecto ${l.proyectoId} / ${l.fecha}`)
         continue
       }
-      const monto = Number.isFinite(l.monto) && l.monto >= 0 ? l.monto : grupo.subtotal
-      lineasValidas.push({ grupo, monto })
+      const monto = Number.isFinite(l.monto) && l.monto >= 0 ? l.monto : dia.subtotal
+      diasValidos.push({ ...dia, monto })
     }
 
-    if (lineasValidas.length === 0) {
+    if (diasValidos.length === 0) {
       return NextResponse.json(
         {
-          error: 'Ninguna de las líneas sigue disponible — probablemente ya se liquidaron en otra hoja mientras revisabas.',
+          error: 'Ninguno de los días sigue disponible — probablemente ya se liquidaron en otra hoja mientras revisabas.',
           omitidas,
         },
         { status: 409 },
       )
     }
 
-    const totalPersonas = new Set(lineasValidas.map((l) => l.grupo.usuarioId)).size
-    const motivo = `Pago a terceros — ${formatFechaCorta(fechaDesde)} al ${formatFechaCorta(fechaHasta)} (${totalPersonas} persona${totalPersonas !== 1 ? 's' : ''})`
+    // Agrupar por persona (1 hoja) y dentro de eso por proyecto (1 línea).
+    const porPersona = new Map<string, { nombre: string; porProyecto: Map<string, DiaValido[]> }>()
+    for (const d of diasValidos) {
+      if (!porPersona.has(d.usuarioId)) porPersona.set(d.usuarioId, { nombre: d.nombre, porProyecto: new Map() })
+      const persona = porPersona.get(d.usuarioId)!
+      const grupoKey = claveGrupo(d.usuarioId, d.proyectoId)
+      if (!persona.porProyecto.has(grupoKey)) persona.porProyecto.set(grupoKey, [])
+      persona.porProyecto.get(grupoKey)!.push(d)
+    }
 
-    const numero = await generarNumeroHoja()
+    const hojasCreadas = await prisma.$transaction(async (tx) => {
+      const resultado: Array<{ id: string; numero: string; empleadoId: string; nombre: string; total: number }> = []
 
-    const hoja = await prisma.$transaction(async (tx) => {
-      // proyectoId: null a propósito. Todos los reportes de costos reales
-      // (costos-reales, margen-real, rentabilidad, kpis) solo suman una hoja
-      // de gastos cuando su CABECERA tiene proyectoId — nunca miran el
-      // proyectoId de cada línea. Dejarlo null aquí excluye automáticamente
-      // esta liquidación de esos reportes: el costo del proyecto ya lo aporta
-      // el devengado por horas (RegistroHoras.costoHora), y esta hoja es solo
-      // el registro de PAGO — sumar ambos duplicaría el costo.
-      const creada = await tx.hojaDeGastos.create({
-        data: {
-          numero,
-          proyectoId: null,
-          categoriaCosto: 'servicios',
-          tipoPropósito: 'honorarios_terceros',
-          empleadoId: session.user.id,
-          motivo,
-          requiereAnticipo: false,
-          estado: 'enviado',
-          fechaEnvio: new Date(),
-          updatedAt: new Date(),
-        },
-      })
+      for (const [usuarioId, { nombre, porProyecto }] of porPersona) {
+        const gruposProyecto = Array.from(porProyecto.values())
+        const totalPersona = gruposProyecto.flat().reduce((s, d) => s + d.monto, 0)
+        // Con `tx`, no con el cliente global — ver el comentario en
+        // generarNumeroHoja.ts: se llama varias veces en esta misma
+        // transacción y necesita ver las hojas recién creadas.
+        const numero = await generarNumeroHoja(tx)
 
-      for (const { grupo, monto } of lineasValidas) {
-        await tx.gastoLinea.create({
+        const motivo = `Honorarios ${nombre} — ${formatFechaCorta(payload.fechaDesde)} al ${formatFechaCorta(payload.fechaHasta)}`
+
+        const creada = await tx.hojaDeGastos.create({
           data: {
-            hojaDeGastosId: creada.id,
-            categoriaGastoId: catHonorarios.id,
-            descripcion: `Honorarios ${grupo.nombre} — ${grupo.fecha} (${grupo.dias}d × ${grupo.proyectoCodigo})`,
-            fecha: new Date(`${grupo.fecha}T00:00:00`),
-            monto,
-            moneda: 'PEN',
-            proyectoId: grupo.proyectoId,
+            numero,
+            // proyectoId: null a propósito — si la persona trabajó en más de
+            // un proyecto, la cabecera no puede cargar uno solo, y así queda
+            // consistente con el resto de casos (ver nota abajo).
+            proyectoId: null,
             categoriaCosto: 'servicios',
+            tipoPropósito: 'honorarios_terceros',
+            empleadoId: usuarioId, // el tercero — el dinero va a SU cuenta
+            creadoPorId: session.user.id, // quien generó la liquidación
+            motivo,
+            requiereAnticipo: true, // habilita el flujo normal aprobar→depositar
+            estado: 'enviado',
+            fechaEnvio: new Date(),
             updatedAt: new Date(),
           },
         })
 
-        await tx.registroHoras.updateMany({
-          where: { id: { in: grupo.registroIds } },
-          data: { liquidadoEnHojaId: creada.id },
+        for (const dias of gruposProyecto) {
+          const primero = dias[0]
+          const totalGrupo = dias.reduce((s, d) => s + d.monto, 0)
+          const fechas = dias.map((d) => d.fecha).sort()
+          const ultimaFecha = fechas[fechas.length - 1]
+          const totalDias = Math.round(dias.reduce((s, d) => s + d.dias, 0) * 100) / 100
+
+          const claveDescripcion = claveGrupo(primero.usuarioId, primero.proyectoId)
+          const descripcion =
+            payload.descripciones?.[claveDescripcion]?.trim() ||
+            `Honorarios ${primero.nombre} — ${primero.proyectoCodigo} — ${fechas.map(formatFechaCorta).join(', ')} ` +
+              `(${totalDias}d) — Adjuntar Recibo por Honorarios`
+
+          await tx.gastoLinea.create({
+            data: {
+              hojaDeGastosId: creada.id,
+              categoriaGastoId: catHonorarios.id,
+              descripcion,
+              fecha: new Date(`${ultimaFecha}T00:00:00`),
+              monto: totalGrupo,
+              moneda: 'PEN',
+              proyectoId: primero.proyectoId,
+              categoriaCosto: 'servicios',
+              updatedAt: new Date(),
+            },
+          })
+
+          await tx.registroHoras.updateMany({
+            where: { id: { in: dias.flatMap((d) => d.registroIds) } },
+            data: { liquidadoEnHojaId: creada.id },
+          })
+        }
+
+        await tx.hojaDeGastosEvento.create({
+          data: {
+            hojaDeGastosId: creada.id,
+            tipo: 'creado',
+            descripcion: `Liquidación de terceros ${numero} creada por ${session.user.name ?? session.user.id} — ${gruposProyecto.length} línea(s)`,
+            estadoNuevo: 'borrador',
+            usuarioId: session.user.id,
+            metadata: { fechaDesde: payload.fechaDesde, fechaHasta: payload.fechaHasta },
+          },
         })
+        await tx.hojaDeGastosEvento.create({
+          data: {
+            hojaDeGastosId: creada.id,
+            tipo: 'enviado',
+            descripcion: 'Enviado automáticamente al crear la liquidación de terceros',
+            estadoAnterior: 'borrador',
+            estadoNuevo: 'enviado',
+            usuarioId: session.user.id,
+          },
+        })
+
+        resultado.push({ id: creada.id, numero, empleadoId: usuarioId, nombre, total: totalPersona })
       }
 
-      await tx.hojaDeGastosEvento.create({
-        data: {
-          hojaDeGastosId: creada.id,
-          tipo: 'creado',
-          descripcion: `Liquidación de terceros ${numero} creada — ${lineasValidas.length} línea(s)`,
-          estadoNuevo: 'borrador',
-          usuarioId: session.user.id,
-          metadata: { fechaDesde: payload.fechaDesde, fechaHasta: payload.fechaHasta, omitidas },
-        },
-      })
-      await tx.hojaDeGastosEvento.create({
-        data: {
-          hojaDeGastosId: creada.id,
-          tipo: 'enviado',
-          descripcion: 'Enviado automáticamente al crear la liquidación de terceros',
-          estadoAnterior: 'borrador',
-          estadoNuevo: 'enviado',
-          usuarioId: session.user.id,
-        },
-      })
-
-      return tx.hojaDeGastos.findUniqueOrThrow({
-        where: { id: creada.id },
-        include: { lineas: true, empleado: { select: { id: true, name: true, email: true } } },
-      })
+      return resultado
     })
 
-    return NextResponse.json({ hoja, omitidas })
+    return NextResponse.json({ hojas: hojasCreadas, omitidas })
   } catch (error) {
     console.error('Error al crear liquidación de terceros:', error)
     return NextResponse.json({ error: 'Error al crear la liquidación' }, { status: 500 })

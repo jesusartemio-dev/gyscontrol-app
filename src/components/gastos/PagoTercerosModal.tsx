@@ -1,11 +1,12 @@
 'use client'
 
 import React, { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -15,13 +16,14 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Loader2, Users, DollarSign, AlertTriangle, ShieldAlert, QrCode, Clock } from 'lucide-react'
+import { Loader2, Users, DollarSign, AlertTriangle, ShieldAlert, QrCode, Clock, CheckCircle2, ArrowRight } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   previsualizarPagoTerceros,
   crearPagoTerceros,
   type LineaPagoTercero,
   type EstadoAsistenciaDia,
+  type HojaCreadaPagoTercero,
 } from '@/lib/services/hojaDeGastos'
 
 interface PagoTercerosModalProps {
@@ -37,6 +39,7 @@ interface LineaEditable extends LineaPagoTercero {
 
 const claveLinea = (l: Pick<LineaPagoTercero, 'usuarioId' | 'proyectoId' | 'fecha'>) =>
   `${l.usuarioId}::${l.proyectoId}::${l.fecha}`
+const claveGrupo = (l: Pick<LineaPagoTercero, 'usuarioId' | 'proyectoId'>) => `${l.usuarioId}::${l.proyectoId}`
 
 // Cómo se ve cada estado de asistencia frente a las horas de tarea: el marcaje
 // (QR) es una fuente independiente de la persona que carga horas de tarea, y
@@ -55,6 +58,21 @@ function formatFechaCorta(fecha: string) {
   return new Date(y, m - 1, d).toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit', month: 'short' })
 }
 
+function formatFechaCompacta(fecha: string) {
+  const [y, m, d] = fecha.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })
+}
+
+// Mismo texto que generaría el servidor si se deja en blanco — se muestra ya
+// escrito (no como placeholder) para que la persona vea exactamente qué va a
+// quedar y lo edite si hace falta, en vez de adivinar qué pasa si no toca nada.
+function descripcionSugerida(dias: LineaEditable[]): string {
+  const primero = dias[0]
+  const fechas = dias.map((d) => d.fecha).sort()
+  const totalDias = Math.round(dias.reduce((s, d) => s + d.dias, 0) * 100) / 100
+  return `Honorarios ${primero.nombre} — ${primero.proyectoCodigo} — ${fechas.map(formatFechaCompacta).join(', ')} (${totalDias}d) — Adjuntar Recibo por Honorarios`
+}
+
 // Primer y último día del mes calendario en curso, en formato YYYY-MM-DD —
 // el rango más común para liquidar (quincena/mes).
 function rangoMesActual() {
@@ -66,12 +84,13 @@ function rangoMesActual() {
 }
 
 export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercerosModalProps) {
-  const router = useRouter()
-  const [paso, setPaso] = useState<'periodo' | 'resumen'>('periodo')
+  const [paso, setPaso] = useState<'periodo' | 'resumen' | 'listo'>('periodo')
   const [{ desde, hasta }, setRango] = useState(rangoMesActual())
   const [loadingPreview, setLoadingPreview] = useState(false)
   const [lineas, setLineas] = useState<LineaEditable[]>([])
+  const [descripciones, setDescripciones] = useState<Record<string, string>>({})
   const [creando, setCreando] = useState(false)
+  const [hojasCreadas, setHojasCreadas] = useState<HojaCreadaPagoTercero[]>([])
 
   const abrirPreview = async () => {
     if (!desde || !hasta) {
@@ -89,7 +108,18 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
         toast.info('No hay horas de terceros aprobadas y sin liquidar en ese rango')
         return
       }
-      setLineas(data.map((l) => ({ ...l, incluido: true, monto: l.subtotal })))
+      const editables = data.map((l) => ({ ...l, incluido: true, monto: l.subtotal }))
+      setLineas(editables)
+      // Prellenar la descripción sugerida por cada grupo persona+proyecto.
+      const porGrupo = new Map<string, LineaEditable[]>()
+      for (const l of editables) {
+        const k = claveGrupo(l)
+        if (!porGrupo.has(k)) porGrupo.set(k, [])
+        porGrupo.get(k)!.push(l)
+      }
+      const desc: Record<string, string> = {}
+      for (const [k, dias] of porGrupo) desc[k] = descripcionSugerida(dias)
+      setDescripciones(desc)
       setPaso('resumen')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al calcular la liquidación')
@@ -106,10 +136,14 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
     setLineas((prev) => prev.map((l) => (claveLinea(l) === key ? { ...l, incluido: !l.incluido } : l)))
   }
 
+  const actualizarDescripcion = (grupoKey: string, texto: string) => {
+    setDescripciones((prev) => ({ ...prev, [grupoKey]: texto }))
+  }
+
   const submit = async () => {
     const seleccionadas = lineas.filter((l) => l.incluido)
     if (seleccionadas.length === 0) {
-      toast.error('Selecciona al menos una línea')
+      toast.error('Selecciona al menos un día')
       return
     }
     try {
@@ -117,15 +151,16 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
       const resultado = await crearPagoTerceros({
         fechaDesde: desde,
         fechaHasta: hasta,
-        lineas: seleccionadas.map((l) => ({ usuarioId: l.usuarioId, proyectoId: l.proyectoId, fecha: l.fecha, monto: l.monto })),
+        dias: seleccionadas.map((l) => ({ usuarioId: l.usuarioId, proyectoId: l.proyectoId, fecha: l.fecha, monto: l.monto })),
+        descripciones,
       })
       if (resultado.omitidas.length > 0) {
-        toast.warning(`${resultado.omitidas.length} línea(s) ya se habían liquidado en otra hoja y se omitieron`)
+        toast.warning(`${resultado.omitidas.length} día(s) ya se habían liquidado en otra hoja y se omitieron`)
       }
-      toast.success(`Liquidación ${resultado.hoja.numero} creada y enviada`)
-      onOpenChange(false)
+      toast.success(`${resultado.hojas.length} liquidación${resultado.hojas.length !== 1 ? 'es' : ''} creada${resultado.hojas.length !== 1 ? 's' : ''} y enviada${resultado.hojas.length !== 1 ? 's' : ''}`)
+      setHojasCreadas(resultado.hojas)
       onCreated()
-      router.push(`/gastos/mis-requerimientos/${resultado.hoja.id}`)
+      setPaso('listo')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al crear la liquidación')
     } finally {
@@ -139,6 +174,8 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
     if (!v) {
       setPaso('periodo')
       setLineas([])
+      setDescripciones({})
+      setHojasCreadas([])
     }
   }
 
@@ -147,8 +184,8 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
   const diasConProblema = lineas.filter((l) => l.estadoAsistencia !== 'completo').length
 
   // Subtotal por trabajador (suma todos sus días marcados, sin importar en
-  // cuántos proyectos — si alguien trabajó en 2, se cuenta igual una vez).
-  // Se recalcula solo, refleja lo marcado/desmarcado y los montos editados.
+  // cuántos proyectos — si alguien trabajó en 2, se cuenta igual una vez, ya
+  // que ambos proyectos terminan en la MISMA hoja de esa persona).
   const subtotalesPorUsuario = useMemo(() => {
     const map = new Map<string, number>()
     for (const l of lineas) {
@@ -165,12 +202,12 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
   const conCabeceras = useMemo(() => {
     let anteriorGrupo = ''
     return lineas.map((l, i) => {
-      const grupoKey = `${l.usuarioId}::${l.proyectoId}`
+      const grupoKey = claveGrupo(l)
       const esNuevoGrupo = grupoKey !== anteriorGrupo
       anteriorGrupo = grupoKey
       const siguiente = lineas[i + 1]
       const esUltimoDeUsuario = !siguiente || siguiente.usuarioId !== l.usuarioId
-      return { linea: l, esNuevoGrupo, esUltimoDeUsuario }
+      return { linea: l, esNuevoGrupo, esUltimoDeUsuario, grupoKey }
     })
   }, [lineas])
 
@@ -183,9 +220,11 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
             Pago a terceros
           </DialogTitle>
           <DialogDescription>
-            {paso === 'periodo'
-              ? 'Elige el periodo a liquidar. Se junta un día por línea, con las horas de tarea y el marcaje de asistencia de esa jornada.'
-              : 'Cada línea es un día. Revisa el marcaje, desmarca lo que no corresponda pagar ahora, y ajusta el monto si hace falta.'}
+            {paso === 'periodo' &&
+              'Elige el periodo a liquidar. Se junta un día por línea, con las horas de tarea y el marcaje de asistencia de esa jornada.'}
+            {paso === 'resumen' &&
+              'El dinero va directo a la cuenta de cada persona: se crea una liquidación independiente por persona (una línea por cada proyecto en el que trabajó). Revisa el marcaje, desmarca lo que no corresponda, y ajusta monto o descripción antes de enviar.'}
+            {paso === 'listo' && 'Listo. Cada liquidación sigue su propio flujo de aprobación y depósito a partir de aquí.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -222,16 +261,26 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
               </div>
             )}
             <div className="space-y-2">
-              {conCabeceras.map(({ linea: l, esNuevoGrupo, esUltimoDeUsuario }) => {
+              {conCabeceras.map(({ linea: l, esNuevoGrupo, esUltimoDeUsuario, grupoKey }) => {
                 const key = claveLinea(l)
                 const info = ASISTENCIA_INFO[l.estadoAsistencia]
                 const Icono = info.icon
                 return (
                   <div key={key}>
                     {esNuevoGrupo && (
-                      <div className="text-xs font-medium text-muted-foreground mt-3 mb-1 flex items-center gap-1.5">
-                        {l.nombre}
-                        <Badge variant="outline" className="text-[10px]">{l.proyectoCodigo}</Badge>
+                      <div className="mt-3 mb-1.5 space-y-1">
+                        <div className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                          {l.nombre}
+                          <Badge variant="outline" className="text-[10px]">{l.proyectoCodigo}</Badge>
+                        </div>
+                        <Textarea
+                          value={descripciones[grupoKey] ?? ''}
+                          onChange={(e) => actualizarDescripcion(grupoKey, e.target.value)}
+                          disabled={creando}
+                          rows={2}
+                          className="text-xs resize-none"
+                          placeholder="Descripción de esta línea (se le indicará a la persona qué Recibo por Honorarios adjuntar)"
+                        />
                       </div>
                     )}
                     <div className={`border rounded-md p-2.5 flex items-start gap-3 ${l.incluido ? '' : 'opacity-50'}`}>
@@ -288,10 +337,35 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
             <div className="flex items-center justify-between border-t pt-2 text-sm font-medium">
               <span className="flex items-center gap-1.5 text-muted-foreground font-normal">
                 <Users className="h-3.5 w-3.5" />
-                {lineas.filter((l) => l.incluido).length} de {lineas.length} días
+                {lineas.filter((l) => l.incluido).length} de {lineas.length} días · {subtotalesPorUsuario.size} persona{subtotalesPorUsuario.size !== 1 && 's'}
               </span>
               <span>Total S/ {totalGeneral.toFixed(2)}</span>
             </div>
+          </div>
+        )}
+
+        {paso === 'listo' && (
+          <div className="space-y-2 py-2">
+            {hojasCreadas.map((h) => (
+              <Link
+                key={h.id}
+                href={`/gastos/mis-requerimientos/${h.id}`}
+                onClick={() => resetAlCerrar(false)}
+                className="flex items-center justify-between gap-3 border rounded-md p-3 hover:bg-muted transition-colors"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{h.nombre}</div>
+                    <div className="text-xs text-muted-foreground">{h.numero}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-sm font-semibold">S/ {h.total.toFixed(2)}</span>
+                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                </div>
+              </Link>
+            ))}
           </div>
         )}
 
@@ -301,18 +375,26 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
               Atrás
             </Button>
           )}
-          <Button variant="outline" onClick={() => resetAlCerrar(false)} disabled={creando || loadingPreview}>
-            Cancelar
-          </Button>
-          {paso === 'periodo' ? (
+          {paso !== 'listo' && (
+            <Button variant="outline" onClick={() => resetAlCerrar(false)} disabled={creando || loadingPreview}>
+              Cancelar
+            </Button>
+          )}
+          {paso === 'periodo' && (
             <Button onClick={abrirPreview} disabled={loadingPreview} className="bg-teal-600 hover:bg-teal-700">
               {loadingPreview && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               Calcular
             </Button>
-          ) : (
+          )}
+          {paso === 'resumen' && (
             <Button onClick={submit} disabled={creando} className="bg-teal-600 hover:bg-teal-700">
               {creando && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               Crear y enviar
+            </Button>
+          )}
+          {paso === 'listo' && (
+            <Button onClick={() => resetAlCerrar(false)} className="bg-teal-600 hover:bg-teal-700">
+              Cerrar
             </Button>
           )}
         </DialogFooter>

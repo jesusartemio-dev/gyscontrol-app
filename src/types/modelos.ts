@@ -2799,6 +2799,8 @@ export interface HojaDeGastos {
   centroCostoId?: string | null
   categoriaCosto: CategoriaCosto
   empleadoId: string
+  /** Quién generó la hoja, si es distinto del beneficiario (empleadoId) — p.ej. pago a terceros. */
+  creadoPorId?: string | null
   aprobadorId?: string | null
   motivo: string
   observaciones?: string | null
@@ -2825,6 +2827,7 @@ export interface HojaDeGastos {
   proyecto?: Pick<Proyecto, 'id' | 'codigo' | 'nombre'> | null
   centroCosto?: CentroCosto | null
   empleado?: { id: string; name: string | null; email: string }
+  creadoPor?: { id: string; name: string | null; email: string } | null
   aprobador?: { id: string; name: string | null; email: string } | null
   lineas?: GastoLinea[]
   adjuntos?: HojaDeGastosAdjunto[]

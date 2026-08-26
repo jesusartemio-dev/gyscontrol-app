@@ -228,12 +228,22 @@ export interface CrearPagoTercerosPayload {
   fechaDesde: string
   fechaHasta: string
   proyectoId?: string
-  lineas: Array<{ usuarioId: string; proyectoId: string; fecha: string; monto: number }>
+  dias: Array<{ usuarioId: string; proyectoId: string; fecha: string; monto: number }>
+  /** Descripción editada por persona+proyecto — clave `usuarioId::proyectoId`. */
+  descripciones?: Record<string, string>
+}
+
+export interface HojaCreadaPagoTercero {
+  id: string
+  numero: string
+  empleadoId: string
+  nombre: string
+  total: number
 }
 
 export async function crearPagoTerceros(
   payload: CrearPagoTercerosPayload
-): Promise<{ hoja: HojaDeGastos; omitidas: string[] }> {
+): Promise<{ hojas: HojaCreadaPagoTercero[]; omitidas: string[] }> {
   const res = await fetch(`${BASE_URL}/pago-terceros`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
