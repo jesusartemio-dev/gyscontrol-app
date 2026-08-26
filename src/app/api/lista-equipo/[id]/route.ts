@@ -125,8 +125,8 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
 
     // ✅ Validar transición de estado + rol si hay cambio de estado
     if (body.estado && body.estado !== existe.estado) {
-      const userRole = session.user.role || ''
-      const resultado = validarTransicion(existe.estado, body.estado, userRole)
+      const userRoles = session.user.roles?.length ? session.user.roles : [session.user.role || '']
+      const resultado = validarTransicion(existe.estado, body.estado, userRoles)
       if (!resultado.valido) {
         return NextResponse.json(
           { error: resultado.error },

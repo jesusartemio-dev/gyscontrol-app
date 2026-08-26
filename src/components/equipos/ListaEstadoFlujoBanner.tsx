@@ -47,12 +47,12 @@ interface Props {
 
 export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0, itemsVerificados = 0, motivoAnulacion, onUpdated, className }: Props) {
   const { data: session } = useSession()
-  const rol = session?.user?.role || ''
+  const roles = session?.user?.roles?.length ? session.user.roles : [session?.user?.role || '']
   const flujo = flujoEstados[estado] || { roles: [] }
 
-  const puedeAvanzar = !!listaId && !!flujo.siguiente && flujo.roles.includes(rol)
-  const puedeRetroceder = !!listaId && !!flujo.retroceder && flujo.roles.includes(rol)
-  const puedeAnular = !!listaId && canAnular(estado, rol)
+  const puedeAvanzar = !!listaId && !!flujo.siguiente && flujo.roles.some((r) => roles.includes(r))
+  const puedeRetroceder = !!listaId && !!flujo.retroceder && flujo.roles.some((r) => roles.includes(r))
+  const puedeAnular = !!listaId && canAnular(estado, roles)
 
   const [motivoAnulacionInput, setMotivoAnulacionInput] = useState('')
   const [openAnulacion, setOpenAnulacion] = useState(false)

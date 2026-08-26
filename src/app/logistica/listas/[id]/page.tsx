@@ -72,10 +72,10 @@ export default function LogisticaListaDetallePage() {
     fetchData()
   }, [id])
 
-  const rol = session?.user?.role || ''
+  const roles = session?.user?.roles?.length ? session.user.roles : [session?.user?.role || '']
   const flujo = lista ? flujoEstados[lista.estado as EstadoListaEquipo] : null
-  const puedeAvanzar = !!flujo?.siguiente && flujo.roles.includes(rol)
-  const puedeRetroceder = !!flujo?.retroceder && flujo.roles.includes(rol)
+  const puedeAvanzar = !!flujo?.siguiente && flujo.roles.some((r) => roles.includes(r))
+  const puedeRetroceder = !!flujo?.retroceder && flujo.roles.some((r) => roles.includes(r))
 
   const handleAvanzarEstado = async () => {
     if (!lista || !flujo?.siguiente) return

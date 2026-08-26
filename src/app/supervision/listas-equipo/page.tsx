@@ -64,7 +64,7 @@ function formatDate(date: string) {
 export default function SupervisionListasEquipoPage() {
   const router = useRouter()
   const { data: session } = useSession()
-  const userRole = session?.user?.role || ''
+  const userRoles = session?.user?.roles?.length ? session.user.roles : [session?.user?.role || '']
 
   const [listas, setListas] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -307,8 +307,8 @@ export default function SupervisionListasEquipoPage() {
             ) : (
               filteredListas.map((lista) => {
                 const flujo = flujoEstados[lista.estado as EstadoListaEquipo] || {}
-                const puedeAvanzar = !!flujo.siguiente && flujo.roles?.includes(userRole)
-                const puedeRetroceder = !!flujo.retroceder && flujo.roles?.includes(userRole)
+                const puedeAvanzar = !!flujo.siguiente && flujo.roles?.some((r) => userRoles.includes(r))
+                const puedeRetroceder = !!flujo.retroceder && flujo.roles?.some((r) => userRoles.includes(r))
                 const esProcesando = procesando === lista.id
 
                 return (

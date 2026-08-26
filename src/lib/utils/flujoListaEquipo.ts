@@ -29,6 +29,18 @@ export const flujoEstados: Record<EstadoListaEquipo, FlujoEstado> = {
 // Roles que pueden anular una lista (desde cualquier estado excepto aprobada)
 export const anulacionRoles = ['coordinador', 'coordinador_logistico', 'admin']
 
+/**
+ * Normaliza rol único o multi-rol (session.user.roles) a un array.
+ * Acepta string suelto por retrocompatibilidad con llamadas antiguas.
+ */
+function normalizarRoles(rol: string | string[]): string[] {
+  return Array.isArray(rol) ? rol : [rol]
+}
+
+function algunRolEn(roles: string | string[], permitidos: string[]): boolean {
+  return normalizarRoles(roles).some((r) => permitidos.includes(r))
+}
+
 export const estadosList: { key: EstadoListaEquipo; label: string }[] = [
   { key: 'borrador',    label: 'Borrador' },
   { key: 'por_revisar', label: 'Por Revisar' },
@@ -54,14 +66,14 @@ export const estadoLabels: Record<string, string> = Object.fromEntries(
 export function validarTransicion(
   estadoActual: string,
   nuevoEstado: string,
-  rol: string
+  rol: string | string[]
 ): { valido: boolean; error?: string } {
   // Anulación: desde cualquier estado excepto aprobada y anulada
   if (nuevoEstado === 'anulada') {
     if (estadoActual === 'aprobada' || estadoActual === 'anulada') {
       return { valido: false, error: `No se puede anular una lista en estado '${estadoActual}'` }
     }
-    if (!anulacionRoles.includes(rol) && rol !== 'admin') {
+    if (!algunRolEn(rol, anulacionRoles)) {
       return { valido: false, error: `Rol '${rol}' no tiene permiso para anular listas` }
     }
     return { valido: true }
@@ -72,7 +84,7 @@ export function validarTransicion(
     return { valido: false, error: `Estado actual '${estadoActual}' no reconocido` }
   }
 
-  if (!flujo.roles.includes(rol) && rol !== 'admin') {
+  if (!algunRolEn(rol, flujo.roles)) {
     return { valido: false, error: `Rol '${rol}' no tiene permiso para cambiar desde '${estadoActual}'` }
   }
 
@@ -89,9 +101,9 @@ export function validarTransicion(
 /**
  * Check if a list can be annulled from its current state
  */
-export function canAnular(estadoActual: string, rol: string): boolean {
+export function canAnular(estadoActual: string, rol: string | string[]): boolean {
   if (estadoActual === 'aprobada' || estadoActual === 'anulada') return false
-  return anulacionRoles.includes(rol) || rol === 'admin'
+  return algunRolEn(rol, anulacionRoles)
 }
 
 /**

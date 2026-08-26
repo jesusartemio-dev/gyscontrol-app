@@ -66,7 +66,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
   onUpdated,
 }) => {
   const { data: session } = useSession()
-  const userRole = session?.user?.role || ''
+  const userRoles = session?.user?.roles?.length ? session.user.roles : [session?.user?.role || '']
   const esCreador = !!usuarioId && session?.user?.id === usuarioId
   const [isUpdating, setIsUpdating] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
@@ -75,7 +75,7 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
   const currentOrden = getEstadoOrden(estado)
 
   const puedeAvanzarA = (target: string): boolean => {
-    return validarTransicionPedido(estado, target, userRole).valido
+    return validarTransicionPedido(estado, target, userRoles).valido
   }
 
   const handleEstadoChange = (nuevoEstado: string) => {

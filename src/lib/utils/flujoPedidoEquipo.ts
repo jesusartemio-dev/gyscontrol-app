@@ -43,6 +43,18 @@ export const estadoPedidoLabels: Record<string, string> = Object.fromEntries(
 )
 
 /**
+ * Normaliza rol único o multi-rol (session.user.roles) a un array.
+ * Acepta string suelto por retrocompatibilidad con llamadas antiguas.
+ */
+function normalizarRoles(rol: string | string[]): string[] {
+  return Array.isArray(rol) ? rol : [rol]
+}
+
+function algunRolEn(rol: string | string[], permitidos: string[]): boolean {
+  return normalizarRoles(rol).some((r) => permitidos.includes(r))
+}
+
+/**
  * Validates whether a state transition is allowed for the given role.
  * Returns `{ valido: true }` if the transition is permitted,
  * or `{ valido: false, error: '...' }` otherwise.
@@ -55,7 +67,7 @@ export const estadoPedidoLabels: Record<string, string> = Object.fromEntries(
 export function validarTransicionPedido(
   estadoActual: string,
   nuevoEstado: string,
-  rol: string,
+  rol: string | string[],
   esCreador = false
 ): { valido: boolean; error?: string } {
   const flujo = flujoEstadosPedido[estadoActual as EstadoPedidoEquipo]
@@ -86,7 +98,7 @@ export function validarTransicionPedido(
   }
 
   // Check role permission
-  if (!flujo.roles.includes(rol)) {
+  if (!algunRolEn(rol, flujo.roles)) {
     return {
       valido: false,
       error: `El rol "${rol}" no tiene permiso para cambiar el estado desde "${estadoPedidoLabels[estadoActual]}"`,

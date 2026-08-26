@@ -200,7 +200,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
 
     // Validate state transition using state machine
     if (body.estado && body.estado !== pedidoActual.estado) {
-      const userRole = session.user.role || ''
+      const userRoles = session.user.roles?.length ? session.user.roles : [session.user.role || '']
       const esCreador = pedidoActual.responsableId === session.user.id
       // Excepción: el área comercial puede aprobar (enviado → aprobado) los pedidos
       // que provienen de una venta de equipos, sin pasar por el área de proyectos.
@@ -210,7 +210,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
         pedidoActual.estado === 'enviado' &&
         body.estado === 'aprobado'
       if (!comercialApruebaVenta) {
-        const resultado = validarTransicionPedido(pedidoActual.estado, body.estado, userRole, esCreador)
+        const resultado = validarTransicionPedido(pedidoActual.estado, body.estado, userRoles, esCreador)
         if (!resultado.valido) {
           return NextResponse.json(
             { error: resultado.error },
