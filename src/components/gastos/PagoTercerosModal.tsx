@@ -89,6 +89,7 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
   const [loadingPreview, setLoadingPreview] = useState(false)
   const [lineas, setLineas] = useState<LineaEditable[]>([])
   const [descripciones, setDescripciones] = useState<Record<string, string>>({})
+  const [descripcionesTocadas, setDescripcionesTocadas] = useState<Set<string>>(new Set())
   const [creando, setCreando] = useState(false)
   const [hojasCreadas, setHojasCreadas] = useState<HojaCreadaPagoTercero[]>([])
 
@@ -132,12 +133,31 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
     setLineas((prev) => prev.map((l) => (claveLinea(l) === key ? { ...l, monto } : l)))
   }
 
+  // Mientras el usuario no haya escrito su propio texto en la descripción de
+  // un grupo, se recalcula sola con los días que van quedando marcados — así
+  // "14, 21, 22, 24 jul" pasa a "14 jul" en cuanto desmarcas el resto. En
+  // cuanto la edita a mano (actualizarDescripcion), se congela: no se vuelve
+  // a pisar aunque siga marcando/desmarcando días de ese grupo.
   const toggleIncluido = (key: string) => {
-    setLineas((prev) => prev.map((l) => (claveLinea(l) === key ? { ...l, incluido: !l.incluido } : l)))
+    setLineas((prev) => {
+      const next = prev.map((l) => (claveLinea(l) === key ? { ...l, incluido: !l.incluido } : l))
+      const linea = next.find((l) => claveLinea(l) === key)
+      if (linea) {
+        const grupoKey = claveGrupo(linea)
+        if (!descripcionesTocadas.has(grupoKey)) {
+          const diasIncluidos = next.filter((l) => claveGrupo(l) === grupoKey && l.incluido)
+          if (diasIncluidos.length > 0) {
+            setDescripciones((prevDesc) => ({ ...prevDesc, [grupoKey]: descripcionSugerida(diasIncluidos) }))
+          }
+        }
+      }
+      return next
+    })
   }
 
   const actualizarDescripcion = (grupoKey: string, texto: string) => {
     setDescripciones((prev) => ({ ...prev, [grupoKey]: texto }))
+    setDescripcionesTocadas((prev) => (prev.has(grupoKey) ? prev : new Set(prev).add(grupoKey)))
   }
 
   const submit = async () => {
@@ -175,6 +195,7 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
       setPaso('periodo')
       setLineas([])
       setDescripciones({})
+      setDescripcionesTocadas(new Set())
       setHojasCreadas([])
     }
   }
