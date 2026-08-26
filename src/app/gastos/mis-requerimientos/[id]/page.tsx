@@ -43,6 +43,7 @@ import {
   Package,
   Pencil,
   Check,
+  MessageCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -77,6 +78,18 @@ const formatDate = (date: string | null | undefined) => {
   if (!date) return '-'
   const [year, month, day] = date.split('T')[0].split('-').map(Number)
   return new Date(year, month - 1, day).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+// Igual que en la lista de "Mis Requerimientos": los pagos a terceros dejan
+// la cabecera sin proyecto a propósito (para no duplicar costo en los
+// reportes) — se deriva de las líneas, que sí llevan su propio proyecto.
+function getAsignadoA(hoja: HojaDeGastos, lineas: GastoLinea[]): string {
+  if (hoja.proyecto) return `${hoja.proyecto.codigo} - ${hoja.proyecto.nombre}`
+  if (hoja.centroCosto) return hoja.centroCosto.nombre
+  const codigos = Array.from(new Set(lineas.map((l) => l.proyecto?.codigo).filter((c): c is string => !!c)))
+  if (codigos.length === 1) return codigos[0]
+  if (codigos.length > 1) return `${codigos[0]} +${codigos.length - 1}`
+  return 'Sin asignación'
 }
 
 export default function RequerimientoDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -322,6 +335,49 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
     URL.revokeObjectURL(url)
   }
 
+  const ESTADO_LABELS: Record<string, string> = {
+    borrador: 'Borrador', enviado: 'Enviado', aprobado: 'Aprobado',
+    depositado: 'Depositado', rendido: 'Rendido', revisado: 'Revisado',
+    validado: 'Validado', cerrado: 'Cerrado', rechazado: 'Rechazado',
+  }
+
+  // Resumen en texto plano para pegar en WhatsApp y gestionar la aprobación
+  // ahí — con el enlace directo a esta hoja y un vistazo rápido del detalle,
+  // sin que el destinatario tenga que abrir la app primero.
+  const handleCopiarWhatsApp = async () => {
+    if (!hoja) return
+    const fmtMoney = (v: number) => `S/ ${v.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    const asignacion = getAsignadoA(hoja, lineas)
+    const url = `${window.location.origin}/gastos/mis-requerimientos/${hoja.id}`
+
+    const MAX_LINEAS = 6
+    const detalle = lineas
+      .slice(0, MAX_LINEAS)
+      .map((l) => `• ${formatDate(l.fecha)} — ${l.descripcion} — ${fmtMoney(l.monto)}`)
+      .join('\n')
+    const masLineas = lineas.length > MAX_LINEAS ? `\n… y ${lineas.length - MAX_LINEAS} línea(s) más` : ''
+
+    const partes = [
+      `*${hoja.numero}* — ${hoja.motivo}`,
+      `Estado: ${ESTADO_LABELS[hoja.estado] || hoja.estado}`,
+      `Empleado: ${hoja.empleado?.name || '-'}`,
+      hoja.creadoPor && hoja.creadoPor.id !== hoja.empleadoId ? `Generado por: ${hoja.creadoPor.name || '-'}` : null,
+      `Asignado a: ${asignacion}`,
+      `Monto: ${fmtMoney(hoja.montoGastado || 0)}`,
+      lineas.length > 0 ? `\nDetalle:\n${detalle}${masLineas}` : null,
+      `\nVer y aprobar: ${url}`,
+    ].filter(Boolean)
+
+    const texto = partes.join('\n')
+
+    try {
+      await navigator.clipboard.writeText(texto)
+      toast.success('Copiado — listo para pegar en WhatsApp')
+    } catch {
+      toast.error('No se pudo copiar. Copia el texto manualmente.')
+    }
+  }
+
   const handleDownloadExcel = async () => {
     try {
       const res = await fetch(`/api/hoja-de-gastos/${id}/exportar`)
@@ -369,9 +425,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
       doc.line(margin, 33, pageWidth - margin, 33)
 
       // --- Info section using autoTable for proper text wrapping ---
-      const asignacion = hoja.proyecto
-        ? `${hoja.proyecto.codigo} - ${hoja.proyecto.nombre}`
-        : hoja.centroCosto?.nombre || '-'
+      const asignacion = getAsignadoA(hoja, lineas)
 
       const infoRows: string[][] = [
         ['Estado', estadoLabels[hoja.estado] || hoja.estado, 'Creado', formatDate(hoja.createdAt)],
@@ -707,6 +761,10 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
               Eliminar
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={handleCopiarWhatsApp}>
+            <MessageCircle className="h-4 w-4 mr-1 text-emerald-600" />
+            Copiar para WhatsApp
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
@@ -727,10 +785,8 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             </DropdownMenuContent>
           </DropdownMenu>
           <Badge className="capitalize text-xs" variant="outline">
-          {hoja.proyecto
-            ? `${hoja.proyecto.codigo} - ${hoja.proyecto.nombre}`
-            : hoja.centroCosto?.nombre || 'Sin asignación'}
-        </Badge>
+            {getAsignadoA(hoja, lineas)}
+          </Badge>
         </div>
       </div>
 
