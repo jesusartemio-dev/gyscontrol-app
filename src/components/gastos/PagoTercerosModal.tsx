@@ -146,15 +146,31 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
   const personasSinTarifa = new Set(lineas.filter((l) => l.sinTarifa).map((l) => l.usuarioId)).size
   const diasConProblema = lineas.filter((l) => l.estadoAsistencia !== 'completo').length
 
+  // Subtotal por trabajador (suma todos sus días marcados, sin importar en
+  // cuántos proyectos — si alguien trabajó en 2, se cuenta igual una vez).
+  // Se recalcula solo, refleja lo marcado/desmarcado y los montos editados.
+  const subtotalesPorUsuario = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const l of lineas) {
+      if (!l.incluido) continue
+      map.set(l.usuarioId, (map.get(l.usuarioId) ?? 0) + (Number(l.monto) || 0))
+    }
+    return map
+  }, [lineas])
+
   // Cabeceras por persona+proyecto, para no repetir nombre y código en cada
   // fila de día — las líneas ya vienen ordenadas por nombre/fecha del backend.
+  // `esUltimoDeUsuario` marca dónde pintar el subtotal: al cierre del bloque
+  // de esa persona (después de su último proyecto/día), no de cada proyecto.
   const conCabeceras = useMemo(() => {
-    let anterior = ''
-    return lineas.map((l) => {
+    let anteriorGrupo = ''
+    return lineas.map((l, i) => {
       const grupoKey = `${l.usuarioId}::${l.proyectoId}`
-      const esNuevoGrupo = grupoKey !== anterior
-      anterior = grupoKey
-      return { linea: l, esNuevoGrupo }
+      const esNuevoGrupo = grupoKey !== anteriorGrupo
+      anteriorGrupo = grupoKey
+      const siguiente = lineas[i + 1]
+      const esUltimoDeUsuario = !siguiente || siguiente.usuarioId !== l.usuarioId
+      return { linea: l, esNuevoGrupo, esUltimoDeUsuario }
     })
   }, [lineas])
 
@@ -206,7 +222,7 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
               </div>
             )}
             <div className="space-y-2">
-              {conCabeceras.map(({ linea: l, esNuevoGrupo }) => {
+              {conCabeceras.map(({ linea: l, esNuevoGrupo, esUltimoDeUsuario }) => {
                 const key = claveLinea(l)
                 const info = ASISTENCIA_INFO[l.estadoAsistencia]
                 const Icono = info.icon
@@ -254,6 +270,14 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
                         className="w-28 shrink-0"
                       />
                     </div>
+                    {esUltimoDeUsuario && (
+                      <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground pt-1 pr-1">
+                        Subtotal {l.nombre}:
+                        <span className="font-semibold text-foreground">
+                          S/ {(subtotalesPorUsuario.get(l.usuarioId) ?? 0).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )
               })}
