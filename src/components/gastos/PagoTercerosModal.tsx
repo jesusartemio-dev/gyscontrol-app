@@ -250,7 +250,10 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
                           </Badge>
                         </div>
                         <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-3 flex-wrap">
-                          <span>{l.horas}h tarea · {l.dias}d × {l.tarifaDia ?? 0} {l.monedaTarifa}</span>
+                          <span>
+                            {l.horas}h tarea · {l.dias}d × {l.tarifaDia ?? 0} {l.monedaTarifa} = S/ {l.subtotal.toFixed(2)}
+                            {l.monto !== l.subtotal && <span className="text-teal-700 font-medium"> (editado)</span>}
+                          </span>
                           {(l.horaIngreso || l.horaSalida) && (
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
