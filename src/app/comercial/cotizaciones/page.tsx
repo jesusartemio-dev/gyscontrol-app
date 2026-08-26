@@ -23,6 +23,8 @@ import type { PaginationMeta } from '@/types/payloads'
 import { penToUSD } from '@/lib/costos'
 import { ExcelImportWizard } from '@/components/agente/ExcelImportWizard'
 import { usePagination } from '@/components/ui/data-pagination'
+import { exportarCotizacionesAExcel } from '@/lib/utils/cotizacionListExcel'
+import { toast } from 'sonner'
 
 const formatCurrencyKPI = (amount: number): string => {
   if (amount >= 1000000) {
@@ -40,6 +42,7 @@ export default function CotizacionesPage() {
   const [error, setError] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [importEnabled, setImportEnabled] = useState(true)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     fetch('/api/agente/features')
@@ -122,6 +125,28 @@ export default function CotizacionesPage() {
     fetchCotizaciones()
   }
 
+  const handleExportExcel = async () => {
+    setExporting(true)
+    try {
+      const result = await getCotizacionesPaginated({
+        page: 1,
+        limit: Math.max(paginationMeta.total, 1),
+        search: debouncedSearch || undefined,
+        estado: statusFilter !== 'all' ? statusFilter : undefined,
+        anio: yearFilter !== 'todos' ? yearFilter : undefined,
+      })
+      if (result.data.length === 0) {
+        toast.info('No hay cotizaciones para exportar')
+        return
+      }
+      exportarCotizacionesAExcel(result.data)
+    } catch {
+      toast.error('Error al exportar cotizaciones')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   // KPI: monto total de la página visible
   const montoTotal = cotizaciones.reduce((sum, c) => {
     const monto = c.totalCliente || 0
@@ -156,8 +181,18 @@ export default function CotizacionesPage() {
               Importar Excel
             </Button>
           )}
-          <Button variant="outline" size="sm" className="h-8">
-            <Download className="h-3.5 w-3.5 mr-1.5" />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={handleExportExcel}
+            disabled={exporting || paginationMeta.total === 0}
+          >
+            {exporting ? (
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <Download className="h-3.5 w-3.5 mr-1.5" />
+            )}
             Exportar
           </Button>
           <CotizacionModal
