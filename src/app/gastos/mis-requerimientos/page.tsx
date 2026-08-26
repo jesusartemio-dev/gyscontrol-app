@@ -9,10 +9,13 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Plus, Search, X, Loader2, CreditCard, ChevronRight, Edit, Trash2, Package, CalendarClock } from 'lucide-react'
+import { Plus, Search, X, Loader2, CreditCard, ChevronRight, Edit, Trash2, Package, CalendarClock, DollarSign } from 'lucide-react'
 import { toast } from 'sonner'
+import { useSession } from 'next-auth/react'
+import { tieneRol } from '@/lib/auth/roles'
 import { getHojasDeGastos, deleteHojaDeGastos } from '@/lib/services/hojaDeGastos'
 import { RequerimientoDelDiaModal } from '@/components/gastos/RequerimientoDelDiaModal'
+import { PagoTercerosModal } from '@/components/gastos/PagoTercerosModal'
 import type { HojaDeGastos } from '@/types'
 
 const ESTADOS = [
@@ -67,8 +70,13 @@ function getAsignadoA(hoja: HojaDeGastos): string {
   return '-'
 }
 
+// Roles que supervisan cuadrillas de campo y pueden liquidar terceros —
+// mismo set que el backend en /api/hoja-de-gastos/pago-terceros.
+const ROLES_PAGO_TERCEROS = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos']
+
 export default function MisRequerimientosPage() {
   const router = useRouter()
+  const { data: session } = useSession()
   const [hojas, setHojas] = useState<HojaDeGastos[]>([])
   const [loading, setLoading] = useState(true)
   const [filterEstado, setFilterEstado] = useState('all')
@@ -76,6 +84,8 @@ export default function MisRequerimientosPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<HojaDeGastos | null>(null)
   const [modalDiaOpen, setModalDiaOpen] = useState(false)
+  const [modalTercerosOpen, setModalTercerosOpen] = useState(false)
+  const puedeLiquidarTerceros = tieneRol(session, ROLES_PAGO_TERCEROS)
 
   useEffect(() => { loadData() }, [])
 
@@ -134,6 +144,12 @@ export default function MisRequerimientosPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {puedeLiquidarTerceros && (
+            <Button variant="outline" onClick={() => setModalTercerosOpen(true)}>
+              <DollarSign className="h-4 w-4 mr-1" />
+              Pago a terceros
+            </Button>
+          )}
           <Button variant="outline" onClick={() => setModalDiaOpen(true)}>
             <CalendarClock className="h-4 w-4 mr-1" />
             Requerimiento del día
@@ -307,6 +323,14 @@ export default function MisRequerimientosPage() {
         onOpenChange={setModalDiaOpen}
         onCreated={loadData}
       />
+
+      {puedeLiquidarTerceros && (
+        <PagoTercerosModal
+          open={modalTercerosOpen}
+          onOpenChange={setModalTercerosOpen}
+          onCreated={loadData}
+        />
+      )}
     </div>
   )
 }

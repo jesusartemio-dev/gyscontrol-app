@@ -177,3 +177,60 @@ export async function crearRequerimientoDelDia(
   }
   return { ok: true, hoja: data }
 }
+
+// Liquidación de terceros: agrupa horas aprobadas de personal eventual por
+// persona+proyecto en un rango de fechas y genera un pago (HojaDeGastos con
+// categoriaCosto='servicios', tipoPropósito='honorarios_terceros').
+export interface GrupoPagoTercero {
+  usuarioId: string
+  nombre: string
+  proyectoId: string
+  proyectoCodigo: string
+  proyectoNombre: string
+  horas: number
+  dias: number
+  tarifaDia: number | null
+  monedaTarifa: string
+  subtotal: number
+  sinTarifa: boolean
+  registroIds: string[]
+}
+
+export interface PreviewPagoTercerosResult {
+  grupos: GrupoPagoTercero[]
+  horasPorDia: number
+  tipoCambio: number
+}
+
+export async function previsualizarPagoTerceros(params: {
+  fechaDesde: string
+  fechaHasta: string
+  proyectoId?: string
+}): Promise<PreviewPagoTercerosResult> {
+  const searchParams = new URLSearchParams({ fechaDesde: params.fechaDesde, fechaHasta: params.fechaHasta })
+  if (params.proyectoId) searchParams.set('proyectoId', params.proyectoId)
+  const res = await fetch(`${BASE_URL}/pago-terceros/preview?${searchParams.toString()}`)
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Error al calcular la liquidación')
+  return data
+}
+
+export interface CrearPagoTercerosPayload {
+  fechaDesde: string
+  fechaHasta: string
+  proyectoId?: string
+  lineas: Array<{ usuarioId: string; proyectoId: string; monto: number }>
+}
+
+export async function crearPagoTerceros(
+  payload: CrearPagoTercerosPayload
+): Promise<{ hoja: HojaDeGastos; omitidas: string[] }> {
+  const res = await fetch(`${BASE_URL}/pago-terceros`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Error al crear la liquidación de terceros')
+  return data
+}

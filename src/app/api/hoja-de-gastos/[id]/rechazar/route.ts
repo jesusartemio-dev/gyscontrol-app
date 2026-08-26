@@ -61,6 +61,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         },
       })
 
+      // Liquidación de terceros rechazada: liberar las horas para que puedan
+      // incluirse en una liquidación nueva (si no se liberan, quedan
+      // "liquidadas" para siempre sin haberse pagado).
+      if (hoja.tipoPropósito === 'honorarios_terceros') {
+        await tx.registroHoras.updateMany({
+          where: { liquidadoEnHojaId: id },
+          data: { liquidadoEnHojaId: null },
+        })
+      }
+
       return updated
     })
 

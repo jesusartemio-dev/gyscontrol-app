@@ -1542,6 +1542,10 @@ model RegistroHoras {
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime
   proyectoTareaId          String?
+  // Liquidación de terceros que ya pagó estas horas — evita liquidar dos
+  // veces el mismo registro. onDelete: SetNull para que si se elimina la
+  // hoja (borrador rechazado, etc.) las horas queden libres de nuevo.
+  liquidadoEnHojaId        String?
   edt                      Edt?                       @relation(fields: [edtId], references: [id])
   proyectoEdt              ProyectoEdt?               @relation(fields: [proyectoEdtId], references: [id])
   proyecto                 Proyecto                   @relation(fields: [proyectoId], references: [id])
@@ -1549,6 +1553,7 @@ model RegistroHoras {
   proyectoTarea            ProyectoTarea?             @relation(fields: [proyectoTareaId], references: [id])
   recurso                  Recurso                    @relation(fields: [recursoId], references: [id])
   user                     User                       @relation(fields: [usuarioId], references: [id])
+  liquidadoEnHoja          HojaDeGastos?              @relation("RegistroHorasLiquidacion", fields: [liquidadoEnHojaId], references: [id], onDelete: SetNull)
   origenCampoMiembro       RegistroHorasCampoMiembro?
   lineaHH                  LineaHH?
 
@@ -1556,6 +1561,7 @@ model RegistroHoras {
   @@index([origen, fechaTrabajo])
   @@index([proyectoEdtId, proyectoTareaId, fechaTrabajo])
   @@index([proyectoTareaId, fechaTrabajo])
+  @@index([liquidadoEnHojaId])
   @@map("registro_horas")
 }
 
@@ -4350,7 +4356,7 @@ model HojaDeGastos {
   updatedAt               DateTime
   // Tipo de requerimiento
   tipoPropósito          String         @default("gastos_viaticos") @map("tipo_proposito")
-  // "gastos_viaticos" | "compra_materiales"
+  // "gastos_viaticos" | "compra_materiales" | "honorarios_terceros"
   justificacionMateriales String?        @map("justificacion_materiales")
   // Trazabilidad: si la hoja se creó automáticamente desde el botón "Requerimiento del día"
   origenRegistroCampoId   String?
@@ -4366,6 +4372,8 @@ model HojaDeGastos {
   itemsMateriales     RequerimientoMaterialItem[]
   comprobantes        GastoComprobante[]
   depositos           DepositoHoja[]
+  // Horas de terceros pagadas por esta hoja (tipoPropósito='honorarios_terceros')
+  registrosLiquidados RegistroHoras[]             @relation("RegistroHorasLiquidacion")
 
   @@index([proyectoId, estado])
   @@index([centroCostoId, estado])

@@ -66,8 +66,12 @@ function costoHoraPEN(
   return horasMes > 0 ? costos.totalMensual / horasMes : 0
 }
 
-/** Parámetros compartidos: horas del mes, horas de la jornada y tipo de cambio. */
-async function obtenerParametros() {
+/**
+ * Parámetros compartidos: horas del mes, horas de la jornada y tipo de cambio.
+ * Exportado porque la liquidación de terceros (pago-terceros) necesita la
+ * misma conversión día↔hora que usa el snapshot, para que ambos coincidan.
+ */
+export async function obtenerParametros() {
   const [config, calendario] = await Promise.all([
     prisma.configuracionGeneral.findFirst({ select: { horasMensuales: true, tipoCambio: true } }),
     prisma.calendarioLaboral.findFirst({ where: { activo: true }, select: { horasPorDia: true } }),
