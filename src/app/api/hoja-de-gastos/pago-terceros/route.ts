@@ -13,6 +13,8 @@ const CATEGORIA_GASTO_HONORARIOS = 'Honorarios Terceros'
 interface LineaPayload {
   usuarioId: string
   proyectoId: string
+  /** YYYY-MM-DD — un día específico, no todo el periodo. */
+  fecha: string
   /** Monto que el usuario dejó en el preview, puede diferir del subtotal sugerido (ajuste manual). */
   monto: number
 }
@@ -67,20 +69,20 @@ export async function POST(req: Request) {
     }
 
     // Fuente de verdad recalculada ahora mismo, no lo que mandó el cliente.
-    const { grupos } = await calcularGruposPagoTerceros({
+    const { lineas: disponibles } = await calcularGruposPagoTerceros({
       fechaDesde,
       fechaHasta,
       proyectoId: payload.proyectoId,
     })
-    const gruposPorClave = new Map(grupos.map((g) => [`${g.usuarioId}::${g.proyectoId}`, g]))
+    const disponiblesPorClave = new Map(disponibles.map((g) => [`${g.usuarioId}::${g.proyectoId}::${g.fecha}`, g]))
 
-    const lineasValidas: Array<{ grupo: (typeof grupos)[number]; monto: number }> = []
+    const lineasValidas: Array<{ grupo: (typeof disponibles)[number]; monto: number }> = []
     const omitidas: string[] = []
 
     for (const l of payload.lineas) {
-      const grupo = gruposPorClave.get(`${l.usuarioId}::${l.proyectoId}`)
+      const grupo = disponiblesPorClave.get(`${l.usuarioId}::${l.proyectoId}::${l.fecha}`)
       if (!grupo) {
-        omitidas.push(`${l.usuarioId} / proyecto ${l.proyectoId}`)
+        omitidas.push(`${l.usuarioId} / proyecto ${l.proyectoId} / ${l.fecha}`)
         continue
       }
       const monto = Number.isFinite(l.monto) && l.monto >= 0 ? l.monto : grupo.subtotal
@@ -130,8 +132,8 @@ export async function POST(req: Request) {
           data: {
             hojaDeGastosId: creada.id,
             categoriaGastoId: catHonorarios.id,
-            descripcion: `Honorarios ${grupo.nombre} — ${grupo.dias}d × ${grupo.proyectoCodigo}`,
-            fecha: fechaHasta,
+            descripcion: `Honorarios ${grupo.nombre} — ${grupo.fecha} (${grupo.dias}d × ${grupo.proyectoCodigo})`,
+            fecha: new Date(`${grupo.fecha}T00:00:00`),
             monto,
             moneda: 'PEN',
             proyectoId: grupo.proyectoId,

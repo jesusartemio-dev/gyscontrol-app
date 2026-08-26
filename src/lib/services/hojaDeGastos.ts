@@ -179,14 +179,18 @@ export async function crearRequerimientoDelDia(
 }
 
 // Liquidación de terceros: agrupa horas aprobadas de personal eventual por
-// persona+proyecto en un rango de fechas y genera un pago (HojaDeGastos con
-// categoriaCosto='servicios', tipoPropósito='honorarios_terceros').
-export interface GrupoPagoTercero {
+// persona+proyecto+DÍA en un rango de fechas y genera un pago (HojaDeGastos
+// con categoriaCosto='servicios', tipoPropósito='honorarios_terceros').
+export type EstadoAsistenciaDia = 'completo' | 'sin_ingreso' | 'sin_salida' | 'sin_marcaje' | 'sin_sesion'
+
+export interface LineaPagoTercero {
   usuarioId: string
   nombre: string
   proyectoId: string
   proyectoCodigo: string
   proyectoNombre: string
+  /** YYYY-MM-DD — un día de trabajo, no todo el periodo. */
+  fecha: string
   horas: number
   dias: number
   tarifaDia: number | null
@@ -194,10 +198,15 @@ export interface GrupoPagoTercero {
   subtotal: number
   sinTarifa: boolean
   registroIds: string[]
+  // Cruce con el marcaje real de esa jornada (QR de asistencia)
+  estadoAsistencia: EstadoAsistenciaDia
+  horaIngreso: string | null
+  horaSalida: string | null
+  horasMarcadas: number | null
 }
 
 export interface PreviewPagoTercerosResult {
-  grupos: GrupoPagoTercero[]
+  lineas: LineaPagoTercero[]
   horasPorDia: number
   tipoCambio: number
 }
@@ -219,7 +228,7 @@ export interface CrearPagoTercerosPayload {
   fechaDesde: string
   fechaHasta: string
   proyectoId?: string
-  lineas: Array<{ usuarioId: string; proyectoId: string; monto: number }>
+  lineas: Array<{ usuarioId: string; proyectoId: string; fecha: string; monto: number }>
 }
 
 export async function crearPagoTerceros(

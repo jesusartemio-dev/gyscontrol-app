@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,12 +15,13 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Loader2, Users, DollarSign, AlertTriangle } from 'lucide-react'
+import { Loader2, Users, DollarSign, AlertTriangle, ShieldAlert, QrCode, Clock } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   previsualizarPagoTerceros,
   crearPagoTerceros,
-  type GrupoPagoTercero,
+  type LineaPagoTercero,
+  type EstadoAsistenciaDia,
 } from '@/lib/services/hojaDeGastos'
 
 interface PagoTercerosModalProps {
@@ -29,9 +30,29 @@ interface PagoTercerosModalProps {
   onCreated: () => void
 }
 
-interface GrupoEditable extends GrupoPagoTercero {
+interface LineaEditable extends LineaPagoTercero {
   incluido: boolean
   monto: number
+}
+
+const claveLinea = (l: Pick<LineaPagoTercero, 'usuarioId' | 'proyectoId' | 'fecha'>) =>
+  `${l.usuarioId}::${l.proyectoId}::${l.fecha}`
+
+// Cómo se ve cada estado de asistencia frente a las horas de tarea: el marcaje
+// (QR) es una fuente independiente de la persona que carga horas de tarea, y
+// pueden no coincidir — esto es para que la persona que liquida lo vea y decida,
+// no para bloquear nada automáticamente.
+const ASISTENCIA_INFO: Record<EstadoAsistenciaDia, { label: string; className: string; icon: typeof QrCode }> = {
+  completo: { label: 'con marcaje', className: 'text-emerald-700 border-emerald-300 bg-emerald-50', icon: QrCode },
+  sin_ingreso: { label: 'sin ingreso marcado', className: 'text-amber-700 border-amber-300 bg-amber-50', icon: AlertTriangle },
+  sin_salida: { label: 'jornada sin cerrar', className: 'text-amber-700 border-amber-300 bg-amber-50', icon: AlertTriangle },
+  sin_marcaje: { label: 'sin ningún marcaje', className: 'text-red-700 border-red-300 bg-red-50', icon: ShieldAlert },
+  sin_sesion: { label: 'sin sesión de asistencia', className: 'text-slate-600 border-slate-300 bg-slate-50', icon: ShieldAlert },
+}
+
+function formatFechaCorta(fecha: string) {
+  const [y, m, d] = fecha.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit', month: 'short' })
 }
 
 // Primer y último día del mes calendario en curso, en formato YYYY-MM-DD —
@@ -49,7 +70,7 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
   const [paso, setPaso] = useState<'periodo' | 'resumen'>('periodo')
   const [{ desde, hasta }, setRango] = useState(rangoMesActual())
   const [loadingPreview, setLoadingPreview] = useState(false)
-  const [grupos, setGrupos] = useState<GrupoEditable[]>([])
+  const [lineas, setLineas] = useState<LineaEditable[]>([])
   const [creando, setCreando] = useState(false)
 
   const abrirPreview = async () => {
@@ -63,12 +84,12 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
     }
     try {
       setLoadingPreview(true)
-      const { grupos: data } = await previsualizarPagoTerceros({ fechaDesde: desde, fechaHasta: hasta })
+      const { lineas: data } = await previsualizarPagoTerceros({ fechaDesde: desde, fechaHasta: hasta })
       if (data.length === 0) {
         toast.info('No hay horas de terceros aprobadas y sin liquidar en ese rango')
         return
       }
-      setGrupos(data.map((g) => ({ ...g, incluido: true, monto: g.subtotal })))
+      setLineas(data.map((l) => ({ ...l, incluido: true, monto: l.subtotal })))
       setPaso('resumen')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al calcular la liquidación')
@@ -78,15 +99,15 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
   }
 
   const actualizarMonto = (key: string, monto: number) => {
-    setGrupos((prev) => prev.map((g) => (`${g.usuarioId}::${g.proyectoId}` === key ? { ...g, monto } : g)))
+    setLineas((prev) => prev.map((l) => (claveLinea(l) === key ? { ...l, monto } : l)))
   }
 
   const toggleIncluido = (key: string) => {
-    setGrupos((prev) => prev.map((g) => (`${g.usuarioId}::${g.proyectoId}` === key ? { ...g, incluido: !g.incluido } : g)))
+    setLineas((prev) => prev.map((l) => (claveLinea(l) === key ? { ...l, incluido: !l.incluido } : l)))
   }
 
   const submit = async () => {
-    const seleccionadas = grupos.filter((g) => g.incluido)
+    const seleccionadas = lineas.filter((l) => l.incluido)
     if (seleccionadas.length === 0) {
       toast.error('Selecciona al menos una línea')
       return
@@ -96,7 +117,7 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
       const resultado = await crearPagoTerceros({
         fechaDesde: desde,
         fechaHasta: hasta,
-        lineas: seleccionadas.map((g) => ({ usuarioId: g.usuarioId, proyectoId: g.proyectoId, monto: g.monto })),
+        lineas: seleccionadas.map((l) => ({ usuarioId: l.usuarioId, proyectoId: l.proyectoId, fecha: l.fecha, monto: l.monto })),
       })
       if (resultado.omitidas.length > 0) {
         toast.warning(`${resultado.omitidas.length} línea(s) ya se habían liquidado en otra hoja y se omitieron`)
@@ -117,12 +138,25 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
     onOpenChange(v)
     if (!v) {
       setPaso('periodo')
-      setGrupos([])
+      setLineas([])
     }
   }
 
-  const totalGeneral = grupos.filter((g) => g.incluido).reduce((sum, g) => sum + (Number(g.monto) || 0), 0)
-  const personasSinTarifa = grupos.filter((g) => g.sinTarifa).length
+  const totalGeneral = lineas.filter((l) => l.incluido).reduce((sum, l) => sum + (Number(l.monto) || 0), 0)
+  const personasSinTarifa = new Set(lineas.filter((l) => l.sinTarifa).map((l) => l.usuarioId)).size
+  const diasConProblema = lineas.filter((l) => l.estadoAsistencia !== 'completo').length
+
+  // Cabeceras por persona+proyecto, para no repetir nombre y código en cada
+  // fila de día — las líneas ya vienen ordenadas por nombre/fecha del backend.
+  const conCabeceras = useMemo(() => {
+    let anterior = ''
+    return lineas.map((l) => {
+      const grupoKey = `${l.usuarioId}::${l.proyectoId}`
+      const esNuevoGrupo = grupoKey !== anterior
+      anterior = grupoKey
+      return { linea: l, esNuevoGrupo }
+    })
+  }, [lineas])
 
   return (
     <Dialog open={open} onOpenChange={resetAlCerrar}>
@@ -134,8 +168,8 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
           </DialogTitle>
           <DialogDescription>
             {paso === 'periodo'
-              ? 'Elige el periodo a liquidar. Se juntan las horas aprobadas de personal tercero, agrupadas por persona y proyecto.'
-              : 'Revisa los montos, desmarca lo que no corresponda pagar ahora, y ajusta si hace falta antes de enviar.'}
+              ? 'Elige el periodo a liquidar. Se junta un día por línea, con las horas de tarea y el marcaje de asistencia de esa jornada.'
+              : 'Cada línea es un día. Revisa el marcaje, desmarca lo que no corresponda pagar ahora, y ajusta el monto si hace falta.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -165,39 +199,61 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
                 {personasSinTarifa} persona{personasSinTarifa !== 1 && 's'} sin tarifa/día cargada en /admin/personal — su monto sale en 0, cárgalo a mano o edítalo ahí primero.
               </div>
             )}
+            {diasConProblema > 0 && (
+              <div className="flex items-center gap-2 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-md px-3 py-2">
+                <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
+                {diasConProblema} día{diasConProblema !== 1 && 's'} con horas de tarea pero sin marcaje completo — revisa si corresponde pagarlo antes de confirmar.
+              </div>
+            )}
             <div className="space-y-2">
-              {grupos.map((g) => {
-                const key = `${g.usuarioId}::${g.proyectoId}`
+              {conCabeceras.map(({ linea: l, esNuevoGrupo }) => {
+                const key = claveLinea(l)
+                const info = ASISTENCIA_INFO[l.estadoAsistencia]
+                const Icono = info.icon
                 return (
-                  <div
-                    key={key}
-                    className={`border rounded-md p-3 flex items-start gap-3 ${g.incluido ? '' : 'opacity-50'}`}
-                  >
-                    <Checkbox checked={g.incluido} onCheckedChange={() => toggleIncluido(key)} disabled={creando} className="mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-sm">{g.nombre}</span>
-                        <Badge variant="outline" className="text-[10px]">{g.proyectoCodigo}</Badge>
-                        {g.sinTarifa && (
-                          <Badge variant="outline" className="text-[10px] gap-1 text-amber-600 border-amber-300">
-                            <AlertTriangle className="h-3 w-3" />
-                            sin tarifa
+                  <div key={key}>
+                    {esNuevoGrupo && (
+                      <div className="text-xs font-medium text-muted-foreground mt-3 mb-1 flex items-center gap-1.5">
+                        {l.nombre}
+                        <Badge variant="outline" className="text-[10px]">{l.proyectoCodigo}</Badge>
+                      </div>
+                    )}
+                    <div className={`border rounded-md p-2.5 flex items-start gap-3 ${l.incluido ? '' : 'opacity-50'}`}>
+                      <Checkbox checked={l.incluido} onCheckedChange={() => toggleIncluido(key)} disabled={creando} className="mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-medium capitalize">{formatFechaCorta(l.fecha)}</span>
+                          {l.sinTarifa && (
+                            <Badge variant="outline" className="text-[10px] gap-1 text-amber-600 border-amber-300">
+                              sin tarifa
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className={`text-[10px] gap-1 ${info.className}`}>
+                            <Icono className="h-3 w-3" />
+                            {info.label}
                           </Badge>
-                        )}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-3 flex-wrap">
+                          <span>{l.horas}h tarea · {l.dias}d × {l.tarifaDia ?? 0} {l.monedaTarifa}</span>
+                          {(l.horaIngreso || l.horaSalida) && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {l.horaIngreso ?? '—'} a {l.horaSalida ?? '—'}
+                              {l.horasMarcadas != null && ` (${l.horasMarcadas}h marcadas)`}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {g.horas}h · {g.dias}d × {g.tarifaDia ?? 0} {g.monedaTarifa}
-                      </div>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={l.monto}
+                        onChange={(e) => actualizarMonto(key, Number(e.target.value))}
+                        disabled={creando || !l.incluido}
+                        className="w-28 shrink-0"
+                      />
                     </div>
-                    <Input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={g.monto}
-                      onChange={(e) => actualizarMonto(key, Number(e.target.value))}
-                      disabled={creando || !g.incluido}
-                      className="w-28 shrink-0"
-                    />
                   </div>
                 )
               })}
@@ -205,7 +261,7 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
             <div className="flex items-center justify-between border-t pt-2 text-sm font-medium">
               <span className="flex items-center gap-1.5 text-muted-foreground font-normal">
                 <Users className="h-3.5 w-3.5" />
-                {grupos.filter((g) => g.incluido).length} de {grupos.length} líneas
+                {lineas.filter((l) => l.incluido).length} de {lineas.length} días
               </span>
               <span>Total S/ {totalGeneral.toFixed(2)}</span>
             </div>
