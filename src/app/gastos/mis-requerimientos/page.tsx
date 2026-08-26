@@ -72,7 +72,7 @@ function getAsignadoA(hoja: HojaDeGastos): string {
   // llevan su propio proyecto.
   const codigos = Array.from(new Set((hoja.lineas ?? []).map((l) => l.proyecto?.codigo).filter((c): c is string => !!c)))
   if (codigos.length === 1) return codigos[0]
-  if (codigos.length > 1) return `${codigos[0]} +${codigos.length - 1}`
+  if (codigos.length > 1) return codigos.join(' + ')
   return '-'
 }
 

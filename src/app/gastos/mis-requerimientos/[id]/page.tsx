@@ -88,7 +88,7 @@ function getAsignadoA(hoja: HojaDeGastos, lineas: GastoLinea[]): string {
   if (hoja.centroCosto) return hoja.centroCosto.nombre
   const codigos = Array.from(new Set(lineas.map((l) => l.proyecto?.codigo).filter((c): c is string => !!c)))
   if (codigos.length === 1) return codigos[0]
-  if (codigos.length > 1) return `${codigos[0]} +${codigos.length - 1}`
+  if (codigos.length > 1) return codigos.join(' + ')
   return 'Sin asignación'
 }
 
