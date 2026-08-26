@@ -13,6 +13,9 @@ export interface EmpleadoPayload {
   asignacionFamiliar?: number
   emo?: number
   regimenLaboral?: 'mype' | 'general'
+  tipoPersonal?: 'planilla' | 'tercero'
+  tarifaDia?: number
+  monedaTarifa?: 'PEN' | 'USD'
   fechaIngreso?: string
   fechaCese?: string
   activo?: boolean

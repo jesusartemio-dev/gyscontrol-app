@@ -54,7 +54,7 @@ import {
   formatUSD,
   penToUSD
 } from '@/lib/costos'
-import { calcularCostosLaborales } from '@/lib/utils/costosLaborales'
+import { calcularCostosLaborales, type CostosLaboralesResult } from '@/lib/utils/costosLaborales'
 
 // Schema de validación
 const empleadoSchema = z.object({
@@ -66,6 +66,9 @@ const empleadoSchema = z.object({
   asignacionFamiliar: z.string().optional(),
   emo: z.string().optional(),
   regimenLaboral: z.enum(['mype', 'general']).default('mype'),
+  tipoPersonal: z.enum(['planilla', 'tercero']).default('planilla'),
+  tarifaDia: z.string().optional(),
+  monedaTarifa: z.enum(['PEN', 'USD']).default('PEN'),
   fechaIngreso: z.string().optional(),
   fechaCese: z.string().optional(),
   activo: z.boolean().default(true),
@@ -89,6 +92,9 @@ const defaultForm: EmpleadoForm = {
   asignacionFamiliar: '0',
   emo: '25',
   regimenLaboral: 'mype',
+  tipoPersonal: 'planilla',
+  tarifaDia: '',
+  monedaTarifa: 'PEN',
   fechaIngreso: '',
   fechaCese: '',
   activo: true,
@@ -104,6 +110,44 @@ const defaultForm: EmpleadoForm = {
 // Helper para calcular sueldo total
 const getSueldoTotal = (planilla?: number | null, honorarios?: number | null): number => {
   return (planilla || 0) + (honorarios || 0)
+}
+
+// Fallback si no hay ningún calendario laboral activo — mismo valor que usa
+// el servidor en costoHoraSnapshot.ts para no dar cifras distintas.
+const HORAS_POR_DIA_FALLBACK = 8
+
+/**
+ * Costos "para mostrar en la tabla", con la misma bifurcación que
+ * costoHoraSnapshot.ts en el servidor:
+ *  - planilla: calcularCostosLaborales() sobre el sueldo (aportes de ley).
+ *  - tercero: tarifaDia / horasPorDia, sin aportes — el EMO/gratificación/CTS
+ *    de un tercero no existen, así que NO se corre calcularCostosLaborales()
+ *    para él (eso era justo el bug: sin sueldo, esa función igual devolvía
+ *    el EMO por defecto y costeaba su hora en ~S/0.12).
+ *
+ * Devuelve además `tarifaDiaMostrar` solo para pintar la columna de terceros.
+ */
+function getCostosDisplay(
+  emp: Pick<Empleado, 'sueldoPlanilla' | 'sueldoHonorarios' | 'asignacionFamiliar' | 'emo' | 'regimenLaboral' | 'tipoPersonal' | 'tarifaDia' | 'monedaTarifa'>,
+  config: { tipoCambio: number; horasMensuales: number },
+  horasPorDia: number,
+): CostosLaboralesResult & { tarifaDiaMostrar: number | null } {
+  if (emp.tipoPersonal === 'tercero') {
+    const tarifa = emp.tarifaDia ?? 0
+    const tarifaPEN = emp.monedaTarifa === 'USD' ? tarifa * (config.tipoCambio || DEFAULTS.TIPO_CAMBIO) : tarifa
+    const costoHoraPEN = horasPorDia > 0 ? tarifaPEN / horasPorDia : 0
+    return {
+      remuneracion: 0, asignacionFamiliar: 0, honorarios: 0, emo: 0,
+      totalRemuneracion: 0, essalud: 0, gratificacion: 0, gratificacionMensual: 0,
+      bonifExtraordinaria: 0, bonifExtraordinariaMensual: 0, cts: 0, ctsMensual: 0,
+      sctr: 0, vidaLey: 0, costoMensualPlanilla: 0, totalMensual: 0,
+      costoHoraUSD: penToUSD(costoHoraPEN, config.tipoCambio),
+      tarifaDiaMostrar: tarifa > 0 ? tarifa : null,
+    }
+  }
+
+  const costos = calcularCostosLaborales(emp, config)
+  return { ...costos, tarifaDiaMostrar: null }
 }
 
 // Helper para formatear moneda
@@ -154,6 +198,9 @@ export default function PersonalClient() {
     semanasxMes: DEFAULTS.SEMANAS_X_MES,
     horasMensuales: DEFAULTS.HORAS_MENSUALES,
   })
+  // Horas de una jornada completa (para terceros: tarifaDia / horasPorDia).
+  // Mismo fallback que usa el servidor en costoHoraSnapshot.ts.
+  const [horasPorDia, setHorasPorDia] = useState(HORAS_POR_DIA_FALLBACK)
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -179,6 +226,13 @@ export default function PersonalClient() {
   useEffect(() => {
     loadData()
     getConfiguracionCostos().then(setConfig)
+    fetch('/api/configuracion/calendario-laboral')
+      .then(r => r.json())
+      .then((calendarios: { activo: boolean; horasPorDia: number }[]) => {
+        const activo = calendarios?.find(c => c.activo)
+        if (activo?.horasPorDia) setHorasPorDia(activo.horasPorDia)
+      })
+      .catch(() => {}) // se queda con el fallback
   }, [])
 
   const loadData = async () => {
@@ -236,8 +290,8 @@ export default function PersonalClient() {
 
     // Ordenar
     return filtered.sort((a, b) => {
-      const costosA = calcularCostosLaborales(a, { tipoCambio: config.tipoCambio, horasMensuales: config.horasMensuales })
-      const costosB = calcularCostosLaborales(b, { tipoCambio: config.tipoCambio, horasMensuales: config.horasMensuales })
+      const costosA = getCostosDisplay(a, config, horasPorDia)
+      const costosB = getCostosDisplay(b, config, horasPorDia)
 
       switch (sortBy) {
         case 'nombre':
@@ -264,7 +318,7 @@ export default function PersonalClient() {
           return 0
       }
     })
-  }, [empleados, searchTerm, filterActivo, filterDepartamento, sortBy, config])
+  }, [empleados, searchTerm, filterActivo, filterDepartamento, sortBy, config, horasPorDia])
 
   // Handlers
   const handleOpenCreate = () => {
@@ -292,6 +346,9 @@ export default function PersonalClient() {
       asignacionFamiliar: empleado.asignacionFamiliar?.toString() || '0',
       emo: empleado.emo?.toString() || '25',
       regimenLaboral: empleado.regimenLaboral || 'mype',
+      tipoPersonal: empleado.tipoPersonal || 'planilla',
+      tarifaDia: empleado.tarifaDia?.toString() || '',
+      monedaTarifa: empleado.monedaTarifa || 'PEN',
       fechaIngreso: empleado.fechaIngreso ? empleado.fechaIngreso.split('T')[0] : '',
       fechaCese: empleado.fechaCese ? empleado.fechaCese.split('T')[0] : '',
       activo: empleado.activo,
@@ -344,6 +401,9 @@ export default function PersonalClient() {
         asignacionFamiliar: form.asignacionFamiliar ? parseFloat(form.asignacionFamiliar) : 0,
         emo: form.emo ? parseFloat(form.emo) : 25,
         regimenLaboral: form.regimenLaboral,
+        tipoPersonal: form.tipoPersonal,
+        tarifaDia: form.tipoPersonal === 'tercero' && form.tarifaDia ? parseFloat(form.tarifaDia) : undefined,
+        monedaTarifa: form.monedaTarifa,
         fechaIngreso: form.fechaIngreso || undefined,
         fechaCese: form.fechaCese || undefined,
         activo: form.activo,
@@ -719,6 +779,7 @@ export default function PersonalClient() {
                       <th className="text-center py-2 px-2 font-semibold text-slate-700 whitespace-nowrap">F. Ingreso</th>
                       <th className="text-left py-2 px-2 font-semibold text-slate-700 min-w-[180px] max-w-[220px]">Cargo</th>
                       <th className="text-left py-2 px-2 font-semibold text-slate-700 whitespace-nowrap min-w-[100px]">Area</th>
+                      <th className="text-center py-2 px-2 font-semibold text-slate-700 whitespace-nowrap">Tipo</th>
                       {/* Columnas de costos laborales */}
                       <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-blue-50">Remuneracion</th>
                       <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-blue-50">Asig. Fam.</th>
@@ -741,6 +802,7 @@ export default function PersonalClient() {
                       )}
                       <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-purple-50">Honorarios</th>
                       <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-orange-200">Total Mensual</th>
+                      <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-teal-100">Tarifa/Día</th>
                       <th className="text-right py-2 px-2 font-semibold text-slate-700 whitespace-nowrap bg-blue-200">$/Hora</th>
                       <th className="text-center py-2 px-2 font-semibold text-slate-700 whitespace-nowrap">Estado</th>
                       <th className="w-16 py-2 px-2 text-center font-semibold text-slate-700">Acc.</th>
@@ -748,7 +810,8 @@ export default function PersonalClient() {
                   </thead>
                   <tbody className="divide-y">
                     {filteredEmpleados.map((emp, index) => {
-                      const costos = calcularCostosLaborales(emp, { tipoCambio: config.tipoCambio, horasMensuales: config.horasMensuales })
+                      const costos = getCostosDisplay(emp, config, horasPorDia)
+                      const esTercero = emp.tipoPersonal === 'tercero'
                       return (
                         <tr key={emp.id} className="hover:bg-muted/30 transition-colors">
                           {/* N° */}
@@ -791,6 +854,18 @@ export default function PersonalClient() {
                           </td>
                           {/* Area/Departamento */}
                           <td className="py-1.5 px-2 truncate" title={emp.departamento?.nombre}>{emp.departamento?.nombre || '—'}</td>
+                          {/* Tipo de personal */}
+                          <td className="py-1.5 px-2 text-center">
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                'text-[10px] px-1.5 py-0',
+                                esTercero ? 'border-teal-300 text-teal-700 bg-teal-50' : 'border-slate-300 text-slate-600 bg-slate-50'
+                              )}
+                            >
+                              {esTercero ? 'Tercero' : 'Planilla'}
+                            </Badge>
+                          </td>
                           {/* Remuneración */}
                           <td className="py-1.5 px-2 text-right font-mono bg-blue-50/50">
                             {costos.remuneracion > 0 ? costos.remuneracion.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
@@ -853,6 +928,12 @@ export default function PersonalClient() {
                           <td className="py-1.5 px-2 text-right font-mono font-bold text-orange-700 bg-orange-100/70">
                             {costos.totalMensual > 0 ? costos.totalMensual.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                           </td>
+                          {/* Tarifa/Día (solo terceros) */}
+                          <td className="py-1.5 px-2 text-right font-mono bg-teal-50/50">
+                            {costos.tarifaDiaMostrar
+                              ? `${costos.tarifaDiaMostrar.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${emp.monedaTarifa || 'PEN'}`
+                              : '—'}
+                          </td>
                           {/* $/Hora */}
                           <td className="py-1.5 px-2 text-right font-mono font-bold text-blue-700 bg-blue-100/50">
                             {formatUSD(costos.costoHoraUSD || 0)}
@@ -901,12 +982,12 @@ export default function PersonalClient() {
                   {/* Fila de totales */}
                   <tfoot>
                     <tr className="border-t-2 bg-slate-50 font-semibold">
-                      <td colSpan={5} className="sticky left-0 z-10 bg-slate-50 py-2 px-2 text-right border-r">
+                      <td colSpan={6} className="sticky left-0 z-10 bg-slate-50 py-2 px-2 text-right border-r">
                         TOTALES ({filteredEmpleados.length} empleados)
                       </td>
                       {(() => {
                         const totales = filteredEmpleados.reduce((acc, emp) => {
-                          const c = calcularCostosLaborales(emp, { tipoCambio: config.tipoCambio, horasMensuales: config.horasMensuales })
+                          const c = getCostosDisplay(emp, config, horasPorDia)
                           return {
                             remuneracion: acc.remuneracion + c.remuneracion,
                             asignacionFamiliar: acc.asignacionFamiliar + c.asignacionFamiliar,
@@ -950,6 +1031,7 @@ export default function PersonalClient() {
                             )}
                             <td className="py-2 px-2 text-right font-mono bg-purple-50">{totales.honorarios.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                             <td className="py-2 px-2 text-right font-mono font-bold text-orange-700 bg-orange-200">{totales.totalMensual.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="py-2 px-2 text-right font-mono bg-teal-50">—</td>
                             <td className="py-2 px-2 text-right font-mono text-blue-700 bg-blue-200">—</td>
                             <td colSpan={2} className="py-2 px-2"></td>
                           </>
@@ -1037,8 +1119,85 @@ export default function PersonalClient() {
                 </div>
               </div>
 
-              {/* Sueldos + Costos Laborales */}
-              {(() => {
+              {/* Tipo de personal: decide si abajo se ve la ficha de planilla o la de tercero */}
+              <div className="space-y-1">
+                <Label htmlFor="tipoPersonal" className="text-xs">Tipo de personal</Label>
+                <Select
+                  value={form.tipoPersonal}
+                  onValueChange={(v) => setForm({ ...form, tipoPersonal: v as 'planilla' | 'tercero' })}
+                >
+                  <SelectTrigger id="tipoPersonal" className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="planilla">Planilla</SelectItem>
+                    <SelectItem value="tercero">Tercero (personal eventual, por día)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-muted-foreground">
+                  {form.tipoPersonal === 'tercero'
+                    ? 'Se paga por día trabajado, sin aportes de ley. Su costo por hora sale de la tarifa/día.'
+                    : 'Sueldo mensual con aportes de ley (EsSalud, CTS, gratificación, SCTR, Vida Ley).'}
+                </p>
+              </div>
+
+              {/* Tercero: solo tarifa por día */}
+              {form.tipoPersonal === 'tercero' ? (() => {
+                const tarifa = form.tarifaDia ? parseFloat(form.tarifaDia) : 0
+                const tarifaPEN = form.monedaTarifa === 'USD' ? tarifa * config.tipoCambio : tarifa
+                const costoHoraPEN = horasPorDia > 0 ? tarifaPEN / horasPorDia : 0
+
+                return (
+                  <div className="p-3 bg-gradient-to-r from-teal-50 to-blue-50 border border-teal-100 rounded-lg">
+                    <div className="grid grid-cols-3 gap-3 mb-3">
+                      <div className="space-y-1 col-span-2">
+                        <Label htmlFor="tarifaDia" className="text-xs">Tarifa por día</Label>
+                        <Input
+                          id="tarifaDia"
+                          type="number"
+                          step="0.01"
+                          value={form.tarifaDia}
+                          onChange={(e) => setForm({ ...form, tarifaDia: e.target.value })}
+                          placeholder="0.00"
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="monedaTarifa" className="text-xs">Moneda</Label>
+                        <Select value={form.monedaTarifa} onValueChange={(v) => setForm({ ...form, monedaTarifa: v as 'PEN' | 'USD' })}>
+                          <SelectTrigger id="monedaTarifa" className="h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="PEN">PEN</SelectItem>
+                            <SelectItem value="USD">USD</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-teal-200">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-1 cursor-help">
+                            <span className="text-[10px] text-muted-foreground">Costo/Hora:</span>
+                            <span className="font-bold text-blue-600">{formatUSD(penToUSD(costoHoraPEN, config.tipoCambio))}/h</span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="left" className="max-w-xs">
+                          <p className="font-mono text-xs">
+                            {formatCurrency(tarifaPEN)} / {horasPorDia}h por jornada
+                          </p>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            Trabaja menos de {horasPorDia}h: se paga proporcional. Ajustes (sobretiempo, etc.)
+                            se hacen al liquidar, no aquí.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                )
+              })() : (() => {
+                /* Planilla: sueldo mensual + costos laborales (Sueldos + Costos Laborales) */
                 const costos = calcularCostosLaborales({
                   sueldoPlanilla: form.sueldoPlanilla ? parseFloat(form.sueldoPlanilla) : 0,
                   sueldoHonorarios: form.sueldoHonorarios ? parseFloat(form.sueldoHonorarios) : 0,

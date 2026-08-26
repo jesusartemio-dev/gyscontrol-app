@@ -2238,6 +2238,14 @@ model Empleado {
   // porque así se calculaba TODA la planilla antes de este campo — no cambia
   // el resultado de nadie hasta que se marque explícitamente 'general'.
   regimenLaboral       RegimenLaboral       @default(mype)
+  // Planilla vs. tercero. Decide CÓMO se costea su hora en costoHoraSnapshot:
+  // planilla → calcularCostosLaborales() sobre el sueldo (aportes de ley);
+  // tercero  → tarifaDia / horasPorDia del calendario, sin aportes, porque a un
+  // tercero no se le paga EsSalud, CTS ni gratificación.
+  tipoPersonal         TipoPersonal         @default(planilla)
+  // Solo para terceros: lo pactado por día trabajado (jornada completa).
+  tarifaDia            Float?
+  monedaTarifa         String               @default("PEN")
   fechaIngreso         DateTime?
   fechaCese            DateTime?
   activo               Boolean              @default(true)
@@ -5354,6 +5362,15 @@ enum ModalidadTrabajo {
 enum RegimenLaboral {
   mype
   general
+}
+
+// Cómo se costea la hora de una persona.
+//   planilla: sueldo mensual + aportes de ley (calcularCostosLaborales)
+//   tercero:  tarifa por día pactada, sin aportes — personal eventual que no
+//             está en planilla y se llama para trabajos puntuales.
+enum TipoPersonal {
+  planilla
+  tercero
 }
 
 enum EstadoSolicitudRemoto {

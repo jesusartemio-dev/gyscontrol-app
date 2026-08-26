@@ -534,6 +534,9 @@ export interface Empleado {
   asignacionFamiliar: number // Asignación familiar (10% RMV si aplica)
   emo: number                // EMO mensual (Examen Médico Ocupacional)
   regimenLaboral?: 'mype' | 'general' // Cambia gratificación (50%/100%) y CTS en calcularCostosLaborales()
+  tipoPersonal?: 'planilla' | 'tercero' // Decide cómo se costea su hora — ver costoHoraSnapshot.ts
+  tarifaDia?: number    // Solo terceros: tarifa pactada por día trabajado
+  monedaTarifa?: 'PEN' | 'USD'
   fechaIngreso?: string
   fechaCese?: string
   activo: boolean
