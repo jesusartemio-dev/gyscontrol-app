@@ -970,6 +970,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             montoGastado={montoGastadoVivo}
             saldo={saldoVivo}
             requiereAnticipo={hoja.requiereAnticipo}
+            labelSaldoNegativo={hoja.tipoPropósito === 'honorarios_terceros' ? 'Pendiente de depositar' : undefined}
             materialesCount={materiales.length > 0 ? materiales.length : undefined}
             materialesTotal={materialesTotal}
             materialesPendientesCount={materialesPendientes.length}

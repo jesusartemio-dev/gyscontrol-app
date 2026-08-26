@@ -17,6 +17,11 @@ interface ResumenFinancieroProps {
   materialesCount?: number
   canEditAnticipo?: boolean
   onSaveAnticipo?: (monto: number) => Promise<void>
+  /** Rótulo cuando el saldo es negativo (se le debe dinero a alguien). Por
+   * defecto asume que es un reembolso de gasto — para casos donde el monto
+   * ya se conocía de antemano (p.ej. honorarios), pásale algo más preciso
+   * como "Pendiente de depositar". */
+  labelSaldoNegativo?: string
 }
 
 const formatCurrency = (amount: number) =>
@@ -34,6 +39,7 @@ export default function ResumenFinanciero({
   materialesCount,
   canEditAnticipo,
   onSaveAnticipo,
+  labelSaldoNegativo = 'A reembolsar al empleado',
 }: ResumenFinancieroProps) {
   const [editingAnticipo, setEditingAnticipo] = useState(false)
   const [anticipoInput, setAnticipoInput] = useState('')
@@ -63,7 +69,7 @@ export default function ResumenFinanciero({
     ] : []),
     { label: 'Total gastado', value: montoGastado, icon: ArrowUpCircle, color: 'text-orange-600', bg: 'bg-orange-50', editable: false },
     {
-      label: saldo < 0 ? 'A reembolsar al empleado' : 'Saldo',
+      label: saldo < 0 ? labelSaldoNegativo : 'Saldo',
       value: saldo < 0 ? Math.abs(saldo) : saldo,
       icon: Wallet,
       color: saldo >= 0 ? 'text-emerald-600' : 'text-amber-700',

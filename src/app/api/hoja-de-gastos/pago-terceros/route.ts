@@ -190,6 +190,22 @@ export async function POST(req: Request) {
           })
         }
 
+        // El monto ya se conoce por completo al crear (a diferencia de un
+        // viático, que se sabe recién al rendir cuentas) — sincronizar los
+        // campos de la cabecera ahora, igual que hace gasto-linea/route.ts al
+        // agregar una línea. Sin esto quedan en 0 y la lista de "Mis
+        // Requerimientos" muestra Solicitado/Gastado/Saldo vacíos aunque las
+        // líneas sí tengan monto.
+        await tx.hojaDeGastos.update({
+          where: { id: creada.id },
+          data: {
+            montoAnticipo: totalPersona,
+            montoGastado: totalPersona,
+            saldo: 0 - totalPersona, // aún no hay depósito — se le debe este monto
+            updatedAt: new Date(),
+          },
+        })
+
         await tx.hojaDeGastosEvento.create({
           data: {
             hojaDeGastosId: creada.id,
