@@ -187,7 +187,7 @@ export async function POST(req: Request) {
       const proyecto = await tx.proyecto.findUniqueOrThrow({
         where: { id: proyectoId },
         select: {
-          id: true, codigo: true, totalCliente: true,
+          id: true, codigo: true, totalCliente: true, grandTotal: true,
           adelantoPorcentaje: true, adelantoMonto: true, adelantoAmortizado: true,
         },
       })
@@ -212,7 +212,7 @@ export async function POST(req: Request) {
         _sum: { montoValorizacion: true },
       })
       const acumuladoAnterior = aggPrev._sum.montoValorizacion || 0
-      const presupuestoContractual = proyecto.totalCliente ?? 0
+      const presupuestoContractual = (proyecto.grandTotal || proyecto.totalCliente) ?? 0
       const acumuladoActual = +(acumuladoAnterior + montoValorizacion).toFixed(2)
       const saldoPorValorizar = +(presupuestoContractual - acumuladoActual).toFixed(2)
       const porcentajeAvance = presupuestoContractual > 0
