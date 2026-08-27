@@ -98,14 +98,14 @@ export async function POST(req: Request) {
       // Get project data
       const proyecto = await prisma.proyecto.findUnique({
         where: { id: proyectoId },
-        select: { id: true, codigo: true, totalCliente: true, grandTotal: true },
+        select: { id: true, codigo: true, totalCliente: true },
       })
       if (!proyecto) {
         errores.push(`Proyecto ${proyectoId} no encontrado`)
         continue
       }
 
-      const presupuestoContractual = (proyecto.grandTotal || proyecto.totalCliente) ?? 0
+      const presupuestoContractual = proyecto.totalCliente ?? 0
 
       // Get existing acumulado (SUM of non-anulada valorizaciones)
       const existingAgg = await prisma.valorizacion.aggregate({

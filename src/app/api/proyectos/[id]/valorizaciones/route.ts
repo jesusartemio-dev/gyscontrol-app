@@ -57,7 +57,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const proyecto = await prisma.proyecto.findUnique({
       where: { id: proyectoId },
       select: {
-        id: true, codigo: true, totalCliente: true, grandTotal: true, clienteId: true,
+        id: true, codigo: true, totalCliente: true, clienteId: true,
         adelantoPorcentaje: true, adelantoMonto: true, adelantoAmortizado: true,
         fondoGarantiaPct: true, descuentoComercialPct: true, igvPct: true,
       },
@@ -75,9 +75,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const numero = (ultimaVal?.numero || 0) + 1
     const codigo = `${proyecto.codigo}-VAL-${String(numero).padStart(3, '0')}`
 
-    // presupuestoContractual: usar grandTotal (monto final con descuento comercial ya aplicado)
-    // del proyecto, con fallback a totalCliente para proyectos sin grandTotal seteado, o override manual
-    const presupuestoContractual = body.presupuestoContractual ?? (proyecto.grandTotal || proyecto.totalCliente) ?? 0
+    // presupuestoContractual: usar totalCliente del proyecto o override manual
+    const presupuestoContractual = body.presupuestoContractual ?? proyecto.totalCliente ?? 0
 
     // Acumulado anterior = SUM(montoValorizacion) de las valorizaciones del proyecto
     // con numero < numero de la nueva (excluyendo anuladas).

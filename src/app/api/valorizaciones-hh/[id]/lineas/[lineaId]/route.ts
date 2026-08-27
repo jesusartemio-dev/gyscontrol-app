@@ -77,7 +77,7 @@ export async function DELETE(
 
       const proyecto = await tx.proyecto.findUniqueOrThrow({
         where: { id: valHH.valorizacion.proyectoId },
-        select: { adelantoPorcentaje: true, adelantoMonto: true, adelantoAmortizado: true, totalCliente: true, grandTotal: true },
+        select: { adelantoPorcentaje: true, adelantoMonto: true, adelantoAmortizado: true, totalCliente: true },
       })
 
       const adelanto = calcularAdelantoValorizacion(proyecto, montoValorizacion)
@@ -90,7 +90,7 @@ export async function DELETE(
       const fondoGarantiaMonto = +(subtotal * val.fondoGarantiaPorcentaje / 100).toFixed(2)
       const netoARecibir = +(subtotal + igvMonto - fondoGarantiaMonto).toFixed(2)
 
-      const presupuestoContractual = (proyecto.grandTotal || proyecto.totalCliente) ?? 0
+      const presupuestoContractual = proyecto.totalCliente ?? 0
       const acumuladoActual = +(val.acumuladoAnterior + montoValorizacion).toFixed(2)
       const saldoPorValorizar = +(presupuestoContractual - acumuladoActual).toFixed(2)
       const porcentajeAvance = presupuestoContractual > 0
