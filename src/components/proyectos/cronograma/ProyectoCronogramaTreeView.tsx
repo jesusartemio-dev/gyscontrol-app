@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, TreePine, Plus, Download, List, Filter, Zap, Trash2, Clock, Calculator } from 'lucide-react'
+import { RefreshCw, TreePine, Plus, Download, List, Filter, Zap, Trash2, Clock, Calculator, Lock } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -910,6 +910,12 @@ export function ProyectoCronogramaTreeView({
                   {selectedCronograma.tipo === 'comercial' && (
                     <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">
                       Solo lectura
+                    </span>
+                  )}
+                  {selectedCronograma.tipo !== 'comercial' && selectedCronograma.bloqueado === true && (
+                    <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded inline-flex items-center gap-1">
+                      <Lock className="h-3 w-3" />
+                      Bloqueado
                     </span>
                   )}
                 </p>
