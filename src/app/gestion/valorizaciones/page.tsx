@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, FileSpreadsheet, Loader2, Search, Eye, Upload, Download, Clock, Info, CalendarDays, Sparkles, ChevronRight, ChevronDown, List, BarChart2, FolderOpen } from 'lucide-react'
+import { Plus, FileSpreadsheet, Loader2, Search, Eye, Upload, Download, Clock, Info, CalendarDays, Sparkles, ChevronRight, ChevronDown, List, BarChart2, FolderOpen, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ValorizacionImportExcelModal from '@/components/gestion/ValorizacionImportExcelModal'
 import { ValorizacionImportIAModal } from '@/components/gestion/ValorizacionImportIAModal'
@@ -32,6 +32,8 @@ interface Proyecto {
   descuentoComercialPct?: number
   igvPct?: number
   fondoGarantiaPct?: number
+  clienteId?: string | null
+  cliente?: { id: string; codigo: string; nombre: string } | null
 }
 
 interface Valorizacion {
@@ -149,9 +151,10 @@ export default function ValorizacionesPage() {
   const [showImportDialog, setShowImportDialog] = useState(false)
   const [showIAModal, setShowIAModal] = useState(false)
   const [iaEnabled, setIaEnabled] = useState(false)
-  const [viewMode, setViewMode] = useState<'lista' | 'meses' | 'proyectos'>('lista')
+  const [viewMode, setViewMode] = useState<'lista' | 'meses' | 'proyectos' | 'clientes'>('lista')
   const [expandedMeses, setExpandedMeses] = useState<Set<string>>(new Set())
   const [expandedProyectos, setExpandedProyectos] = useState<Set<string>>(new Set())
+  const [expandedClientes, setExpandedClientes] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetch('/api/agente/features')
@@ -284,7 +287,7 @@ export default function ValorizacionesPage() {
     type ProjGroup = {
       proyectoId: string; codigo: string; nombre: string
       vals: Valorizacion[]; presupuesto: number; acumulado: number; totalNeto: number
-      ultimaFecha: string
+      ultimaFecha: string; moneda: string
     }
     const map = new Map<string, ProjGroup>()
     for (const v of filtered) {
@@ -299,6 +302,7 @@ export default function ValorizacionesPage() {
           acumulado: 0,
           totalNeto: 0,
           ultimaFecha: '',
+          moneda: v.moneda || 'USD',
         })
       }
       const p = map.get(pid)!
@@ -314,6 +318,101 @@ export default function ValorizacionesPage() {
     // Proyecto con val más reciente primero (igual que vista por mes)
     return [...map.values()].sort((a, b) => b.ultimaFecha.localeCompare(a.ultimaFecha))
   }, [filtered])
+
+  // ── Estado de valorización por proyecto (sin filtros, para la vista por cliente) ──
+  const proyectoStatsMap = useMemo(() => {
+    type Stats = {
+      presupuesto: number; acumulado: number; moneda: string
+      ultimoEstado: string | null; numeroVals: number; totalNeto: number; maxNumero: number
+    }
+    const map = new Map<string, Stats>()
+    for (const v of items) {
+      if (!map.has(v.proyectoId)) {
+        map.set(v.proyectoId, {
+          presupuesto: 0, acumulado: 0, moneda: v.moneda || 'USD',
+          ultimoEstado: null, numeroVals: 0, totalNeto: 0, maxNumero: -1,
+        })
+      }
+      const s = map.get(v.proyectoId)!
+      if (v.estado !== 'anulada') {
+        s.numeroVals += 1
+        s.totalNeto += v.subtotal ?? 0
+        if (v.numero > s.maxNumero) {
+          s.maxNumero = v.numero
+          s.presupuesto = v.presupuestoContractual ?? 0
+          s.acumulado = v.acumuladoActual ?? 0
+          s.moneda = v.moneda || 'USD'
+          s.ultimoEstado = v.estado
+        }
+      }
+    }
+    return map
+  }, [items])
+
+  // ── Agrupación por cliente (todos los proyectos, incluso sin valorizar aún) ──
+  const clientesData = useMemo(() => {
+    type ProyResumen = {
+      proyectoId: string; codigo: string; nombre: string
+      presupuesto: number; acumulado: number; moneda: string
+      numeroVals: number; totalNeto: number; ultimoEstado: string | null
+    }
+    type ClienteGroup = {
+      clienteId: string; nombreCliente: string; codigoCliente: string
+      proyectos: ProyResumen[]
+    }
+    const map = new Map<string, ClienteGroup>()
+    for (const p of proyectos) {
+      const cid = p.clienteId || '__sin_cliente__'
+      if (!map.has(cid)) {
+        map.set(cid, {
+          clienteId: cid,
+          nombreCliente: p.cliente?.nombre || 'Sin cliente asignado',
+          codigoCliente: p.cliente?.codigo || '',
+          proyectos: [],
+        })
+      }
+      const stats = proyectoStatsMap.get(p.id)
+      map.get(cid)!.proyectos.push({
+        proyectoId: p.id,
+        codigo: p.codigo,
+        nombre: p.nombre,
+        presupuesto: stats && stats.numeroVals > 0 ? stats.presupuesto : (p.totalCliente ?? 0),
+        acumulado: stats?.acumulado ?? 0,
+        moneda: (stats && stats.numeroVals > 0 ? stats.moneda : p.moneda) || 'USD',
+        numeroVals: stats?.numeroVals ?? 0,
+        totalNeto: stats?.totalNeto ?? 0,
+        ultimoEstado: stats?.ultimoEstado ?? null,
+      })
+    }
+
+    let groups = [...map.values()]
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase()
+      groups = groups
+        .map(g => {
+          const matchCliente = g.nombreCliente.toLowerCase().includes(term) || g.codigoCliente.toLowerCase().includes(term)
+          return matchCliente ? g : { ...g, proyectos: g.proyectos.filter(pr => pr.nombre.toLowerCase().includes(term) || pr.codigo.toLowerCase().includes(term)) }
+        })
+        .filter(g => g.proyectos.length > 0)
+    }
+
+    const result = groups.map(g => {
+      const byMoneda: Record<string, { presupuesto: number; acumulado: number; saldo: number; totalNeto: number }> = {}
+      for (const pr of g.proyectos) {
+        const m = pr.moneda || 'USD'
+        if (!byMoneda[m]) byMoneda[m] = { presupuesto: 0, acumulado: 0, saldo: 0, totalNeto: 0 }
+        byMoneda[m].presupuesto += pr.presupuesto
+        byMoneda[m].acumulado += pr.acumulado
+        byMoneda[m].totalNeto += pr.totalNeto
+      }
+      for (const m in byMoneda) byMoneda[m].saldo = byMoneda[m].presupuesto - byMoneda[m].acumulado
+      const totalVals = g.proyectos.reduce((s, p) => s + p.numeroVals, 0)
+      const totalPresupuesto = Object.values(byMoneda).reduce((s, x) => s + x.presupuesto, 0)
+      return { ...g, byMoneda, totalProyectos: g.proyectos.length, totalVals, totalPresupuesto }
+    })
+
+    return result.sort((a, b) => b.totalPresupuesto - a.totalPresupuesto)
+  }, [proyectos, proyectoStatsMap, searchTerm])
 
   // Preview info: qué número de valorización se creará y si hay partidas anteriores
   const formPreview = useMemo(() => {
@@ -527,6 +626,7 @@ export default function ValorizacionesPage() {
           { key: 'lista', icon: List, label: 'Lista' },
           { key: 'meses', icon: BarChart2, label: 'Por mes' },
           { key: 'proyectos', icon: FolderOpen, label: 'Por proyecto' },
+          { key: 'clientes', icon: Users, label: 'Por cliente' },
         ] as const).map(({ key, icon: Icon, label }) => (
           <button
             key={key}
@@ -755,12 +855,13 @@ export default function ValorizacionesPage() {
                 </div>
               ) : (
                 <div className="divide-y">
-                  {proyectosData.map(({ proyectoId, codigo, nombre, vals, presupuesto, acumulado, totalNeto }) => {
+                  {proyectosData.map(({ proyectoId, codigo, nombre, vals, presupuesto, acumulado, totalNeto, moneda }) => {
                     const isOpen = expandedProyectos.has(proyectoId)
                     const pct = presupuesto > 0 ? Math.min(100, acumulado / presupuesto * 100) : 0
                     const barColor = pct >= 100 ? 'bg-green-500' : pct >= 75 ? 'bg-blue-500' : pct >= 40 ? 'bg-blue-400' : 'bg-blue-300'
                     const valsOrdenadas = [...vals].sort((a, b) => b.numero - a.numero)
                     const ultimoEstado = valsOrdenadas[0]?.estado
+                    const saldo = presupuesto - acumulado
 
                     return (
                       <div key={proyectoId}>
@@ -787,14 +888,19 @@ export default function ValorizacionesPage() {
                                 <span className="text-xs font-mono font-semibold w-12 text-right">{pct.toFixed(1)}%</span>
                               </div>
                               {presupuesto > 0 && (
-                                <p className="text-[10px] text-muted-foreground mt-0.5">
-                                  {formatCurrency(acumulado, 'USD')} de {formatCurrency(presupuesto, 'USD')} acumulado
-                                </p>
+                                <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                                  <p className="text-[10px] text-muted-foreground">
+                                    {formatCurrency(acumulado, moneda)} de {formatCurrency(presupuesto, moneda)} acumulado
+                                  </p>
+                                  <p className={`text-[10px] font-semibold ${saldo > 0.01 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                    {saldo > 0.01 ? `Falta valorizar: ${formatCurrency(saldo, moneda)}` : 'Totalmente valorizado'}
+                                  </p>
+                                </div>
                               )}
                             </div>
                             <div className="text-right shrink-0 ml-4">
                               <p className="text-xs text-muted-foreground">{vals.length} val{vals.length > 1 ? 'es' : ''}</p>
-                              <p className="text-sm font-semibold font-mono">{formatCurrency(totalNeto, 'USD')}</p>
+                              <p className="text-sm font-semibold font-mono">{formatCurrency(totalNeto, moneda)}</p>
                               <p className="text-[10px] text-muted-foreground">sin IGV</p>
                             </div>
                           </div>
@@ -828,10 +934,164 @@ export default function ValorizacionesPage() {
                   {/* Fila total */}
                   <div className="px-5 py-3 bg-muted/30 flex items-center justify-between">
                     <span className="text-sm font-medium text-muted-foreground">{proyectosData.length} proyecto{proyectosData.length > 1 ? 's' : ''} · {filtered.length} valorizaciones</span>
-                    <div className="text-right">
+                    <div className="text-right space-y-0.5">
                       {Object.entries(totals.byMoneda).map(([m, t]) => (
                         <p key={m} className="text-sm font-semibold font-mono">{formatCurrency(t.neto, m)} <span className="text-xs font-normal text-muted-foreground">subtotal sin IGV</span></p>
                       ))}
+                      {(() => {
+                        const saldoPorMoneda: Record<string, number> = {}
+                        for (const p of proyectosData) saldoPorMoneda[p.moneda] = (saldoPorMoneda[p.moneda] || 0) + (p.presupuesto - p.acumulado)
+                        return Object.entries(saldoPorMoneda).map(([m, s]) => (
+                          <p key={m} className="text-xs font-mono text-amber-600 dark:text-amber-400">
+                            {formatCurrency(s, m)} <span className="font-normal text-muted-foreground">falta por valorizar</span>
+                          </p>
+                        ))
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })()}
+
+      {/* ── VISTA POR CLIENTE ── */}
+      {viewMode === 'clientes' && (() => {
+        const toggleCliente = (id: string) => setExpandedClientes(prev => {
+          const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s
+        })
+        return (
+          <Card>
+            <CardContent className="p-0">
+              {clientesData.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Users className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">No hay datos para mostrar</p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {clientesData.map(({ clienteId, nombreCliente, codigoCliente, proyectos: proys, byMoneda, totalProyectos, totalVals }) => {
+                    const isOpen = expandedClientes.has(clienteId)
+                    const proysOrdenados = [...proys].sort((a, b) => (b.presupuesto - b.acumulado) - (a.presupuesto - a.acumulado))
+
+                    return (
+                      <div key={clienteId}>
+                        <button
+                          className="w-full text-left px-5 py-4 hover:bg-muted/30 transition-colors"
+                          onClick={() => toggleCliente(clienteId)}
+                        >
+                          <div className="flex items-center gap-3">
+                            {isOpen
+                              ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                              : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-semibold text-sm">{codigoCliente ? `${codigoCliente} - ` : ''}{nombreCliente}</span>
+                                <span className="text-xs text-muted-foreground">{totalProyectos} proyecto{totalProyectos > 1 ? 's' : ''} · {totalVals} val{totalVals !== 1 ? 'es' : ''}</span>
+                              </div>
+                              {Object.entries(byMoneda).map(([m, t]) => {
+                                const pct = t.presupuesto > 0 ? Math.min(100, t.acumulado / t.presupuesto * 100) : 0
+                                const barColor = pct >= 100 ? 'bg-green-500' : pct >= 75 ? 'bg-blue-500' : pct >= 40 ? 'bg-blue-400' : 'bg-blue-300'
+                                return (
+                                  <div key={m} className="mt-1">
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex-1 bg-muted rounded-full h-2">
+                                        <div className={`${barColor} h-2 rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                                      </div>
+                                      <span className="text-xs font-mono font-semibold w-12 text-right">{pct.toFixed(1)}%</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                                      <p className="text-[10px] text-muted-foreground">
+                                        {formatCurrency(t.acumulado, m)} de {formatCurrency(t.presupuesto, m)} acumulado ({m})
+                                      </p>
+                                      <p className={`text-[10px] font-semibold ${t.saldo > 0.01 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                        {t.saldo > 0.01 ? `Falta valorizar: ${formatCurrency(t.saldo, m)}` : 'Totalmente valorizado'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                            <div className="text-right shrink-0 ml-4">
+                              {Object.entries(byMoneda).map(([m, t]) => (
+                                <p key={m} className="text-sm font-semibold font-mono">{formatCurrency(t.totalNeto, m)}</p>
+                              ))}
+                              <p className="text-[10px] text-muted-foreground">valorizado sin IGV</p>
+                            </div>
+                          </div>
+                        </button>
+                        {isOpen && (
+                          <div className="bg-muted/20 border-t divide-y">
+                            {proysOrdenados.map(p => {
+                              const pPct = p.presupuesto > 0 ? Math.min(100, p.acumulado / p.presupuesto * 100) : 0
+                              const pSaldo = p.presupuesto - p.acumulado
+                              return (
+                                <div key={p.proyectoId} className="flex items-center gap-3 px-10 py-2.5 hover:bg-muted/30">
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-xs font-mono font-medium">{p.codigo}</span>
+                                    <span className="text-xs text-muted-foreground ml-2 truncate">{p.nombre}</span>
+                                    {p.numeroVals === 0 && (
+                                      <span className="text-[10px] text-muted-foreground ml-2 italic">sin valorizar aún</span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <div className="w-14 bg-muted rounded-full h-1.5">
+                                      <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${pPct}%` }} />
+                                    </div>
+                                    <span className="text-[10px] font-mono w-8">{pPct.toFixed(0)}%</span>
+                                  </div>
+                                  {p.ultimoEstado && (
+                                    <Badge className={`${getEstadoColor(p.ultimoEstado)} text-[10px] py-0`}>{getEstadoLabel(p.ultimoEstado)}</Badge>
+                                  )}
+                                  <span className={`text-xs font-mono font-medium w-28 text-right shrink-0 ${pSaldo > 0.01 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                    {formatCurrency(pSaldo, p.moneda)}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => {
+                                      if (p.numeroVals > 0) {
+                                        setFilterProyecto(p.proyectoId)
+                                        setViewMode('proyectos')
+                                        setExpandedProyectos(prev => new Set(prev).add(p.proyectoId))
+                                      } else {
+                                        router.push(`/proyectos/${p.proyectoId}`)
+                                      }
+                                    }}
+                                    title={p.numeroVals > 0 ? 'Ver valorizaciones del proyecto' : 'Ver proyecto'}
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                  {/* Fila total */}
+                  <div className="px-5 py-3 bg-muted/30 flex items-center justify-between">
+                    <span className="text-sm font-medium text-muted-foreground">{clientesData.length} cliente{clientesData.length !== 1 ? 's' : ''}</span>
+                    <div className="text-right space-y-0.5">
+                      {(() => {
+                        const porMoneda: Record<string, { totalNeto: number; saldo: number }> = {}
+                        for (const c of clientesData) {
+                          for (const [m, t] of Object.entries(c.byMoneda)) {
+                            if (!porMoneda[m]) porMoneda[m] = { totalNeto: 0, saldo: 0 }
+                            porMoneda[m].totalNeto += t.totalNeto
+                            porMoneda[m].saldo += t.saldo
+                          }
+                        }
+                        return Object.entries(porMoneda).map(([m, t]) => (
+                          <div key={m}>
+                            <p className="text-sm font-semibold font-mono">{formatCurrency(t.totalNeto, m)} <span className="text-xs font-normal text-muted-foreground">valorizado sin IGV</span></p>
+                            <p className="text-xs font-mono text-amber-600 dark:text-amber-400">{formatCurrency(t.saldo, m)} <span className="font-normal text-muted-foreground">falta por valorizar</span></p>
+                          </div>
+                        ))
+                      })()}
                     </div>
                   </div>
                 </div>
