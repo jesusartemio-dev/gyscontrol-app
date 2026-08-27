@@ -288,6 +288,17 @@ export function TreeNode({
             {node.nombre}
           </span>
 
+          {/* Código del EDT de catálogo al que está enlazado este EDT */}
+          {node.type === 'edt' && node.data?.catalogoEdtCodigo && (
+            <Badge
+              variant="outline"
+              className="text-[10px] leading-none px-1 py-0 h-4 bg-blue-50 text-blue-700 border-blue-200 shrink-0"
+              title={node.data.catalogoEdtDescripcion || undefined}
+            >
+              {node.data.catalogoEdtCodigo}
+            </Badge>
+          )}
+
           {/* Children count inline */}
           {hasChildren && (
             <span className="text-[10px] text-gray-400 shrink-0">({node.metadata.totalChildren})</span>

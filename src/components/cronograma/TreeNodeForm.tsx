@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertTriangle, CheckCircle, XCircle, Users, Clock, Lock } from 'lucide-react'
+import { AlertTriangle, CheckCircle, XCircle, Users, Clock, Lock, Tag } from 'lucide-react'
 // import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { TreeNode, NodeType, PositioningMode, PositioningConfig } from './types'
 import { obtenerCalendarioLaboral } from '@/lib/utils/calendarioLaboral'
@@ -621,6 +621,20 @@ export function TreeNodeForm({
                   required
                 />
               </div>
+
+              {/* EDT de catálogo (solo lectura, informativo) */}
+              {isEdt && editNode?.data?.catalogoEdtCodigo && (
+                <div className="space-y-1.5">
+                  <Label className="flex items-center gap-1 text-muted-foreground">
+                    <Tag className="h-3.5 w-3.5" />
+                    EDT de catálogo
+                  </Label>
+                  <div className="text-sm px-3 py-2 rounded-md border bg-muted text-muted-foreground">
+                    {editNode.data.catalogoEdtCodigo}
+                    {editNode.data.catalogoEdtDescripcion ? ` — ${editNode.data.catalogoEdtDescripcion}` : ''}
+                  </div>
+                </div>
+              )}
 
               {/* Descripción */}
               <div className="space-y-1.5">

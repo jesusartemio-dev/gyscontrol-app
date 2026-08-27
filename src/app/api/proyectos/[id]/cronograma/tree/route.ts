@@ -119,6 +119,9 @@ export async function GET(
               user: {
                 select: { id: true, name: true, email: true }
               },
+              edt: {
+                select: { id: true, nombre: true, descripcion: true }
+              },
               proyectoActividad: {
                 include: {
                   user: {
@@ -187,6 +190,9 @@ export async function GET(
                 user: {
                   select: { id: true, name: true, email: true }
                 },
+                edt: {
+                  select: { id: true, nombre: true, descripcion: true }
+                },
                 proyectoActividad: {
                   include: {
                     user: {
@@ -231,6 +237,9 @@ export async function GET(
               include: {
                 user: {
                   select: { id: true, name: true, email: true }
+                },
+                edt: {
+                  select: { id: true, nombre: true, descripcion: true }
                 },
                 proyectoActividad: {
                   include: {
@@ -324,6 +333,8 @@ export async function GET(
             data: {
               descripcion: edt.descripcion,
               edtId: edt.edtId,
+              catalogoEdtCodigo: edt.edt?.nombre || null,
+              catalogoEdtDescripcion: edt.edt?.descripcion || null,
               fechaInicioComercial: edt.fechaInicioPlan,
               fechaFinComercial: edt.fechaFinPlan,
               fechaInicioReal: edt.fechaInicioReal,
