@@ -52,7 +52,7 @@ import {
 import ConfirmDialog from '@/components/ConfirmDialog'
 import { buildApiUrl, cn, normalizeStr } from '@/lib/utils'
 
-const ALLOWED_ROLES = ['proyectos', 'coordinador', 'gestor', 'gerente', 'admin']
+const ALLOWED_ROLES = ['proyectos', 'coordinador', 'gestor', 'gerente', 'admin', 'seguridad']
 
 type ViewMode = 'cards' | 'table'
 type FilterStatus = 'all' | ProyectoEstado
