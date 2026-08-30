@@ -26,7 +26,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           select: { id: true, name: true }
         },
         proyectoTarea: {
-          where: { estado: { not: 'completada' } },
+          // Se filtra por % real, no por `estado`: ambos campos deben ir sincronizados
+          // (ver src/lib/services/avanceTarea.ts) pero una edición manual del estado en el
+          // árbol del cronograma puede desincronizarlos, y aquí el % es la fuente confiable.
+          where: { porcentajeCompletado: { lt: 100 } },
           include: {
             user: {
               select: { id: true, name: true }

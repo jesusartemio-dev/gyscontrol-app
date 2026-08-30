@@ -237,7 +237,10 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
       field: 'estado',
       headerName: 'Estado',
       width: 120,
-      editable: true,
+      // Solo la tarea tiene estado editable: en actividad/EDT/fase es un rollup calculado
+      // por ProgresoService a partir de sus tareas, y una edición manual se pisaría en el
+      // siguiente recálculo.
+      editable: (params) => params.data?.tipo === 'tarea',
       cellEditor: 'agSelectCellEditor',
       cellEditorParams: { values: ESTADO_OPTIONS },
     },
@@ -245,7 +248,8 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
       field: 'avance',
       headerName: 'Avance %',
       width: 90,
-      editable: (params) => !['proyecto', 'fase'].includes(params.data?.tipo || ''),
+      // Igual que 'estado': el % de actividad/EDT/fase es derivado (ProgresoService), no editable.
+      editable: (params) => params.data?.tipo === 'tarea',
       valueFormatter: (params: ValueFormatterParams) => `${params.value}%`,
     },
     {
@@ -337,8 +341,9 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
     else if (field === 'estado') payload.estado = newValue
     else if (field === 'prioridad') payload.prioridad = newValue
     else if (field === 'avance') {
-      if (tipo === 'tarea') payload.porcentajeCompletado = Number(newValue)
-      else payload.porcentajeAvance = Number(newValue)
+      // Columna solo editable para tarea (ver columnDefs) — actividad/EDT/fase derivan su
+      // % en el backend (ProgresoService) y no aceptan escritura directa.
+      payload.porcentajeCompletado = Number(newValue)
     }
     else if (field === 'horasPlan') {
       if (tipo === 'tarea') payload.horasEstimadas = Number(newValue)
@@ -356,8 +361,10 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
     else return
 
     try {
+      // La ruta /cronograma/tree/[nodeId] solo expone PUT (no PATCH) — con PATCH el fetch
+      // siempre devolvía 405 y la edición se revertía en silencio para el usuario.
       const response = await fetch(url, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
@@ -368,6 +375,9 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
       }
 
       toastRef.current({ title: 'Actualizado', description: `${TIPO_LABEL[tipo]} "${row.nombre}" actualizado` })
+      // Refresca para reflejar rollups recalculados en padres (avance/horas de actividad,
+      // EDT, fase) que este PUT puede haber disparado.
+      fetchData()
     } catch (error) {
       toastRef.current({
         title: 'Error al guardar',

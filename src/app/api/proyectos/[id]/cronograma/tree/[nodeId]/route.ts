@@ -13,6 +13,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { logger } from '@/lib/logger'
+import { registrarAvanceTarea, propagarRollup } from '@/lib/services/avanceTarea'
 import {
   validarPermisoCronogramaPorEdt,
   validarPermisoCronogramaPorTarea,
@@ -48,6 +49,9 @@ const updateNodeSchema = z.object({
   personasEstimadas: z.number().int().min(1).optional(),
   recursoId: z.string().nullable().optional(),
   responsableId: z.string().nullable().optional(),
+  // Solo aplica a tarea — actividad/EDT/fase derivan su % de sus tareas (ProgresoService)
+  // y no se pueden editar directamente.
+  porcentajeCompletado: z.number().min(0).max(100).optional(),
 })
 
 // ✅ PUT /api/proyectos/[id]/cronograma/tree/[nodeId] - Actualizar nodo específico
@@ -170,7 +174,7 @@ export async function PUT(
         })
         break
 
-      case 'tarea':
+      case 'tarea': {
         updateData = {
           nombre: validatedData.nombre,
           descripcion: validatedData.descripcion,
@@ -179,7 +183,6 @@ export async function PUT(
           fechaFin: validatedData.fechaFinComercial ? new Date(validatedData.fechaFinComercial) : (validatedData.fechaFin ? new Date(validatedData.fechaFin) : undefined),
           horasEstimadas: validatedData.horasEstimadas || validatedData.horasPlan,
           prioridad: validatedData.prioridad,
-          estado: validatedData.estado,
           personasEstimadas: validatedData.personasEstimadas,
           recursoId: validatedData.recursoId,
           responsableId: validatedData.responsableId,
@@ -190,7 +193,41 @@ export async function PUT(
           where: { id: realId },
           data: updateData
         })
+
+        // El % manda sobre el estado (ver src/lib/services/avanceTarea.ts): tanto marcar la
+        // tarea como "completada" como editar directamente el % (columna "Avance %" de la
+        // vista Tabla) van por el libro mayor para no desincronizar porcentajeCompletado,
+        // igual que en /api/tareas/mis-asignadas. El resto de estados (pausada, cancelada,
+        // planificado...) no tienen % asociado y se aplican tal cual.
+        const nuevoProgreso =
+          validatedData.estado === 'completada' ? 100 :
+          validatedData.porcentajeCompletado !== undefined ? validatedData.porcentajeCompletado :
+          undefined
+
+        if (nuevoProgreso !== undefined) {
+          await registrarAvanceTarea(prisma, {
+            proyectoTareaId: realId,
+            porcentaje: nuevoProgreso,
+            fechaEfecto: new Date(),
+            origen: 'oficina',
+            usuarioId: session.user.id,
+          })
+          await propagarRollup(realId)
+          updateData.estado = nuevoProgreso >= 100 ? 'completada' : nuevoProgreso > 0 ? 'en_progreso' : 'pendiente'
+          updateData.porcentajeCompletado = nuevoProgreso
+        } else if (validatedData.estado) {
+          // Nota: el enum EstadoTarea de Prisma no incluye 'planificado' (solo EstadoEdt lo
+          // tiene), pero STATUS_OPTIONS en TreeNodeForm lo ofrece igual para tareas — bug
+          // preexistente y ajeno a este fix. `as any` preserva el comportamiento previo
+          // (antes bypaseado porque `updateData` era `any`) en vez de romper el build.
+          await prisma.proyectoTarea.update({
+            where: { id: realId },
+            data: { estado: validatedData.estado as any, updatedAt: new Date() }
+          })
+          updateData.estado = validatedData.estado
+        }
         break
+      }
 
       default:
         return NextResponse.json(
