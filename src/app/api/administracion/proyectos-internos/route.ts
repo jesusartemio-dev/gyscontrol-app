@@ -140,7 +140,10 @@ export async function POST(req: NextRequest) {
           fechaFin,
           horasEstimadas: 9999,
           personasEstimadas: 1,
-          estado: 'en_progreso',
+          // 'pendiente' porque porcentajeCompletado nace en 0 (default del schema) — 'en_progreso'
+          // a 0% desincroniza estado y % igual que el bug ya corregido en el árbol/tabla del
+          // cronograma (ver src/lib/services/avanceTarea.ts).
+          estado: 'pendiente',
           prioridad: 'media',
           orden: 0,
           creadoPorId: session.user.id,

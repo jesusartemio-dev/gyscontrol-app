@@ -95,7 +95,10 @@ export async function POST(request: NextRequest) {
         proyectoCronogramaId: cronogramaEjecucion.id,
         horasEstimadas: horasEstimadas,
         estado,
-        porcentajeCompletado: 0,
+        // Si el caller pide crear la tarea ya 'completada', el % debe nacer en 100 — de lo
+        // contrario queda 'completada' al 0%, el mismo desajuste corregido en el árbol/tabla
+        // del cronograma (ver src/lib/services/avanceTarea.ts).
+        porcentajeCompletado: estado === 'completada' ? 100 : 0,
         horasReales: 0,
         orden: 999,
         esExtra: true,

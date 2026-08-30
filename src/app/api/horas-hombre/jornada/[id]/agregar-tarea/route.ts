@@ -216,7 +216,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
             personasEstimadas: personasEstimadas && personasEstimadas > 0 ? personasEstimadas : miembros.length,
             creadoPorId: session.user.id,
             responsableId: responsableId || null,
-            estado: 'en_progreso',
+            // 'pendiente' porque porcentajeCompletado nace en 0 (default del schema) — 'en_progreso'
+            // a 0% desincroniza estado y % igual que el bug ya corregido en el árbol/tabla del
+            // cronograma (ver src/lib/services/avanceTarea.ts). El % real llega al cerrar la
+            // jornada, vía registrarAvanceTarea.
+            estado: 'pendiente',
             orden: 0,
             updatedAt: new Date()
           }
