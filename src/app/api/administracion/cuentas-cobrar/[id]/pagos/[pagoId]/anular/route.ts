@@ -29,12 +29,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: 'El motivo debe tener al menos 10 caracteres' }, { status: 400 })
     }
 
-    const pago = await prisma.pagoCobro.findUnique({ where: { id: pagoId } })
+    const pago = await prisma.pagoCobro.findUnique({
+      where: { id: pagoId },
+      include: { abonoValorizacion: { select: { id: true } } },
+    })
     if (!pago || pago.cuentaPorCobrarId !== cuentaPorCobrarId) {
       return NextResponse.json({ error: 'Pago no encontrado' }, { status: 404 })
     }
     if (pago.anulado) {
       return NextResponse.json({ error: 'El pago ya está anulado' }, { status: 400 })
+    }
+    // Un pago ligado a un evento del Cronograma de Cobro (factoring) debe
+    // revertirse desde ahí (revertirAbonoFactoringRecibido) — esa función
+    // también resetea el AbonoValorizacion a 'pendiente'; este endpoint no
+    // sabe nada de eso y lo dejaría desincronizado.
+    if (pago.abonoValorizacion) {
+      return NextResponse.json(
+        { error: 'Este pago pertenece a un evento del Cronograma de Cobro — revierte desde el ícono de esa fila, no desde acá.' },
+        { status: 400 }
+      )
     }
 
     const cuenta = await prisma.$transaction(async (tx) => {

@@ -187,7 +187,8 @@ export async function marcarAbonoFactoringRecibido(
   montoReal: number,
   fechaReal: Date,
   tx: PrismaClientOrTx,
-  observaciones?: string | null
+  observaciones?: string | null,
+  numeroConstanciaBN?: string | null
 ) {
   const abono = await tx.abonoValorizacion.findUnique({
     where: { id: abonoId },
@@ -249,6 +250,7 @@ export async function marcarAbonoFactoringRecibido(
       fechaPago: fechaReal,
       medioPago,
       esDetraccion: abono.tipo === 'detraccion',
+      numeroConstanciaBN: abono.tipo === 'detraccion' ? (numeroConstanciaBN || null) : null,
       observaciones: observaciones || `${etiqueta} factoring${cobro.financiera ? ` ${cobro.financiera}` : ''}`,
       updatedAt: new Date(),
     },

@@ -88,6 +88,7 @@ interface PagoCobro {
   anulado: boolean
   motivoAnulacion: string | null
   fechaAnulacion: string | null
+  abonoValorizacion: { id: string } | null
   cuentaBancaria: { id: string; nombreBanco: string; numeroCuenta: string } | null
 }
 
@@ -270,6 +271,10 @@ export default function CxCDetallePage() {
   const [montoRecibir, setMontoRecibir]       = useState('')
   const [fechaRecibir, setFechaRecibir]       = useState(new Date().toISOString().split('T')[0])
   const [obsRecibir, setObsRecibir]           = useState('')
+  // Solo aplica cuando el evento es 'detraccion' — mismo campo que ya usa el
+  // cobro directo (PagoCobro.numeroConstanciaBN), antes no se pedía acá y
+  // todo caía genérico en observaciones.
+  const [constanciaRecibir, setConstanciaRecibir] = useState('')
   const [savingRecibir, setSavingRecibir]     = useState(false)
 
   // Revertir (Sub-fase E) — Caso 1 (desembolso completo, nada recibido
@@ -541,6 +546,7 @@ export default function CxCDetallePage() {
     setMontoRecibir(abono.montoEsperado != null ? String(abono.montoEsperado) : '')
     setFechaRecibir(new Date().toISOString().split('T')[0])
     setObsRecibir('')
+    setConstanciaRecibir('')
   }
 
   const handleMarcarRecibido = async () => {
@@ -550,7 +556,10 @@ export default function CxCDetallePage() {
       const res = await fetch(
         `/api/proyectos/${cxc.valorizacion.proyectoId}/valorizaciones/${cxc.valorizacion.id}/cobro/abonos/${abonoRecibiendo.id}/recibir`,
         { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ montoReal: parseFloat(montoRecibir), fechaReal: fechaRecibir, observaciones: obsRecibir || null }) }
+          body: JSON.stringify({
+            montoReal: parseFloat(montoRecibir), fechaReal: fechaRecibir, observaciones: obsRecibir || null,
+            numeroConstanciaBN: abonoRecibiendo.tipo === 'detraccion' ? (constanciaRecibir || null) : undefined,
+          }) }
       )
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
       toast.success(abonoRecibiendo.tipo === 'excedente' ? 'Cliente pagó la factura — excedente liberado y aplicado a la CxC' : 'Cobro registrado')
@@ -1325,7 +1334,20 @@ export default function CxCDetallePage() {
                         <TableCell className="text-xs text-muted-foreground">{p.numeroOperacion || '—'}</TableCell>
                         <TableCell className={`text-right font-medium ${p.anulado ? 'line-through' : ''}`}>{formatCurrency(p.monto, cxc.moneda)}</TableCell>
                         <TableCell>
-                          {!p.anulado && (
+                          {!p.anulado && p.abonoValorizacion ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span tabIndex={0}>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" disabled>
+                                    <Ban className="h-3.5 w-3.5 text-muted-foreground" />
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-64">
+                                Este pago pertenece a un evento del Cronograma de Cobro (factoring) — revierte desde el ícono ↺ de esa fila, no desde acá.
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : !p.anulado ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => abrirAnularPago(p)}>
@@ -1334,7 +1356,7 @@ export default function CxCDetallePage() {
                               </TooltipTrigger>
                               <TooltipContent>Anular pago (se registró con error)</TooltipContent>
                             </Tooltip>
-                          )}
+                          ) : null}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1435,6 +1457,12 @@ export default function CxCDetallePage() {
               <Label>Fecha real *</Label>
               <Input type="date" value={fechaRecibir} onChange={e => setFechaRecibir(e.target.value)} />
             </div>
+            {abonoRecibiendo?.tipo === 'detraccion' && (
+              <div>
+                <Label>N° Constancia (Banco de la Nación)</Label>
+                <Input value={constanciaRecibir} onChange={e => setConstanciaRecibir(e.target.value)} placeholder="Ej: 298887985" />
+              </div>
+            )}
             <div>
               <Label>Observaciones (opcional)</Label>
               <Input value={obsRecibir} onChange={e => setObsRecibir(e.target.value)} />

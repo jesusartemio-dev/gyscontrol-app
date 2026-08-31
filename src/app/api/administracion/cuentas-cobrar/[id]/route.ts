@@ -28,7 +28,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           },
         },
         pagos: {
-          include: { cuentaBancaria: { select: { id: true, nombreBanco: true, numeroCuenta: true } } },
+          include: {
+            cuentaBancaria: { select: { id: true, nombreBanco: true, numeroCuenta: true } },
+            // Un pago ligado a un evento del Cronograma de Cobro (factoring) se
+            // revierte desde ahí (respeta orden entre eventos y efectos del
+            // excedente) — no desde "Anular pago" del Historial, que no sabe
+            // nada de AbonoValorizacion.
+            abonoValorizacion: { select: { id: true } },
+          },
           orderBy: { fechaPago: 'desc' },
         },
         adjuntos: { orderBy: { createdAt: 'desc' } },
