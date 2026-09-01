@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
-import { procesarDesembolsoFactoring } from '@/lib/services/factoringCobro'
+import { procesarDesembolsoFactoring, procesarRegistroCobroDirecto } from '@/lib/services/factoringCobro'
 
 type Ctx = { params: Promise<{ id: string; valId: string }> }
 
@@ -23,6 +23,10 @@ const CobroSchema = z.object({
   // Factoring — liquidación
   detraccionPct: z.number().min(0).max(100).optional().nullable(),
   detraccionMonto: z.number().min(0).optional().nullable(),
+  // Retención — aplica a factoring y a directo (mismo campo)
+  retencionPct: z.number().min(0).max(100).optional().nullable(),
+  retencionMonto: z.number().min(0).optional().nullable(),
+  retencionNumeroComprobante: z.string().max(100).optional().nullable(),
   excedentePct: z.number().min(0).max(100).optional().nullable(),
   excedenteMonto: z.number().min(0).optional().nullable(),
   valorAFinanciar: z.number().min(0).optional().nullable(),
@@ -37,6 +41,8 @@ const CobroSchema = z.object({
   montoDescontado: z.number().min(0).optional().nullable(),
   montoNeto: z.number().min(0).optional().nullable(),
   // Cobro directo
+  montoNetoDirecto: z.number().min(0).optional().nullable(),
+  cuentaBancariaId: z.string().optional().nullable(), // no es campo de CobroValorizacion — solo para el PagoCobro del Neto
   confirmacionCliente: z.enum(['pendiente', 'confirmado', 'en_disputa']).optional().nullable(),
   fechaVencimientoPago: z.string().optional().nullable(),
   observaciones: z.string().max(500).optional().nullable(),
@@ -57,6 +63,9 @@ function buildUpsertPayload(data: CobroData) {
     // Liquidación
     detraccionPct: data.detraccionPct ?? null,
     detraccionMonto: data.detraccionMonto ?? null,
+    retencionPct: data.retencionPct ?? null,
+    retencionMonto: data.retencionMonto ?? null,
+    retencionNumeroComprobante: data.retencionNumeroComprobante ?? null,
     excedentePct: data.excedentePct ?? null,
     excedenteMonto: data.excedenteMonto ?? null,
     valorAFinanciar: data.valorAFinanciar ?? null,
@@ -71,6 +80,7 @@ function buildUpsertPayload(data: CobroData) {
     montoDescontado: data.montoDescontado ?? null,
     montoNeto: data.montoNeto ?? null,
     // Directo
+    montoNetoDirecto: data.montoNetoDirecto ?? null,
     confirmacionCliente: data.confirmacionCliente ?? null,
     fechaVencimientoPago: data.fechaVencimientoPago ? new Date(data.fechaVencimientoPago) : null,
     observaciones: data.observaciones ?? null,
@@ -124,14 +134,20 @@ export async function POST(request: NextRequest, { params }: Ctx) {
         include: { abonos: true },
       })
 
-      const esNuevoDesembolso =
-        data.tipo === 'factoring' &&
+      const esNuevoRegistro =
         existente?.fechaDesembolso == null &&
         actualizado.fechaDesembolso != null
 
-      if (esNuevoDesembolso) {
+      if (esNuevoRegistro && data.tipo === 'factoring') {
         await procesarDesembolsoFactoring(actualizado.id, tx)
         // Releer para devolver el estado ya actualizado a 'desembolsada'.
+        return tx.cobroValorizacion.findUniqueOrThrow({
+          where: { id: actualizado.id },
+          include: { abonos: true },
+        })
+      }
+      if (esNuevoRegistro && data.tipo === 'directo') {
+        await procesarRegistroCobroDirecto(actualizado.id, data.cuentaBancariaId ?? null, tx)
         return tx.cobroValorizacion.findUniqueOrThrow({
           where: { id: actualizado.id },
           include: { abonos: true },

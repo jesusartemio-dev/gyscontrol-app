@@ -26,12 +26,13 @@ import { calcularFechaEstimadaPagoDesde } from '@/lib/utils/cuentasCobrarExcel'
 interface AbonoValorizacion {
   id: string
   cobroId: string
-  tipo: 'adelanto' | 'saldo_girar' | 'detraccion' | 'excedente' | null
+  tipo: 'adelanto' | 'saldo_girar' | 'detraccion' | 'excedente' | 'neto' | null
   estado: 'pendiente' | 'recibido'
   montoEsperado: number | null
   montoReal: number | null
   fechaEsperada: string | null
   fechaReal: string | null
+  pagoCobroId: string | null
   observaciones: string | null
   createdAt: string
 }
@@ -49,6 +50,9 @@ interface CobroValorizacion {
   diasFinanciamiento: number | null
   detraccionPct: number | null
   detraccionMonto: number | null
+  retencionPct: number | null
+  retencionMonto: number | null
+  retencionNumeroComprobante: string | null
   excedentePct: number | null
   excedenteMonto: number | null
   valorAFinanciar: number | null
@@ -59,6 +63,7 @@ interface CobroValorizacion {
   montoADesembolsar: number | null
   adelantoBanpro: number | null
   saldoAGirar: number | null
+  montoNetoDirecto: number | null
   confirmacionCliente: string | null
   fechaVencimientoPago: string | null
   observaciones: string | null
@@ -167,7 +172,7 @@ function senalAbono(abono: AbonoValorizacion): { texto: string; clase: string } 
 // 'pendiente' no tienen fechaReal (null), y Postgres no da un orden estable
 // entre nulls, así que las filas pendientes se reacomodaban solas cada vez
 // que algo cambiaba (ej. al revertir un evento).
-const ORDEN_TIPO_EVENTO: Record<string, number> = { adelanto: 0, saldo_girar: 1, detraccion: 2, excedente: 3 }
+const ORDEN_TIPO_EVENTO: Record<string, number> = { adelanto: 0, neto: 0, saldo_girar: 1, detraccion: 2, excedente: 3 }
 
 const ESTADO_COLORS: Record<string, string> = {
   pendiente: 'bg-yellow-100 text-yellow-800',
@@ -245,6 +250,12 @@ export default function CxCDetallePage() {
   const [cobroDias, setCobroDias]                       = useState('')
   const [cobroDetraccionPct, setCobroDetraccionPct]     = useState('12')
   const [cobroDetraccionMonto, setCobroDetraccionMonto] = useState('')
+  // Retención — aplica a factoring y a cobro directo por igual: se conoce de
+  // inmediato (viene impresa en la factura), se descuenta junto con la
+  // Detracción antes de calcular el resto. Nunca es un evento pendiente.
+  const [cobroRetencionPct, setCobroRetencionPct]       = useState('')
+  const [cobroRetencionMonto, setCobroRetencionMonto]   = useState('')
+  const [cobroRetencionComprobante, setCobroRetencionComprobante] = useState('')
   const [cobroExcedentePct, setCobroExcedentePct]       = useState('1')
   const [cobroExcedenteMonto, setCobroExcedenteMonto]   = useState('')
   const [cobroValorAFinanciar, setCobroValorAFinanciar] = useState('')
@@ -257,6 +268,11 @@ export default function CxCDetallePage() {
   const [cobroGastos, setCobroGastos]                   = useState('')
   const [cobroIgvGastos, setCobroIgvGastos]             = useState('')
   const [cobroAdelantoBanpro, setCobroAdelantoBanpro]   = useState('')
+  // Cobro directo — mini liquidación (Neto/Detracción/Retención), mismo
+  // Cronograma de Cobro que factoring pero sin Adelanto/Saldo a Girar/
+  // Excedente (mecánica exclusiva de la financiera).
+  const [cobroMontoNetoDirecto, setCobroMontoNetoDirecto] = useState('')
+  const [cobroCuentaBancariaIdDirecto, setCobroCuentaBancariaIdDirecto] = useState('none')
   const [cobroConfirmacion, setCobroConfirmacion]       = useState('')
   const [cobroFechaVencPago, setCobroFechaVencPago]     = useState('')
   const [cobroObs, setCobroObs]                         = useState('')
@@ -341,6 +357,9 @@ export default function CxCDetallePage() {
         setCobroDias(cobro.diasFinanciamiento?.toString() || '')
         setCobroDetraccionPct(cobro.detraccionPct?.toString() || '12')
         setCobroDetraccionMonto(cobro.detraccionMonto?.toString() || '')
+        setCobroRetencionPct(cobro.retencionPct?.toString() || '')
+        setCobroRetencionMonto(cobro.retencionMonto?.toString() || '')
+        setCobroRetencionComprobante(cobro.retencionNumeroComprobante || '')
         setCobroExcedentePct(cobro.excedentePct?.toString() || '1')
         setCobroExcedenteMonto(cobro.excedenteMonto?.toString() || '')
         setCobroValorAFinanciar(cobro.valorAFinanciar?.toString() || '')
@@ -350,6 +369,7 @@ export default function CxCDetallePage() {
         setCobroGastos(cobro.gastosAdicionales?.toString() || '')
         setCobroIgvGastos(cobro.igvGastos?.toString() || '')
         setCobroAdelantoBanpro(cobro.adelantoBanpro?.toString() || '')
+        setCobroMontoNetoDirecto(cobro.montoNetoDirecto?.toString() || '')
         setCobroConfirmacion(cobro.confirmacionCliente || '')
         setCobroFechaVencPago(cobro.fechaVencimientoPago ? cobro.fechaVencimientoPago.split('T')[0] : '')
         setCobroObs(cobro.observaciones || '')
@@ -366,7 +386,9 @@ export default function CxCDetallePage() {
     const base      = cxc?.monto ?? 0
     const detPctV   = n(cobroDetraccionPct)
     const detMonto  = n(cobroDetraccionMonto) || (base * detPctV / 100)
-    const valorNeto = base - detMonto
+    const retPctV   = n(cobroRetencionPct)
+    const retMonto  = n(cobroRetencionMonto) || (base * retPctV / 100)
+    const valorNeto = base - detMonto - retMonto
     const excPctV   = n(cobroExcedentePct)
     const excMonto  = n(cobroExcedenteMonto) || (valorNeto * excPctV / 100)
     const aFinanciar = n(cobroValorAFinanciar) || (valorNeto - excMonto)
@@ -382,10 +404,21 @@ export default function CxCDetallePage() {
     const dias      = parseInt(cobroDias) || 0
     const refInteres = tasa > 0 && dias > 0 ? aFinanciar * (tasa / 100 / 30) * dias : 0
     const refInteresDisponible = tasa > 0 && dias > 0 && aFinanciar > 0
-    return { base, detMonto, valorNeto, excMonto, aFinanciar, totalCostos, aDesembolsar, saldo, refInteres, refInteresDisponible }
-  }, [cxc, cobroDetraccionPct, cobroDetraccionMonto, cobroExcedentePct, cobroExcedenteMonto,
+    return { base, detMonto, retMonto, valorNeto, excMonto, aFinanciar, totalCostos, aDesembolsar, saldo, refInteres, refInteresDisponible }
+  }, [cxc, cobroDetraccionPct, cobroDetraccionMonto, cobroRetencionPct, cobroRetencionMonto, cobroExcedentePct, cobroExcedenteMonto,
       cobroValorAFinanciar, cobroInteres, cobroComision, cobroGastos, cobroIgvGastos,
       cobroAdelantoBanpro, cobroTasa, cobroDias])
+
+  // ── Mini liquidación cobro directo (Neto = Base − Detracción − Retención) ──
+  const liqDirecto = useMemo(() => {
+    const base     = cxc?.monto ?? 0
+    const detPctV  = n(cobroDetraccionPct)
+    const detMonto = n(cobroDetraccionMonto) || (base * detPctV / 100)
+    const retPctV  = n(cobroRetencionPct)
+    const retMonto = n(cobroRetencionMonto) || (base * retPctV / 100)
+    const neto     = base - detMonto - retMonto
+    return { base, detMonto, retMonto, neto }
+  }, [cxc, cobroDetraccionPct, cobroDetraccionMonto, cobroRetencionPct, cobroRetencionMonto])
 
   // Sugerencia de Interés: tasa × valorAFinanciar × (días/30). Solo se aplica
   // mientras el campo esté vacío o siga marcado como "sugerido" — nunca pisa
@@ -510,6 +543,9 @@ export default function CxCDetallePage() {
         body.diasFinanciamiento  = cobroDias ? parseInt(cobroDias) : null
         body.detraccionPct       = cobroDetraccionPct ? parseFloat(cobroDetraccionPct) : null
         body.detraccionMonto     = liq.detMonto
+        body.retencionPct        = cobroRetencionPct ? parseFloat(cobroRetencionPct) : null
+        body.retencionMonto      = liq.retMonto
+        body.retencionNumeroComprobante = cobroRetencionComprobante || null
         body.excedentePct        = cobroExcedentePct ? parseFloat(cobroExcedentePct) : null
         body.excedenteMonto      = liq.excMonto
         body.valorAFinanciar     = liq.aFinanciar
@@ -523,6 +559,14 @@ export default function CxCDetallePage() {
         body.montoDescontado     = liq.totalCostos
         body.montoNeto           = liq.aDesembolsar
       } else {
+        body.fechaDesembolso     = cobroFechaDesembolso || null
+        body.detraccionPct       = cobroDetraccionPct ? parseFloat(cobroDetraccionPct) : null
+        body.detraccionMonto     = liqDirecto.detMonto
+        body.retencionPct        = cobroRetencionPct ? parseFloat(cobroRetencionPct) : null
+        body.retencionMonto      = liqDirecto.retMonto
+        body.retencionNumeroComprobante = cobroRetencionComprobante || null
+        body.montoNetoDirecto    = n(cobroMontoNetoDirecto) || liqDirecto.neto
+        body.cuentaBancariaId    = cobroCuentaBancariaIdDirecto !== 'none' ? cobroCuentaBancariaIdDirecto : null
         body.confirmacionCliente = cobroConfirmacion || null
         body.fechaVencimientoPago = cobroFechaVencPago || null
         body.observaciones       = cobroObs || null
@@ -719,11 +763,13 @@ export default function CxCDetallePage() {
   const tieneFactoring = !!cxc.valorizacionId
   const abonoExcedentePendiente = cobro?.abonos.find(a => a.tipo === 'excedente' && a.estado === 'pendiente') ?? null
 
-  // Cronograma de cobro (factoring): orden entre eventos, reflejando el guard
-  // del backend (marcarAbonoFactoringRecibido) para que el botón ya aparezca
-  // deshabilitado en vez de que el usuario descubra el bloqueo al hacer clic.
-  const adelantoRecibido = cobro?.abonos.some(a => a.tipo === 'adelanto' && a.estado === 'recibido') ?? false
-  const requiereRegularizacion = !!cobro && cobro.tipo === 'factoring' && cobro.estado !== 'en_negociacion' && !adelantoRecibido
+  // Cronograma de cobro (factoring y directo): orden entre eventos,
+  // reflejando el guard del backend (marcarAbonoFactoringRecibido) para que
+  // el botón ya aparezca deshabilitado en vez de que el usuario descubra el
+  // bloqueo al hacer clic. 'neto' cumple el mismo rol que 'adelanto' —
+  // el evento base de cobro directo, siempre recibido de inmediato.
+  const adelantoRecibido = cobro?.abonos.some(a => (a.tipo === 'adelanto' || a.tipo === 'neto') && a.estado === 'recibido') ?? false
+  const requiereRegularizacion = !!cobro && cobro.estado !== 'en_negociacion' && !adelantoRecibido
   const faltantesParaExcedente = (cobro?.abonos ?? []).filter(a => (a.tipo === 'saldo_girar' || a.tipo === 'detraccion') && a.estado === 'pendiente')
 
   const eventosRecibidos = cobro?.abonos.filter(a => a.estado === 'recibido') ?? []
@@ -738,11 +784,12 @@ export default function CxCDetallePage() {
   const pagosCobro = cxc.pagos.filter(p => !p.esDetraccion && !p.esRetencion && !p.anulado)
   const pagosDetraccion = cxc.pagos.filter(p => p.esDetraccion && !p.anulado)
   const pagosRetencion  = cxc.pagos.filter(p => p.esRetencion && !p.anulado)
+  const totalRetencion = pagosRetencion.reduce((s, p) => s + p.monto, 0)
 
   // Revertir (Sub-fase E): mismas 2 restricciones que ya valida el backend,
   // calculadas acá para que el ícono de revertir ni aparezca cuando no aplica.
-  const puedeRevertirDesembolso = !!cobro && cobro.tipo === 'factoring' && cobro.estado === 'desembolsada'
-    && !cobro.abonos.some(a => a.tipo !== 'adelanto' && a.estado === 'recibido')
+  const puedeRevertirDesembolso = !!cobro && cobro.estado === 'desembolsada'
+    && !cobro.abonos.some(a => a.tipo !== 'adelanto' && a.tipo !== 'neto' && a.estado === 'recibido')
   // El rol para excedente se oculta, no se deshabilita (ver DISENO_UI_REVERSION_FACTORING.md,
   // punto 3a) — restricción de rol, no de estado, el usuario no puede resolverla desde acá.
   const puedeRevertirExcedente = tieneRol(session, ['admin', 'gerente'])
@@ -878,7 +925,7 @@ export default function CxCDetallePage() {
                     <Building2 className="h-4 w-4 text-muted-foreground" />
                     Factoring / Cobro con Financiera
                     {cobro && <Badge variant="outline" className="text-xs">{cobro.tipo === 'factoring' ? 'Factoring' : 'Directo'}</Badge>}
-                    {cobro?.tipo === 'factoring' && (
+                    {cobro && (
                       <Badge className={`text-xs ${
                         cobro.estado === 'confirmada' ? 'bg-green-100 text-green-700'
                         : cobro.estado === 'desembolsada' ? 'bg-blue-100 text-blue-700'
@@ -948,6 +995,10 @@ export default function CxCDetallePage() {
                       {labelRow('Saldo a Girar', cobro.saldoAGirar != null ? formatCurrency(cobro.saldoAGirar, cxc.moneda) : null)}
                       {labelRow('Fecha Confirmación', cobro.fechaConfirmacion ? formatDate(cobro.fechaConfirmacion) : null)}
                     </> : <>
+                      {labelRow('Fecha de Cobro', cobro.fechaDesembolso ? formatDate(cobro.fechaDesembolso) : null)}
+                      {labelRow('Detracción', cobro.detraccionMonto != null ? formatCurrency(cobro.detraccionMonto, cxc.moneda) : null)}
+                      {labelRow('Retención', cobro.retencionMonto != null ? formatCurrency(cobro.retencionMonto, cxc.moneda) : null)}
+                      {labelRow('Neto Cobrado', cobro.montoNetoDirecto != null ? formatCurrency(cobro.montoNetoDirecto, cxc.moneda) : null)}
                       {labelRow('Confirmación Cliente', cobro.confirmacionCliente)}
                       {labelRow('Fecha Venc. Pago', cobro.fechaVencimientoPago ? formatDate(cobro.fechaVencimientoPago) : null)}
                       {labelRow('Observaciones', cobro.observaciones)}
@@ -1037,6 +1088,19 @@ export default function CxCDetallePage() {
                                   </div>
                                 </td>
                               </tr>
+                              <tr className="border-b bg-gray-50">
+                                <td className="px-3 py-2 text-muted-foreground">Retención</td>
+                                <td className="px-3 py-2 text-right text-red-600">− {formatCurrency(liq.retMonto, cxc.moneda)}</td>
+                                <td className="px-3 py-2">
+                                  <div className="flex gap-1">
+                                    <Input className="h-7 text-xs w-16" type="number" placeholder="%" value={cobroRetencionPct} onChange={e => setCobroRetencionPct(e.target.value)} />
+                                    <Input className="h-7 text-xs" type="number" placeholder="Monto" value={cobroRetencionMonto} onChange={e => setCobroRetencionMonto(e.target.value)} />
+                                  </div>
+                                  {liq.retMonto > 0 && (
+                                    <Input className="h-7 text-xs mt-1" placeholder="N° Comprobante" value={cobroRetencionComprobante} onChange={e => setCobroRetencionComprobante(e.target.value)} />
+                                  )}
+                                </td>
+                              </tr>
                               <tr className="border-b">
                                 <td className="px-3 py-2 text-muted-foreground">Valor Neto</td>
                                 <td className="px-3 py-2 text-right font-medium">{formatCurrency(liq.valorNeto, cxc.moneda)}</td>
@@ -1115,27 +1179,98 @@ export default function CxCDetallePage() {
                         </div>
                       </>
                     ) : (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label>Confirmación Cliente</Label>
-                          <Select value={cobroConfirmacion} onValueChange={setCobroConfirmacion}>
-                            <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pendiente">Pendiente</SelectItem>
-                              <SelectItem value="confirmado">Confirmado</SelectItem>
-                              <SelectItem value="en_disputa">En disputa</SelectItem>
-                            </SelectContent>
-                          </Select>
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label>Fecha de Cobro</Label>
+                            <Input type="date" value={cobroFechaDesembolso} onChange={e => setCobroFechaDesembolso(e.target.value)} />
+                          </div>
+                          <div>
+                            <Label>Cuenta Bancaria (Neto)</Label>
+                            <Select value={cobroCuentaBancariaIdDirecto} onValueChange={setCobroCuentaBancariaIdDirecto}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Sin especificar</SelectItem>
+                                {bancos.map(b => <SelectItem key={b.id} value={b.id}>{b.nombreBanco} — {b.numeroCuenta}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
-                        <div>
-                          <Label>Fecha Venc. Pago</Label>
-                          <Input type="date" value={cobroFechaVencPago} onChange={e => setCobroFechaVencPago(e.target.value)} />
+
+                        {/* Mini hoja de liquidación — Neto/Detracción/Retención, sin
+                            Adelanto/Saldo a Girar/Excedente (mecánica exclusiva de factoring) */}
+                        <div className="border rounded-lg overflow-hidden">
+                          <div className="bg-gray-800 text-white text-xs px-3 py-2 font-semibold">Liquidación (Cobro Directo)</div>
+                          <table className="w-full text-sm">
+                            <tbody>
+                              <tr className="border-b">
+                                <td className="px-3 py-2 text-muted-foreground">Base (Monto Factura)</td>
+                                <td className="px-3 py-2 text-right font-medium">{formatCurrency(liqDirecto.base, cxc.moneda)}</td>
+                                <td className="px-3 py-2 w-40"></td>
+                              </tr>
+                              <tr className="border-b bg-gray-50">
+                                <td className="px-3 py-2 text-muted-foreground">Detracción</td>
+                                <td className="px-3 py-2 text-right text-red-600">− {formatCurrency(liqDirecto.detMonto, cxc.moneda)}</td>
+                                <td className="px-3 py-2">
+                                  <div className="flex gap-1">
+                                    <Input className="h-7 text-xs w-16" type="number" placeholder="%" value={cobroDetraccionPct} onChange={e => setCobroDetraccionPct(e.target.value)} />
+                                    <Input className="h-7 text-xs" type="number" placeholder="Monto" value={cobroDetraccionMonto} onChange={e => setCobroDetraccionMonto(e.target.value)} />
+                                  </div>
+                                </td>
+                              </tr>
+                              <tr className="border-b bg-gray-50">
+                                <td className="px-3 py-2 text-muted-foreground">Retención</td>
+                                <td className="px-3 py-2 text-right text-red-600">− {formatCurrency(liqDirecto.retMonto, cxc.moneda)}</td>
+                                <td className="px-3 py-2">
+                                  <div className="flex gap-1">
+                                    <Input className="h-7 text-xs w-16" type="number" placeholder="%" value={cobroRetencionPct} onChange={e => setCobroRetencionPct(e.target.value)} />
+                                    <Input className="h-7 text-xs" type="number" placeholder="Monto" value={cobroRetencionMonto} onChange={e => setCobroRetencionMonto(e.target.value)} />
+                                  </div>
+                                  {liqDirecto.retMonto > 0 && (
+                                    <Input className="h-7 text-xs mt-1" placeholder="N° Comprobante" value={cobroRetencionComprobante} onChange={e => setCobroRetencionComprobante(e.target.value)} />
+                                  )}
+                                </td>
+                              </tr>
+                              <tr className="font-bold text-base">
+                                <td className="px-3 py-2">Neto a Cobrar</td>
+                                <td className="px-3 py-2 text-right text-green-700">
+                                  {formatCurrency(n(cobroMontoNetoDirecto) || liqDirecto.neto, cxc.moneda)}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <Input className="h-7 text-xs" type="number" placeholder={liqDirecto.neto.toFixed(2)} value={cobroMontoNetoDirecto} onChange={e => setCobroMontoNetoDirecto(e.target.value)} />
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
-                        <div className="col-span-2">
-                          <Label>Observaciones</Label>
-                          <Textarea value={cobroObs} onChange={e => setCobroObs(e.target.value)} rows={2} />
+                        {cobro?.estado === 'desembolsada' && (
+                          <p className="text-xs text-muted-foreground">
+                            Ya registrado — la Detracción pendiente se marca recibida desde el Cronograma de Cobro más abajo.
+                          </p>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label>Confirmación Cliente</Label>
+                            <Select value={cobroConfirmacion} onValueChange={setCobroConfirmacion}>
+                              <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pendiente">Pendiente</SelectItem>
+                                <SelectItem value="confirmado">Confirmado</SelectItem>
+                                <SelectItem value="en_disputa">En disputa</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label>Fecha Venc. Pago</Label>
+                            <Input type="date" value={cobroFechaVencPago} onChange={e => setCobroFechaVencPago(e.target.value)} />
+                          </div>
+                          <div className="col-span-2">
+                            <Label>Observaciones</Label>
+                            <Textarea value={cobroObs} onChange={e => setCobroObs(e.target.value)} rows={2} />
+                          </div>
                         </div>
-                      </div>
+                      </>
                     )}
 
                     <div className="flex gap-2 justify-end">
@@ -1149,8 +1284,8 @@ export default function CxCDetallePage() {
                 )}
 
                 {/* Resumen de esta operación — el "entró X, falta Y, costó Z" */}
-                {cobro && cobro.tipo === 'factoring' && cobro.abonos.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-gray-50 rounded-lg border">
+                {cobro && cobro.abonos.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-3 bg-gray-50 rounded-lg border">
                     <div>
                       <p className="text-[11px] text-muted-foreground">Cobrado (real)</p>
                       <p className="text-sm font-semibold text-green-700">{formatCurrency(totalCobradoReal, cxc.moneda)}</p>
@@ -1169,11 +1304,15 @@ export default function CxCDetallePage() {
                       <p className="text-[11px] text-muted-foreground">Ajuste por mora</p>
                       <p className="text-sm font-semibold text-red-700">{formatCurrency(totalAjusteMora, cxc.moneda)}</p>
                     </div>
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">Retención</p>
+                      <p className="text-sm font-semibold text-red-700">{formatCurrency(totalRetencion, cxc.moneda)}</p>
+                    </div>
                   </div>
                 )}
 
-                {/* Cronograma de Cobro — los 4 eventos de la operación de factoring */}
-                {cobro && cobro.tipo === 'factoring' && (
+                {/* Cronograma de Cobro — eventos de factoring o cobro directo */}
+                {cobro && (
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-muted-foreground">Cronograma de Cobro</p>
 
@@ -1203,7 +1342,7 @@ export default function CxCDetallePage() {
                                 : ''
                             // El adelanto no se revierte suelto (ver revertirAbonoFactoringRecibido) —
                             // solo se deshace completo con "Revertir desembolso" (ícono del header).
-                            const puedeRevertirEsteEvento = a.tipo === 'adelanto' ? false : esExcedente ? puedeRevertirExcedente : true
+                            const puedeRevertirEsteEvento = (a.tipo === 'adelanto' || a.tipo === 'neto') ? false : esExcedente ? puedeRevertirExcedente : true
                             const fueRevertido = a.estado === 'pendiente' && (a.observaciones ?? '').includes('Revertido:')
                             const boton = a.estado === 'recibido' ? (
                               <span className="inline-flex items-center gap-1.5">
@@ -1506,12 +1645,15 @@ export default function CxCDetallePage() {
               ) : revertirTarget?.tipo === 'desembolso' ? (
                 <>
                   {(() => {
-                    const pagoAdelanto = cxc.pagos.find(p => p.medioPago === 'factoring' && !p.esCostoFinanciamiento && !p.esAjusteMora && !p.anulado)
+                    const abonoBase = cobro?.abonos.find(a => a.tipo === 'adelanto' || a.tipo === 'neto')
+                    const pagoBase = abonoBase?.pagoCobroId ? cxc.pagos.find(p => p.id === abonoBase.pagoCobroId) : undefined
                     const pagoCosto = cxc.pagos.find(p => p.esCostoFinanciamiento && !p.anulado)
+                    const pagoRetencion = cxc.pagos.find(p => p.esRetencion && !p.anulado)
                     return (
                       <>
-                        {pagoAdelanto && <p className="text-sm">Adelanto · {formatCurrency(pagoAdelanto.monto, cxc.moneda)} · {formatDate(pagoAdelanto.fechaPago)}</p>}
+                        {pagoBase && <p className="text-sm">{TIPO_EVENTO_FACTORING_LABEL[abonoBase?.tipo ?? ''] ?? 'Adelanto/Neto'} · {formatCurrency(pagoBase.monto, cxc.moneda)} · {formatDate(pagoBase.fechaPago)}</p>}
                         {pagoCosto && <p className="text-sm">Costo de financiamiento · {formatCurrency(pagoCosto.monto, cxc.moneda)} · {formatDate(pagoCosto.fechaPago)}</p>}
+                        {pagoRetencion && <p className="text-sm">Retención · {formatCurrency(pagoRetencion.monto, cxc.moneda)} · {formatDate(pagoRetencion.fechaPago)}</p>}
                       </>
                     )
                   })()}
@@ -1521,7 +1663,7 @@ export default function CxCDetallePage() {
 
             <div className="text-xs text-muted-foreground space-y-1 border-l-2 border-amber-300 pl-3">
               {revertirTarget?.tipo === 'desembolso' ? (
-                <p>El pago se anula (no se borra) y queda en el historial marcado como anulado. Los 4 eventos del cronograma se eliminan — ninguno se ha recibido todavía, así que no hay nada más que perder. La operación vuelve a &quot;En negociación&quot; y el formulario de liquidación se reabre con tus datos, listo para corregir.</p>
+                <p>El/los pago(s) se anulan (no se borran) y quedan en el historial marcados como anulados. Los eventos del cronograma se eliminan — ninguno se ha recibido todavía, así que no hay nada más que perder. La operación vuelve a &quot;En negociación&quot; y el formulario se reabre con tus datos, listo para corregir.</p>
               ) : (
                 <>
                   <p>El pago se anula (no se borra) y queda en el historial marcado como anulado, con el motivo que escribas abajo. El evento vuelve a &quot;Pendiente&quot; con su monto teórico intacto para volver a registrarlo bien.</p>

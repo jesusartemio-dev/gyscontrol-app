@@ -2397,6 +2397,15 @@ model CobroValorizacion {
   // Factoring — hoja de liquidación
   detraccionPct          Float? // ej. 12.0 (Peru)
   detraccionMonto        Float?
+  // Retención — aplica tanto a factoring como a cobro directo (mismo
+  // mecanismo: se descuenta del Monto Factura ANTES de calcular el resto,
+  // igual que la Detracción). Es dinero que GYS nunca recibe como efectivo
+  // — va a SUNAT a nombre de GYS como crédito fiscal — así que se conoce de
+  // inmediato (viene impreso en la factura) y se registra como un PagoCobro
+  // ya cerrado al guardar, no como un evento pendiente del Cronograma.
+  retencionPct               Float?
+  retencionMonto             Float?
+  retencionNumeroComprobante String?
   excedentePct           Float? // % que retiene la financiera, ej. 1.0
   excedenteMonto         Float?
   valorAFinanciar        Float? // = valor neto - excedente
@@ -2412,7 +2421,10 @@ model CobroValorizacion {
   // Legacy (mantener para compatibilidad)
   montoDescontado        Float? // total costos/descuentos
   montoNeto              Float? // = montoADesembolsar (alias)
-  // Cobro directo
+  // Cobro directo — mini "hoja de liquidación" (Neto/Detracción/Retención),
+  // mismo Cronograma de Cobro que factoring pero sin Adelanto/Saldo a
+  // Girar/Excedente (mecánica exclusiva de la financiera).
+  montoNetoDirecto       Float? // = Monto Factura − Detracción − Retención, editable
   confirmacionCliente    String? // 'pendiente' | 'confirmado' | 'en_disputa'
   fechaVencimientoPago   DateTime?
   observaciones          String?
@@ -2436,19 +2448,24 @@ enum EstadoAbonoFactoring {
   recibido
 }
 
-// Los 4 eventos de cobro de una operación de factoring con recurso.
-enum TipoAbonoFactoring {
+// Los eventos de cobro de una operación — factoring (Adelanto, Saldo a
+// Girar, Detracción, Excedente) o cobro directo (Neto, Detracción). Neto y
+// Adelanto cumplen el mismo rol (el evento base, siempre 'recibido' de
+// inmediato); Retención no está acá porque nunca queda 'pendiente' — se
+// registra como PagoCobro ya cerrado, sin pasar por el Cronograma.
+enum TipoEventoCobro {
   adelanto
   saldo_girar
   detraccion
   excedente
+  neto
 }
 
 model AbonoValorizacion {
   id            String               @id @default(cuid())
   cobroId       String
   // null = abono legacy sin clasificar (creado antes de este modelo de eventos)
-  tipo          TipoAbonoFactoring?
+  tipo          TipoEventoCobro?
   estado        EstadoAbonoFactoring @default(recibido)
   montoEsperado Float? // monto teórico de la liquidación al crear el evento como 'pendiente'
   // "montoReal"/"fechaReal": antes se llamaban monto/fecha y eran obligatorios;

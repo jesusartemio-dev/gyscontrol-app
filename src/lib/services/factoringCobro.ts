@@ -32,6 +32,37 @@ async function resolverCuentaBancariaFactoring(moneda: string, client: PrismaCli
 }
 
 /**
+ * Retención — aplica tanto a factoring como a cobro directo (mismo campo en
+ * CobroValorizacion, mismo momento: se conoce de inmediato porque viene
+ * impresa en la factura, así que se registra como un PagoCobro YA CERRADO
+ * al procesar el desembolso/registro — igual que el costo de financiamiento,
+ * nunca es un evento pendiente del Cronograma porque GYS nunca recibe ese
+ * dinero como efectivo (va a SUNAT a nombre de GYS, es crédito fiscal).
+ */
+async function crearPagoRetencionSiAplica(
+  cobro: { id: string; retencionMonto: number | null; retencionPct: number | null; retencionNumeroComprobante: string | null; fechaDesembolso: Date | null; financiera: string | null },
+  cxc: { id: string },
+  tx: PrismaClientOrTx
+) {
+  if (!cobro.retencionMonto || cobro.retencionMonto <= 0) return
+  await tx.pagoCobro.create({
+    data: {
+      cuentaPorCobrarId: cxc.id,
+      cuentaBancariaId: null,
+      monto: cobro.retencionMonto,
+      fechaPago: cobro.fechaDesembolso ?? new Date(),
+      medioPago: 'retencion',
+      esRetencion: true,
+      retencionPorcentaje: cobro.retencionPct ?? null,
+      retencionMonto: cobro.retencionMonto,
+      retencionNumeroConstancia: cobro.retencionNumeroComprobante ?? null,
+      observaciones: `Retención${cobro.retencionPct ? ` ${cobro.retencionPct}%` : ''}${cobro.financiera ? ` — ${cobro.financiera}` : ''}`,
+      updatedAt: new Date(),
+    },
+  })
+}
+
+/**
  * Desembolso de factoring (opción B, modelo de cobros esperados): genera el
  * PagoCobro del adelanto real y su AbonoValorizacion ya 'recibido', el del
  * costo de financiamiento (esCostoFinanciamiento), y crea saldo_girar,
@@ -130,6 +161,8 @@ export async function procesarDesembolsoFactoring(cobroValorizacionId: string, t
     })
   }
 
+  await crearPagoRetencionSiAplica(cobro, cxc, tx)
+
   // 3) Eventos 2, 3 y 4 — "cobros esperados" pendientes, sin PagoCobro todavía.
   // Llegan después y se marcan recibidos por separado (Sub-fase C). Solo se
   // crea cada uno si su monto teórico es > 0 — mismo criterio que el costo.
@@ -149,6 +182,88 @@ export async function procesarDesembolsoFactoring(cobroValorizacionId: string, t
         cobroId: cobroValorizacionId, tipo: 'excedente', estado: 'pendiente',
         montoEsperado: cobro.excedenteMonto, fechaEsperada: cobro.fechaVencimiento,
       },
+    })
+  }
+
+  await recalcularCuentaPorCobrar(cxc.id, tx)
+
+  await tx.cobroValorizacion.update({
+    where: { id: cobroValorizacionId },
+    data: { estado: 'desembolsada', updatedAt: new Date() },
+  })
+}
+
+/**
+ * Registro de un cobro directo con Detracción y/o Retención (mini "hoja de
+ * liquidación", equivalente al desembolso de factoring pero sin Adelanto/
+ * Saldo a Girar/Excedente — esa es mecánica exclusiva de la financiera).
+ * Genera el PagoCobro del Neto real y su AbonoValorizacion ya 'recibido'
+ * (mismo rol que el Adelanto: registrar ES el evento), la Retención como
+ * PagoCobro ya cerrado si aplica, y Detracción como AbonoValorizacion
+ * 'pendiente' con su monto teórico si aplica — se marca recibida por
+ * separado, vía marcarAbonoFactoringRecibido, cuando el Banco de la Nación
+ * confirma el depósito real.
+ */
+export async function procesarRegistroCobroDirecto(
+  cobroValorizacionId: string,
+  cuentaBancariaId: string | null,
+  tx: PrismaClientOrTx
+) {
+  const cobro = await tx.cobroValorizacion.findUnique({
+    where: { id: cobroValorizacionId },
+    include: { valorizacion: { include: { cuentasPorCobrar: true } } },
+  })
+  if (!cobro) {
+    throw new Error('CobroValorizacion no encontrado')
+  }
+  if (cobro.tipo !== 'directo') {
+    throw new Error('procesarRegistroCobroDirecto solo aplica a operaciones tipo directo')
+  }
+  if (!cobro.fechaDesembolso) {
+    throw new Error('Falta la fecha de registro del cobro')
+  }
+  if (cobro.estado !== 'en_negociacion') {
+    throw new Error(`No se puede procesar el registro: la operación ya está en estado '${cobro.estado}'`)
+  }
+  if (!cobro.montoNetoDirecto || cobro.montoNetoDirecto <= 0) {
+    throw new Error('Falta el monto neto a cobrar')
+  }
+
+  const cxc = cobro.valorizacion.cuentasPorCobrar.find(c => c.estado !== 'anulada')
+  if (!cxc) {
+    throw new Error('La valorización no tiene una CuentaPorCobrar activa para aplicar el registro')
+  }
+
+  const pagoNeto = await tx.pagoCobro.create({
+    data: {
+      cuentaPorCobrarId: cxc.id,
+      cuentaBancariaId,
+      monto: cobro.montoNetoDirecto,
+      fechaPago: cobro.fechaDesembolso,
+      medioPago: 'transferencia',
+      numeroOperacion: cobro.numeroOperacion,
+      updatedAt: new Date(),
+    },
+  })
+
+  await tx.abonoValorizacion.create({
+    data: {
+      cobroId: cobroValorizacionId,
+      tipo: 'neto',
+      estado: 'recibido',
+      montoEsperado: cobro.montoNetoDirecto,
+      montoReal: cobro.montoNetoDirecto,
+      fechaEsperada: cobro.fechaDesembolso,
+      fechaReal: cobro.fechaDesembolso,
+      pagoCobroId: pagoNeto.id,
+    },
+  })
+
+  await crearPagoRetencionSiAplica(cobro, cxc, tx)
+
+  if (cobro.detraccionMonto && cobro.detraccionMonto > 0) {
+    await tx.abonoValorizacion.create({
+      data: { cobroId: cobroValorizacionId, tipo: 'detraccion', estado: 'pendiente', montoEsperado: cobro.detraccionMonto },
     })
   }
 
@@ -210,13 +325,14 @@ export async function marcarAbonoFactoringRecibido(
     throw new Error('La valorización no tiene una CuentaPorCobrar activa')
   }
 
-  // Orden entre eventos.
-  const adelantoRecibido = await tx.abonoValorizacion.findFirst({
-    where: { cobroId: cobro.id, tipo: 'adelanto', estado: 'recibido' },
+  // Orden entre eventos. 'neto' cumple el mismo rol que 'adelanto' para
+  // cobro directo — el evento base, siempre recibido de inmediato.
+  const eventoBaseRecibido = await tx.abonoValorizacion.findFirst({
+    where: { cobroId: cobro.id, tipo: { in: ['adelanto', 'neto'] }, estado: 'recibido' },
     select: { id: true },
   })
-  if (!adelantoRecibido) {
-    throw new Error('No se puede recibir ningún evento antes que el adelanto')
+  if (!eventoBaseRecibido) {
+    throw new Error('No se puede recibir ningún evento antes que el adelanto/neto')
   }
   if (abono.tipo === 'excedente') {
     const pendientesPrevios = await tx.abonoValorizacion.findFirst({
@@ -329,12 +445,13 @@ export async function revertirDesembolsoFactoring(
   if (cobro.estado !== 'desembolsada') {
     throw new Error(`No se puede revertir: la operación está en estado '${cobro.estado}', no 'desembolsada'`)
   }
+  // 'neto' cumple el mismo rol que 'adelanto' para cobro directo.
   const yaHayRecibidos = cobro.abonos.some(
-    a => a.tipo !== 'adelanto' && a.estado === 'recibido'
+    a => a.tipo !== 'adelanto' && a.tipo !== 'neto' && a.estado === 'recibido'
   )
   if (yaHayRecibidos) {
     throw new Error(
-      'No se puede revertir el desembolso: ya hay eventos recibidos sobre él. Revierte primero cada evento recibido (incluido el excedente si aplica) y luego el desembolso.'
+      'No se puede revertir: ya hay eventos recibidos sobre él. Revierte primero cada evento recibido (incluido el excedente si aplica) y luego esto.'
     )
   }
 
@@ -345,10 +462,10 @@ export async function revertirDesembolsoFactoring(
 
   const fechaAnulacion = new Date()
 
-  const abonoAdelanto = cobro.abonos.find(a => a.tipo === 'adelanto')
-  if (abonoAdelanto?.pagoCobroId) {
+  const abonoBase = cobro.abonos.find(a => a.tipo === 'adelanto' || a.tipo === 'neto')
+  if (abonoBase?.pagoCobroId) {
     await tx.pagoCobro.update({
-      where: { id: abonoAdelanto.pagoCobroId },
+      where: { id: abonoBase.pagoCobroId },
       data: { anulado: true, motivoAnulacion: motivo, fechaAnulacion, updatedAt: new Date() },
     })
   }
@@ -359,6 +476,16 @@ export async function revertirDesembolsoFactoring(
   if (pagoCosto) {
     await tx.pagoCobro.update({
       where: { id: pagoCosto.id },
+      data: { anulado: true, motivoAnulacion: motivo, fechaAnulacion, updatedAt: new Date() },
+    })
+  }
+
+  const pagoRetencion = await tx.pagoCobro.findFirst({
+    where: { cuentaPorCobrarId: cxc.id, esRetencion: true, anulado: false },
+  })
+  if (pagoRetencion) {
+    await tx.pagoCobro.update({
+      where: { id: pagoRetencion.id },
       data: { anulado: true, motivoAnulacion: motivo, fechaAnulacion, updatedAt: new Date() },
     })
   }
@@ -409,15 +536,15 @@ export async function revertirAbonoFactoringRecibido(
   if (!abono.tipo) {
     throw new Error('Este abono no tiene un tipo de evento definido — no se puede procesar por este flujo')
   }
-  // El adelanto no se revierte suelto: es la base de todo el resto del
+  // El adelanto/neto no se revierte suelto: es la base de todo el resto del
   // cronograma (el guard de orden de marcarAbonoFactoringRecibido exige que
   // esté 'recibido' antes que cualquier otro evento). Revertirlo con esta
-  // función solo anularía SU PagoCobro, dejando el de costo de financiamiento
-  // (que no está vinculado a ningún abono) activo y el resto del cronograma
-  // en un estado inconsistente. La única forma correcta de deshacer el
-  // adelanto es revertir el desembolso completo (Caso 1).
-  if (abono.tipo === 'adelanto') {
-    throw new Error('El adelanto no se revierte individualmente — usa "Revertir desembolso" para deshacer la operación completa')
+  // función solo anularía SU PagoCobro, dejando el costo de financiamiento o
+  // la retención (que no están vinculados a ningún abono) activos y el resto
+  // del cronograma en un estado inconsistente. La única forma correcta de
+  // deshacerlo es revertir el registro completo (Caso 1).
+  if (abono.tipo === 'adelanto' || abono.tipo === 'neto') {
+    throw new Error(`El ${abono.tipo} no se revierte individualmente — usa "Revertir desembolso" para deshacer la operación completa`)
   }
 
   const cobro = abono.cobro
