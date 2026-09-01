@@ -223,9 +223,32 @@ export async function uploadFile(options: {
   return res.data
 }
 
+/**
+ * Borra el archivo de Drive; si no se puede borrar definitivo, lo manda a la
+ * papelera.
+ *
+ * En el Shared Drive la cuenta de servicio es Content manager: puede subir y
+ * editar, pero NO borrar definitivo (`canDelete: false`). Ahí `files.delete`
+ * falla, y Drive responde 404 "File not found" en vez de 403 — o sea que por
+ * el código de error no se distingue "no tengo permiso" de "no existe". Por
+ * eso se reintenta con papelera en vez de mirar el status.
+ *
+ * Todos los llamadores envuelven esto en try/catch, así que antes el archivo
+ * simplemente quedaba huérfano en Drive sin que nadie se enterara.
+ */
 export async function deleteFile(fileId: string): Promise<void> {
   const drive = getDriveClient()
-  await drive.files.delete({ fileId, supportsAllDrives: true })
+  try {
+    await drive.files.delete({ fileId, supportsAllDrives: true })
+  } catch (errorBorrado) {
+    try {
+      await drive.files.update({ fileId, requestBody: { trashed: true }, supportsAllDrives: true })
+    } catch {
+      // Si tampoco se pudo mandar a papelera, el archivo de verdad no existe
+      // o no hay acceso: se propaga el error original, que es el informativo.
+      throw errorBorrado
+    }
+  }
 }
 
 export async function createFolder(options: {
