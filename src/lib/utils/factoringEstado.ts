@@ -14,4 +14,5 @@ export const TIPO_EVENTO_FACTORING_LABEL: Record<string, string> = {
   detraccion: 'Detracción',
   excedente: 'Excedente',
   neto: 'Neto', // cobro directo — mismo rol que Adelanto
+  retencion: 'Retención',
 }

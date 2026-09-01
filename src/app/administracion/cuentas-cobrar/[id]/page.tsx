@@ -26,7 +26,7 @@ import { calcularFechaEstimadaPagoDesde } from '@/lib/utils/cuentasCobrarExcel'
 interface AbonoValorizacion {
   id: string
   cobroId: string
-  tipo: 'adelanto' | 'saldo_girar' | 'detraccion' | 'excedente' | 'neto' | null
+  tipo: 'adelanto' | 'saldo_girar' | 'detraccion' | 'excedente' | 'neto' | 'retencion' | null
   estado: 'pendiente' | 'recibido'
   montoEsperado: number | null
   montoReal: number | null
@@ -52,7 +52,6 @@ interface CobroValorizacion {
   detraccionMonto: number | null
   retencionPct: number | null
   retencionMonto: number | null
-  retencionNumeroComprobante: string | null
   excedentePct: number | null
   excedenteMonto: number | null
   valorAFinanciar: number | null
@@ -172,7 +171,7 @@ function senalAbono(abono: AbonoValorizacion): { texto: string; clase: string } 
 // 'pendiente' no tienen fechaReal (null), y Postgres no da un orden estable
 // entre nulls, así que las filas pendientes se reacomodaban solas cada vez
 // que algo cambiaba (ej. al revertir un evento).
-const ORDEN_TIPO_EVENTO: Record<string, number> = { adelanto: 0, neto: 0, saldo_girar: 1, detraccion: 2, excedente: 3 }
+const ORDEN_TIPO_EVENTO: Record<string, number> = { adelanto: 0, neto: 0, saldo_girar: 1, detraccion: 2, retencion: 2, excedente: 3 }
 
 const ESTADO_COLORS: Record<string, string> = {
   pendiente: 'bg-yellow-100 text-yellow-800',
@@ -250,12 +249,14 @@ export default function CxCDetallePage() {
   const [cobroDias, setCobroDias]                       = useState('')
   const [cobroDetraccionPct, setCobroDetraccionPct]     = useState('12')
   const [cobroDetraccionMonto, setCobroDetraccionMonto] = useState('')
-  // Retención — aplica a factoring y a cobro directo por igual: se conoce de
-  // inmediato (viene impresa en la factura), se descuenta junto con la
-  // Detracción antes de calcular el resto. Nunca es un evento pendiente.
+  // Retención — aplica a factoring y a cobro directo por igual: el % y monto
+  // teórico se conocen de inmediato (vienen en la factura) y se descuentan
+  // junto con la Detracción antes de calcular el resto — pero el Comprobante
+  // de Retención lo emite el cliente al pagar y puede demorar, así que es un
+  // evento pendiente del Cronograma (su N° se captura en "Marcar recibido",
+  // no acá).
   const [cobroRetencionPct, setCobroRetencionPct]       = useState('')
   const [cobroRetencionMonto, setCobroRetencionMonto]   = useState('')
-  const [cobroRetencionComprobante, setCobroRetencionComprobante] = useState('')
   const [cobroExcedentePct, setCobroExcedentePct]       = useState('1')
   const [cobroExcedenteMonto, setCobroExcedenteMonto]   = useState('')
   const [cobroValorAFinanciar, setCobroValorAFinanciar] = useState('')
@@ -359,7 +360,6 @@ export default function CxCDetallePage() {
         setCobroDetraccionMonto(cobro.detraccionMonto?.toString() || '')
         setCobroRetencionPct(cobro.retencionPct?.toString() || '')
         setCobroRetencionMonto(cobro.retencionMonto?.toString() || '')
-        setCobroRetencionComprobante(cobro.retencionNumeroComprobante || '')
         setCobroExcedentePct(cobro.excedentePct?.toString() || '1')
         setCobroExcedenteMonto(cobro.excedenteMonto?.toString() || '')
         setCobroValorAFinanciar(cobro.valorAFinanciar?.toString() || '')
@@ -545,7 +545,6 @@ export default function CxCDetallePage() {
         body.detraccionMonto     = liq.detMonto
         body.retencionPct        = cobroRetencionPct ? parseFloat(cobroRetencionPct) : null
         body.retencionMonto      = liq.retMonto
-        body.retencionNumeroComprobante = cobroRetencionComprobante || null
         body.excedentePct        = cobroExcedentePct ? parseFloat(cobroExcedentePct) : null
         body.excedenteMonto      = liq.excMonto
         body.valorAFinanciar     = liq.aFinanciar
@@ -564,7 +563,6 @@ export default function CxCDetallePage() {
         body.detraccionMonto     = liqDirecto.detMonto
         body.retencionPct        = cobroRetencionPct ? parseFloat(cobroRetencionPct) : null
         body.retencionMonto      = liqDirecto.retMonto
-        body.retencionNumeroComprobante = cobroRetencionComprobante || null
         body.montoNetoDirecto    = n(cobroMontoNetoDirecto) || liqDirecto.neto
         body.cuentaBancariaId    = cobroCuentaBancariaIdDirecto !== 'none' ? cobroCuentaBancariaIdDirecto : null
         body.confirmacionCliente = cobroConfirmacion || null
@@ -603,6 +601,7 @@ export default function CxCDetallePage() {
           body: JSON.stringify({
             montoReal: parseFloat(montoRecibir), fechaReal: fechaRecibir, observaciones: obsRecibir || null,
             numeroConstanciaBN: abonoRecibiendo.tipo === 'detraccion' ? (constanciaRecibir || null) : undefined,
+            numeroComprobanteRetencion: abonoRecibiendo.tipo === 'retencion' ? (constanciaRecibir || null) : undefined,
           }) }
       )
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
@@ -770,7 +769,7 @@ export default function CxCDetallePage() {
   // el evento base de cobro directo, siempre recibido de inmediato.
   const adelantoRecibido = cobro?.abonos.some(a => (a.tipo === 'adelanto' || a.tipo === 'neto') && a.estado === 'recibido') ?? false
   const requiereRegularizacion = !!cobro && cobro.estado !== 'en_negociacion' && !adelantoRecibido
-  const faltantesParaExcedente = (cobro?.abonos ?? []).filter(a => (a.tipo === 'saldo_girar' || a.tipo === 'detraccion') && a.estado === 'pendiente')
+  const faltantesParaExcedente = (cobro?.abonos ?? []).filter(a => (a.tipo === 'saldo_girar' || a.tipo === 'detraccion' || a.tipo === 'retencion') && a.estado === 'pendiente')
 
   const eventosRecibidos = cobro?.abonos.filter(a => a.estado === 'recibido') ?? []
   const eventosPendientes = cobro?.abonos.filter(a => a.estado === 'pendiente') ?? []
@@ -1096,9 +1095,6 @@ export default function CxCDetallePage() {
                                     <Input className="h-7 text-xs w-16" type="number" placeholder="%" value={cobroRetencionPct} onChange={e => setCobroRetencionPct(e.target.value)} />
                                     <Input className="h-7 text-xs" type="number" placeholder="Monto" value={cobroRetencionMonto} onChange={e => setCobroRetencionMonto(e.target.value)} />
                                   </div>
-                                  {liq.retMonto > 0 && (
-                                    <Input className="h-7 text-xs mt-1" placeholder="N° Comprobante" value={cobroRetencionComprobante} onChange={e => setCobroRetencionComprobante(e.target.value)} />
-                                  )}
                                 </td>
                               </tr>
                               <tr className="border-b">
@@ -1226,9 +1222,6 @@ export default function CxCDetallePage() {
                                     <Input className="h-7 text-xs w-16" type="number" placeholder="%" value={cobroRetencionPct} onChange={e => setCobroRetencionPct(e.target.value)} />
                                     <Input className="h-7 text-xs" type="number" placeholder="Monto" value={cobroRetencionMonto} onChange={e => setCobroRetencionMonto(e.target.value)} />
                                   </div>
-                                  {liqDirecto.retMonto > 0 && (
-                                    <Input className="h-7 text-xs mt-1" placeholder="N° Comprobante" value={cobroRetencionComprobante} onChange={e => setCobroRetencionComprobante(e.target.value)} />
-                                  )}
                                 </td>
                               </tr>
                               <tr className="font-bold text-base">
@@ -1596,10 +1589,14 @@ export default function CxCDetallePage() {
               <Label>Fecha real *</Label>
               <Input type="date" value={fechaRecibir} onChange={e => setFechaRecibir(e.target.value)} />
             </div>
-            {abonoRecibiendo?.tipo === 'detraccion' && (
+            {(abonoRecibiendo?.tipo === 'detraccion' || abonoRecibiendo?.tipo === 'retencion') && (
               <div>
-                <Label>N° Constancia (Banco de la Nación)</Label>
-                <Input value={constanciaRecibir} onChange={e => setConstanciaRecibir(e.target.value)} placeholder="Ej: 298887985" />
+                <Label>{abonoRecibiendo.tipo === 'detraccion' ? 'N° Constancia (Banco de la Nación)' : 'N° Comprobante de Retención'}</Label>
+                <Input
+                  value={constanciaRecibir}
+                  onChange={e => setConstanciaRecibir(e.target.value)}
+                  placeholder={abonoRecibiendo.tipo === 'detraccion' ? 'Ej: 298887985' : 'Ej: C001-123'}
+                />
               </div>
             )}
             <div>

@@ -15,6 +15,7 @@ const RecibirSchema = z.object({
   fechaReal: z.string().min(1),
   observaciones: z.string().max(300).optional().nullable(),
   numeroConstanciaBN: z.string().max(100).optional().nullable(),
+  numeroComprobanteRetencion: z.string().max(100).optional().nullable(),
 })
 
 // POST /api/proyectos/:id/valorizaciones/:valId/cobro/abonos/:abonoId/recibir
@@ -49,7 +50,8 @@ export async function POST(request: NextRequest, { params }: Ctx) {
         new Date(data.fechaReal),
         tx,
         data.observaciones,
-        data.numeroConstanciaBN
+        data.numeroConstanciaBN,
+        data.numeroComprobanteRetencion
       )
     })
 

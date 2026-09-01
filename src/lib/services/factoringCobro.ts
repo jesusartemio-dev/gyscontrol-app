@@ -32,37 +32,6 @@ async function resolverCuentaBancariaFactoring(moneda: string, client: PrismaCli
 }
 
 /**
- * Retención — aplica tanto a factoring como a cobro directo (mismo campo en
- * CobroValorizacion, mismo momento: se conoce de inmediato porque viene
- * impresa en la factura, así que se registra como un PagoCobro YA CERRADO
- * al procesar el desembolso/registro — igual que el costo de financiamiento,
- * nunca es un evento pendiente del Cronograma porque GYS nunca recibe ese
- * dinero como efectivo (va a SUNAT a nombre de GYS, es crédito fiscal).
- */
-async function crearPagoRetencionSiAplica(
-  cobro: { id: string; retencionMonto: number | null; retencionPct: number | null; retencionNumeroComprobante: string | null; fechaDesembolso: Date | null; financiera: string | null },
-  cxc: { id: string },
-  tx: PrismaClientOrTx
-) {
-  if (!cobro.retencionMonto || cobro.retencionMonto <= 0) return
-  await tx.pagoCobro.create({
-    data: {
-      cuentaPorCobrarId: cxc.id,
-      cuentaBancariaId: null,
-      monto: cobro.retencionMonto,
-      fechaPago: cobro.fechaDesembolso ?? new Date(),
-      medioPago: 'retencion',
-      esRetencion: true,
-      retencionPorcentaje: cobro.retencionPct ?? null,
-      retencionMonto: cobro.retencionMonto,
-      retencionNumeroConstancia: cobro.retencionNumeroComprobante ?? null,
-      observaciones: `Retención${cobro.retencionPct ? ` ${cobro.retencionPct}%` : ''}${cobro.financiera ? ` — ${cobro.financiera}` : ''}`,
-      updatedAt: new Date(),
-    },
-  })
-}
-
-/**
  * Desembolso de factoring (opción B, modelo de cobros esperados): genera el
  * PagoCobro del adelanto real y su AbonoValorizacion ya 'recibido', el del
  * costo de financiamiento (esCostoFinanciamiento), y crea saldo_girar,
@@ -161,11 +130,9 @@ export async function procesarDesembolsoFactoring(cobroValorizacionId: string, t
     })
   }
 
-  await crearPagoRetencionSiAplica(cobro, cxc, tx)
-
-  // 3) Eventos 2, 3 y 4 — "cobros esperados" pendientes, sin PagoCobro todavía.
-  // Llegan después y se marcan recibidos por separado (Sub-fase C). Solo se
-  // crea cada uno si su monto teórico es > 0 — mismo criterio que el costo.
+  // 3) Eventos 2, 3, 4 y 5 — "cobros esperados" pendientes, sin PagoCobro
+  // todavía. Llegan después y se marcan recibidos por separado. Solo se crea
+  // cada uno si su monto teórico es > 0 — mismo criterio que el costo.
   if (cobro.saldoAGirar && cobro.saldoAGirar > 0) {
     await tx.abonoValorizacion.create({
       data: { cobroId: cobroValorizacionId, tipo: 'saldo_girar', estado: 'pendiente', montoEsperado: cobro.saldoAGirar },
@@ -174,6 +141,15 @@ export async function procesarDesembolsoFactoring(cobroValorizacionId: string, t
   if (cobro.detraccionMonto && cobro.detraccionMonto > 0) {
     await tx.abonoValorizacion.create({
       data: { cobroId: cobroValorizacionId, tipo: 'detraccion', estado: 'pendiente', montoEsperado: cobro.detraccionMonto },
+    })
+  }
+  // Retención: el % y el monto teórico se conocen de inmediato (vienen en la
+  // factura), pero el Comprobante de Retención lo emite el cliente al pagar
+  // y puede demorar/llegar por separado — pendiente igual que Detracción,
+  // no un PagoCobro cerrado al procesar.
+  if (cobro.retencionMonto && cobro.retencionMonto > 0) {
+    await tx.abonoValorizacion.create({
+      data: { cobroId: cobroValorizacionId, tipo: 'retencion', estado: 'pendiente', montoEsperado: cobro.retencionMonto },
     })
   }
   if (cobro.excedenteMonto && cobro.excedenteMonto > 0) {
@@ -259,11 +235,14 @@ export async function procesarRegistroCobroDirecto(
     },
   })
 
-  await crearPagoRetencionSiAplica(cobro, cxc, tx)
-
   if (cobro.detraccionMonto && cobro.detraccionMonto > 0) {
     await tx.abonoValorizacion.create({
       data: { cobroId: cobroValorizacionId, tipo: 'detraccion', estado: 'pendiente', montoEsperado: cobro.detraccionMonto },
+    })
+  }
+  if (cobro.retencionMonto && cobro.retencionMonto > 0) {
+    await tx.abonoValorizacion.create({
+      data: { cobroId: cobroValorizacionId, tipo: 'retencion', estado: 'pendiente', montoEsperado: cobro.retencionMonto },
     })
   }
 
@@ -303,7 +282,8 @@ export async function marcarAbonoFactoringRecibido(
   fechaReal: Date,
   tx: PrismaClientOrTx,
   observaciones?: string | null,
-  numeroConstanciaBN?: string | null
+  numeroConstanciaBN?: string | null,
+  numeroComprobanteRetencion?: string | null
 ) {
   const abono = await tx.abonoValorizacion.findUnique({
     where: { id: abonoId },
@@ -336,26 +316,28 @@ export async function marcarAbonoFactoringRecibido(
   }
   if (abono.tipo === 'excedente') {
     const pendientesPrevios = await tx.abonoValorizacion.findFirst({
-      where: { cobroId: cobro.id, tipo: { in: ['saldo_girar', 'detraccion'] }, estado: 'pendiente' },
+      where: { cobroId: cobro.id, tipo: { in: ['saldo_girar', 'detraccion', 'retencion'] }, estado: 'pendiente' },
       select: { id: true },
     })
     if (pendientesPrevios) {
-      throw new Error('No se puede recibir el excedente: todavía falta recibir el saldo a girar y/o la detracción')
+      throw new Error('No se puede recibir el excedente: todavía falta recibir el saldo a girar, la detracción y/o la retención')
     }
   }
 
   const medioPago = abono.tipo === 'saldo_girar' ? 'factoring'
     : abono.tipo === 'detraccion' ? 'detraccion'
+    : abono.tipo === 'retencion' ? 'retencion'
     : 'factoring_excedente' // excedente
 
   let cuentaBancariaId: string | null = null
-  if (abono.tipo !== 'detraccion') {
+  if (abono.tipo !== 'detraccion' && abono.tipo !== 'retencion') {
     const cuentaBancaria = await resolverCuentaBancariaFactoring(cxc.moneda, tx)
     cuentaBancariaId = cuentaBancaria.id
   }
 
   const etiqueta = abono.tipo === 'saldo_girar' ? 'Saldo a girar'
     : abono.tipo === 'detraccion' ? 'Detracción'
+    : abono.tipo === 'retencion' ? 'Retención'
     : 'Excedente'
 
   const pagoReal = await tx.pagoCobro.create({
@@ -367,6 +349,8 @@ export async function marcarAbonoFactoringRecibido(
       medioPago,
       esDetraccion: abono.tipo === 'detraccion',
       numeroConstanciaBN: abono.tipo === 'detraccion' ? (numeroConstanciaBN || null) : null,
+      esRetencion: abono.tipo === 'retencion',
+      retencionNumeroConstancia: abono.tipo === 'retencion' ? (numeroComprobanteRetencion || null) : null,
       observaciones: observaciones || `${etiqueta} factoring${cobro.financiera ? ` ${cobro.financiera}` : ''}`,
       updatedAt: new Date(),
     },
@@ -480,15 +464,8 @@ export async function revertirDesembolsoFactoring(
     })
   }
 
-  const pagoRetencion = await tx.pagoCobro.findFirst({
-    where: { cuentaPorCobrarId: cxc.id, esRetencion: true, anulado: false },
-  })
-  if (pagoRetencion) {
-    await tx.pagoCobro.update({
-      where: { id: pagoRetencion.id },
-      data: { anulado: true, motivoAnulacion: motivo, fechaAnulacion, updatedAt: new Date() },
-    })
-  }
+  // Retención ya no crea un PagoCobro inmediato (ver marcarAbonoFactoringRecibido)
+  // — es un AbonoValorizacion 'pendiente' más, se borra abajo con el resto.
 
   await tx.abonoValorizacion.deleteMany({ where: { cobroId: cobroValorizacionId } })
 
@@ -553,9 +530,9 @@ export async function revertirAbonoFactoringRecibido(
     throw new Error('La valorización no tiene una CuentaPorCobrar activa')
   }
 
-  // Guard de orden simétrico: no se puede revertir saldo_girar/detraccion si
-  // el excedente (que dependía de ambos) ya está recibido.
-  if (abono.tipo === 'saldo_girar' || abono.tipo === 'detraccion') {
+  // Guard de orden simétrico: no se puede revertir saldo_girar/detraccion/
+  // retencion si el excedente (que dependía de los 3) ya está recibido.
+  if (abono.tipo === 'saldo_girar' || abono.tipo === 'detraccion' || abono.tipo === 'retencion') {
     const excedenteRecibido = await tx.abonoValorizacion.findFirst({
       where: { cobroId: cobro.id, tipo: 'excedente', estado: 'recibido' },
       select: { id: true },
@@ -579,6 +556,7 @@ export async function revertirAbonoFactoringRecibido(
       // tipo de evento en la observación (ver marcarAbonoFactoringRecibido).
       const etiqueta = abono.tipo === 'saldo_girar' ? 'Saldo a girar'
         : abono.tipo === 'detraccion' ? 'Detracción'
+        : abono.tipo === 'retencion' ? 'Retención'
         : 'Excedente'
       const pagoMora = await tx.pagoCobro.findFirst({
         where: {

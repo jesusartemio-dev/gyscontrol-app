@@ -23,10 +23,10 @@ const CobroSchema = z.object({
   // Factoring — liquidación
   detraccionPct: z.number().min(0).max(100).optional().nullable(),
   detraccionMonto: z.number().min(0).optional().nullable(),
-  // Retención — aplica a factoring y a directo (mismo campo)
+  // Retención — aplica a factoring y a directo (mismo campo). El N° de
+  // comprobante se captura al confirmar el evento (Marcar recibido), no acá.
   retencionPct: z.number().min(0).max(100).optional().nullable(),
   retencionMonto: z.number().min(0).optional().nullable(),
-  retencionNumeroComprobante: z.string().max(100).optional().nullable(),
   excedentePct: z.number().min(0).max(100).optional().nullable(),
   excedenteMonto: z.number().min(0).optional().nullable(),
   valorAFinanciar: z.number().min(0).optional().nullable(),
@@ -65,7 +65,6 @@ function buildUpsertPayload(data: CobroData) {
     detraccionMonto: data.detraccionMonto ?? null,
     retencionPct: data.retencionPct ?? null,
     retencionMonto: data.retencionMonto ?? null,
-    retencionNumeroComprobante: data.retencionNumeroComprobante ?? null,
     excedentePct: data.excedentePct ?? null,
     excedenteMonto: data.excedenteMonto ?? null,
     valorAFinanciar: data.valorAFinanciar ?? null,

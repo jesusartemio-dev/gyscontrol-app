@@ -2399,13 +2399,13 @@ model CobroValorizacion {
   detraccionMonto        Float?
   // Retención — aplica tanto a factoring como a cobro directo (mismo
   // mecanismo: se descuenta del Monto Factura ANTES de calcular el resto,
-  // igual que la Detracción). Es dinero que GYS nunca recibe como efectivo
-  // — va a SUNAT a nombre de GYS como crédito fiscal — así que se conoce de
-  // inmediato (viene impreso en la factura) y se registra como un PagoCobro
-  // ya cerrado al guardar, no como un evento pendiente del Cronograma.
+  // igual que la Detracción). El % y el monto teórico se conocen de
+  // inmediato (vienen impresos en la factura), pero el Comprobante de
+  // Retención lo emite el cliente AL MOMENTO DE PAGAR y puede demorar o
+  // llegar por separado — así que, igual que Detracción, es un evento
+  // 'pendiente' del Cronograma, no un PagoCobro cerrado al guardar.
   retencionPct               Float?
   retencionMonto             Float?
-  retencionNumeroComprobante String?
   excedentePct           Float? // % que retiene la financiera, ej. 1.0
   excedenteMonto         Float?
   valorAFinanciar        Float? // = valor neto - excedente
@@ -2459,6 +2459,7 @@ enum TipoEventoCobro {
   detraccion
   excedente
   neto
+  retencion
 }
 
 model AbonoValorizacion {
