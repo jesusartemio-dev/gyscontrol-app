@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Loader2, ArrowLeft, Pencil, Save, Plus, Trash2, ExternalLink, DollarSign, Building2, ChevronDown, ChevronUp, Ban, AlertTriangle, HelpCircle, RotateCcw, Info } from 'lucide-react'
+import { Loader2, ArrowLeft, Pencil, Save, Plus, Trash2, ExternalLink, DollarSign, Building2, ChevronDown, ChevronUp, Ban, AlertTriangle, HelpCircle, RotateCcw, Info, ScanLine } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
@@ -280,9 +280,10 @@ export default function CxCDetallePage() {
   const [savingCobro, setSavingCobro]                   = useState(false)
 
   // Lectura automática de documentos (factura / liquidación de la financiera
-  // / voucher de transferencia): sube el PDF como adjunto de la CxC y precarga
-  // los campos de la liquidación. Los valores quedan como sugerencia editable
-  // — Administración los revisa y recién al "Guardar Cobro" se persisten.
+  // / voucher de transferencia): lee el archivo y precarga los campos de la
+  // liquidación. El documento NO se archiva — se lee y se descarta. Los
+  // valores quedan como sugerencia editable: Administración los revisa y
+  // recién al "Guardar Cobro" se persisten.
   const [subiendoDoc, setSubiendoDoc]     = useState<string | null>(null)
   const [camposDesdeDoc, setCamposDesdeDoc] = useState<string[]>([])
   const [alertaDoc, setAlertaDoc]         = useState<string | null>(null)
@@ -586,8 +587,9 @@ export default function CxCDetallePage() {
         toast.success(`${nombreTipo}: ${llenados.length} campo(s) precargados — revísalos antes de guardar`)
       }
       // OJO: no se llama load() acá a propósito — recargaría el formulario
-      // desde la base y borraría justo lo que se acaba de precargar. El
-      // adjunto ya quedó guardado del lado del servidor.
+      // desde la base y borraría justo lo que se acaba de precargar. Del lado
+      // del servidor no se guardó nada: lo único que queda es lo precargado
+      // en pantalla, hasta que Administración le dé "Guardar Cobro".
     } catch (e: any) {
       toast.error(e.message || 'Error al procesar el documento')
     } finally {
@@ -1143,15 +1145,16 @@ export default function CxCDetallePage() {
                       }}
                     >
                       <p className="text-xs text-muted-foreground">
-                        Sube el documento y los montos se llenan solos — revísalos antes de guardar.
+                        Elige el documento y los montos se llenan solos — revísalos antes de guardar.
                         También puedes <strong>pegar una captura con Ctrl+V</strong> o arrastrar el archivo acá:
                         se identifica solo si es factura, liquidación o voucher.
+                        El documento solo se lee para llenar los campos, <strong>no queda archivado</strong>.
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {([
-                          { tipo: 'factura' as const, label: 'Subir Factura', mostrar: true },
-                          { tipo: 'liquidacion_factoring' as const, label: 'Subir Liquidación de la financiera', mostrar: cobroTipo === 'factoring' },
-                          { tipo: 'voucher_transferencia' as const, label: 'Subir Voucher de transferencia', mostrar: cobroTipo === 'directo' },
+                          { tipo: 'factura' as const, label: 'Leer Factura', mostrar: true },
+                          { tipo: 'liquidacion_factoring' as const, label: 'Leer Liquidación de la financiera', mostrar: cobroTipo === 'factoring' },
+                          { tipo: 'voucher_transferencia' as const, label: 'Leer Voucher de transferencia', mostrar: cobroTipo === 'directo' },
                         ]).filter(b => b.mostrar).map(b => (
                           <label
                             key={b.tipo}
@@ -1159,7 +1162,7 @@ export default function CxCDetallePage() {
                           >
                             {subiendoDoc === b.tipo
                               ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              : <Plus className="h-3.5 w-3.5" />}
+                              : <ScanLine className="h-3.5 w-3.5" />}
                             {subiendoDoc === b.tipo ? 'Leyendo…' : b.label}
                             <input
                               type="file"

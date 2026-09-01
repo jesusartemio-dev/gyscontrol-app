@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { uploadFile, createFolder, getAdminDriveId } from '@/lib/services/googleDrive'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 import {
   extraerDocumentoCobro,
@@ -17,21 +16,19 @@ const ROLES_ALLOWED = ['admin', 'gerente', 'administracion']
 // una captura o arrastrar un archivo, sin elegir tipo).
 const TIPOS_VALIDOS: TipoDocumentoCobroInput[] = ['factura', 'liquidacion_factoring', 'voucher_transferencia', 'auto']
 
-async function getOrCreateCxCFolder(): Promise<string> {
-  const parentId = getAdminDriveId()
-  const folder = await createFolder({ parentId, folderName: 'CxC_Comprobantes' })
-  return folder.id!
-}
-
 // POST /api/administracion/cuentas-cobrar/:id/documento-cobro
-// Sube el documento (factura, liquidación de la financiera o voucher de
-// transferencia) como CxCAdjunto y, en la misma acción, lo manda a Claude
-// para extraer los datos que precargan la Hoja de Liquidación.
+// Lee el documento (factura, liquidación de la financiera o voucher de
+// transferencia) con Claude y devuelve los datos que precargan la Hoja de
+// Liquidación.
 //
-// La extracción NUNCA escribe en la base: solo devuelve los datos para que
-// el formulario los precargue como sugerencia editable — Administración
-// revisa y confirma con "Guardar Cobro", igual que el resto de campos
-// sugeridos (Interés, Fecha Vencimiento).
+// Esto es un LECTOR, no un repositorio: el archivo se procesa en memoria y se
+// descarta. No se sube a Drive ni se guarda como adjunto — para archivar
+// comprobantes está el flujo de adjuntos de la CxC, que es aparte.
+//
+// Tampoco escribe en la base: solo devuelve los datos para que el formulario
+// los precargue como sugerencia editable — Administración revisa y confirma
+// con "Guardar Cobro", igual que el resto de campos sugeridos (Interés,
+// Fecha Vencimiento).
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
@@ -72,12 +69,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Cuenta por cobrar no encontrada' }, { status: 404 })
     }
 
-    // 1) Extraer primero: si Claude falla, no dejamos un adjunto huérfano
-    // subido a Drive por una operación que el usuario vio fallar.
+    // 1) Leer el documento. El archivo no sale de acá: se procesa en memoria.
     const extraccion = await extraerDocumentoCobro(file, tipo, session.user.id)
 
-    // Si no se reconoció el documento, no se guarda nada — probablemente
-    // se pegó/arrastró el archivo equivocado; mejor que lo reintente.
+    // Si no se reconoció el documento, probablemente se pegó/arrastró el
+    // archivo equivocado; mejor que lo reintente.
     if (extraccion.tipo === 'desconocido') {
       return NextResponse.json(
         { error: extraccion.observaciones ?? 'No se reconoció el documento' },
@@ -85,30 +81,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    // 2) Guardar el archivo como adjunto de la CxC (mismo patrón que
-    // /api/cxc-adjunto: Drive + fila CxCAdjunto con rastro de quién lo subió).
-    const folderId = await getOrCreateCxCFolder()
-    const buffer = Buffer.from(await file.arrayBuffer())
-    const driveFile = await uploadFile({
-      folderId,
-      fileName: file.name,
-      mimeType: file.type || 'application/octet-stream',
-      buffer,
-    })
-    const adjunto = await prisma.cxCAdjunto.create({
-      data: {
-        cuentaPorCobrarId,
-        nombreArchivo: file.name,
-        urlArchivo: driveFile.webViewLink || '',
-        driveFileId: driveFile.id || null,
-        // Con 'auto' se guarda el tipo que el modelo detectó, no 'auto'.
-        tipoArchivo: extraccion.tipo,
-        tamano: file.size || null,
-        subidoPorId: session.user.id,
-      },
-    })
-
-    // 3) Cruce con lo que ya sabemos: si el importe total de la factura no
+    // 2) Cruce con lo que ya sabemos: si el importe total de la factura no
     // calza con el monto de la CxC, se avisa — nunca se pisa el monto.
     let alerta: string | null = null
     if (extraccion.tipo === 'factura' && extraccion.datos.importeTotal != null) {
@@ -118,7 +91,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
     }
 
-    return NextResponse.json({ adjunto, extraccion, alerta })
+    return NextResponse.json({ extraccion, alerta })
   } catch (error) {
     console.error('[POST /cuentas-cobrar/:id/documento-cobro]', error)
     const message = error instanceof Error ? error.message : 'Error del servidor'

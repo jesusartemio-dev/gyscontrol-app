@@ -228,15 +228,6 @@ export async function deleteFile(fileId: string): Promise<void> {
   await drive.files.delete({ fileId, supportsAllDrives: true })
 }
 
-// Manda el archivo a la papelera en vez de borrarlo definitivamente.
-// En el Shared Drive la cuenta de servicio es Content manager: puede editar y
-// mandar a papelera, pero NO borrar definitivo (canDelete:false), y `files.delete`
-// falla con un 404 "File not found" que parece otra cosa.
-export async function trashFile(fileId: string): Promise<void> {
-  const drive = getDriveClient()
-  await drive.files.update({ fileId, requestBody: { trashed: true }, supportsAllDrives: true })
-}
-
 export async function createFolder(options: {
   parentId: string
   folderName: string
