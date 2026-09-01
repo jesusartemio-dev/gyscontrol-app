@@ -11,6 +11,9 @@ import { getModelForTask } from '@/lib/agente/models'
 import { trackUsage } from '@/lib/agente/usageTracker'
 
 export type TipoDocumentoCobro = 'factura' | 'liquidacion_factoring' | 'voucher_transferencia'
+/** 'auto' = que el modelo identifique cuál de los 3 documentos es (se usa al
+ *  pegar una captura o arrastrar un archivo, donde el usuario no eligió tipo). */
+export type TipoDocumentoCobroInput = TipoDocumentoCobro | 'auto'
 
 /** Datos de la factura — aplican tanto a factoring como a cobro directo. */
 export interface ExtraccionFactura {
@@ -56,6 +59,7 @@ export type ResultadoExtraccion =
   | { tipo: 'factura'; datos: ExtraccionFactura; confianza: Confianza; observaciones: string | null }
   | { tipo: 'liquidacion_factoring'; datos: ExtraccionLiquidacion; confianza: Confianza; observaciones: string | null }
   | { tipo: 'voucher_transferencia'; datos: ExtraccionVoucher; confianza: Confianza; observaciones: string | null }
+  | { tipo: 'desconocido'; datos: null; confianza: Confianza; observaciones: string | null }
 
 export type Confianza = 'alta' | 'media' | 'baja'
 
@@ -157,6 +161,55 @@ Si el voucher solo muestra un monto, ponlo en montoTotal y deja montoTransferido
   },
 }
 
+// Prompt de detección automática — se usa al pegar una captura o arrastrar un
+// archivo, donde el usuario no eligió el tipo. Los 3 documentos son
+// visualmente inconfundibles, así que el modelo primero identifica cuál es y
+// después llena SOLO el bloque que corresponde.
+const PROMPT_AUTO = {
+  system: `${SYSTEM_BASE}
+
+Recibes UNO de estos 3 documentos y primero debes identificar cuál es:
+
+1. "factura" — FACTURA ELECTRÓNICA emitida por GYS a un cliente. Tiene "FACTURA ELECTRONICA", RUC de GYS (20545610672), número tipo E001-####, "Importe Total", y secciones "Información de la detracción" y/o "Información de la retención".
+
+2. "liquidacion_factoring" — DETALLE DE LIQUIDACIÓN DE FACTORING de una financiera (normalmente BANPRO). Tiene "Nro. Operación", una tabla con columnas tipo MONTO DOCUM. / % ANT. / MTO. NOM.ANT. / MTO. NO ANT. / MTO.DIF.PRECIO, y al pie Adelanto, Comisión, Gasto legal, I.G.V, Saldo liquido a girar.
+
+3. "voucher_transferencia" — VOUCHER/CONSTANCIA DE TRANSFERENCIA BANCARIA. Tiene datos de cuenta de origen y destino, "Monto total", "Monto transferido", "Comisión", código de operación.
+
+Equivalencias para la liquidación (la financiera usa sus propias etiquetas):
+- "MTO. NOM.ANT." = valor a financiar; "MTO. NO ANT." = excedente retenido;
+  "MTO.DIF.PRECIO" = interés; "Gasto legal" = gastos; "FEC. CURSE" = fecha de desembolso.
+
+Para el voucher, distingue "Monto total" (lo debitado al cliente) de "Monto transferido" (lo realmente acreditado, neto de comisión).
+
+Si no es ninguno de los 3, devuelve tipoDetectado "desconocido" y explica en observaciones qué es.`,
+  user: `Identifica qué documento es y extrae sus datos. Devuelve ÚNICAMENTE este JSON, llenando SOLO el bloque del tipo detectado y dejando los otros dos en null:
+
+{
+  "tipoDetectado": "factura|liquidacion_factoring|voucher_transferencia|desconocido",
+  "factura": {
+    "numeroDocumento": "string o null", "fechaEmision": "YYYY-MM-DD o null", "moneda": "PEN|USD o null",
+    "importeTotal": number o null, "detraccionPct": number o null, "detraccionMonto": number o null,
+    "retencionPct": number o null, "retencionMonto": number o null
+  } o null,
+  "liquidacion": {
+    "financiera": "string o null", "numeroOperacion": "string o null",
+    "fechaDesembolso": "YYYY-MM-DD o null", "fechaVencimiento": "YYYY-MM-DD o null",
+    "diasFinanciamiento": number o null, "montoDocumento": number o null,
+    "excedenteMonto": number o null, "valorAFinanciar": number o null, "interesMonto": number o null,
+    "comisionEstructuracion": number o null, "gastosAdicionales": number o null, "igvGastos": number o null,
+    "adelantoBanpro": number o null, "saldoAGirar": number o null
+  } o null,
+  "voucher": {
+    "fechaOperacion": "YYYY-MM-DD o null", "numeroOperacion": "string o null",
+    "montoTotal": number o null, "montoTransferido": number o null, "comision": number o null,
+    "moneda": "PEN|USD o null"
+  } o null,
+  "confianza": "alta|media|baja",
+  "observaciones": "string si algo no se pudo leer bien o no se reconoce el documento, null si todo OK"
+}`,
+}
+
 const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB — límite de Claude Vision
 const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const
 const SUPPORTED_MIME_TYPES = [...SUPPORTED_IMAGE_TYPES, 'application/pdf'] as const
@@ -194,7 +247,7 @@ function parseJson(text: string): Record<string, unknown> {
  */
 export async function extraerDocumentoCobro(
   file: File,
-  tipo: TipoDocumentoCobro,
+  tipo: TipoDocumentoCobroInput,
   userId: string
 ): Promise<ResultadoExtraccion> {
   const apiKey = process.env.ANTHROPIC_API_KEY
@@ -216,7 +269,7 @@ export async function extraerDocumentoCobro(
         },
       }
 
-  const { system, user } = PROMPTS[tipo]
+  const { system, user } = tipo === 'auto' ? PROMPT_AUTO : PROMPTS[tipo]
   const inicio = Date.now()
   const message = await client.messages.create({
     model,
@@ -254,65 +307,97 @@ export async function extraerDocumentoCobro(
     if (tipo === 'liquidacion_factoring') {
       return { tipo, ...vacio, datos: { financiera: null, numeroOperacion: null, fechaDesembolso: null, fechaVencimiento: null, diasFinanciamiento: null, montoDocumento: null, excedenteMonto: null, valorAFinanciar: null, interesMonto: null, comisionEstructuracion: null, gastosAdicionales: null, igvGastos: null, adelantoBanpro: null, saldoAGirar: null } }
     }
-    return { tipo, ...vacio, datos: { fechaOperacion: null, numeroOperacion: null, montoTotal: null, montoTransferido: null, comision: null, moneda: null } }
+    if (tipo === 'voucher_transferencia') {
+      return { tipo, ...vacio, datos: { fechaOperacion: null, numeroOperacion: null, montoTotal: null, montoTransferido: null, comision: null, moneda: null } }
+    }
+    return { tipo: 'desconocido', datos: null, ...vacio }
   }
 
   const confianza = confianzaDe(raw.confianza)
   const observaciones = str(raw.observaciones)
 
-  if (tipo === 'factura') {
+  // Con 'auto' el modelo devuelve { tipoDetectado, factura|liquidacion|voucher }
+  // — se normaliza al mismo formato plano que devuelven los prompts específicos,
+  // para que de acá abajo el código sea uno solo.
+  let tipoFinal: TipoDocumentoCobro
+  let campos: Record<string, unknown>
+  if (tipo === 'auto') {
+    const detectado = raw.tipoDetectado
+    if (detectado === 'factura') {
+      tipoFinal = 'factura'
+      campos = (raw.factura as Record<string, unknown>) ?? {}
+    } else if (detectado === 'liquidacion_factoring') {
+      tipoFinal = 'liquidacion_factoring'
+      campos = (raw.liquidacion as Record<string, unknown>) ?? {}
+    } else if (detectado === 'voucher_transferencia') {
+      tipoFinal = 'voucher_transferencia'
+      campos = (raw.voucher as Record<string, unknown>) ?? {}
+    } else {
+      return {
+        tipo: 'desconocido',
+        datos: null,
+        confianza,
+        observaciones: observaciones ?? 'No se reconoció el documento: no parece una factura, una liquidación de factoring ni un voucher de transferencia.',
+      }
+    }
+  } else {
+    tipoFinal = tipo
+    campos = raw
+  }
+
+  if (tipoFinal === 'factura') {
     return {
-      tipo,
+      tipo: tipoFinal,
       confianza,
       observaciones,
       datos: {
-        numeroDocumento: str(raw.numeroDocumento),
-        fechaEmision: str(raw.fechaEmision),
-        moneda: moneda(raw.moneda),
-        importeTotal: num(raw.importeTotal),
-        detraccionPct: num(raw.detraccionPct),
-        detraccionMonto: num(raw.detraccionMonto),
-        retencionPct: num(raw.retencionPct),
-        retencionMonto: num(raw.retencionMonto),
+        numeroDocumento: str(campos.numeroDocumento),
+        fechaEmision: str(campos.fechaEmision),
+        moneda: moneda(campos.moneda),
+        importeTotal: num(campos.importeTotal),
+        detraccionPct: num(campos.detraccionPct),
+        detraccionMonto: num(campos.detraccionMonto),
+        retencionPct: num(campos.retencionPct),
+        retencionMonto: num(campos.retencionMonto),
       },
     }
   }
 
-  if (tipo === 'liquidacion_factoring') {
+  if (tipoFinal === 'liquidacion_factoring') {
     return {
-      tipo,
+      tipo: tipoFinal,
       confianza,
       observaciones,
       datos: {
-        financiera: str(raw.financiera),
-        numeroOperacion: str(raw.numeroOperacion),
-        fechaDesembolso: str(raw.fechaDesembolso),
-        fechaVencimiento: str(raw.fechaVencimiento),
-        diasFinanciamiento: num(raw.diasFinanciamiento),
-        montoDocumento: num(raw.montoDocumento),
-        excedenteMonto: num(raw.excedenteMonto),
-        valorAFinanciar: num(raw.valorAFinanciar),
-        interesMonto: num(raw.interesMonto),
-        comisionEstructuracion: num(raw.comisionEstructuracion),
-        gastosAdicionales: num(raw.gastosAdicionales),
-        igvGastos: num(raw.igvGastos),
-        adelantoBanpro: num(raw.adelantoBanpro),
-        saldoAGirar: num(raw.saldoAGirar),
+        financiera: str(campos.financiera),
+        numeroOperacion: str(campos.numeroOperacion),
+        fechaDesembolso: str(campos.fechaDesembolso),
+        fechaVencimiento: str(campos.fechaVencimiento),
+        diasFinanciamiento: num(campos.diasFinanciamiento),
+        montoDocumento: num(campos.montoDocumento),
+        excedenteMonto: num(campos.excedenteMonto),
+        valorAFinanciar: num(campos.valorAFinanciar),
+        interesMonto: num(campos.interesMonto),
+        comisionEstructuracion: num(campos.comisionEstructuracion),
+        gastosAdicionales: num(campos.gastosAdicionales),
+        igvGastos: num(campos.igvGastos),
+        adelantoBanpro: num(campos.adelantoBanpro),
+        saldoAGirar: num(campos.saldoAGirar),
       },
     }
   }
 
   return {
-    tipo,
+    tipo: tipoFinal,
     confianza,
     observaciones,
     datos: {
-      fechaOperacion: str(raw.fechaOperacion),
-      numeroOperacion: str(raw.numeroOperacion),
-      montoTotal: num(raw.montoTotal),
-      montoTransferido: num(raw.montoTransferido),
-      comision: num(raw.comision),
-      moneda: moneda(raw.moneda),
+      fechaOperacion: str(campos.fechaOperacion),
+      numeroOperacion: str(campos.numeroOperacion),
+      montoTotal: num(campos.montoTotal),
+      montoTransferido: num(campos.montoTransferido),
+      comision: num(campos.comision),
+      moneda: moneda(campos.moneda),
     },
   }
 }

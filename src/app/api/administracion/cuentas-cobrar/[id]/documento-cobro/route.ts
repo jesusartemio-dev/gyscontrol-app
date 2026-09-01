@@ -8,12 +8,14 @@ import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 import {
   extraerDocumentoCobro,
   validarArchivo,
-  type TipoDocumentoCobro,
+  type TipoDocumentoCobroInput,
 } from '@/lib/services/cobroDocumentoExtractor'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'administracion']
 
-const TIPOS_VALIDOS: TipoDocumentoCobro[] = ['factura', 'liquidacion_factoring', 'voucher_transferencia']
+// 'auto' = el modelo identifica cuál de los 3 documentos es (se usa al pegar
+// una captura o arrastrar un archivo, sin elegir tipo).
+const TIPOS_VALIDOS: TipoDocumentoCobroInput[] = ['factura', 'liquidacion_factoring', 'voucher_transferencia', 'auto']
 
 async function getOrCreateCxCFolder(): Promise<string> {
   const parentId = getAdminDriveId()
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { id: cuentaPorCobrarId } = await params
     const formData = await request.formData()
     const file = formData.get('file') as File | null
-    const tipo = formData.get('tipo') as TipoDocumentoCobro | null
+    const tipo = formData.get('tipo') as TipoDocumentoCobroInput | null
 
     if (!file) {
       return NextResponse.json({ error: 'Archivo requerido' }, { status: 400 })
@@ -74,6 +76,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // subido a Drive por una operación que el usuario vio fallar.
     const extraccion = await extraerDocumentoCobro(file, tipo, session.user.id)
 
+    // Si no se reconoció el documento, no se guarda nada — probablemente
+    // se pegó/arrastró el archivo equivocado; mejor que lo reintente.
+    if (extraccion.tipo === 'desconocido') {
+      return NextResponse.json(
+        { error: extraccion.observaciones ?? 'No se reconoció el documento' },
+        { status: 422 }
+      )
+    }
+
     // 2) Guardar el archivo como adjunto de la CxC (mismo patrón que
     // /api/cxc-adjunto: Drive + fila CxCAdjunto con rastro de quién lo subió).
     const folderId = await getOrCreateCxCFolder()
@@ -90,7 +101,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         nombreArchivo: file.name,
         urlArchivo: driveFile.webViewLink || '',
         driveFileId: driveFile.id || null,
-        tipoArchivo: tipo,
+        // Con 'auto' se guarda el tipo que el modelo detectó, no 'auto'.
+        tipoArchivo: extraccion.tipo,
         tamano: file.size || null,
         subidoPorId: session.user.id,
       },

@@ -389,6 +389,26 @@ export default function CxCDetallePage() {
 
   useEffect(() => { load() }, [load])
 
+  // Pegar (Ctrl+V) una captura mientras el formulario de cobro está abierto:
+  // el modelo identifica solo si es factura, liquidación o voucher. Se
+  // escucha a nivel documento (no en un div con foco) para que funcione
+  // pegando en cualquier parte del formulario, que es lo natural al venir
+  // de un Print Screen o del recorte de pantalla.
+  useEffect(() => {
+    if (!showCobroForm) return
+    const onPaste = (e: ClipboardEvent) => {
+      if (subiendoDoc) return
+      const item = Array.from(e.clipboardData?.items ?? []).find(i => i.type.startsWith('image/'))
+      const file = item?.getAsFile() ?? Array.from(e.clipboardData?.files ?? [])[0]
+      if (!file) return
+      e.preventDefault()
+      handleSubirDocumento('auto', file)
+    }
+    document.addEventListener('paste', onPaste)
+    return () => document.removeEventListener('paste', onPaste)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCobroForm, subiendoDoc, cxc?.id])
+
   // ── Liquidación factoring (calculada en tiempo real) ──────────────────────
   const liq = useMemo(() => {
     const base      = cxc?.monto ?? 0
@@ -496,7 +516,7 @@ export default function CxCDetallePage() {
   // precarga con lo que la IA leyó. Solo llena campos: no guarda nada en la
   // base — eso sigue siendo un "Guardar Cobro" explícito de Administración.
   const handleSubirDocumento = async (
-    tipo: 'factura' | 'liquidacion_factoring' | 'voucher_transferencia',
+    tipo: 'factura' | 'liquidacion_factoring' | 'voucher_transferencia' | 'auto',
     file: File
   ) => {
     if (!cxc) return
@@ -557,10 +577,13 @@ export default function CxCDetallePage() {
       if (alerta) setAlertaDoc(alerta)
       if (extraccion.observaciones) toast(`Nota del lector: ${extraccion.observaciones}`, { icon: '⚠️' })
 
+      const nombreTipo = extraccion.tipo === 'factura' ? 'Factura'
+        : extraccion.tipo === 'liquidacion_factoring' ? 'Liquidación de la financiera'
+        : 'Voucher de transferencia'
       if (llenados.length === 0) {
-        toast.error('No se pudo leer ningún dato del documento — revísalo o llena los campos a mano')
+        toast.error(`Se reconoció como ${nombreTipo}, pero no se pudo leer ningún dato — revísalo o llena los campos a mano`)
       } else {
-        toast.success(`${llenados.length} campo(s) precargados — revísalos antes de guardar`)
+        toast.success(`${nombreTipo}: ${llenados.length} campo(s) precargados — revísalos antes de guardar`)
       }
       // OJO: no se llama load() acá a propósito — recargaría el formulario
       // desde la base y borraría justo lo que se acaba de precargar. El
@@ -1109,9 +1132,20 @@ export default function CxCDetallePage() {
 
                     {/* Lectura automática de documentos — precarga los campos
                         de abajo; siempre editables, se confirman al guardar. */}
-                    <div className="rounded-lg border border-dashed p-3 space-y-2">
+                    <div
+                      className="rounded-lg border border-dashed p-3 space-y-2"
+                      onDragOver={e => { e.preventDefault() }}
+                      onDrop={e => {
+                        e.preventDefault()
+                        if (subiendoDoc) return
+                        const file = e.dataTransfer.files?.[0]
+                        if (file) handleSubirDocumento('auto', file)
+                      }}
+                    >
                       <p className="text-xs text-muted-foreground">
                         Sube el documento y los montos se llenan solos — revísalos antes de guardar.
+                        También puedes <strong>pegar una captura con Ctrl+V</strong> o arrastrar el archivo acá:
+                        se identifica solo si es factura, liquidación o voucher.
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {([
