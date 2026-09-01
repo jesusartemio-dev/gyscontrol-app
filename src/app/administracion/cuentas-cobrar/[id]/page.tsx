@@ -279,6 +279,14 @@ export default function CxCDetallePage() {
   const [cobroObs, setCobroObs]                         = useState('')
   const [savingCobro, setSavingCobro]                   = useState(false)
 
+  // Lectura automática de documentos (factura / liquidación de la financiera
+  // / voucher de transferencia): sube el PDF como adjunto de la CxC y precarga
+  // los campos de la liquidación. Los valores quedan como sugerencia editable
+  // — Administración los revisa y recién al "Guardar Cobro" se persisten.
+  const [subiendoDoc, setSubiendoDoc]     = useState<string | null>(null)
+  const [camposDesdeDoc, setCamposDesdeDoc] = useState<string[]>([])
+  const [alertaDoc, setAlertaDoc]         = useState<string | null>(null)
+
   // Marcar un "cobro esperado" (saldo_girar / detraccion / excedente) como
   // recibido. Un solo diálogo genérico para los 3 — "Cliente pagó factura" es
   // solo el disparador visualmente distinto para el evento excedente (el
@@ -482,6 +490,86 @@ export default function CxCDetallePage() {
     setCobroGastos(gastos.toFixed(2))
     setCobroIgvGastos(igv.toFixed(2))
     setCobroAdelantoBanpro(adelanto.toFixed(2))
+  }
+
+  // Sube un documento (factura / liquidación de la financiera / voucher) y
+  // precarga con lo que la IA leyó. Solo llena campos: no guarda nada en la
+  // base — eso sigue siendo un "Guardar Cobro" explícito de Administración.
+  const handleSubirDocumento = async (
+    tipo: 'factura' | 'liquidacion_factoring' | 'voucher_transferencia',
+    file: File
+  ) => {
+    if (!cxc) return
+    setSubiendoDoc(tipo)
+    setAlertaDoc(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('tipo', tipo)
+      const res = await fetch(`/api/administracion/cuentas-cobrar/${cxc.id}/documento-cobro`, { method: 'POST', body: fd })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Error') }
+      const { extraccion, alerta } = await res.json()
+
+      const llenados: string[] = []
+      const set = (valor: number | string | null | undefined, setter: (v: string) => void, etiqueta: string) => {
+        if (valor === null || valor === undefined || valor === '') return
+        setter(String(valor))
+        llenados.push(etiqueta)
+      }
+
+      if (extraccion.tipo === 'factura') {
+        const d = extraccion.datos
+        set(d.detraccionPct, setCobroDetraccionPct, 'Detracción %')
+        set(d.detraccionMonto, setCobroDetraccionMonto, 'Detracción monto')
+        set(d.retencionPct, setCobroRetencionPct, 'Retención %')
+        set(d.retencionMonto, setCobroRetencionMonto, 'Retención monto')
+      } else if (extraccion.tipo === 'liquidacion_factoring') {
+        const d = extraccion.datos
+        set(d.financiera, setCobroFinanciera, 'Financiera')
+        set(d.numeroOperacion, setCobroNumeroOperacion, 'N° Operación')
+        set(d.fechaDesembolso, setCobroFechaDesembolso, 'Fecha Desembolso')
+        set(d.fechaVencimiento, setCobroFechaVencimiento, 'Fecha Vencimiento')
+        set(d.diasFinanciamiento, setCobroDias, 'Días')
+        set(d.excedenteMonto, setCobroExcedenteMonto, 'Excedente')
+        set(d.valorAFinanciar, setCobroValorAFinanciar, 'Valor a Financiar')
+        set(d.interesMonto, setCobroInteres, 'Interés')
+        set(d.comisionEstructuracion, setCobroComision, 'Comisión')
+        set(d.gastosAdicionales, setCobroGastos, 'Gastos')
+        set(d.igvGastos, setCobroIgvGastos, 'IGV Gastos')
+        set(d.adelantoBanpro, setCobroAdelantoBanpro, 'Adelanto')
+        // El interés vino del documento real, ya no es la sugerencia calculada.
+        if (d.interesMonto != null) setInteresEsSugerido(false)
+        if (d.fechaVencimiento) setFechaVencimientoEsSugerida(false)
+      } else {
+        const d = extraccion.datos
+        // El neto real es lo que se acreditó (montoTransferido), NO el monto
+        // bruto que salió de la cuenta del cliente — esa confusión fue
+        // justamente el error que hubo que reparar a mano en FMK01.
+        set(d.montoTransferido ?? d.montoTotal, setCobroMontoNetoDirecto, 'Neto a Cobrar')
+        set(d.fechaOperacion, setCobroFechaDesembolso, 'Fecha de Cobro')
+        set(d.numeroOperacion, setCobroNumeroOperacion, 'N° Operación')
+        if (d.comision != null && d.montoTransferido != null) {
+          setAlertaDoc(`El banco cobró ${formatCurrency(d.comision, cxc.moneda)} de comisión: se precargó el neto realmente acreditado (${formatCurrency(d.montoTransferido, cxc.moneda)}), no el monto bruto.`)
+        }
+      }
+
+      setCamposDesdeDoc(llenados)
+      if (alerta) setAlertaDoc(alerta)
+      if (extraccion.observaciones) toast(`Nota del lector: ${extraccion.observaciones}`, { icon: '⚠️' })
+
+      if (llenados.length === 0) {
+        toast.error('No se pudo leer ningún dato del documento — revísalo o llena los campos a mano')
+      } else {
+        toast.success(`${llenados.length} campo(s) precargados — revísalos antes de guardar`)
+      }
+      // OJO: no se llama load() acá a propósito — recargaría el formulario
+      // desde la base y borraría justo lo que se acaba de precargar. El
+      // adjunto ya quedó guardado del lado del servidor.
+    } catch (e: any) {
+      toast.error(e.message || 'Error al procesar el documento')
+    } finally {
+      setSubiendoDoc(null)
+    }
   }
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -1017,6 +1105,52 @@ export default function CxCDetallePage() {
                           <SelectItem value="directo">Directo</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+
+                    {/* Lectura automática de documentos — precarga los campos
+                        de abajo; siempre editables, se confirman al guardar. */}
+                    <div className="rounded-lg border border-dashed p-3 space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        Sube el documento y los montos se llenan solos — revísalos antes de guardar.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {([
+                          { tipo: 'factura' as const, label: 'Subir Factura', mostrar: true },
+                          { tipo: 'liquidacion_factoring' as const, label: 'Subir Liquidación de la financiera', mostrar: cobroTipo === 'factoring' },
+                          { tipo: 'voucher_transferencia' as const, label: 'Subir Voucher de transferencia', mostrar: cobroTipo === 'directo' },
+                        ]).filter(b => b.mostrar).map(b => (
+                          <label
+                            key={b.tipo}
+                            className={`inline-flex items-center gap-1.5 rounded-md border px-3 h-8 text-xs font-medium cursor-pointer hover:bg-accent ${subiendoDoc ? 'opacity-50 pointer-events-none' : ''}`}
+                          >
+                            {subiendoDoc === b.tipo
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : <Plus className="h-3.5 w-3.5" />}
+                            {subiendoDoc === b.tipo ? 'Leyendo…' : b.label}
+                            <input
+                              type="file"
+                              accept=".pdf,image/*"
+                              className="hidden"
+                              onChange={e => {
+                                const f = e.target.files?.[0]
+                                e.target.value = ''
+                                if (f) handleSubirDocumento(b.tipo, f)
+                              }}
+                            />
+                          </label>
+                        ))}
+                      </div>
+                      {camposDesdeDoc.length > 0 && (
+                        <p className="text-xs text-blue-700">
+                          Precargado desde el documento: {camposDesdeDoc.join(', ')}.
+                        </p>
+                      )}
+                      {alertaDoc && (
+                        <p className="text-xs text-amber-700 flex items-start gap-1">
+                          <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span>{alertaDoc}</span>
+                        </p>
+                      )}
                     </div>
 
                     {cobroTipo === 'factoring' ? (

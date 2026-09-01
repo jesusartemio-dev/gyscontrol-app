@@ -19,6 +19,7 @@ export interface IAFeatureFlags {
   importarValorizacionIA: boolean
   verificarCotizacionProyecto: boolean
   cronogramaPlanificacionIA: boolean
+  documentosCobroIA: boolean
 }
 
 const DEFAULT_FLAGS: IAFeatureFlags = {
@@ -37,6 +38,7 @@ const DEFAULT_FLAGS: IAFeatureFlags = {
   importarValorizacionIA: true,
   verificarCotizacionProyecto: true,
   cronogramaPlanificacionIA: true,
+  documentosCobroIA: true,
 }
 
 function parseFlags(raw: unknown): IAFeatureFlags {
@@ -58,6 +60,7 @@ function parseFlags(raw: unknown): IAFeatureFlags {
     importarValorizacionIA: typeof obj.importarValorizacionIA === 'boolean' ? obj.importarValorizacionIA : DEFAULT_FLAGS.importarValorizacionIA,
     verificarCotizacionProyecto: typeof obj.verificarCotizacionProyecto === 'boolean' ? obj.verificarCotizacionProyecto : DEFAULT_FLAGS.verificarCotizacionProyecto,
     cronogramaPlanificacionIA: typeof obj.cronogramaPlanificacionIA === 'boolean' ? obj.cronogramaPlanificacionIA : DEFAULT_FLAGS.cronogramaPlanificacionIA,
+    documentosCobroIA: typeof obj.documentosCobroIA === 'boolean' ? obj.documentosCobroIA : DEFAULT_FLAGS.documentosCobroIA,
   }
 }
 
