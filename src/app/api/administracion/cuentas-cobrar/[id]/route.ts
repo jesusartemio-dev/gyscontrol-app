@@ -81,11 +81,22 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
 
     // Editar campos administrativos (no toca monto/saldo/estado financiero — solo metadata)
+    //
+    // Los descuentos de ley se editan acá porque son datos de LA FACTURA. Las
+    // CxC facturadas antes de que existieran estos campos no pasaron por el
+    // paso de Facturación que los captura, así que este es su único camino
+    // — a mano, o aplicándolos desde "Verificar contra la factura".
     const editableFields = [
       'fechaEmision', 'fechaRecepcion', 'ordenCompraCliente', 'numeroHES', 'numeroGuiaRemision',
       'numeroNegociacion', 'bancoFinanciera', 'tipoCambio', 'diasCredito',
       'observaciones', 'descripcion', 'numeroDocumento',
+      'detraccionPct', 'detraccionMonto', 'detraccionMontoPEN', 'detraccionCodigo',
+      'retencionPct', 'retencionMonto',
     ] as const
+
+    const NUMERICOS = new Set([
+      'detraccionPct', 'detraccionMonto', 'detraccionMontoPEN', 'retencionPct', 'retencionMonto',
+    ])
 
     const data: Record<string, any> = {}
     for (const field of editableFields) {
@@ -93,6 +104,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         const value = body[field]
         if (field === 'fechaRecepcion' || field === 'fechaEmision') {
           data[field] = value ? new Date(value) : null
+        } else if (NUMERICOS.has(field)) {
+          // Vienen del formulario como string; vacío o ilegible = sin dato.
+          const n = value === '' || value == null ? null : Number(value)
+          data[field] = n != null && Number.isFinite(n) ? n : null
         } else {
           data[field] = value === '' ? null : value
         }

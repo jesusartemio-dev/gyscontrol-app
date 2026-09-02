@@ -96,6 +96,21 @@ interface PagoCobro {
   cuentaBancaria: { id: string; nombreBanco: string; numeroCuenta: string } | null
 }
 
+/**
+ * Una fila de la comparación entre lo guardado en la CxC y lo que dice la
+ * factura. `campo` es null cuando el dato no es editable desde acá (ej. el
+ * monto de la CxC, que no se toca porque arrastra saldo y pagos).
+ */
+interface FilaVerificacion {
+  etiqueta: string
+  campo: string | null
+  guardado: string
+  leido: string
+  valorParaAplicar: string | null
+  estado: 'igual' | 'distinto' | 'falta' | 'sin_dato'
+  nota?: string
+}
+
 interface CxCDetalle {
   id: string
   proyectoId: string
@@ -233,8 +248,22 @@ export default function CxCDetallePage() {
     numeroDocumento: '', descripcion: '', fechaEmision: '', fechaRecepcion: '',
     diasCredito: '', tipoCambio: '', ordenCompraCliente: '', numeroHES: '',
     numeroGuiaRemision: '', bancoFinanciera: '', numeroNegociacion: '', observaciones: '',
+    // Descuentos de ley de la factura. Para las CxC facturadas antes de que
+    // existieran estos campos, este es el único sitio donde cargarlos.
+    detraccionPct: '', detraccionMonto: '', detraccionMontoPEN: '', detraccionCodigo: '',
+    retencionPct: '', retencionMonto: '',
   })
   const [savingEdit, setSavingEdit] = useState(false)
+
+  // ── Verificar contra la factura ──────────────────────────────────────────
+  // Sube la factura y COMPARA contra lo guardado, en vez de rellenar. Nace de
+  // que las CxC viejas se llenaron a mano y no hay ninguna factura archivada
+  // en el sistema contra la cual contrastar.
+  const [showVerificar, setShowVerificar] = useState(false)
+  const [verificando, setVerificando] = useState(false)
+  const [verifResultado, setVerifResultado] = useState<FilaVerificacion[] | null>(null)
+  const [verifSeleccion, setVerifSeleccion] = useState<Record<string, boolean>>({})
+  const [aplicandoVerif, setAplicandoVerif] = useState(false)
 
   // ── Anular / Eliminar ────────────────────────────────────────────────────
   const [confirmAction, setConfirmAction] = useState<'anular' | 'eliminar' | null>(null)
@@ -359,6 +388,12 @@ export default function CxCDetallePage() {
         bancoFinanciera: data.bancoFinanciera ?? '',
         numeroNegociacion: data.numeroNegociacion ?? '',
         observaciones: data.observaciones ?? '',
+        detraccionPct: data.detraccionPct != null ? String(data.detraccionPct) : '',
+        detraccionMonto: data.detraccionMonto != null ? String(data.detraccionMonto) : '',
+        detraccionMontoPEN: data.detraccionMontoPEN != null ? String(data.detraccionMontoPEN) : '',
+        detraccionCodigo: data.detraccionCodigo ?? '',
+        retencionPct: data.retencionPct != null ? String(data.retencionPct) : '',
+        retencionMonto: data.retencionMonto != null ? String(data.retencionMonto) : '',
       })
       // Detracción y retención vienen de la factura, capturadas al facturar.
       // Son el punto de partida del cobro: si la CxC ya las trae, no hay que
@@ -636,6 +671,111 @@ export default function CxCDetallePage() {
     }
   }
 
+  // Lee la factura y la compara contra lo guardado. NO escribe nada: devuelve
+  // la comparación para que Administración decida qué aplicar, campo por campo.
+  const handleVerificarFactura = async (file: File) => {
+    if (!cxc) return
+    setVerificando(true)
+    setVerifResultado(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('tipo', 'factura')
+      const res = await fetch('/api/administracion/documentos-cobro', { method: 'POST', body: fd })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'No se pudo leer el documento') }
+      const { extraccion } = await res.json()
+      if (extraccion.tipo !== 'factura') {
+        throw new Error(`El documento se reconoció como ${String(extraccion.tipo).replace(/_/g, ' ')}, no como una factura`)
+      }
+      const d = extraccion.datos
+
+      const comparar = (
+        etiqueta: string,
+        campo: string | null,
+        guardadoRaw: string | number | null,
+        leidoRaw: string | number | null,
+        opts: { moneda?: boolean; tolerancia?: number; nota?: string } = {}
+      ): FilaVerificacion => {
+        const fmt = (v: string | number | null) =>
+          v == null || v === '' ? '—' : (opts.moneda && typeof v === 'number' ? formatCurrency(v, cxc.moneda) : String(v))
+        const guardado = fmt(guardadoRaw)
+        const leido = fmt(leidoRaw)
+        let estado: FilaVerificacion['estado']
+        if (leidoRaw == null || leidoRaw === '') estado = 'sin_dato'
+        else if (guardadoRaw == null || guardadoRaw === '') estado = 'falta'
+        else if (typeof guardadoRaw === 'number' && typeof leidoRaw === 'number') {
+          estado = Math.abs(guardadoRaw - leidoRaw) <= (opts.tolerancia ?? 0.01) ? 'igual' : 'distinto'
+        } else {
+          estado = String(guardadoRaw).trim().toLowerCase() === String(leidoRaw).trim().toLowerCase() ? 'igual' : 'distinto'
+        }
+        return {
+          etiqueta, campo, guardado, leido, estado, nota: opts.nota,
+          valorParaAplicar: campo && leidoRaw != null && leidoRaw !== '' ? String(leidoRaw) : null,
+        }
+      }
+
+      const filas: FilaVerificacion[] = [
+        comparar('N° Factura', 'numeroDocumento', cxc.numeroDocumento, d.numeroDocumento),
+        comparar('Fecha de emisión', 'fechaEmision', cxc.fechaEmision?.split('T')[0] ?? null, d.fechaEmision),
+        comparar('Importe total', null, cxc.monto, d.importeTotal, {
+          moneda: true,
+          nota: 'El monto de la CxC no se edita desde acá: arrastra saldo y pagos.',
+        }),
+        comparar('Detracción %', 'detraccionPct', cxc.detraccionPct, d.detraccionPct),
+        comparar(`Detracción (${cxc.moneda})`, 'detraccionMonto', cxc.detraccionMonto, d.detraccionMonto, { moneda: true, tolerancia: 0.5 }),
+        comparar('Retención %', 'retencionPct', cxc.retencionPct, d.retencionPct),
+        comparar(`Retención (${cxc.moneda})`, 'retencionMonto', cxc.retencionMonto, d.retencionMonto, { moneda: true, tolerancia: 0.5 }),
+      ]
+      if (cxc.moneda !== 'PEN') {
+        filas.push(comparar('Depósito al BN (S/)', 'detraccionMontoPEN', cxc.detraccionMontoPEN, d.detraccionMontoPEN, {
+          tolerancia: 0.5,
+          nota: 'Importe del depósito. No entra al cálculo del cobro.',
+        }))
+      }
+
+      setVerifResultado(filas)
+      // Por defecto solo se marcan los que FALTAN. Pisar un valor que alguien
+      // cargó a mano tiene que ser una decisión consciente, no el default.
+      const sel: Record<string, boolean> = {}
+      for (const f of filas) if (f.campo && f.valorParaAplicar) sel[f.campo] = f.estado === 'falta'
+      setVerifSeleccion(sel)
+
+      if (extraccion.observaciones) toast(`Nota del lector: ${extraccion.observaciones}`, { icon: '⚠️' })
+      const problemas = filas.filter(f => f.estado === 'distinto').length
+      const faltantes = filas.filter(f => f.estado === 'falta').length
+      if (problemas === 0 && faltantes === 0) toast.success('Todo coincide con la factura')
+      else toast(`${problemas} dato(s) distinto(s), ${faltantes} sin cargar`, { icon: '🔍' })
+    } catch (e: any) {
+      toast.error(e.message || 'Error al verificar la factura')
+    } finally {
+      setVerificando(false)
+    }
+  }
+
+  const handleAplicarVerificacion = async () => {
+    if (!cxc || !verifResultado) return
+    const body: Record<string, string> = {}
+    for (const f of verifResultado) {
+      if (f.campo && f.valorParaAplicar && verifSeleccion[f.campo]) body[f.campo] = f.valorParaAplicar
+    }
+    if (Object.keys(body).length === 0) { toast.error('No hay nada seleccionado'); return }
+    setAplicandoVerif(true)
+    try {
+      const res = await fetch(`/api/administracion/cuentas-cobrar/${cxc.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Error') }
+      toast.success(`${Object.keys(body).length} campo(s) actualizados desde la factura`)
+      setShowVerificar(false)
+      setVerifResultado(null)
+      load(true)
+    } catch (e: any) {
+      toast.error(e.message || 'Error al aplicar')
+    } finally {
+      setAplicandoVerif(false)
+    }
+  }
+
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handlePago = async () => {
@@ -852,6 +992,12 @@ export default function CxCDetallePage() {
           bancoFinanciera: editForm.bancoFinanciera || null,
           numeroNegociacion: editForm.numeroNegociacion || null,
           observaciones: editForm.observaciones || null,
+          detraccionPct: editForm.detraccionPct,
+          detraccionMonto: editForm.detraccionMonto,
+          detraccionMontoPEN: editForm.detraccionMontoPEN,
+          detraccionCodigo: editForm.detraccionCodigo || null,
+          retencionPct: editForm.retencionPct,
+          retencionMonto: editForm.retencionMonto,
         }),
       })
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Error') }
@@ -973,6 +1119,16 @@ export default function CxCDetallePage() {
           {cxc.estado !== 'anulada' && (
             <Button variant="outline" size="sm" onClick={() => setShowEditForm(v => !v)}>
               <Pencil className="h-4 w-4 mr-1" /> Editar
+            </Button>
+          )}
+          {cxc.estado !== 'anulada' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setVerifResultado(null); setShowVerificar(true) }}
+              title="Sube la factura y compara con lo que está guardado — no modifica nada por su cuenta"
+            >
+              <ScanLine className="h-4 w-4 mr-1" /> Verificar factura
             </Button>
           )}
           {(cxc.estado === 'pendiente' || cxc.estado === 'parcial' || cxc.estado === 'vencida') && (
@@ -2081,6 +2237,86 @@ export default function CxCDetallePage() {
       </Dialog>
 
       {/* ── Dialog Editar ── */}
+      {/* Verificar contra la factura — compara, no rellena. */}
+      <Dialog open={showVerificar} onOpenChange={open => { setShowVerificar(open); if (!open) setVerifResultado(null) }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Verificar contra la factura</DialogTitle>
+            <DialogDescription>
+              Sube la factura y se compara con lo que está guardado. No se modifica nada hasta que lo apliques.
+              El documento solo se lee, no queda archivado.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div
+            className="rounded-lg border border-dashed p-3"
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => { e.preventDefault(); if (verificando) return; const f = e.dataTransfer.files?.[0]; if (f) handleVerificarFactura(f) }}
+          >
+            <label className={`inline-flex items-center gap-1.5 rounded-md border px-3 h-8 text-xs font-medium cursor-pointer hover:bg-accent ${verificando ? 'opacity-50 pointer-events-none' : ''}`}>
+              {verificando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ScanLine className="h-3.5 w-3.5" />}
+              {verificando ? 'Leyendo…' : verifResultado ? 'Subir otra factura' : 'Subir Factura'}
+              <input type="file" accept=".pdf,image/*" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) handleVerificarFactura(f) }} />
+            </label>
+            <span className="text-xs text-muted-foreground ml-2">o arrástrala acá</span>
+          </div>
+
+          {verifResultado && (
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-xs text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium">Campo</th>
+                    <th className="px-3 py-2 text-right font-medium">Guardado</th>
+                    <th className="px-3 py-2 text-right font-medium">Dice la factura</th>
+                    <th className="px-3 py-2 text-center font-medium w-24">Aplicar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {verifResultado.map(f => (
+                    <tr key={f.etiqueta} className="border-t">
+                      <td className="px-3 py-2">
+                        {f.etiqueta}
+                        {f.nota && <p className="text-xs text-muted-foreground">{f.nota}</p>}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono text-xs">{f.guardado}</td>
+                      <td className={`px-3 py-2 text-right font-mono text-xs ${f.estado === 'distinto' ? 'text-red-600 font-semibold' : f.estado === 'falta' ? 'text-blue-700' : ''}`}>
+                        {f.leido}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {f.estado === 'igual' && <span className="text-green-600" title="Coincide">✓</span>}
+                        {f.estado === 'sin_dato' && <span className="text-muted-foreground text-xs" title="No se pudo leer de la factura">—</span>}
+                        {(f.estado === 'distinto' || f.estado === 'falta') && (
+                          f.campo && f.valorParaAplicar
+                            ? <input type="checkbox" checked={!!verifSeleccion[f.campo]}
+                                onChange={e => setVerifSeleccion(s => ({ ...s, [f.campo!]: e.target.checked }))} />
+                            : <span className="text-amber-600" title="Revísalo a mano">!</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="text-xs text-muted-foreground px-3 py-2 border-t bg-gray-50">
+                Los que <strong>faltan</strong> vienen marcados; los que <strong>difieren</strong> no, porque pisar un valor
+                cargado a mano es una decisión tuya.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowVerificar(false)}>Cerrar</Button>
+            {verifResultado && (
+              <Button onClick={handleAplicarVerificacion} disabled={aplicandoVerif || !Object.values(verifSeleccion).some(Boolean)}>
+                {aplicandoVerif ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                Aplicar seleccionados
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showEditForm} onOpenChange={setShowEditForm}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -2112,6 +2348,67 @@ export default function CxCDetallePage() {
             </div>
             <div><Label>Descripción</Label><Input placeholder="Servicio eléctrico..." value={editForm.descripcion} onChange={e => setEditForm(f => ({ ...f, descripcion: e.target.value }))} /></div>
             <div><Label>Observaciones</Label><Input placeholder="Notas adicionales" value={editForm.observaciones} onChange={e => setEditForm(f => ({ ...f, observaciones: e.target.value }))} /></div>
+
+            {/* Descuentos de ley — son datos de la factura, no del cobro. Las
+                CxC facturadas antes de que existieran estos campos se cargan
+                acá (o desde "Verificar contra la factura"). */}
+            <div className="border-t pt-3 space-y-3">
+              <div>
+                <p className="text-sm font-medium">Descuentos de ley (de la factura)</p>
+                <p className="text-xs text-muted-foreground">
+                  El monto va en <strong>{cxc.moneda}</strong>, que es lo que descuenta la factura. Si la factura no es en soles,
+                  el importe del depósito al Banco de la Nación va aparte — no reemplaza al de arriba.
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <Label>Detracción %</Label>
+                  <Input type="number" placeholder="12" value={editForm.detraccionPct} onChange={e => setEditForm(f => ({ ...f, detraccionPct: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Detracción ({cxc.moneda})</Label>
+                  <Input type="number" placeholder="4239.17" value={editForm.detraccionMonto} onChange={e => setEditForm(f => ({ ...f, detraccionMonto: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Código</Label>
+                  <Input placeholder="037" value={editForm.detraccionCodigo} onChange={e => setEditForm(f => ({ ...f, detraccionCodigo: e.target.value }))} />
+                </div>
+              </div>
+              {cxc.moneda !== 'PEN' && (
+                <div>
+                  <Label>Depósito al Banco de la Nación (S/)</Label>
+                  <Input type="number" placeholder="14248.00" value={editForm.detraccionMontoPEN} onChange={e => setEditForm(f => ({ ...f, detraccionMontoPEN: e.target.value }))} />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    El importe en soles que aparece impreso en la factura. Es lo que se deposita; no entra al cálculo del cobro.
+                  </p>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Retención %</Label>
+                  <Input type="number" placeholder="3" value={editForm.retencionPct} onChange={e => setEditForm(f => ({ ...f, retencionPct: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Retención ({cxc.moneda})</Label>
+                  <Input type="number" placeholder="0.00" value={editForm.retencionMonto} onChange={e => setEditForm(f => ({ ...f, retencionMonto: e.target.value }))} />
+                </div>
+              </div>
+              {(() => {
+                const pct = parseFloat(editForm.detraccionPct)
+                const monto = parseFloat(editForm.detraccionMonto)
+                const esperado = cxc.monto * pct / 100
+                if (!(pct > 0) || !(monto > 0) || !(esperado > 0) || monto / esperado <= 2) return null
+                return (
+                  <p className="text-xs text-amber-700 flex items-start gap-1">
+                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>
+                      {formatCurrency(monto, cxc.moneda)} es mucho más que el {pct}% de la factura ({formatCurrency(esperado, cxc.moneda)}).
+                      ¿Ese número está en soles? Si es así, va en el campo del depósito al Banco de la Nación.
+                    </span>
+                  </p>
+                )
+              })()}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditForm(false)}>Cancelar</Button>
