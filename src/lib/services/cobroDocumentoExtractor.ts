@@ -15,7 +15,18 @@ export type TipoDocumentoCobro = 'factura' | 'liquidacion_factoring' | 'voucher_
  *  pegar una captura o arrastrar un archivo, donde el usuario no eligió tipo). */
 export type TipoDocumentoCobroInput = TipoDocumentoCobro | 'auto'
 
-/** Datos de la factura — aplican tanto a factoring como a cobro directo. */
+/**
+ * Datos de la factura — aplican tanto a factoring como a cobro directo.
+ *
+ * Sobre la detracción: en una factura en dólares el monto de detracción viene
+ * impreso en SOLES, porque así se deposita en el Banco de la Nación. Pero lo
+ * que se le descuenta al cobro está en la moneda de la factura. Por eso se
+ * devuelven los dos por separado:
+ *   - detraccionMonto  → SIEMPRE en la moneda de la factura (lo que descuenta)
+ *   - detraccionMontoPEN → el importe en soles del depósito, si la factura lo
+ *     trae en soles y la factura no es en soles. null si no aplica.
+ * Se separan porque confundirlos hace que el Valor Neto salga ~3.4x mal.
+ */
 export interface ExtraccionFactura {
   numeroDocumento: string | null
   fechaEmision: string | null
@@ -23,6 +34,7 @@ export interface ExtraccionFactura {
   importeTotal: number | null
   detraccionPct: number | null
   detraccionMonto: number | null
+  detraccionMontoPEN: number | null
   retencionPct: number | null
   retencionMonto: number | null
 }
@@ -80,7 +92,13 @@ const PROMPTS: Record<TipoDocumentoCobro, { system: string; user: string }> = {
 Estás leyendo una FACTURA ELECTRÓNICA emitida por GYS a un cliente. Te interesan el importe total y los descuentos de ley (detracción y/o retención) que aparecen impresos en la factura.
 
 - "Importe Total" es el total de la factura con IGV incluido.
-- La sección "Información de la detracción" trae el porcentaje y el monto de detracción. OJO: el monto de detracción a veces viene en Soles aunque la factura sea en Dólares — si es así, devuélvelo tal como aparece y aclara la moneda en observaciones.
+- La sección "Información de la detracción" trae el porcentaje y el monto de detracción.
+
+MUY IMPORTANTE — la moneda de la detracción:
+En una factura en DÓLARES, el monto de detracción se imprime en SOLES (con "S/"), porque el depósito al Banco de la Nación siempre se hace en soles. Pero lo que se le descuenta al cobro está en dólares. Por eso tienes que devolver DOS campos distintos:
+- "detraccionMonto": SIEMPRE en la moneda de la factura. Si la factura es en dólares y la detracción está impresa en soles, NO copies el número en soles: calcula el porcentaje sobre el importe total (ej. 12% de $35,326.44 = 4239.17). Si la factura trae "Monto neto pendiente de pago", verifica que importeTotal − detraccionMonto dé ese neto.
+- "detraccionMontoPEN": el importe en soles tal como está impreso, SOLO si la factura es en dólares y la detracción viene en soles. Si la factura ya es en soles, devuelve null (el importe en soles es "detraccionMonto").
+
 - La sección "Información de la retención" (cuando existe) trae la base imponible, el porcentaje y el monto de la retención.
 - No todas las facturas tienen detracción y retención; puede tener una, ambas o ninguna.`,
     user: `Extrae los datos de esta factura y devuelve ÚNICAMENTE este JSON:
@@ -92,6 +110,7 @@ Estás leyendo una FACTURA ELECTRÓNICA emitida por GYS a un cliente. Te interes
   "importeTotal": number o null,
   "detraccionPct": number o null,
   "detraccionMonto": number o null,
+  "detraccionMontoPEN": number o null,
   "retencionPct": number o null,
   "retencionMonto": number o null,
   "confianza": "alta|media|baja",
@@ -189,7 +208,7 @@ Si no es ninguno de los 3, devuelve tipoDetectado "desconocido" y explica en obs
   "tipoDetectado": "factura|liquidacion_factoring|voucher_transferencia|desconocido",
   "factura": {
     "numeroDocumento": "string o null", "fechaEmision": "YYYY-MM-DD o null", "moneda": "PEN|USD o null",
-    "importeTotal": number o null, "detraccionPct": number o null, "detraccionMonto": number o null,
+    "importeTotal": number o null, "detraccionPct": number o null, "detraccionMonto": number o null, "detraccionMontoPEN": number o null,
     "retencionPct": number o null, "retencionMonto": number o null
   } o null,
   "liquidacion": {
@@ -302,7 +321,7 @@ export async function extraerDocumentoCobro(
   } catch {
     const vacio = { confianza: 'baja' as const, observaciones: `Respuesta no interpretable: ${texto.slice(0, 200)}` }
     if (tipo === 'factura') {
-      return { tipo, ...vacio, datos: { numeroDocumento: null, fechaEmision: null, moneda: null, importeTotal: null, detraccionPct: null, detraccionMonto: null, retencionPct: null, retencionMonto: null } }
+      return { tipo, ...vacio, datos: { numeroDocumento: null, fechaEmision: null, moneda: null, importeTotal: null, detraccionPct: null, detraccionMonto: null, detraccionMontoPEN: null, retencionPct: null, retencionMonto: null } }
     }
     if (tipo === 'liquidacion_factoring') {
       return { tipo, ...vacio, datos: { financiera: null, numeroOperacion: null, fechaDesembolso: null, fechaVencimiento: null, diasFinanciamiento: null, montoDocumento: null, excedenteMonto: null, valorAFinanciar: null, interesMonto: null, comisionEstructuracion: null, gastosAdicionales: null, igvGastos: null, adelantoBanpro: null, saldoAGirar: null } }
@@ -357,6 +376,7 @@ export async function extraerDocumentoCobro(
         importeTotal: num(campos.importeTotal),
         detraccionPct: num(campos.detraccionPct),
         detraccionMonto: num(campos.detraccionMonto),
+        detraccionMontoPEN: num(campos.detraccionMontoPEN),
         retencionPct: num(campos.retencionPct),
         retencionMonto: num(campos.retencionMonto),
       },

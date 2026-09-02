@@ -433,7 +433,23 @@ export default function CxCDetallePage() {
     const dias      = parseInt(cobroDias) || 0
     const refInteres = tasa > 0 && dias > 0 ? aFinanciar * (tasa / 100 / 30) * dias : 0
     const refInteresDisponible = tasa > 0 && dias > 0 && aFinanciar > 0
-    return { base, detMonto, retMonto, valorNeto, excMonto, aFinanciar, totalCostos, aDesembolsar, saldo, refInteres, refInteresDisponible }
+
+    // En una factura en dólares el monto de detracción viene impreso en soles
+    // (así se deposita en el BN). Si alguien copia ese número acá, el Valor
+    // Neto sale ~3.4x mal. Se compara contra lo que implica el porcentaje.
+    const detEsperada = base * detPctV / 100
+    const detraccionSospechosa = detPctV > 0 && detEsperada > 0 && detMonto / detEsperada > 2
+
+    // Los eventos del cobro más los costos tienen que sumar la factura. La
+    // identidad se cumple sola salvo que se escriba a mano el Valor a
+    // Financiar — que es justo cuando conviene avisar.
+    const sumaEventos = adelanto + saldo + totalCostos + excMonto + detMonto + retMonto
+    const descuadre = base - sumaEventos
+
+    return {
+      base, detMonto, retMonto, valorNeto, excMonto, aFinanciar, totalCostos, aDesembolsar, saldo,
+      refInteres, refInteresDisponible, detEsperada, detraccionSospechosa, sumaEventos, descuadre,
+    }
   }, [cxc, cobroDetraccionPct, cobroDetraccionMonto, cobroRetencionPct, cobroRetencionMonto, cobroExcedentePct, cobroExcedenteMonto,
       cobroValorAFinanciar, cobroInteres, cobroComision, cobroGastos, cobroIgvGastos,
       cobroAdelantoBanpro, cobroTasa, cobroDias])
@@ -527,7 +543,9 @@ export default function CxCDetallePage() {
       const fd = new FormData()
       fd.append('file', file)
       fd.append('tipo', tipo)
-      const res = await fetch(`/api/administracion/cuentas-cobrar/${cxc.id}/documento-cobro`, { method: 'POST', body: fd })
+      // Para que avise si el total de la factura no calza con lo registrado.
+      fd.append('montoReferencia', String(cxc.monto))
+      const res = await fetch('/api/administracion/documentos-cobro', { method: 'POST', body: fd })
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Error') }
       const { extraccion, alerta } = await res.json()
 
@@ -541,9 +559,14 @@ export default function CxCDetallePage() {
       if (extraccion.tipo === 'factura') {
         const d = extraccion.datos
         set(d.detraccionPct, setCobroDetraccionPct, 'Detracción %')
+        // detraccionMonto viene siempre en la moneda de la factura; el importe
+        // en soles es solo el del depósito en el BN y no entra al cálculo.
         set(d.detraccionMonto, setCobroDetraccionMonto, 'Detracción monto')
         set(d.retencionPct, setCobroRetencionPct, 'Retención %')
         set(d.retencionMonto, setCobroRetencionMonto, 'Retención monto')
+        if (d.detraccionMontoPEN != null) {
+          setAlertaDoc(`La detracción se deposita en el Banco de la Nación por S/ ${d.detraccionMontoPEN.toFixed(2)}. En la liquidación se cargó el importe en ${cxc.moneda} (${formatCurrency(d.detraccionMonto ?? 0, cxc.moneda)}), que es lo que descuenta la factura.`)
+        }
       } else if (extraccion.tipo === 'liquidacion_factoring') {
         const d = extraccion.datos
         set(d.financiera, setCobroFinanciera, 'Financiera')
@@ -1344,6 +1367,30 @@ export default function CxCDetallePage() {
                             </tbody>
                           </table>
                         </div>
+
+                        {/* Avisos: no bloquean el guardado, pero delatan los dos
+                            errores que ya pasaron en producción. */}
+                        {liq.detraccionSospechosa && (
+                          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 flex items-start gap-2">
+                            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                            <span>
+                              La Detracción ({formatCurrency(liq.detMonto, cxc.moneda)}) es mucho mayor que el {cobroDetraccionPct}% de la factura,
+                              que serían {formatCurrency(liq.detEsperada, cxc.moneda)}. <strong>¿Copiaste el monto en soles?</strong> En una
+                              factura en {cxc.moneda} la detracción se imprime en S/ porque así se deposita en el Banco de la Nación, pero acá
+                              va el importe en {cxc.moneda} — el que la factura descuenta en &quot;Monto neto pendiente de pago&quot;.
+                            </span>
+                          </div>
+                        )}
+                        {Math.abs(liq.descuadre) > 0.05 && (
+                          <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-xs text-red-900 flex items-start gap-2">
+                            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                            <span>
+                              Los montos no cierran contra la factura: Adelanto + Saldo a Girar + Costos + Excedente + Detracción + Retención
+                              suman {formatCurrency(liq.sumaEventos, cxc.moneda)}, y la factura es {formatCurrency(liq.base, cxc.moneda)}
+                              {' '}({liq.descuadre > 0 ? 'faltan' : 'sobran'} {formatCurrency(Math.abs(liq.descuadre), cxc.moneda)}).
+                            </span>
+                          </div>
+                        )}
                       </>
                     ) : (
                       <>

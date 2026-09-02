@@ -1,6 +1,5 @@
 import { tieneRol } from '@/lib/auth/roles'
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
@@ -16,20 +15,20 @@ const ROLES_ALLOWED = ['admin', 'gerente', 'administracion']
 // una captura o arrastrar un archivo, sin elegir tipo).
 const TIPOS_VALIDOS: TipoDocumentoCobroInput[] = ['factura', 'liquidacion_factoring', 'voucher_transferencia', 'auto']
 
-// POST /api/administracion/cuentas-cobrar/:id/documento-cobro
-// Lee el documento (factura, liquidación de la financiera o voucher de
-// transferencia) con Claude y devuelve los datos que precargan la Hoja de
-// Liquidación.
+// POST /api/administracion/documentos-cobro
 //
-// Esto es un LECTOR, no un repositorio: el archivo se procesa en memoria y se
-// descarta. No se sube a Drive ni se guarda como adjunto — para archivar
-// comprobantes está el flujo de adjuntos de la CxC, que es aparte.
+// Lee un documento de cobro (factura, liquidación de la financiera o voucher
+// de transferencia) y devuelve los datos que precargan un formulario.
 //
-// Tampoco escribe en la base: solo devuelve los datos para que el formulario
-// los precargue como sugerencia editable — Administración revisa y confirma
-// con "Guardar Cobro", igual que el resto de campos sugeridos (Interés,
-// Fecha Vencimiento).
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+// No está colgado de ninguna entidad a propósito: se usa tanto en Facturación
+// (donde la CxC todavía no existe) como en el detalle de la CxC. Es un LECTOR
+// puro — el archivo se procesa en memoria y se descarta, no se sube a Drive ni
+// se guarda como adjunto, y no escribe nada en la base. Quien llama decide qué
+// hacer con lo leído.
+//
+// Para archivar el documento está el flujo de adjuntos de cada entidad, que es
+// aparte (ej. /api/proyectos/:id/valorizaciones/:valId/adjuntos).
+export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
@@ -45,10 +44,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    const { id: cuentaPorCobrarId } = await params
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const tipo = formData.get('tipo') as TipoDocumentoCobroInput | null
+    // Opcional: contra qué monto contrastar el total de la factura. En
+    // Facturación es el Neto a Recibir de la valorización; en la CxC, su monto.
+    const montoReferenciaRaw = formData.get('montoReferencia')
+    const montoReferencia = montoReferenciaRaw != null && montoReferenciaRaw !== ''
+      ? Number(montoReferenciaRaw)
+      : null
 
     if (!file) {
       return NextResponse.json({ error: 'Archivo requerido' }, { status: 400 })
@@ -61,15 +65,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: errorArchivo }, { status: 400 })
     }
 
-    const cxc = await prisma.cuentaPorCobrar.findUnique({
-      where: { id: cuentaPorCobrarId },
-      select: { id: true, monto: true, moneda: true },
-    })
-    if (!cxc) {
-      return NextResponse.json({ error: 'Cuenta por cobrar no encontrada' }, { status: 404 })
-    }
-
-    // 1) Leer el documento. El archivo no sale de acá: se procesa en memoria.
     const extraccion = await extraerDocumentoCobro(file, tipo, session.user.id)
 
     // Si no se reconoció el documento, probablemente se pegó/arrastró el
@@ -81,19 +76,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    // 2) Cruce con lo que ya sabemos: si el importe total de la factura no
-    // calza con el monto de la CxC, se avisa — nunca se pisa el monto.
+    // Cruce con lo que ya sabemos: si el total de la factura no calza con el
+    // monto de referencia, se avisa. Nunca se pisa nada automáticamente.
     let alerta: string | null = null
-    if (extraccion.tipo === 'factura' && extraccion.datos.importeTotal != null) {
-      const diferencia = Math.abs(extraccion.datos.importeTotal - cxc.monto)
+    if (
+      extraccion.tipo === 'factura' &&
+      extraccion.datos.importeTotal != null &&
+      montoReferencia != null &&
+      Number.isFinite(montoReferencia)
+    ) {
+      const diferencia = Math.abs(extraccion.datos.importeTotal - montoReferencia)
       if (diferencia > 0.01) {
-        alerta = `El importe total de la factura (${extraccion.datos.importeTotal}) no coincide con el monto registrado en la CxC (${cxc.monto}). Revisa cuál es el correcto — el monto de la CxC no se modifica automáticamente.`
+        alerta = `El importe total de la factura (${extraccion.datos.importeTotal.toFixed(2)}) no coincide con el monto calculado (${montoReferencia.toFixed(2)}). Diferencia: ${diferencia.toFixed(2)}.`
       }
     }
 
     return NextResponse.json({ extraccion, alerta })
   } catch (error) {
-    console.error('[POST /cuentas-cobrar/:id/documento-cobro]', error)
+    console.error('[POST /administracion/documentos-cobro]', error)
     const message = error instanceof Error ? error.message : 'Error del servidor'
     return NextResponse.json({ error: `Error procesando el documento: ${message}` }, { status: 500 })
   }
