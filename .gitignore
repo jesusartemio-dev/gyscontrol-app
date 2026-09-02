@@ -54,3 +54,7 @@ CONTEXT_DUMP.md
 *.log
 dev-server.log
 avance-semanal-historico.csv
+
+# Volcados con datos reales de produccion: no deben terminar en el repo
+RESPALDO_COBRO_CXC_*.json
+DRIVE_HUERFANOS.csv
