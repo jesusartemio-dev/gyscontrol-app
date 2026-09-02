@@ -1299,20 +1299,38 @@ export default function CxCDetallePage() {
               <CardContent className="space-y-4">
 
                 {/* Resumen cobro existente */}
-                {cobro && !showCobroForm && (
+                {cobro && !showCobroForm && (() => {
+                  // La detracción se muestra en la moneda de la factura (que es
+                  // lo que descuenta) y, al lado, el importe que se deposita en
+                  // el Banco de la Nación con su tipo de cambio.
+                  const detMonto = cobro.detraccionMonto ?? cxc.detraccionMonto
+                  const detPEN = cxc.detraccionMontoPEN
+                  const detraccionResumen = detMonto == null ? null : [
+                    formatCurrency(detMonto, cxc.moneda),
+                    cobro.detraccionPct != null ? `(${cobro.detraccionPct}%)` : null,
+                    detPEN != null
+                      ? `· depósito BN S/ ${detPEN.toFixed(2)}${cxc.tipoCambio ? ` · TC ${cxc.tipoCambio}` : ''}`
+                      : null,
+                  ].filter(Boolean).join(' ')
+                  return (
                   <div className="space-y-0">
                     {cobro.tipo === 'factoring' ? <>
                       {labelRow('Financiera', cobro.financiera)}
                       {labelRow('Tasa', cobro.tasaDescuentoPct != null ? `${cobro.tasaDescuentoPct}%` : null)}
                       {labelRow('Fecha Desembolso', cobro.fechaDesembolso ? formatDate(cobro.fechaDesembolso) : null)}
                       {labelRow('N° Operación', cobro.numeroOperacion)}
+                      {/* Detracción y retención también en factoring: son
+                          descuentos de la factura y aplican igual, se cobre
+                          por financiera o directo. */}
+                      {labelRow('Detracción', detraccionResumen)}
+                      {labelRow('Retención', cobro.retencionMonto != null ? formatCurrency(cobro.retencionMonto, cxc.moneda) : null)}
                       {labelRow('Monto a Desembolsar', cobro.montoADesembolsar != null ? formatCurrency(cobro.montoADesembolsar, cxc.moneda) : null)}
                       {labelRow('Adelanto Banpro', cobro.adelantoBanpro != null ? formatCurrency(cobro.adelantoBanpro, cxc.moneda) : null)}
                       {labelRow('Saldo a Girar', cobro.saldoAGirar != null ? formatCurrency(cobro.saldoAGirar, cxc.moneda) : null)}
                       {labelRow('Fecha Confirmación', cobro.fechaConfirmacion ? formatDate(cobro.fechaConfirmacion) : null)}
                     </> : <>
                       {labelRow('Fecha de Cobro', cobro.fechaDesembolso ? formatDate(cobro.fechaDesembolso) : null)}
-                      {labelRow('Detracción', cobro.detraccionMonto != null ? formatCurrency(cobro.detraccionMonto, cxc.moneda) : null)}
+                      {labelRow('Detracción', detraccionResumen)}
                       {labelRow('Retención', cobro.retencionMonto != null ? formatCurrency(cobro.retencionMonto, cxc.moneda) : null)}
                       {labelRow('Neto Cobrado', cobro.montoNetoDirecto != null ? formatCurrency(cobro.montoNetoDirecto, cxc.moneda) : null)}
                       {labelRow('Confirmación Cliente', cobro.confirmacionCliente)}
@@ -1320,7 +1338,8 @@ export default function CxCDetallePage() {
                       {labelRow('Observaciones', cobro.observaciones)}
                     </>}
                   </div>
-                )}
+                  )
+                })()}
 
                 {/* Formulario cobro */}
                 {showCobroForm && (
