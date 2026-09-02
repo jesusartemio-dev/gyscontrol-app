@@ -4842,6 +4842,19 @@ model CuentaPorCobrar {
   numeroHES          String? // N° de Hoja de Entrada de Servicios (HES) — cuando se factura un servicio
   numeroGuiaRemision String? // N° de Guía de Remisión — cuando se factura entrega de bienes
   numeroNegociacion  String? // N° de operación con la financiera (cuando se negocia/factoriza la factura)
+
+  // Descuentos de ley que trae impresos la factura. Van acá y no en
+  // CobroValorizacion porque son atributos de LA FACTURA, no de cómo se cobra:
+  // una misma factura con detracción y/o retención se puede cobrar por
+  // factoring o directo. Se capturan una sola vez, al facturar, y el cobro los
+  // usa como base en vez de volver a pedirlos.
+  detraccionPct      Float? // ej. 12
+  detraccionMonto    Float? // SIEMPRE en la moneda de la factura — es lo que descuenta
+  detraccionMontoPEN Float? // importe del depósito en el Banco de la Nación, cuando la factura no es en soles
+  detraccionCodigo   String? // ej. '037' Demás servicios gravados con el IGV
+  retencionPct       Float?
+  retencionMonto     Float?
+
   estado             EstadoCuentaCobrar @default(pendiente)
   observaciones      String?
   createdAt          DateTime           @default(now())

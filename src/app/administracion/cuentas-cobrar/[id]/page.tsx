@@ -118,6 +118,13 @@ interface CxCDetalle {
   numeroHES: string | null
   numeroGuiaRemision: string | null
   numeroNegociacion: string | null
+  // Descuentos de ley de la factura, capturados al facturar.
+  detraccionPct: number | null
+  detraccionMonto: number | null
+  detraccionMontoPEN: number | null
+  detraccionCodigo: string | null
+  retencionPct: number | null
+  retencionMonto: number | null
   estado: string
   observaciones: string | null
   proyecto: { id: string; codigo: string; nombre: string }
@@ -353,6 +360,15 @@ export default function CxCDetallePage() {
         numeroNegociacion: data.numeroNegociacion ?? '',
         observaciones: data.observaciones ?? '',
       })
+      // Detracción y retención vienen de la factura, capturadas al facturar.
+      // Son el punto de partida del cobro: si la CxC ya las trae, no hay que
+      // volver a subir la factura acá. Un cobro ya guardado las pisa, porque
+      // esa es la foto de la liquidación que se cerró.
+      setCobroDetraccionPct(data.detraccionPct != null ? String(data.detraccionPct) : '12')
+      setCobroDetraccionMonto(data.detraccionMonto != null ? String(data.detraccionMonto) : '')
+      setCobroRetencionPct(data.retencionPct != null ? String(data.retencionPct) : '')
+      setCobroRetencionMonto(data.retencionMonto != null ? String(data.retencionMonto) : '')
+
       // Populate cobro form if exists
       const cobro = data.valorizacion?.cobro
       if (cobro) {

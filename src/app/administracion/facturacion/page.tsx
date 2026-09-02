@@ -9,8 +9,21 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Search, Eye, Receipt, DollarSign, FileSpreadsheet, Check, Ban, Undo2, CalendarDays, ClipboardCheck, Upload } from 'lucide-react'
+import { Loader2, Search, Eye, Receipt, DollarSign, FileSpreadsheet, Check, Ban, Undo2, CalendarDays, ClipboardCheck, Upload, ScanLine, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+/** Lo que devuelve el lector de facturas para precargar este diálogo. */
+interface ExtraccionFacturaUI {
+  numeroDocumento: string | null
+  fechaEmision: string | null
+  moneda: 'PEN' | 'USD' | null
+  importeTotal: number | null
+  detraccionPct: number | null
+  detraccionMonto: number | null
+  detraccionMontoPEN: number | null
+  retencionPct: number | null
+  retencionMonto: number | null
+}
 
 interface Proyecto {
   id: string
@@ -170,6 +183,14 @@ export default function FacturacionPage() {
   const [numFactura, setNumFactura] = useState('')
   const [fechaEmisionFactura, setFechaEmisionFactura] = useState('')
   const [fechaVencimiento, setFechaVencimiento] = useState('')
+
+  // Lectura de la factura al facturar. Acá es donde la factura entra al
+  // sistema por primera vez, así que es donde conviene leerla: el N° y la
+  // fecha dejan de teclearse, y la detracción/retención quedan guardadas en la
+  // CxC para que el cobro no tenga que volver a pedir el mismo documento.
+  const [leyendoFactura, setLeyendoFactura] = useState(false)
+  const [datosFactura, setDatosFactura] = useState<ExtraccionFacturaUI | null>(null)
+  const [usarImporteFactura, setUsarImporteFactura] = useState(false)
   const [factCondicionPago, setFactCondicionPago] = useState('contado')
   const [factDiasCredito, setFactDiasCredito] = useState<number | ''>('')
 
@@ -334,8 +355,57 @@ export default function FacturacionPage() {
     setFechaVencimiento(venc.toISOString().split('T')[0])
     setFactCondicionPago('contado')
     setFactDiasCredito('')
+    // La lectura es por factura: no arrastrar lo leído de la anterior.
+    setDatosFactura(null)
+    setUsarImporteFactura(false)
     setShowFacturarDialog(true)
   }
+
+  // Lee la factura y precarga el diálogo. No guarda nada: los valores quedan
+  // editables y se persisten recién al "Facturar y Crear CxC". El archivo se
+  // lee y se descarta — no queda archivado.
+  const handleLeerFactura = async (file: File) => {
+    if (!facturarTarget) return
+    setLeyendoFactura(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('tipo', 'factura')
+      // Para que avise si el total impreso no calza con el Neto a Recibir.
+      fd.append('montoReferencia', String(facturarTarget.netoARecibir))
+      const res = await fetch('/api/administracion/documentos-cobro', { method: 'POST', body: fd })
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}))
+        throw new Error(e.error || 'No se pudo leer el documento')
+      }
+      const { extraccion } = await res.json()
+      if (extraccion.tipo !== 'factura') {
+        throw new Error(`El documento se reconoció como ${extraccion.tipo.replace(/_/g, ' ')}, no como una factura`)
+      }
+      const d: ExtraccionFacturaUI = extraccion.datos
+      setDatosFactura(d)
+
+      const llenados: string[] = []
+      if (d.numeroDocumento) { setNumFactura(d.numeroDocumento); llenados.push('N° Factura') }
+      if (d.fechaEmision) { setFechaEmisionFactura(d.fechaEmision); llenados.push('Fecha de Emisión') }
+      if (d.detraccionMonto != null) llenados.push('Detracción')
+      if (d.retencionMonto != null) llenados.push('Retención')
+
+      if (extraccion.observaciones) toast(`Nota del lector: ${extraccion.observaciones}`, { icon: '⚠️' })
+      if (llenados.length === 0) toast.error('Se reconoció la factura pero no se pudo leer ningún dato — llénalos a mano')
+      else toast.success(`Factura leída: ${llenados.join(', ')} — revísalos antes de facturar`)
+    } catch (e: any) {
+      toast.error(e.message || 'Error al leer la factura')
+    } finally {
+      setLeyendoFactura(false)
+    }
+  }
+
+  // Diferencia entre lo que dice la factura y el Neto a Recibir calculado.
+  const difImporte = facturarTarget && datosFactura?.importeTotal != null
+    ? datosFactura.importeTotal - facturarTarget.netoARecibir
+    : null
+  const hayDifImporte = difImporte != null && Math.abs(difImporte) > 0.01
 
   // Handle facturar with CxC creation
   const handleFacturar = async () => {
@@ -357,6 +427,16 @@ export default function FacturacionPage() {
           fechaVencimiento,
           condicionPago: factCondicionPago,
           diasCredito: factCondicionPago === 'credito' && factDiasCredito ? Number(factDiasCredito) : undefined,
+          // Solo si Administración lo eligió explícitamente: el monto de la CxC
+          // pasa a ser el importe impreso en la factura en vez del calculado.
+          montoFactura: usarImporteFactura && datosFactura?.importeTotal != null ? datosFactura.importeTotal : undefined,
+          // Descuentos de ley leídos de la factura, para que el cobro no tenga
+          // que volver a pedir el mismo documento.
+          detraccionPct: datosFactura?.detraccionPct ?? undefined,
+          detraccionMonto: datosFactura?.detraccionMonto ?? undefined,
+          detraccionMontoPEN: datosFactura?.detraccionMontoPEN ?? undefined,
+          retencionPct: datosFactura?.retencionPct ?? undefined,
+          retencionMonto: datosFactura?.retencionMonto ?? undefined,
         }),
       })
       if (!res.ok) throw new Error()
@@ -777,7 +857,11 @@ export default function FacturacionPage() {
                   <span>Neto a Recibir (con IGV)</span>
                   <span className="font-mono">{formatCurrency(facturarTarget.netoARecibir, facturarTarget.moneda)}</span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Se creará automáticamente una Cuenta por Cobrar por el monto neto.</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {usarImporteFactura && datosFactura?.importeTotal != null
+                    ? <>Se creará la Cuenta por Cobrar por el <strong>importe de la factura</strong>: {formatCurrency(datosFactura.importeTotal, facturarTarget.moneda)}.</>
+                    : 'Se creará automáticamente una Cuenta por Cobrar por el monto neto.'}
+                </p>
               </div>
               {(facturarTarget.numeroHES || facturarTarget.numeroGuiaRemision) && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm flex justify-between items-center">
@@ -785,6 +869,82 @@ export default function FacturacionPage() {
                   <span className="font-mono text-amber-800">{facturarTarget.numeroHES || facturarTarget.numeroGuiaRemision}</span>
                 </div>
               )}
+              {/* Lectura de la factura — precarga los campos de abajo. El
+                  documento se lee y se descarta, no queda archivado. */}
+              <div
+                className="rounded-lg border border-dashed p-3 space-y-2"
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => {
+                  e.preventDefault()
+                  if (leyendoFactura) return
+                  const f = e.dataTransfer.files?.[0]
+                  if (f) handleLeerFactura(f)
+                }}
+              >
+                <p className="text-xs text-muted-foreground">
+                  Sube la factura y se llenan solos el N°, la fecha y los descuentos de ley — revísalos antes de facturar.
+                  También puedes arrastrarla acá. El documento solo se lee, <strong>no queda archivado</strong>.
+                </p>
+                <label className={`inline-flex items-center gap-1.5 rounded-md border px-3 h-8 text-xs font-medium cursor-pointer hover:bg-accent ${leyendoFactura ? 'opacity-50 pointer-events-none' : ''}`}>
+                  {leyendoFactura ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ScanLine className="h-3.5 w-3.5" />}
+                  {leyendoFactura ? 'Leyendo…' : 'Leer Factura'}
+                  <input
+                    type="file"
+                    accept=".pdf,image/*"
+                    className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) handleLeerFactura(f) }}
+                  />
+                </label>
+
+                {datosFactura && (
+                  <div className="text-xs space-y-1 pt-1 border-t">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Importe total de la factura</span>
+                      <span className="font-mono">{datosFactura.importeTotal != null ? formatCurrency(datosFactura.importeTotal, datosFactura.moneda ?? facturarTarget.moneda) : '—'}</span>
+                    </div>
+                    {datosFactura.detraccionMonto != null && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Detracción {datosFactura.detraccionPct ?? ''}%</span>
+                        <span className="font-mono">
+                          {formatCurrency(datosFactura.detraccionMonto, datosFactura.moneda ?? facturarTarget.moneda)}
+                          {datosFactura.detraccionMontoPEN != null && (
+                            <span className="text-muted-foreground"> · depósito S/ {datosFactura.detraccionMontoPEN.toFixed(2)}</span>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                    {datosFactura.retencionMonto != null && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Retención {datosFactura.retencionPct ?? ''}%</span>
+                        <span className="font-mono">{formatCurrency(datosFactura.retencionMonto, datosFactura.moneda ?? facturarTarget.moneda)}</span>
+                      </div>
+                    )}
+                    <p className="text-muted-foreground pt-1">
+                      Se guardan en la Cuenta por Cobrar: al registrar el cobro ya no hay que volver a subir la factura.
+                    </p>
+                  </div>
+                )}
+
+                {/* El importe impreso manda sobre el calculado, pero solo si
+                    Administración lo decide — nunca en silencio. */}
+                {hayDifImporte && (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 space-y-2">
+                    <div className="flex items-start gap-1.5">
+                      <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                      <span>
+                        La factura dice {formatCurrency(datosFactura!.importeTotal!, facturarTarget.moneda)} y el Neto a Recibir calculado
+                        es {formatCurrency(facturarTarget.netoARecibir, facturarTarget.moneda)} — una diferencia
+                        de {formatCurrency(Math.abs(difImporte!), facturarTarget.moneda)}.
+                      </span>
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={usarImporteFactura} onChange={e => setUsarImporteFactura(e.target.checked)} />
+                      <span>Crear la CxC por el importe de la factura ({formatCurrency(datosFactura!.importeTotal!, facturarTarget.moneda)})</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
               <div>
                 <Label>N° Factura *</Label>
                 <Input placeholder="F001-00123" value={numFactura} onChange={e => setNumFactura(e.target.value)} />

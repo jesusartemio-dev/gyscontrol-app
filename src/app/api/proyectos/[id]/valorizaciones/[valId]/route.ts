@@ -246,6 +246,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           select: { clienteId: true },
         })
         if (proyecto) {
+          // El monto de la CxC sale del Neto a Recibir calculado en la
+          // valorización, salvo que se haya leído la factura y Administración
+          // haya elegido usar el importe impreso — el cliente paga lo que dice
+          // la factura, no lo que calculó la valorización.
+          const montoCxC = typeof body.montoFactura === 'number' && body.montoFactura > 0
+            ? body.montoFactura
+            : existing.netoARecibir
+
+          const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+
           await prisma.cuentaPorCobrar.create({
             data: {
               proyectoId,
@@ -253,10 +263,19 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
               valorizacionId: valId,
               numeroDocumento: body.numeroDocumento || null,
               descripcion: `Valorización ${existing.codigo}`,
-              monto: existing.netoARecibir,
+              monto: montoCxC,
               moneda: existing.moneda,
               tipoCambio: existing.tipoCambio,
-              saldoPendiente: existing.netoARecibir,
+              saldoPendiente: montoCxC,
+              // Descuentos de ley leídos de la factura al facturar, para que el
+              // cobro no tenga que volver a pedirlos. detraccionMonto va en la
+              // moneda de la factura; el importe en soles es solo el depósito.
+              detraccionPct: num(body.detraccionPct),
+              detraccionMonto: num(body.detraccionMonto),
+              detraccionMontoPEN: num(body.detraccionMontoPEN),
+              detraccionCodigo: body.detraccionCodigo || null,
+              retencionPct: num(body.retencionPct),
+              retencionMonto: num(body.retencionMonto),
               fechaEmision: body.fechaEmision ? new Date(body.fechaEmision) : new Date(),
               fechaVencimiento: body.fechaVencimiento
                 ? new Date(body.fechaVencimiento)
