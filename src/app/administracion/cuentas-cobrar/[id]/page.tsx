@@ -285,6 +285,9 @@ export default function CxCDetallePage() {
   const [cobroDias, setCobroDias]                       = useState('')
   const [cobroDetraccionPct, setCobroDetraccionPct]     = useState('12')
   const [cobroDetraccionMonto, setCobroDetraccionMonto] = useState('')
+  // Importe del depósito en el Banco de la Nación. Es un dato de la factura
+  // (se guarda en la CxC), no del cobro: no entra a ningún cálculo de acá.
+  const [cobroDetraccionMontoPEN, setCobroDetraccionMontoPEN] = useState('')
   // Retención — aplica a factoring y a cobro directo por igual: el % y monto
   // teórico se conocen de inmediato (vienen en la factura) y se descuentan
   // junto con la Detracción antes de calcular el resto — pero el Comprobante
@@ -401,6 +404,8 @@ export default function CxCDetallePage() {
       // esa es la foto de la liquidación que se cerró.
       setCobroDetraccionPct(data.detraccionPct != null ? String(data.detraccionPct) : '12')
       setCobroDetraccionMonto(data.detraccionMonto != null ? String(data.detraccionMonto) : '')
+      setCobroDetraccionMontoPEN(data.detraccionMontoPEN != null ? String(data.detraccionMontoPEN) : '')
+      setCobroDetraccionMontoPEN(data.detraccionMontoPEN != null ? String(data.detraccionMontoPEN) : '')
       setCobroRetencionPct(data.retencionPct != null ? String(data.retencionPct) : '')
       setCobroRetencionMonto(data.retencionMonto != null ? String(data.retencionMonto) : '')
 
@@ -616,6 +621,8 @@ export default function CxCDetallePage() {
         set(d.retencionPct, setCobroRetencionPct, 'Retención %')
         set(d.retencionMonto, setCobroRetencionMonto, 'Retención monto')
         if (d.detraccionMontoPEN != null) {
+          setCobroDetraccionMontoPEN(String(d.detraccionMontoPEN))
+          setCobroDetraccionMontoPEN(String(d.detraccionMontoPEN))
           setAlertaDoc(`La detracción se deposita en el Banco de la Nación por S/ ${d.detraccionMontoPEN.toFixed(2)}. En la liquidación se cargó el importe en ${cxc.moneda} (${formatCurrency(d.detraccionMonto ?? 0, cxc.moneda)}), que es lo que descuenta la factura.`)
         }
       } else if (extraccion.tipo === 'liquidacion_factoring') {
@@ -835,6 +842,7 @@ export default function CxCDetallePage() {
         body.diasFinanciamiento  = cobroDias ? parseInt(cobroDias) : null
         body.detraccionPct       = cobroDetraccionPct ? parseFloat(cobroDetraccionPct) : null
         body.detraccionMonto     = liq.detMonto
+        body.detraccionMontoPEN  = cobroDetraccionMontoPEN ? parseFloat(cobroDetraccionMontoPEN) : null
         body.retencionPct        = cobroRetencionPct ? parseFloat(cobroRetencionPct) : null
         body.retencionMonto      = liq.retMonto
         body.excedentePct        = cobroExcedentePct ? parseFloat(cobroExcedentePct) : null
@@ -853,6 +861,7 @@ export default function CxCDetallePage() {
         body.fechaDesembolso     = cobroFechaDesembolso || null
         body.detraccionPct       = cobroDetraccionPct ? parseFloat(cobroDetraccionPct) : null
         body.detraccionMonto     = liqDirecto.detMonto
+        body.detraccionMontoPEN  = cobroDetraccionMontoPEN ? parseFloat(cobroDetraccionMontoPEN) : null
         body.retencionPct        = cobroRetencionPct ? parseFloat(cobroRetencionPct) : null
         body.retencionMonto      = liqDirecto.retMonto
         body.montoNetoDirecto    = n(cobroMontoNetoDirecto) || liqDirecto.neto
@@ -1444,9 +1453,33 @@ export default function CxCDetallePage() {
                                 <td className="px-3 py-2 w-40"></td>
                               </tr>
                               <tr className="border-b bg-gray-50">
-                                <td className="px-3 py-2 text-muted-foreground">Detracción</td>
-                                <td className="px-3 py-2 text-right text-red-600">− {formatCurrency(liq.detMonto, cxc.moneda)}</td>
-                                <td className="px-3 py-2">
+                                <td className="px-3 py-2 text-muted-foreground align-top">
+                                  Detracción
+                                  {/* La detracción se deposita en soles en el Banco de la
+                                      Nación aunque la factura sea en otra moneda. Es un dato
+                                      del depósito: no entra al cálculo de arriba. */}
+                                  {cxc.moneda !== 'PEN' && (
+                                    <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                                      <span>Depósito BN</span>
+                                      <span>S/</span>
+                                      <Input
+                                        className="h-6 text-xs w-24"
+                                        type="number"
+                                        placeholder={liq.detMonto > 0 && cxc.tipoCambio ? (liq.detMonto * cxc.tipoCambio).toFixed(2) : '0.00'}
+                                        value={cobroDetraccionMontoPEN}
+                                        onChange={e => setCobroDetraccionMontoPEN(e.target.value)}
+                                      />
+                                      {cxc.tipoCambio ? <span>· TC {cxc.tipoCambio}</span> : null}
+                                    </div>
+                                  )}
+                                  {cxc.moneda !== 'PEN' && !cobroDetraccionMontoPEN && liq.detMonto > 0 && cxc.tipoCambio ? (
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                      Al TC de la CxC serían ≈ S/ {(liq.detMonto * cxc.tipoCambio).toFixed(2)} — pon el importe exacto que dice la factura.
+                                    </p>
+                                  ) : null}
+                                </td>
+                                <td className="px-3 py-2 text-right text-red-600 align-top">− {formatCurrency(liq.detMonto, cxc.moneda)}</td>
+                                <td className="px-3 py-2 align-top">
                                   <div className="flex gap-1">
                                     <Input className="h-7 text-xs w-16" type="number" placeholder="%" value={cobroDetraccionPct} onChange={e => setCobroDetraccionPct(e.target.value)} />
                                     <Input className="h-7 text-xs" type="number" placeholder="Monto" value={cobroDetraccionMonto} onChange={e => setCobroDetraccionMonto(e.target.value)} />

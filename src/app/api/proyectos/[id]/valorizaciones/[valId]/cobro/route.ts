@@ -23,6 +23,10 @@ const CobroSchema = z.object({
   // Factoring — liquidación
   detraccionPct: z.number().min(0).max(100).optional().nullable(),
   detraccionMonto: z.number().min(0).optional().nullable(),
+  // Importe del depósito en el Banco de la Nación, cuando la factura no es en
+  // soles. No entra al cálculo del cobro: se guarda en la CxC, junto al resto
+  // de datos de la factura.
+  detraccionMontoPEN: z.number().min(0).optional().nullable(),
   // Retención — aplica a factoring y a directo (mismo campo). El N° de
   // comprobante se captura al confirmar el evento (Marcar recibido), no acá.
   retencionPct: z.number().min(0).max(100).optional().nullable(),
@@ -132,6 +136,21 @@ export async function POST(request: NextRequest, { params }: Ctx) {
         update: payload,
         include: { abonos: true },
       })
+
+      // Detracción y retención son datos de LA FACTURA, no del cobro: se
+      // reflejan también en la CxC para que las dos no digan cosas distintas
+      // sobre el mismo documento. Solo se tocan los campos que vinieron en el
+      // request — así un guardado que no los incluye no los borra.
+      const datosFactura: Record<string, number | null> = {}
+      for (const campo of ['detraccionPct', 'detraccionMonto', 'detraccionMontoPEN', 'retencionPct', 'retencionMonto'] as const) {
+        if (data[campo] !== undefined) datosFactura[campo] = data[campo] ?? null
+      }
+      if (Object.keys(datosFactura).length > 0) {
+        await tx.cuentaPorCobrar.updateMany({
+          where: { valorizacionId: valId },
+          data: { ...datosFactura, updatedAt: new Date() },
+        })
+      }
 
       const esNuevoRegistro =
         existente?.fechaDesembolso == null &&
