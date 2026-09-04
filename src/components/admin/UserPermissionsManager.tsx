@@ -109,6 +109,7 @@ const roleDisplayMap: Record<RolUsuario, { label: string; color: string }> = {
   colaborador: { label: 'Colaborador', color: 'bg-gray-100 text-gray-800' },
   administracion: { label: 'Administración', color: 'bg-rose-100 text-rose-800' },
   terceros: { label: 'Tercero', color: 'bg-cyan-100 text-cyan-800' },
+  rrhh: { label: 'RRHH', color: 'bg-fuchsia-100 text-fuchsia-800' },
 };
 
 // Variantes de animación
@@ -212,7 +213,7 @@ const SIDEBAR_ACCESS_MAP: SidebarAccessSection[] = [
     title: 'RRHH',
     icon: UserCheck,
     color: 'text-pink-500',
-    roles: ['admin', 'gerente', 'administracion'],
+    roles: ['admin', 'gerente', 'administracion', 'rrhh'],
     links: [
       { label: 'Dashboard Asistencia', href: '/rrhh/asistencia/dashboard' },
       { label: 'Reporte de Asistencia', href: '/rrhh/asistencia' },
@@ -310,7 +311,7 @@ const SIDEBAR_ACCESS_MAP: SidebarAccessSection[] = [
 
 const ALL_ROLES_ORDERED: RolUsuario[] = [
   'admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'proyectos',
-  'seguridad', 'comercial', 'presupuestos', 'logistico', 'administracion', 'colaborador', 'terceros',
+  'seguridad', 'comercial', 'presupuestos', 'logistico', 'administracion', 'rrhh', 'colaborador', 'terceros',
 ];
 
 function AccessMapTab({ usuarios }: { usuarios: UsuarioModel[] }) {

@@ -4209,6 +4209,10 @@ enum Role {
   // jornadas de campo. Distinto de Empleado.tipoPersonal='tercero' (que
   // decide cómo se costea la hora) — este es el rol de acceso al sistema.
   terceros
+  // Rol RRHH independiente: personal y asistencia (sección 'rrhh'), sin las
+  // secciones financieras de `administracion` (Cuentas por Cobrar/Pagar,
+  // Facturación). Se asigna solo o como rolesExtra junto a otro rol principal.
+  rrhh
 }
 
 enum TipoDependencia {

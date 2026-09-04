@@ -1,21 +1,24 @@
-import { tieneRol } from '@/lib/auth/roles'
+import { tieneRol, rolesDe } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getUserIdsDeMiEquipo } from '@/lib/services/equipoSupervision'
 
-// Este endpoint alimenta exclusivamente las vistas nominales de RRHH
-// (Detalle/Resumen/Horas por día/Ranking en /rrhh/asistencia): trae
-// GPS, minutosTarde y dispositivo de cada marcaje de TODA la empresa, sin
-// scope por equipo. 'coordinador'/'gestor'/'proyectos' ya no tienen ninguna
-// vista visible que dependa de él (su única pestaña, "Por Proyecto", usa
-// /api/asistencia/por-proyecto, que no expone estos datos) — por eso no
-// están en este allowlist.
+// Vistas nominales de RRHH (Detalle/Resumen/Horas por día/Ranking en
+// /rrhh/asistencia): sin scope, ven GPS/tardanza/dispositivo de toda la
+// empresa.
 const ROLES_VIEW = ['admin', 'gerente', 'administracion']
+// Vista "Detalle"/"Resumen" en /supervision/asistencia: coordinador/gestor
+// solo ven a su propio equipo (ver getUserIdsDeMiEquipo) — el scope se
+// aplica más abajo forzando `where.userId`.
+const ROLES_VIEW_EQUIPO = ['coordinador', 'gestor']
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)
-  if (!session || !tieneRol(session, ROLES_VIEW)) {
+  const accesoTotal = tieneRol(session, ROLES_VIEW)
+  const accesoEquipo = tieneRol(session, ROLES_VIEW_EQUIPO)
+  if (!session || (!accesoTotal && !accesoEquipo)) {
     return NextResponse.json({ message: 'No autorizado' }, { status: 403 })
   }
 
@@ -59,6 +62,17 @@ export async function GET(req: Request) {
       { empleado: { departamento: { nombre: { contains: q, mode: 'insensitive' } } } },
       { ubicacion: { nombre: { contains: q, mode: 'insensitive' } } },
     ]
+  }
+
+  // Sin acceso total: acotar a la gente del propio equipo, sin importar lo
+  // que haya pedido `userId` — si pidió a alguien fuera de su equipo, no ve
+  // nada (mejor vacío que filtrar silenciosamente distinto a lo pedido).
+  if (!accesoTotal) {
+    const equipoIds = await getUserIdsDeMiEquipo(session.user.id, rolesDe(session))
+    if (userId && !equipoIds.includes(userId)) {
+      return NextResponse.json({ data: [], total: 0, truncated: false })
+    }
+    where.userId = userId ?? { in: equipoIds }
   }
 
   const TAKE = 1000

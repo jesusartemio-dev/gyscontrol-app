@@ -87,6 +87,7 @@ const roles: RolUsuario[] = [
   'administracion',
   'colaborador',
   'terceros',
+  'rrhh',
 ]
 
 // Zod Schema
@@ -186,6 +187,12 @@ const roleDisplayMap: Record<RolUsuario, { label: string; color: string; bgColor
     bgColor: 'bg-teal-50 border-teal-200',
     description: 'Personal eventual: solo marcaje de asistencia y jornadas'
   },
+  rrhh: {
+    label: 'RRHH',
+    color: 'text-fuchsia-700',
+    bgColor: 'bg-fuchsia-50 border-fuchsia-200',
+    description: 'Personal y asistencia — sin las secciones financieras de Administración'
+  },
 }
 
 // Helper para obtener iniciales
@@ -214,6 +221,7 @@ function getAvatarColor(role: RolUsuario): string {
     administracion: 'bg-rose-500',
     colaborador: 'bg-gray-500',
     terceros: 'bg-cyan-500',
+    rrhh: 'bg-fuchsia-500',
   }
   return colors[role] || 'bg-gray-500'
 }

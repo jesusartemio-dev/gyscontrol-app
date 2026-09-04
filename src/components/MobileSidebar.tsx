@@ -291,7 +291,7 @@ export default function MobileSidebar() {
       title: 'RRHH',
       icon: UserCheck,
       color: 'text-pink-400',
-      roles: ['admin', 'gerente', 'administracion'],
+      roles: ['admin', 'gerente', 'administracion', 'rrhh'],
       links: [
         { href: '/rrhh/asistencia/dashboard', label: 'Dashboard Asistencia', icon: BarChart3 },
         { href: '/rrhh/asistencia', label: 'Reporte de Asistencia', icon: ClipboardList },

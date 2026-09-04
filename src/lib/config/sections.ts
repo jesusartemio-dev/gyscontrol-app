@@ -53,6 +53,7 @@ export const ALL_ROLES = [
   'administracion',
   'colaborador',
   'terceros',
+  'rrhh',
 ] as const
 
 export type RoleKey = (typeof ALL_ROLES)[number]
@@ -74,6 +75,11 @@ export const DEFAULT_ROLE_SECTIONS: Record<RoleKey, SectionKey[]> = {
   // Personal eventual: solo marcaje de asistencia. Sin `gastos` — no
   // registran requerimientos, sus pagos van por la liquidación de terceros.
   terceros: ['mi-trabajo'],
+  // Rol RRHH independiente: personal y asistencia, sin las secciones
+  // financieras que sí tiene `administracion` (Cuentas por Cobrar/Pagar,
+  // Facturación). Pensado para asignarse como rolesExtra junto a otro rol
+  // principal (multi-rol), igual que ya se hace con Heber Conza.
+  rrhh: ['mi-trabajo', 'gastos', 'rrhh'],
 }
 
 // Mapeo de prefijos de ruta a sectionKey (para middleware)

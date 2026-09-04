@@ -31,6 +31,7 @@ export type RolUsuario =
   | 'administracion'
   | 'admin'
   | 'terceros'
+  | 'rrhh'
 
 // ✅ Tipos para el sistema de notificaciones del sidebar
 export type NotificationBadgeType =
