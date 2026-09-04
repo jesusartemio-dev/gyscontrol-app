@@ -69,13 +69,16 @@ const roles: RolUsuario[] = [
   'gerente',
   'gestor',
   'coordinador',
+  'coordinador_logistico',
   'proyectos',
   'comercial',
   'presupuestos',
   'logistico',
   'seguridad',
   'administracion',
+  'rrhh',
   'colaborador',
+  'terceros',
 ];
 
 // Schema de validación para usuarios
@@ -85,6 +88,7 @@ export const userSchema = z.object({
   name: z.string().min(2, { message: 'Nombre debe tener al menos 2 caracteres' }),
   password: z.string().min(4, { message: 'La contraseña debe tener al menos 4 caracteres' }).optional(),
   role: z.enum(roles as [RolUsuario, ...RolUsuario[]], { required_error: 'Elige un rol' }),
+  rolesExtra: z.array(z.enum(roles as [RolUsuario, ...RolUsuario[]])).optional(),
 }).refine(data => {
   if (!data.id && !data.password) return false;
   if (data.id && data.password && data.password.length < 4) return false;
@@ -657,6 +661,7 @@ export default function UserPermissionsManager({ className }: UserPermissionsMan
     name: '',
     password: '',
     role: 'comercial' as RolUsuario,
+    rolesExtra: [] as RolUsuario[],
   });
 
   // Estados del formulario de permisos
@@ -715,16 +720,33 @@ export default function UserPermissionsManager({ className }: UserPermissionsMan
   };
 
   const handleUserChange = (name: string, value: string) => {
-    setUserForm({ ...userForm, [name]: value });
+    setUserForm(prev => ({
+      ...prev,
+      [name]: value,
+      // Si el nuevo rol principal ya estaba marcado como adicional, sácalo
+      // de ahí — no tiene sentido repetirlo.
+      ...(name === 'role' ? { rolesExtra: prev.rolesExtra.filter(r => r !== value) } : {}),
+    }));
     if (formErrors[name]) {
       setFormErrors({ ...formErrors, [name]: '' });
     }
   };
 
   const resetUserForm = () => {
-    setUserForm({ id: '', email: '', name: '', password: '', role: 'comercial' });
+    setUserForm({ id: '', email: '', name: '', password: '', role: 'comercial', rolesExtra: [] });
     setError('');
     setFormErrors({});
+  };
+
+  // Marca/desmarca un rol adicional. Si coincide con el rol principal
+  // recién elegido, lo saca de la lista (no tiene sentido repetirlo).
+  const toggleRolExtra = (rol: RolUsuario) => {
+    setUserForm(prev => ({
+      ...prev,
+      rolesExtra: prev.rolesExtra.includes(rol)
+        ? prev.rolesExtra.filter(r => r !== rol)
+        : [...prev.rolesExtra, rol],
+    }));
   };
 
   const handleUserSubmit = async (e: React.FormEvent) => {
@@ -813,6 +835,7 @@ export default function UserPermissionsManager({ className }: UserPermissionsMan
       name: usuario.name || '',
       password: '',
       role: usuario.role || 'comercial',
+      rolesExtra: usuario.rolesExtra ?? [],
     });
     setError('');
     setFormErrors({});
@@ -1266,6 +1289,46 @@ export default function UserPermissionsManager({ className }: UserPermissionsMan
                         )}
                       </div>
 
+                      {/* Roles adicionales — los permisos son la unión con el rol principal */}
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Shield className="h-4 w-4" />
+                          Roles adicionales
+                          <span className="text-xs font-normal text-gray-500">(opcional)</span>
+                        </Label>
+                        <div className="grid grid-cols-2 gap-1.5 rounded-md border p-2.5 max-h-52 overflow-y-auto">
+                          {roles
+                            .filter((rol) => rol !== userForm.role)
+                            .map((rol) => {
+                              const activo = userForm.rolesExtra.includes(rol);
+                              return (
+                                <button
+                                  key={rol}
+                                  type="button"
+                                  onClick={() => toggleRolExtra(rol)}
+                                  aria-pressed={activo}
+                                  className={`flex items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors ${
+                                    activo
+                                      ? 'bg-blue-50 ring-1 ring-blue-300 font-medium'
+                                      : 'hover:bg-gray-50'
+                                  }`}
+                                >
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-[10px] px-1.5 ${roleDisplayMap[rol]?.color || 'bg-gray-100 text-gray-800'}`}
+                                  >
+                                    {roleDisplayMap[rol]?.label || rol}
+                                  </Badge>
+                                </button>
+                              );
+                            })}
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          El usuario tendrá los permisos del rol principal <strong>más</strong> los de
+                          cada rol que marques aquí. Deja vacío para un solo rol.
+                        </p>
+                      </div>
+
                       {/* Error Alert */}
                       {error && (
                         <Alert variant="destructive">
@@ -1371,12 +1434,23 @@ export default function UserPermissionsManager({ className }: UserPermissionsMan
                             </div>
 
                             <div className="flex items-center gap-3">
-                              <Badge
-                                variant="outline"
-                                className={roleDisplayMap[usuario.role]?.color || 'bg-gray-100 text-gray-800'}
-                              >
-                                {roleDisplayMap[usuario.role]?.label || usuario.role}
-                              </Badge>
+                              <div className="flex flex-wrap items-center gap-1">
+                                <Badge
+                                  variant="outline"
+                                  className={roleDisplayMap[usuario.role]?.color || 'bg-gray-100 text-gray-800'}
+                                >
+                                  {roleDisplayMap[usuario.role]?.label || usuario.role}
+                                </Badge>
+                                {(usuario.rolesExtra ?? []).map((rol) => (
+                                  <Badge
+                                    key={rol}
+                                    variant="outline"
+                                    className={`text-[10px] ${roleDisplayMap[rol]?.color || 'bg-gray-100 text-gray-800'}`}
+                                  >
+                                    +{roleDisplayMap[rol]?.label || rol}
+                                  </Badge>
+                                ))}
+                              </div>
 
                               <div className="flex gap-1">
                                 <Button
