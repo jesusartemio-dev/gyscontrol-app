@@ -124,6 +124,7 @@ export default function MobileSidebar() {
     documentos: false,
     'mi-trabajo': false,
     supervision: false,
+    rrhh: false,
     logistica: false,
     aprovisionamiento: false,
     finanzas: false,
@@ -266,7 +267,7 @@ export default function MobileSidebar() {
           icon: ClipboardList,
           submenu: [
             { href: '/mi-trabajo/asistencia-campo', label: 'QR del Día', icon: QrCode },
-            { href: '/supervision/asistencia', label: 'Asistencia del Equipo', icon: ClipboardList },
+            { href: '/supervision/asistencia', label: 'Asistencia por Proyecto', icon: ClipboardList },
             { href: '/supervision/asistencia/dispositivos', label: 'Aprobar Dispositivos', icon: ClipboardList },
             { href: '/supervision/solicitudes-remoto', label: 'Solicitudes Remoto', icon: Home, badge: 'solicitudes-remoto-pendientes' as NotificationBadgeType },
           ],
@@ -284,6 +285,22 @@ export default function MobileSidebar() {
         { href: '/supervision/resumen', label: 'Resumen Proyectos', icon: BarChart3 },
         { href: '/supervision/analisis-edt', label: 'Análisis EDT', icon: Target },
       ]
+    },
+    {
+      key: 'rrhh',
+      title: 'RRHH',
+      icon: UserCheck,
+      color: 'text-pink-400',
+      roles: ['admin', 'gerente', 'administracion'],
+      links: [
+        { href: '/rrhh/asistencia/dashboard', label: 'Dashboard Asistencia', icon: BarChart3 },
+        { href: '/rrhh/asistencia', label: 'Reporte de Asistencia', icon: ClipboardList },
+        { href: '/rrhh/personal', label: 'Personal', icon: UserCheck },
+        { href: '/rrhh/cargos', label: 'Cargos', icon: Briefcase },
+        { href: '/rrhh/departamentos', label: 'Departamentos', icon: Building2 },
+        { href: '/rrhh/saldos-ausencia', label: 'Saldos de Ausencia', icon: CalendarOff },
+        { href: '/rrhh/tipos-ausencia', label: 'Tipos de Ausencia', icon: CalendarOff },
+      ],
     },
     {
       key: 'logistica',
@@ -382,7 +399,6 @@ export default function MobileSidebar() {
         { href: '/administracion/compras-mes', label: 'Compras del Mes', icon: ShoppingCart },
         { href: '/administracion/cuentas-bancarias', label: 'Cuentas Bancarias', icon: Landmark },
         { href: '/administracion/proyectos-internos', label: 'Proyectos Internos', icon: Building2 },
-        { href: '/administracion/saldos-ausencia', label: 'Saldos de Ausencia', icon: CalendarOff },
       ],
     },
     {
@@ -429,9 +445,6 @@ export default function MobileSidebar() {
         { href: '/catalogo/unidades-servicio', label: 'Unidades Servicio', icon: Calculator },
         { href: '/catalogo/recursos', label: 'Recursos HH', icon: Wrench },
         { href: '/catalogo/imagenes', label: 'Biblioteca de Imágenes', icon: Images },
-        { href: '/admin/personal', label: 'Personal (RRHH)', icon: UserCheck },
-        { href: '/configuracion/cargos', label: 'Cargos', icon: Briefcase },
-        { href: '/configuracion/departamentos', label: 'Departamentos', icon: Building2 },
         {
           href: '#asistencia-configuracion',
           label: 'Asistencia',
@@ -440,7 +453,6 @@ export default function MobileSidebar() {
             { href: '/admin/asistencia/ubicaciones', label: 'Ubicaciones', icon: MapPin },
             { href: '/admin/asistencia/sedes-remotas', label: 'Sedes Remotas', icon: Home },
             { href: '/admin/asistencia/modalidades', label: 'Modalidades de Trabajo', icon: Home },
-            { href: '/admin/asistencia/dashboard', label: 'Dashboard', icon: BarChart3 },
           ],
         },
         { href: '/catalogo/exclusiones', label: 'Exclusiones', icon: FileText },
@@ -455,7 +467,6 @@ export default function MobileSidebar() {
         { href: '/configuracion/centros-costo', label: 'Centros de Costo', icon: CreditCard },
         { href: '/configuracion/tarifas-campo', label: 'Tarifas de Campo', icon: DollarSign },
         { href: '/configuracion/catalogo-columnas', label: 'Vistas Catálogo', icon: Wrench },
-        { href: '/configuracion/tipos-ausencia', label: 'Tipos de Ausencia', icon: CalendarOff },
         { href: '/admin/uso-ia', label: 'Uso IA', icon: Sparkles },
       ],
     },

@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-const ROLES_ADMIN = ['admin', 'gerente', 'coordinador_rrhh']
+const ROLES_ADMIN = ['admin', 'gerente']
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)

@@ -4,7 +4,10 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-const ROLES_VIEW = ['admin', 'gerente', 'coordinador', 'gestor', 'proyectos', 'administracion']
+// Alerta nominal de toda la empresa (>50% del mes en visita externa) que
+// alimenta un banner de cumplimiento en /rrhh/asistencia: es de RRHH,
+// no tiene scope por equipo. coordinador/gestor/proyectos no ven ese banner.
+const ROLES_VIEW = ['admin', 'gerente', 'administracion']
 
 const UMBRAL_ALERTA = 0.5
 

@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
           severity: ausentes.length > 5 ? 'error' : 'warning',
           title: `Reporte diario de asistencia: ${ausentes.length} sin marcaje, ${tardanzas.length} tardanzas`,
           message: detalles,
-          route: '/admin/asistencia/dashboard',
+          route: '/rrhh/asistencia/dashboard',
           metadata: { ausentes: ausentes.length, tardanzas: tardanzas.length, totalMinTarde },
           timestamp: Date.now(),
         }])

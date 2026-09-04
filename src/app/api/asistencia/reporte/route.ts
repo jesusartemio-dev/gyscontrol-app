@@ -4,7 +4,14 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-const ROLES_VIEW = ['admin', 'gerente', 'coordinador', 'gestor', 'proyectos', 'administracion']
+// Este endpoint alimenta exclusivamente las vistas nominales de RRHH
+// (Detalle/Resumen/Horas por día/Ranking en /rrhh/asistencia): trae
+// GPS, minutosTarde y dispositivo de cada marcaje de TODA la empresa, sin
+// scope por equipo. 'coordinador'/'gestor'/'proyectos' ya no tienen ninguna
+// vista visible que dependa de él (su única pestaña, "Por Proyecto", usa
+// /api/asistencia/por-proyecto, que no expone estos datos) — por eso no
+// están en este allowlist.
+const ROLES_VIEW = ['admin', 'gerente', 'administracion']
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions)

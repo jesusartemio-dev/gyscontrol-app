@@ -272,7 +272,7 @@ export function PagoTercerosModal({ open, onOpenChange, onCreated }: PagoTercero
             {personasSinTarifa > 0 && (
               <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                {personasSinTarifa} persona{personasSinTarifa !== 1 && 's'} sin tarifa/día cargada en /admin/personal — su monto sale en 0, cárgalo a mano o edítalo ahí primero.
+                {personasSinTarifa} persona{personasSinTarifa !== 1 && 's'} sin tarifa/día cargada en /rrhh/personal — su monto sale en 0, cárgalo a mano o edítalo ahí primero.
               </div>
             )}
             {diasConProblema > 0 && (

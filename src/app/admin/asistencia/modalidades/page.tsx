@@ -164,7 +164,7 @@ export default function ModalidadesPage() {
               )}
             </button>
             <Link
-              href="/admin/personal"
+              href="/rrhh/personal"
               className="shrink-0 text-sm font-medium text-amber-700 underline hover:text-amber-900"
             >
               Ir a Personal (RRHH) →
@@ -197,7 +197,7 @@ export default function ModalidadesPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <Link
-                          href="/admin/personal"
+                          href="/rrhh/personal"
                           className="inline-flex items-center gap-1 text-xs text-amber-700 underline hover:text-amber-900"
                         >
                           <UserPlus className="h-3 w-3" /> Crear ficha

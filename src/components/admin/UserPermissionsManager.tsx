@@ -41,7 +41,8 @@ import {
   PackageCheck,
   BarChart3,
   Receipt,
-  CreditCard
+  CreditCard,
+  UserCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -207,6 +208,22 @@ const SIDEBAR_ACCESS_MAP: SidebarAccessSection[] = [
     ],
   },
   {
+    key: 'rrhh',
+    title: 'RRHH',
+    icon: UserCheck,
+    color: 'text-pink-500',
+    roles: ['admin', 'gerente', 'administracion'],
+    links: [
+      { label: 'Dashboard Asistencia', href: '/rrhh/asistencia/dashboard' },
+      { label: 'Reporte de Asistencia', href: '/rrhh/asistencia' },
+      { label: 'Personal', href: '/rrhh/personal' },
+      { label: 'Cargos', href: '/rrhh/cargos' },
+      { label: 'Departamentos', href: '/rrhh/departamentos' },
+      { label: 'Saldos de Ausencia', href: '/rrhh/saldos-ausencia' },
+      { label: 'Tipos de Ausencia', href: '/rrhh/tipos-ausencia' },
+    ],
+  },
+  {
     key: 'logistica',
     title: 'Logística',
     icon: Truck,
@@ -287,13 +304,12 @@ const SIDEBAR_ACCESS_MAP: SidebarAccessSection[] = [
       { label: 'Notificaciones', href: '/configuracion/notificaciones' },
       { label: 'Catálogos', href: '/catalogo/equipos' },
       { label: 'Centros de Costo', href: '/configuracion/centros-costo' },
-      { label: 'Personal (RRHH)', href: '/admin/personal' },
     ],
   },
 ];
 
 const ALL_ROLES_ORDERED: RolUsuario[] = [
-  'admin', 'gerente', 'gestor', 'coordinador', 'proyectos',
+  'admin', 'gerente', 'gestor', 'coordinador', 'coordinador_logistico', 'proyectos',
   'seguridad', 'comercial', 'presupuestos', 'logistico', 'administracion', 'colaborador', 'terceros',
 ];
 

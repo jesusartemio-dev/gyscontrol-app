@@ -31,7 +31,7 @@ export async function PATCH(
   if (!jornada) return NextResponse.json({ error: 'Jornada no encontrada' }, { status: 404 })
 
   // Solo el supervisor dueño o un admin pueden editar
-  const esAdmin = tieneRol(session, ['admin', 'gerente', 'coordinador_rrhh'])
+  const esAdmin = tieneRol(session, ['admin', 'gerente'])
   if (jornada.supervisorId !== session.user.id && !esAdmin) {
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
   }

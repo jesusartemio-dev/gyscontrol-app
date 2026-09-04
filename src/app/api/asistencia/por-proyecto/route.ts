@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { resolverColorProyecto } from '@/lib/utils/planificacion'
+import { tieneRol } from '@/lib/auth/roles'
+
+const ROLES_VIEW = ['admin', 'gerente', 'coordinador', 'gestor', 'proyectos', 'administracion']
 
 /**
  * GET /api/asistencia/por-proyecto
@@ -14,6 +17,9 @@ export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    if (!tieneRol(session, ROLES_VIEW)) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    }
 
     const sp = req.nextUrl.searchParams
     const desdeStr = sp.get('desde')

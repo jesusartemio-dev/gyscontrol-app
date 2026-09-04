@@ -10,6 +10,7 @@ export const SECTION_KEYS = [
   'documentos',
   'mi-trabajo',
   'supervision',
+  'rrhh',
   'logistica',
   'aprovisionamiento',
   'gastos',
@@ -28,6 +29,7 @@ export const SECTION_LABELS: Record<SectionKey, string> = {
   documentos: 'Documentos',
   'mi-trabajo': 'Mi Trabajo',
   supervision: 'Supervisión',
+  rrhh: 'RRHH',
   logistica: 'Logística',
   aprovisionamiento: 'Aprovisionamiento',
   gastos: 'Gastos',
@@ -57,8 +59,8 @@ export type RoleKey = (typeof ALL_ROLES)[number]
 
 // Mapeo por defecto (fallback) basado en la config hardcodeada actual del Sidebar
 export const DEFAULT_ROLE_SECTIONS: Record<RoleKey, SectionKey[]> = {
-  admin: ['comercial', 'crm', 'proyectos', 'documentos', 'mi-trabajo', 'supervision', 'logistica', 'aprovisionamiento', 'gastos', 'seguridad', 'administracion', 'gestion', 'configuracion'],
-  gerente: ['comercial', 'crm', 'proyectos', 'documentos', 'mi-trabajo', 'supervision', 'logistica', 'aprovisionamiento', 'gastos', 'seguridad', 'administracion', 'gestion', 'configuracion'],
+  admin: ['comercial', 'crm', 'proyectos', 'documentos', 'mi-trabajo', 'supervision', 'rrhh', 'logistica', 'aprovisionamiento', 'gastos', 'seguridad', 'administracion', 'gestion', 'configuracion'],
+  gerente: ['comercial', 'crm', 'proyectos', 'documentos', 'mi-trabajo', 'supervision', 'rrhh', 'logistica', 'aprovisionamiento', 'gastos', 'seguridad', 'administracion', 'gestion', 'configuracion'],
   gestor: ['proyectos', 'documentos', 'mi-trabajo', 'supervision', 'logistica', 'aprovisionamiento', 'gastos', 'seguridad', 'gestion'],
   coordinador: ['proyectos', 'documentos', 'mi-trabajo', 'supervision', 'gastos'],
   coordinador_logistico: ['logistica', 'documentos', 'mi-trabajo', 'supervision', 'gastos'],
@@ -67,7 +69,7 @@ export const DEFAULT_ROLE_SECTIONS: Record<RoleKey, SectionKey[]> = {
   comercial: ['comercial', 'crm', 'documentos', 'mi-trabajo'],
   presupuestos: ['comercial', 'mi-trabajo'],
   logistico: ['logistica', 'documentos', 'mi-trabajo', 'gastos'],
-  administracion: ['mi-trabajo', 'gastos', 'administracion', 'gestion'],
+  administracion: ['mi-trabajo', 'gastos', 'administracion', 'gestion', 'rrhh'],
   colaborador: ['mi-trabajo', 'gastos'],
   // Personal eventual: solo marcaje de asistencia. Sin `gastos` — no
   // registran requerimientos, sus pagos van por la liquidación de terceros.
@@ -82,6 +84,7 @@ export const ROUTE_TO_SECTION: Record<string, SectionKey> = {
   '/documentos': 'documentos',
   '/mi-trabajo': 'mi-trabajo',
   '/supervision': 'supervision',
+  '/rrhh': 'rrhh',
   '/logistica': 'logistica',
   '/finanzas/aprovisionamiento': 'aprovisionamiento',
   '/gastos': 'gastos',

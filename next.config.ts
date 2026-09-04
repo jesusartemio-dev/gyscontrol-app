@@ -281,6 +281,40 @@ const nextConfig: NextConfig = {
         destination: '/supervision/tareas',
         permanent: true,
       },
+
+      // 🔄 Redirects: reorganizacion de RRHH (Fase 2 seccion RRHH)
+      // /supervision/asistencia NO se redirige: esa URL sigue viva, solo
+      // sirve la vista "Por Proyecto" ahora (ver src/app/supervision/asistencia).
+      {
+        source: '/admin/asistencia/dashboard',
+        destination: '/rrhh/asistencia/dashboard',
+        permanent: true,
+      },
+      {
+        source: '/admin/personal',
+        destination: '/rrhh/personal',
+        permanent: true,
+      },
+      {
+        source: '/configuracion/cargos',
+        destination: '/rrhh/cargos',
+        permanent: true,
+      },
+      {
+        source: '/configuracion/departamentos',
+        destination: '/rrhh/departamentos',
+        permanent: true,
+      },
+      {
+        source: '/configuracion/tipos-ausencia',
+        destination: '/rrhh/tipos-ausencia',
+        permanent: true,
+      },
+      {
+        source: '/administracion/saldos-ausencia',
+        destination: '/rrhh/saldos-ausencia',
+        permanent: true,
+      },
     ];
   },
   

@@ -2,7 +2,7 @@
 //
 // Suma calcularCostosLaborales(empleado).totalMensual sobre los empleados
 // activos. No es una fuente de datos nueva: reutiliza la misma fórmula ya
-// usada en /admin/personal y en costoHoraSnapshot.ts (el "costo-empresa
+// usada en /rrhh/personal y en costoHoraSnapshot.ts (el "costo-empresa
 // completo" ya existía, solo nunca se sumó como KPI de empresa).
 //
 // El hueco de datos (empleados activos sin sueldoPlanilla) se reporta

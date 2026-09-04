@@ -4,7 +4,10 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-const ROLES_VIEW = ['admin', 'gerente', 'coordinador', 'gestor', 'proyectos', 'administracion']
+// Solo lo consume la vista "Sesiones" de /rrhh/asistencia, que es de
+// RRHH (borra jornadas de cualquier persona de la empresa). No la usan
+// coordinador/gestor/proyectos, cuya única vista visible ahí es "Por Proyecto".
+const ROLES_VIEW = ['admin', 'gerente', 'administracion']
 
 // GET /api/asistencia/jornada/todas?desde=YYYY-MM-DD&hasta=YYYY-MM-DD
 // Lista TODAS las asistencias de campo (sesiones de QR) para supervisión.
