@@ -315,6 +315,15 @@ const nextConfig: NextConfig = {
         destination: '/rrhh/saldos-ausencia',
         permanent: true,
       },
+
+      // 🔄 Redirect: /admin/permisos se unificó dentro de /admin/usuarios
+      // (pestaña "Mapa de Acceso") — la pestaña "Permisos" que tenía no
+      // hacía nada real, no está enforced en ningún lado de la app.
+      {
+        source: '/admin/permisos',
+        destination: '/admin/usuarios',
+        permanent: true,
+      },
     ];
   },
   

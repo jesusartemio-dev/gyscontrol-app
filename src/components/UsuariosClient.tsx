@@ -56,8 +56,10 @@ import {
 } from '@/components/ui/table'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn, normalizeStr } from '@/lib/utils'
 import type { RolUsuario } from '@/types/modelos'
+import AccessMapTab from '@/components/admin/AccessMapTab'
 
 // Extended user type with auth info from API
 interface UsuarioModel {
@@ -73,7 +75,7 @@ interface UsuarioModel {
 import { buildApiUrl } from '@/lib/utils'
 
 // Lista centralizada de roles
-const roles: RolUsuario[] = [
+export const roles: RolUsuario[] = [
   'admin',
   'comercial',
   'presupuestos',
@@ -108,7 +110,7 @@ export const schema = z.object({
 })
 
 // Role display mapping con descripciones
-const roleDisplayMap: Record<RolUsuario, { label: string; color: string; bgColor: string; description: string }> = {
+export const roleDisplayMap: Record<RolUsuario, { label: string; color: string; bgColor: string; description: string }> = {
   admin: {
     label: 'Administrador',
     color: 'text-red-700',
@@ -206,7 +208,7 @@ function getInitials(name: string): string {
 }
 
 // Helper para color de avatar basado en rol
-function getAvatarColor(role: RolUsuario): string {
+export function getAvatarColor(role: RolUsuario): string {
   const colors: Record<RolUsuario, string> = {
     admin: 'bg-red-500',
     comercial: 'bg-blue-500',
@@ -980,6 +982,19 @@ export default function UsuariosClient() {
             </div>
           </div>
 
+          <Tabs defaultValue="usuarios">
+            <TabsList>
+              <TabsTrigger value="usuarios" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Usuarios
+              </TabsTrigger>
+              <TabsTrigger value="access-map" className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Mapa de Acceso
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="usuarios" className="space-y-6">
           {/* Main Content Card */}
           <Card className="shadow-sm">
             {/* Toolbar */}
@@ -1142,6 +1157,12 @@ export default function UsuariosClient() {
               )}
             </CardContent>
           </Card>
+            </TabsContent>
+
+            <TabsContent value="access-map">
+              <AccessMapTab usuarios={usuarios} />
+            </TabsContent>
+          </Tabs>
         </div>
 
         {/* User Form Modal */}

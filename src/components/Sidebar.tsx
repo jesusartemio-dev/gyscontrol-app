@@ -470,7 +470,6 @@ export default function Sidebar() {
       links: [
         { href: '/configuracion/general', label: 'General', icon: Settings },
         { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
-        { href: '/admin/permisos', label: 'Permisos', icon: Shield },
         { href: '/admin/actividad', label: 'Actividad Sistema', icon: Activity },
         { href: '/configuracion/actividad-usuarios', label: 'Actividad Usuarios', icon: Users },
         { href: '/configuracion/notificaciones', label: 'Notificaciones', icon: AlertCircle },
