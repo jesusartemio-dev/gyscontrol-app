@@ -96,6 +96,35 @@ interface PagoCobro {
   cuentaBancaria: { id: string; nombreBanco: string; numeroCuenta: string } | null
 }
 
+/** La operación de factoring vista completa: todas las facturas que agrupa. */
+interface OperacionFactoring {
+  numeroOperacion: string
+  financiera: string | null
+  financierasDistintas: string[] | null
+  monedasDistintas: string[] | null
+  documentosDeclarados: number | null
+  facturasRegistradas: number
+  facturasFaltantes: number | null
+  facturas: {
+    cobroId: string
+    cuentaPorCobrarId: string | null
+    numeroDocumento: string | null
+    cliente: string | null
+    proyecto: string | null
+    moneda: string
+    montoFactura: number | null
+    valorAFinanciar: number | null
+    excedenteMonto: number | null
+    interesMonto: number | null
+    comisionEstructuracion: number | null
+    gastosAdicionales: number | null
+    igvGastos: number | null
+    adelantoBanpro: number | null
+    saldoAGirar: number | null
+  }[]
+  totales: Record<string, number>
+}
+
 /**
  * Una fila de la comparación entre lo guardado en la CxC y lo que dice la
  * factura. `campo` es null cuando el dato no es editable desde acá (ej. el
@@ -254,6 +283,14 @@ export default function CxCDetallePage() {
     retencionPct: '', retencionMonto: '',
   })
   const [savingEdit, setSavingEdit] = useState(false)
+
+  // ── Operación de factoring (puede cubrir varias facturas) ────────────────
+  // BANPRO junta 2 o más facturas en una sola operación, incluso de clientes
+  // distintos, y cobra comisión/gastos/adelanto a nivel de operación. El
+  // modelo guarda un cobro por factura, así que sin esto la operación es
+  // invisible: no se ve que faltan facturas por registrar ni que el reparto
+  // manual de los costos no cuadra.
+  const [operacion, setOperacion] = useState<OperacionFactoring | null>(null)
 
   // ── Verificar contra la factura ──────────────────────────────────────────
   // Sube la factura y COMPARA contra lo guardado, en vez de rellenar. Nace de
@@ -445,6 +482,19 @@ export default function CxCDetallePage() {
   }, [id, router])
 
   useEffect(() => { load() }, [load])
+
+  // Trae el resto de facturas de la misma operación. Solo aplica a factoring:
+  // en cobro directo no hay operación que agrupar.
+  useEffect(() => {
+    const op = cxc?.valorizacion?.cobro?.numeroOperacion
+    if (!op || cxc?.valorizacion?.cobro?.tipo !== 'factoring') { setOperacion(null); return }
+    let cancelado = false
+    fetch(`/api/administracion/operaciones-factoring/${encodeURIComponent(op)}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (!cancelado) setOperacion(d) })
+      .catch(() => { if (!cancelado) setOperacion(null) })
+    return () => { cancelado = true }
+  }, [cxc?.valorizacion?.cobro?.numeroOperacion, cxc?.valorizacion?.cobro?.tipo])
 
   // Pegar (Ctrl+V) una captura mientras el formulario de cobro está abierto:
   // el modelo identifica solo si es factura, liquidación o voucher. Se
@@ -1328,6 +1378,10 @@ export default function CxCDetallePage() {
                       {labelRow('Adelanto Banpro', cobro.adelantoBanpro != null ? formatCurrency(cobro.adelantoBanpro, cxc.moneda) : null)}
                       {labelRow('Saldo a Girar', cobro.saldoAGirar != null ? formatCurrency(cobro.saldoAGirar, cxc.moneda) : null)}
                       {labelRow('Fecha Confirmación', cobro.fechaConfirmacion ? formatDate(cobro.fechaConfirmacion) : null)}
+                      {operacion && operacion.facturas.length > 1 && labelRow(
+                        'Operación',
+                        `N° ${operacion.numeroOperacion} — ${operacion.facturas.length} facturas`
+                      )}
                     </> : <>
                       {labelRow('Fecha de Cobro', cobro.fechaDesembolso ? formatDate(cobro.fechaDesembolso) : null)}
                       {labelRow('Detracción', detraccionResumen)}
@@ -1340,6 +1394,95 @@ export default function CxCDetallePage() {
                   </div>
                   )
                 })()}
+
+                {/* La operación de factoring completa. Se muestra cuando cubre
+                    más de una factura, o cuando BANPRO declaró más documentos
+                    de los que hay cargados — ese segundo caso es el grave: son
+                    CxC con saldo completo contra las que ya se adelantó plata. */}
+                {cobro && !showCobroForm && operacion &&
+                 (operacion.facturas.length > 1 || (operacion.facturasFaltantes ?? 0) > 0) && (
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="bg-slate-700 text-white text-xs px-3 py-2 font-semibold flex items-center justify-between">
+                      <span>Operación {operacion.numeroOperacion}{operacion.financiera ? ` — ${operacion.financiera}` : ''}</span>
+                      <span className="font-normal">
+                        {operacion.facturasRegistradas} factura(s) registrada(s)
+                        {operacion.documentosDeclarados != null && ` de ${operacion.documentosDeclarados}`}
+                      </span>
+                    </div>
+
+                    {(operacion.facturasFaltantes ?? 0) > 0 && (
+                      <div className="bg-red-50 border-b border-red-200 px-3 py-2 text-xs text-red-900 flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                        <span>
+                          BANPRO declaró {operacion.documentosDeclarados} documentos en esta operación y solo
+                          hay {operacion.facturasRegistradas} cargados. <strong>Faltan {operacion.facturasFaltantes}</strong>:
+                          esas facturas siguen figurando con su saldo completo aunque ya se adelantó dinero contra ellas.
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50 text-muted-foreground">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-medium">Factura</th>
+                            <th className="px-3 py-2 text-right font-medium">Valor a Financiar</th>
+                            <th className="px-3 py-2 text-right font-medium">Interés</th>
+                            <th className="px-3 py-2 text-right font-medium">Comisión</th>
+                            <th className="px-3 py-2 text-right font-medium">Gastos</th>
+                            <th className="px-3 py-2 text-right font-medium">IGV</th>
+                            <th className="px-3 py-2 text-right font-medium">Adelanto</th>
+                            <th className="px-3 py-2 text-right font-medium">Saldo a Girar</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {operacion.facturas.map(f => {
+                            const esEsta = f.cuentaPorCobrarId === cxc.id
+                            return (
+                              <tr key={f.cobroId} className={`border-t ${esEsta ? 'bg-blue-50' : ''}`}>
+                                <td className="px-3 py-2">
+                                  {f.cuentaPorCobrarId && !esEsta ? (
+                                    <Link href={`/administracion/cuentas-cobrar/${f.cuentaPorCobrarId}`} className="text-blue-700 hover:underline">
+                                      {f.numeroDocumento ?? '—'}
+                                    </Link>
+                                  ) : (
+                                    <span className={esEsta ? 'font-semibold' : ''}>{f.numeroDocumento ?? '—'}</span>
+                                  )}
+                                  <div className="text-muted-foreground">{f.proyecto} · {f.cliente?.slice(0, 24)}</div>
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono">{f.valorAFinanciar != null ? f.valorAFinanciar.toFixed(2) : '—'}</td>
+                                <td className="px-3 py-2 text-right font-mono">{f.interesMonto != null ? f.interesMonto.toFixed(2) : '—'}</td>
+                                <td className="px-3 py-2 text-right font-mono">{f.comisionEstructuracion != null ? f.comisionEstructuracion.toFixed(2) : '—'}</td>
+                                <td className="px-3 py-2 text-right font-mono">{f.gastosAdicionales != null ? f.gastosAdicionales.toFixed(2) : '—'}</td>
+                                <td className="px-3 py-2 text-right font-mono">{f.igvGastos != null ? f.igvGastos.toFixed(2) : '—'}</td>
+                                <td className="px-3 py-2 text-right font-mono">{f.adelantoBanpro != null ? f.adelantoBanpro.toFixed(2) : '—'}</td>
+                                <td className="px-3 py-2 text-right font-mono">{f.saldoAGirar != null ? f.saldoAGirar.toFixed(2) : '—'}</td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t bg-gray-50 font-semibold">
+                            <td className="px-3 py-2">Total de la operación</td>
+                            <td className="px-3 py-2 text-right font-mono">{operacion.totales.valorAFinanciar.toFixed(2)}</td>
+                            <td className="px-3 py-2 text-right font-mono">{operacion.totales.interesMonto.toFixed(2)}</td>
+                            <td className="px-3 py-2 text-right font-mono">{operacion.totales.comisionEstructuracion.toFixed(2)}</td>
+                            <td className="px-3 py-2 text-right font-mono">{operacion.totales.gastosAdicionales.toFixed(2)}</td>
+                            <td className="px-3 py-2 text-right font-mono">{operacion.totales.igvGastos.toFixed(2)}</td>
+                            <td className="px-3 py-2 text-right font-mono">{operacion.totales.adelantoBanpro.toFixed(2)}</td>
+                            <td className="px-3 py-2 text-right font-mono">{operacion.totales.saldoAGirar.toFixed(2)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground px-3 py-2 border-t bg-gray-50">
+                      Comisión, gastos, IGV y adelanto los cobra BANPRO por la operación completa y se reparten a mano
+                      entre las facturas. <strong>Compara esta fila de totales contra el Detalle de Liquidación</strong> —
+                      el adelanto es un solo depósito, así que ahí tiene que salir el monto exacto.
+                    </p>
+                  </div>
+                )}
 
                 {/* Formulario cobro */}
                 {showCobroForm && (
