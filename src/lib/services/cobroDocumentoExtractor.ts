@@ -39,20 +39,54 @@ export interface ExtraccionFactura {
   retencionMonto: number | null
 }
 
-/** Datos de la hoja de liquidación de la financiera (solo factoring). */
+/**
+ * Una fila del Detalle de Liquidación: los datos de UNA factura dentro de la
+ * operación. La financiera calcula interés, excedente y valor a financiar por
+ * documento, porque cada factura tiene su propio plazo y vencimiento.
+ */
+export interface ExtraccionLiquidacionDocumento {
+  numeroDocumento: string | null   // "NRO. DOC." — los últimos dígitos de la factura (ej. 1719)
+  deudor: string | null
+  fechaVencimiento: string | null  // "FEC. VTO.NOM."
+  diasFinanciamiento: number | null
+  montoDocumento: number | null    // "MONTO DOCUM." — la factura ya neta de detracción
+  detraccion: number | null
+  porcentajeAnticipo: number | null // "% ANT." (ej. 99)
+  valorAFinanciar: number | null   // "MTO. NOM.ANT."
+  excedenteMonto: number | null    // "MTO. NO ANT."
+  interesMonto: number | null      // "MTO.DIF.PRECIO"
+  montoAnticipo: number | null     // "MTO.ANT. S/DESCTO" = valorAFinanciar − interés
+}
+
+/**
+ * Datos de la hoja de liquidación de la financiera (solo factoring).
+ *
+ * OJO: una operación puede cubrir VARIAS facturas —la 52104 real junta tres, y
+ * de clientes distintos—. Por eso los importes se parten en dos niveles:
+ *   - `documentos[]`: lo que la financiera calcula por factura.
+ *   - comisión, gastos, IGV, adelanto y saldo a girar: los cobra por la
+ *     OPERACIÓN completa, en un solo depósito. No vienen por factura.
+ * Los campos sueltos de nivel documento se conservan para el caso de una sola
+ * factura, que es la mayoría: ahí `documentos` trae un único elemento.
+ */
 export interface ExtraccionLiquidacion {
   financiera: string | null
   numeroOperacion: string | null
-  fechaDesembolso: string | null
+  fechaDesembolso: string | null   // "FEC. CURSE" — igual para toda la operación
+  cantidadDocumentos: number | null
+  documentos: ExtraccionLiquidacionDocumento[]
+  // Nivel documento — el primero, por compatibilidad con la operación de 1 factura
   fechaVencimiento: string | null
   diasFinanciamiento: number | null
   montoDocumento: number | null
   excedenteMonto: number | null
   valorAFinanciar: number | null
   interesMonto: number | null
+  // Nivel operación — se reparten a mano entre las facturas
   comisionEstructuracion: number | null
   gastosAdicionales: number | null
   igvGastos: number | null
+  aplicaciones: number | null
   adelantoBanpro: number | null
   saldoAGirar: number | null
 }
@@ -122,37 +156,60 @@ En una factura en DÓLARES, el monto de detracción se imprime en SOLES (con "S/
 
 Estás leyendo un DETALLE DE LIQUIDACIÓN DE FACTORING de una financiera (normalmente BANPRO). Es el documento donde la financiera detalla cuánto adelanta por la factura y qué descuenta.
 
+MUY IMPORTANTE — la tabla puede tener VARIAS FILAS:
+Una operación de factoring puede cubrir 2 o más facturas, incluso de deudores distintos. La tabla central trae UNA FILA POR FACTURA, cada una con su propio plazo, vencimiento e interés. Devuelve TODAS las filas en "documentos", una entrada por cada línea de la tabla. NO incluyas la fila "TOTAL" como si fuera un documento.
+
+Distingue dos niveles:
+- POR FACTURA (las columnas de la tabla): NRO. DOC., DEUDOR, FEC. VTO.NOM., DIAS, MONTO DOCUM., DETRAC., % ANT., MTO. NOM.ANT., MTO. NO ANT., MTO.DIF.PRECIO, MTO.ANT. S/DESCTO.
+- POR OPERACIÓN (el bloque de abajo a la derecha, fuera de la tabla): Adelanto, Comisión, Gasto legal, I.G.V, Aplicación(es), Saldo liquido a girar. Estos son de la operación completa y NO se reparten por factura — ponlos en la raíz del JSON, no dentro de "documentos".
+
 Equivalencias de nombres (la financiera usa sus propias etiquetas):
 - "MONTO DOCUM." / "Monto de los documentos" = monto del documento financiado (la factura ya neta de detracción/retención).
 - "MTO. NOM.ANT." / "Monto anticipado" = valor a financiar (el % anticipado del monto documento).
 - "MTO. NO ANT." / "Monto no financiado" = excedente retenido por la financiera.
 - "MTO.DIF.PRECIO" / "Diferencia de precio" = interés del financiamiento.
+- "MTO.ANT. S/DESCTO" = monto anticipo = valor a financiar − interés.
+- "% ANT." = porcentaje anticipado (con BANPRO suele ser 99).
 - "Comisión" = comisión de estructuración.
 - "Gasto legal" / "Gastos" = gastos adicionales.
 - "I.G.V" = IGV sobre los gastos/comisión.
-- "Adelanto" / "Monto adelanto" = lo que la financiera desembolsa de inmediato.
+- "Aplicación(es)" / "Monto aplicado" = descuentos aplicados a la operación (normalmente 0).
+- "Adelanto" / "Monto adelanto" = lo que la financiera desembolsa de inmediato, en UN SOLO depósito por la operación.
 - "Saldo liquido a girar" / "Liquido a girar" = lo que queda por girar después del adelanto.
-- "FEC. CURSE" = fecha de desembolso. "FEC. VTO.NOM." = fecha de vencimiento. "DIAS" = días de financiamiento.`,
+- "FEC. CURSE" = fecha de desembolso, igual para toda la operación. "FEC. VTO.NOM." = fecha de vencimiento de esa factura. "DIAS" = días de financiamiento de esa factura.`,
     user: `Extrae los datos de esta liquidación de factoring y devuelve ÚNICAMENTE este JSON:
 
 {
   "financiera": "string (ej: BANPRO) o null",
   "numeroOperacion": "string o null",
   "fechaDesembolso": "YYYY-MM-DD o null",
-  "fechaVencimiento": "YYYY-MM-DD o null",
-  "diasFinanciamiento": number o null,
-  "montoDocumento": number o null,
-  "excedenteMonto": number o null,
-  "valorAFinanciar": number o null,
-  "interesMonto": number o null,
+  "cantidadDocumentos": number o null,
+  "documentos": [
+    {
+      "numeroDocumento": "string (ej: 1719) o null",
+      "deudor": "string o null",
+      "fechaVencimiento": "YYYY-MM-DD o null",
+      "diasFinanciamiento": number o null,
+      "montoDocumento": number o null,
+      "detraccion": number o null,
+      "porcentajeAnticipo": number o null,
+      "valorAFinanciar": number o null,
+      "excedenteMonto": number o null,
+      "interesMonto": number o null,
+      "montoAnticipo": number o null
+    }
+  ],
   "comisionEstructuracion": number o null,
   "gastosAdicionales": number o null,
   "igvGastos": number o null,
+  "aplicaciones": number o null,
   "adelantoBanpro": number o null,
   "saldoAGirar": number o null,
   "confianza": "alta|media|baja",
   "observaciones": "string si algo no se pudo leer bien, null si todo OK"
-}`,
+}
+
+"documentos" lleva UNA entrada por cada fila de la tabla, sin la fila TOTAL.`,
   },
   voucher_transferencia: {
     system: `${SYSTEM_BASE}
@@ -213,11 +270,15 @@ Si no es ninguno de los 3, devuelve tipoDetectado "desconocido" y explica en obs
   } o null,
   "liquidacion": {
     "financiera": "string o null", "numeroOperacion": "string o null",
-    "fechaDesembolso": "YYYY-MM-DD o null", "fechaVencimiento": "YYYY-MM-DD o null",
-    "diasFinanciamiento": number o null, "montoDocumento": number o null,
-    "excedenteMonto": number o null, "valorAFinanciar": number o null, "interesMonto": number o null,
+    "fechaDesembolso": "YYYY-MM-DD o null", "cantidadDocumentos": number o null,
+    "documentos": [ { "numeroDocumento": "string o null", "deudor": "string o null",
+      "fechaVencimiento": "YYYY-MM-DD o null", "diasFinanciamiento": number o null,
+      "montoDocumento": number o null, "detraccion": number o null,
+      "porcentajeAnticipo": number o null, "valorAFinanciar": number o null,
+      "excedenteMonto": number o null, "interesMonto": number o null,
+      "montoAnticipo": number o null } ],
     "comisionEstructuracion": number o null, "gastosAdicionales": number o null, "igvGastos": number o null,
-    "adelantoBanpro": number o null, "saldoAGirar": number o null
+    "aplicaciones": number o null, "adelantoBanpro": number o null, "saldoAGirar": number o null
   } o null,
   "voucher": {
     "fechaOperacion": "YYYY-MM-DD o null", "numeroOperacion": "string o null",
@@ -324,7 +385,7 @@ export async function extraerDocumentoCobro(
       return { tipo, ...vacio, datos: { numeroDocumento: null, fechaEmision: null, moneda: null, importeTotal: null, detraccionPct: null, detraccionMonto: null, detraccionMontoPEN: null, retencionPct: null, retencionMonto: null } }
     }
     if (tipo === 'liquidacion_factoring') {
-      return { tipo, ...vacio, datos: { financiera: null, numeroOperacion: null, fechaDesembolso: null, fechaVencimiento: null, diasFinanciamiento: null, montoDocumento: null, excedenteMonto: null, valorAFinanciar: null, interesMonto: null, comisionEstructuracion: null, gastosAdicionales: null, igvGastos: null, adelantoBanpro: null, saldoAGirar: null } }
+      return { tipo, ...vacio, datos: { financiera: null, numeroOperacion: null, fechaDesembolso: null, cantidadDocumentos: null, documentos: [], fechaVencimiento: null, diasFinanciamiento: null, montoDocumento: null, excedenteMonto: null, valorAFinanciar: null, interesMonto: null, comisionEstructuracion: null, gastosAdicionales: null, igvGastos: null, aplicaciones: null, adelantoBanpro: null, saldoAGirar: null } }
     }
     if (tipo === 'voucher_transferencia') {
       return { tipo, ...vacio, datos: { fechaOperacion: null, numeroOperacion: null, montoTotal: null, montoTransferido: null, comision: null, moneda: null } }
@@ -384,6 +445,30 @@ export async function extraerDocumentoCobro(
   }
 
   if (tipoFinal === 'liquidacion_factoring') {
+    // Una fila por factura. Se descartan las que vengan sin nada útil (p.ej. si
+    // el modelo coló la fila TOTAL a pesar de que el prompt se lo prohíbe).
+    const filas = Array.isArray(campos.documentos) ? (campos.documentos as unknown[]) : []
+    const docs: ExtraccionLiquidacionDocumento[] = filas
+      .filter((f): f is Record<string, unknown> => !!f && typeof f === 'object')
+      .map(f => ({
+        numeroDocumento: str(f.numeroDocumento),
+        deudor: str(f.deudor),
+        fechaVencimiento: str(f.fechaVencimiento),
+        diasFinanciamiento: num(f.diasFinanciamiento),
+        montoDocumento: num(f.montoDocumento),
+        detraccion: num(f.detraccion),
+        porcentajeAnticipo: num(f.porcentajeAnticipo),
+        valorAFinanciar: num(f.valorAFinanciar),
+        excedenteMonto: num(f.excedenteMonto),
+        interesMonto: num(f.interesMonto),
+        montoAnticipo: num(f.montoAnticipo),
+      }))
+      .filter(d => d.numeroDocumento != null || d.montoDocumento != null)
+
+    // Solo cuando hay exactamente una factura tiene sentido exponer sus
+    // importes sueltos: con varias, cualquier elección sería arbitraria.
+    const unico = docs.length === 1 ? docs[0] : null
+
     return {
       tipo: tipoFinal,
       confianza,
@@ -392,15 +477,23 @@ export async function extraerDocumentoCobro(
         financiera: str(campos.financiera),
         numeroOperacion: str(campos.numeroOperacion),
         fechaDesembolso: str(campos.fechaDesembolso),
-        fechaVencimiento: str(campos.fechaVencimiento),
-        diasFinanciamiento: num(campos.diasFinanciamiento),
-        montoDocumento: num(campos.montoDocumento),
-        excedenteMonto: num(campos.excedenteMonto),
-        valorAFinanciar: num(campos.valorAFinanciar),
-        interesMonto: num(campos.interesMonto),
+        cantidadDocumentos: num(campos.cantidadDocumentos),
+        documentos: docs,
+        // Nivel documento: si la operación cubre una sola factura se exponen
+        // sueltos, que es como los consume el formulario de cobro. Con varias
+        // no se puede elegir uno, así que quedan en null y hay que ir a
+        // `documentos` — el flujo multi-factura.
+        fechaVencimiento: unico?.fechaVencimiento ?? str(campos.fechaVencimiento),
+        diasFinanciamiento: unico?.diasFinanciamiento ?? num(campos.diasFinanciamiento),
+        montoDocumento: unico?.montoDocumento ?? num(campos.montoDocumento),
+        excedenteMonto: unico?.excedenteMonto ?? num(campos.excedenteMonto),
+        valorAFinanciar: unico?.valorAFinanciar ?? num(campos.valorAFinanciar),
+        interesMonto: unico?.interesMonto ?? num(campos.interesMonto),
+        // Nivel operación
         comisionEstructuracion: num(campos.comisionEstructuracion),
         gastosAdicionales: num(campos.gastosAdicionales),
         igvGastos: num(campos.igvGastos),
+        aplicaciones: num(campos.aplicaciones),
         adelantoBanpro: num(campos.adelantoBanpro),
         saldoAGirar: num(campos.saldoAGirar),
       },
