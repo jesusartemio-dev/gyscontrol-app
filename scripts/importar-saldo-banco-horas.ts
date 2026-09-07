@@ -6,11 +6,10 @@
  * llevaba el coordinador de construcción. fechaCorte = hoy: el sistema
  * calcula solo desde ese punto en adelante usando RegistroHoras aprobado.
  *
- * Los nombres de abajo son fragmentos cortos (como aparecen en el Excel,
- * ej. "TitoA"), no el nombre completo — el script busca por
- * `User.name` insensible a mayúsculas y EXIGE exactamente un match; si
- * encuentra 0 o más de 1, lo reporta y no aplica nada para esa persona
- * (no adivina). Revisar el reporte del --dry antes de correr --apply.
+ * Emails confirmados contra producción (scripts/tmp-buscar-nombres.ts) —
+ * el patrón corto del Excel ("TitoA") coincide exactamente con el prefijo
+ * del email real (tito.a@gyscontrol.com), y eso desambigua el caso
+ * "Jhonatan" (hay dos: Molocho y Flores — el Excel es jhonatan.m).
  *
  * Uso:
  *   npx dotenv -e .env.production -o -- npx tsx scripts/importar-saldo-banco-horas.ts --dry
@@ -20,15 +19,15 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-// email o fragmento de nombre → saldo en horas (positivo = a favor, negativo = debe)
-const SALDOS: Array<{ nombreFragmento: string; saldoInicial: number }> = [
-  { nombreFragmento: 'TitoA', saldoInicial: 53.5 },
-  { nombreFragmento: 'JhonatanM', saldoInicial: -29 },
-  { nombreFragmento: 'AngelP', saldoInicial: -2 },
-  { nombreFragmento: 'NelsonLl', saldoInicial: -147.5 },
-  { nombreFragmento: 'AntonyV', saldoInicial: -86 },
-  { nombreFragmento: 'RolyS', saldoInicial: -61.5 },
-  { nombreFragmento: 'BenjaminA', saldoInicial: -44.5 },
+// email exacto → saldo en horas (positivo = a favor, negativo = debe)
+const SALDOS: Array<{ email: string; saldoInicial: number }> = [
+  { email: 'tito.a@gyscontrol.com', saldoInicial: 53.5 },
+  { email: 'jhonatan.m@gyscontrol.com', saldoInicial: -29 },
+  { email: 'angel.p@gyscontrol.com', saldoInicial: -2 },
+  { email: 'nelson.l@gyscontrol.com', saldoInicial: -147.5 },
+  { email: 'antony.v@gyscontrol.com', saldoInicial: -86 },
+  { email: 'roly.s@gyscontrol.com', saldoInicial: -61.5 },
+  { email: 'benjamin.a@gyscontrol.com', saldoInicial: -44.5 },
 ]
 
 const APPLY = process.argv.includes('--apply')
@@ -48,24 +47,15 @@ async function main() {
 
   const fechaCorte = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z')
 
-  for (const { nombreFragmento, saldoInicial } of SALDOS) {
-    const candidatos = await prisma.user.findMany({
-      where: { name: { contains: nombreFragmento, mode: 'insensitive' } },
-      select: { id: true, name: true, email: true },
-    })
+  for (const { email, saldoInicial } of SALDOS) {
+    const u = await prisma.user.findUnique({ where: { email }, select: { id: true, name: true, email: true } })
 
-    if (candidatos.length === 0) {
-      console.log(`⚠ "${nombreFragmento}": NO ENCONTRADO — revisa el fragmento de nombre`)
-      continue
-    }
-    if (candidatos.length > 1) {
-      console.log(`⚠ "${nombreFragmento}": ${candidatos.length} coincidencias, ambiguo:`)
-      candidatos.forEach((c) => console.log(`    - ${c.name} <${c.email}>`))
+    if (!u) {
+      console.log(`⚠ "${email}": NO ENCONTRADO`)
       continue
     }
 
-    const u = candidatos[0]
-    console.log(`✔ "${nombreFragmento}" → ${u.name} <${u.email}>`)
+    console.log(`✔ ${u.name} <${u.email}>`)
     console.log(`    saldoInicial=${saldoInicial >= 0 ? '+' : ''}${saldoInicial}h  fechaCorte=${fechaCorte.toISOString().slice(0, 10)}`)
 
     if (!APPLY) continue
