@@ -38,6 +38,7 @@ import {
   ArrowUpDown,
   X,
   List,
+  Wallet,
 } from 'lucide-react'
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, getISOWeek, getISOWeekYear } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -126,6 +127,7 @@ function TimesheetContent() {
   const [loadingSemana, setLoadingSemana] = useState(true)
   const [estadoAprobacion, setEstadoAprobacion] = useState<any>(null)
   const [enviando, setEnviando] = useState(false)
+  const [bancoHorasAcumulado, setBancoHorasAcumulado] = useState<number | null>(null)
 
   // ── Historial tab state ──
   const [registros, setRegistros] = useState<Registro[]>([])
@@ -294,6 +296,10 @@ function TimesheetContent() {
     if (!session?.user) return
     cargarAprobaciones()
     cargarProyectos()
+    fetch('/api/banco-horas')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setBancoHorasAcumulado(d?.acumulado ?? null))
+      .catch(() => {})
   }, [status, session, cargarAprobaciones, cargarProyectos])
 
   useEffect(() => {
@@ -622,6 +628,19 @@ function TimesheetContent() {
                 </span>
                 <span className={`text-xs ${((resumenSemana || datosDefault).vsSemanaAnterior) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>Vs Anterior</span>
               </div>
+              <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-lg">
+                <Clock className="h-4 w-4 text-slate-500" />
+                <span className="text-xs text-slate-600">Meta semanal 48h</span>
+              </div>
+              {bancoHorasAcumulado !== null && (
+                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${bancoHorasAcumulado >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                  <Wallet className={`h-4 w-4 ${bancoHorasAcumulado >= 0 ? 'text-emerald-600' : 'text-red-600'}`} />
+                  <span className={`font-bold ${bancoHorasAcumulado >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                    {bancoHorasAcumulado >= 0 ? '+' : ''}{bancoHorasAcumulado.toFixed(1)}h
+                  </span>
+                  <span className={`text-xs ${bancoHorasAcumulado >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>Banco de horas</span>
+                </div>
+              )}
             </div>
           </div>
 

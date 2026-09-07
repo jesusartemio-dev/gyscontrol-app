@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, X, Save, CalendarOff } from 'lucide-react'
+import { Plus, X, Save, CalendarOff, Wallet, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -32,6 +32,20 @@ interface TipoAusencia {
   id: string
   codigo: string
   nombre: string
+}
+
+interface BancoHorasRow {
+  user: { id: string; name: string; email: string }
+  saldoInicial: number
+  fechaCorte: string
+  acumulado: number
+}
+
+interface PeriodoVacacion {
+  id: string
+  fechaInicio: string
+  fechaFin: string
+  diasHabiles: number | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -177,6 +191,94 @@ function AjusteModal({
   )
 }
 
+// ── Banco de Horas ───────────────────────────────────────────────────────────
+
+function BancoHorasSection() {
+  const [filas, setFilas] = useState<BancoHorasRow[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/banco-horas/equipo')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setFilas(Array.isArray(d) ? d : []))
+      .catch(() => toast.error('Error al cargar el banco de horas'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <p className="text-sm text-muted-foreground">Cargando banco de horas...</p>
+  if (filas.length === 0) return null
+
+  return (
+    <div className="space-y-2">
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+        <Wallet className="h-4 w-4" /> Banco de Horas
+      </h2>
+      <p className="text-xs text-muted-foreground">
+        Calculado automáticamente desde el timesheet aprobado — no se ajusta a mano. Ver{' '}
+        <a href="/rrhh/asistencia" className="underline">detalle de asistencia</a> si un número no cuadra.
+      </p>
+      <div className="rounded-lg border">
+        <table className="w-full text-sm">
+          <thead className="border-b bg-muted/40">
+            <tr>
+              <th className="px-4 py-2 text-left font-medium">Colaborador</th>
+              <th className="px-4 py-2 text-center font-medium">Saldo inicial</th>
+              <th className="px-4 py-2 text-center font-medium">Fecha de corte</th>
+              <th className="px-4 py-2 text-center font-medium">Acumulado</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {filas.map((f) => (
+              <tr key={f.user.id} className="hover:bg-muted/20">
+                <td className="px-4 py-2 font-medium">{f.user.name}</td>
+                <td className="px-4 py-2 text-center text-muted-foreground">
+                  {f.saldoInicial >= 0 ? '+' : ''}{f.saldoInicial.toFixed(1)}h
+                </td>
+                <td className="px-4 py-2 text-center text-muted-foreground">{f.fechaCorte}</td>
+                <td className="px-4 py-2 text-center">
+                  <span className={`font-semibold ${f.acumulado >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+                    {f.acumulado >= 0 ? '+' : ''}{f.acumulado.toFixed(1)}h
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ── Periodos de vacaciones (expandible por fila VAC) ────────────────────────────
+
+function PeriodosVacacion({ userId }: { userId: string }) {
+  const [periodos, setPeriodos] = useState<PeriodoVacacion[] | null>(null)
+
+  useEffect(() => {
+    fetch(`/api/ausencias/periodos-vacaciones?userId=${userId}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setPeriodos(Array.isArray(d) ? d : []))
+      .catch(() => setPeriodos([]))
+  }, [userId])
+
+  if (periodos === null) return <p className="px-4 py-2 text-xs text-muted-foreground">Cargando periodos...</p>
+  if (periodos.length === 0) return <p className="px-4 py-2 text-xs text-muted-foreground">Sin periodos de vacaciones aprobados.</p>
+
+  return (
+    <div className="px-4 py-2 space-y-1">
+      {periodos.map((p, i) => (
+        <div key={p.id} className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Periodo {i + 1}:</span>
+          <span>{new Date(p.fechaInicio).toLocaleDateString('es-PE', { timeZone: 'UTC' })}</span>
+          <span>–</span>
+          <span>{new Date(p.fechaFin).toLocaleDateString('es-PE', { timeZone: 'UTC' })}</span>
+          {p.diasHabiles != null && <span>({p.diasHabiles}d)</span>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Props ──────────────────────────────────────────────────────────────────────
 
 interface TablaSaldosEquipoProps {
@@ -199,6 +301,7 @@ export default function TablaSaldosEquipo({ titulo, subtitulo, defaultTipoCodigo
   const [usuarios, setUsuarios] = useState<Array<{ id: string; name: string }>>([])
   const [loading, setLoading] = useState(true)
   const [ajusteModal, setAjusteModal] = useState<{ open: boolean; saldo?: SaldoRow }>({ open: false })
+  const [expandedVacId, setExpandedVacId] = useState<string | null>(null)
 
   const defaultAppliedRef = useRef(false)
 
@@ -255,6 +358,8 @@ export default function TablaSaldosEquipo({ titulo, subtitulo, defaultTipoCodigo
         </Button>
       </div>
 
+      <BancoHorasSection />
+
       {/* Filtros */}
       <div className="flex flex-wrap gap-3">
         <Select value={String(anio)} onValueChange={(v) => setAnio(Number(v))}>
@@ -305,29 +410,48 @@ export default function TablaSaldosEquipo({ titulo, subtitulo, defaultTipoCodigo
             <tbody className="divide-y">
               {saldos.map((s) => {
                 const codigo = s.tipoAusencia.codigo
+                const esVac = codigo === 'VAC'
+                const expandido = expandedVacId === s.id
                 return (
-                  <tr key={s.id} className="hover:bg-muted/20">
-                    <td className="px-4 py-3 font-medium">{s.user.name}</td>
-                    <td className="px-4 py-3">
-                      <span className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full" style={{ background: s.tipoAusencia.color }} />
-                        {s.tipoAusencia.nombre}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">{formatSaldo(s.diasAsignados, codigo)}</td>
-                    <td className="px-4 py-3 text-center">{formatSaldo(s.diasGozados, codigo)}</td>
-                    <td className="px-4 py-3 text-center">{formatSaldo(s.diasPendientes, codigo)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`font-semibold ${colorDisponibles(s.diasDisponibles, codigo)}`}>
-                        {formatSaldo(s.diasDisponibles, codigo)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button variant="ghost" size="sm" onClick={() => setAjusteModal({ open: true, saldo: s })}>
-                        Ajustar
-                      </Button>
-                    </td>
-                  </tr>
+                  <Fragment key={s.id}>
+                    <tr className="hover:bg-muted/20">
+                      <td className="px-4 py-3 font-medium">{s.user.name}</td>
+                      <td className="px-4 py-3">
+                        <span className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full" style={{ background: s.tipoAusencia.color }} />
+                          {s.tipoAusencia.nombre}
+                          {esVac && (
+                            <button
+                              onClick={() => setExpandedVacId(expandido ? null : s.id)}
+                              className="inline-flex items-center gap-0.5 text-xs text-muted-foreground underline hover:text-foreground"
+                            >
+                              Ver periodos {expandido ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                            </button>
+                          )}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">{formatSaldo(s.diasAsignados, codigo)}</td>
+                      <td className="px-4 py-3 text-center">{formatSaldo(s.diasGozados, codigo)}</td>
+                      <td className="px-4 py-3 text-center">{formatSaldo(s.diasPendientes, codigo)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`font-semibold ${colorDisponibles(s.diasDisponibles, codigo)}`}>
+                          {formatSaldo(s.diasDisponibles, codigo)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Button variant="ghost" size="sm" onClick={() => setAjusteModal({ open: true, saldo: s })}>
+                          Ajustar
+                        </Button>
+                      </td>
+                    </tr>
+                    {esVac && expandido && (
+                      <tr className="bg-muted/10">
+                        <td colSpan={7} className="p-0">
+                          <PeriodosVacacion userId={s.user.id} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 )
               })}
             </tbody>

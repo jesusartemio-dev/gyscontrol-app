@@ -2185,6 +2185,11 @@ model User {
   ausenciasComoRechazador                  SolicitudAusencia[]                  @relation("AusenciaRechazador")
   saldosAusencia                           SaldoAusencia[]                      @relation("SaldosAusencia")
   movimientosSaldoAusencia                 MovimientoSaldoAusencia[]            @relation("MovimientoSaldoCreador")
+  // Banco de Horas
+  bancoHorasAjustesDia                     BancoHorasAjusteDia[]                @relation("BancoHorasAjusteUsuario")
+  bancoHorasAjustesCreados                 BancoHorasAjusteDia[]                @relation("BancoHorasAjusteCreador")
+  bancoHorasSaldoInicial                   BancoHorasSaldoInicial?              @relation("BancoHorasSaldoUsuario")
+  bancoHorasSaldosCreados                  BancoHorasSaldoInicial[]             @relation("BancoHorasSaldoCreador")
   // Módulo Planificación
   planificacionesDia                       PlanificacionDia[]                   @relation("PlanificacionPersona")
   planificacionesDiaCreadas                PlanificacionDia[]                   @relation("PlanificacionCreador")
@@ -5093,6 +5098,9 @@ model TimesheetAprobacion {
   motivoRechazo   String?
   fechaEnvio      DateTime?
   fechaResolucion DateTime?
+  // Banco de Horas: si el excedente de esta semana se pagó en efectivo,
+  // no se acumula como horas a favor. Lo marca coordinador/admin al revisar.
+  pagadoEnEfectivo Boolean        @default(false)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime
 
@@ -6829,6 +6837,62 @@ model MovimientoSaldoAusencia {
 
   @@index([saldoId, createdAt(sort: Desc)])
   @@map("movimiento_saldo_ausencia")
+}
+
+// ============================================================
+// ⏱️ Banco de Horas — banco de horas trabajadas vs. jornada esperada,
+// calculado desde RegistroHoras (aprobado=true), nunca desde Asistencia.
+// ============================================================
+
+// Jornada esperada por día de semana — config global, una sola fila activa.
+model JornadaEsperada {
+  id        String   @id @default(cuid())
+  lunes     Float    @default(9.5)
+  martes    Float    @default(9.5)
+  miercoles Float    @default(9.5)
+  jueves    Float    @default(9.5)
+  viernes   Float    @default(10)
+  sabado    Float    @default(0)
+  domingo   Float    @default(0)
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("jornada_esperada")
+}
+
+// Coordinador/admin marca que este día no hubo trabajo asignado (culpa de
+// la empresa, no del trabajador) — el día no penaliza ni acredita de más.
+model BancoHorasAjusteDia {
+  id          String   @id @default(cuid())
+  userId      String
+  fecha       DateTime @db.Date
+  motivo      String?
+  creadoPorId String
+  createdAt   DateTime @default(now())
+
+  user      User @relation("BancoHorasAjusteUsuario", fields: [userId], references: [id])
+  creadoPor User @relation("BancoHorasAjusteCreador", fields: [creadoPorId], references: [id])
+
+  @@unique([userId, fecha])
+  @@map("banco_horas_ajuste_dia")
+}
+
+// Saldo de arrastre (importado una sola vez desde el registro manual previo
+// del coordinador), fecha de corte desde la cual el sistema calcula solo.
+model BancoHorasSaldoInicial {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  saldoInicial Float
+  fechaCorte   DateTime @db.Date
+  creadoPorId  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user      User @relation("BancoHorasSaldoUsuario", fields: [userId], references: [id])
+  creadoPor User @relation("BancoHorasSaldoCreador", fields: [creadoPorId], references: [id])
+
+  @@map("banco_horas_saldo_inicial")
 }
 
 // ============================================================

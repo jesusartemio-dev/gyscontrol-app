@@ -110,6 +110,7 @@ export async function GET(request: NextRequest) {
           semana: a.semana,
           estado: a.estado as string,
           totalHoras: enriched.totalHoras || a.totalHoras,
+          pagadoEnEfectivo: a.pagadoEnEfectivo,
           fechaEnvio: a.fechaEnvio,
           fechaResolucion: a.fechaResolucion,
           motivoRechazo: a.motivoRechazo,

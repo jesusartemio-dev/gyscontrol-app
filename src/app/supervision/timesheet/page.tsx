@@ -1,7 +1,10 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { useSession } from 'next-auth/react'
+import { tieneRol } from '@/lib/auth/roles'
 import { Card, CardContent } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -48,6 +51,8 @@ import {
   Copy,
   MessageSquare,
   Check,
+  Wallet,
+  Loader2,
 } from 'lucide-react'
 import { format, getISOWeek, getISOWeekYear } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -85,6 +90,7 @@ interface Aprobacion {
   diasTrabajados: number
   proyectos: ProyectoResumen[]
   registros: Registro[]
+  pagadoEnEfectivo?: boolean
 }
 
 function parseSemanaLabel(semana: string): string {
@@ -148,8 +154,109 @@ function formatSemanaRango(semana: string): string {
   return `${format(r.start, 'd MMM yyyy', { locale: es })} – ${format(r.end, 'd MMM yyyy', { locale: es })}`
 }
 
+// Banco de horas de la persona + acciones de coordinador/admin sobre esta
+// semana concreta: marcar "pagado en efectivo" (no acumula el excedente) y
+// marcar un día sin trabajo asignado (no penaliza el déficit de ese día).
+function BancoHorasPanel({
+  usuarioId,
+  aprobacionId,
+  semanaInicio,
+  pagadoEnEfectivoInicial,
+  puedeAjustar,
+}: {
+  usuarioId: string
+  aprobacionId: string
+  semanaInicio: Date
+  pagadoEnEfectivoInicial: boolean
+  puedeAjustar: boolean
+}) {
+  const { toast } = useToast()
+  const [acumulado, setAcumulado] = useState<number | null>(null)
+  const [pagadoEnEfectivo, setPagadoEnEfectivo] = useState(pagadoEnEfectivoInicial)
+  const [guardandoPago, setGuardandoPago] = useState(false)
+  const [fechaSinTrabajo, setFechaSinTrabajo] = useState(() => format(semanaInicio, 'yyyy-MM-dd'))
+  const [guardandoAjuste, setGuardandoAjuste] = useState(false)
+
+  useEffect(() => {
+    fetch(`/api/banco-horas?userId=${usuarioId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setAcumulado(d?.acumulado ?? null))
+      .catch(() => {})
+  }, [usuarioId])
+
+  const togglePagadoEnEfectivo = async (checked: boolean) => {
+    setGuardandoPago(true)
+    try {
+      const res = await fetch(`/api/horas-hombre/timesheet-aprobacion/${aprobacionId}/pago-efectivo`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pagadoEnEfectivo: checked }),
+      })
+      if (!res.ok) throw new Error()
+      setPagadoEnEfectivo(checked)
+      toast({ title: checked ? 'Marcado como pagado en efectivo' : 'Desmarcado' })
+    } catch {
+      toast({ title: 'No se pudo guardar', variant: 'destructive' })
+    } finally {
+      setGuardandoPago(false)
+    }
+  }
+
+  const marcarSinTrabajo = async () => {
+    setGuardandoAjuste(true)
+    try {
+      const res = await fetch('/api/banco-horas/ajuste-dia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: usuarioId, fecha: fechaSinTrabajo, motivo: 'Sin trabajo asignado' }),
+      })
+      if (!res.ok) throw new Error()
+      toast({ title: `${fechaSinTrabajo}: marcado como sin trabajo asignado` })
+      fetch(`/api/banco-horas?userId=${usuarioId}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => setAcumulado(d?.acumulado ?? null))
+        .catch(() => {})
+    } catch {
+      toast({ title: 'No se pudo marcar el día', variant: 'destructive' })
+    } finally {
+      setGuardandoAjuste(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-4 rounded-lg border bg-slate-50/60 px-3 py-2 mb-3 text-sm">
+      <div className={`flex items-center gap-1.5 font-medium ${acumulado === null ? 'text-muted-foreground' : acumulado >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+        <Wallet className="h-3.5 w-3.5" />
+        {acumulado === null ? 'Banco de horas: —' : `Banco de horas: ${acumulado >= 0 ? '+' : ''}${acumulado.toFixed(1)}h`}
+      </div>
+      {puedeAjustar && (
+        <>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <Checkbox checked={pagadoEnEfectivo} disabled={guardandoPago} onCheckedChange={(v) => togglePagadoEnEfectivo(v === true)} />
+            Pagado en efectivo esta semana (no acumular excedente)
+          </label>
+          <div className="flex items-center gap-1.5">
+            <Input
+              type="date"
+              value={fechaSinTrabajo}
+              onChange={(e) => setFechaSinTrabajo(e.target.value)}
+              className="h-7 w-36 text-xs"
+            />
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={marcarSinTrabajo} disabled={guardandoAjuste}>
+              {guardandoAjuste ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+              Marcar sin trabajo asignado
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function SupervisionTimesheetPage() {
   const { toast } = useToast()
+  const { data: session } = useSession()
+  const puedeAjustarBancoHoras = tieneRol(session, ['admin', 'gerente', 'coordinador'])
   const [tab, setTab] = useState('todos')
   const [aprobaciones, setAprobaciones] = useState<Aprobacion[]>([])
   const [loading, setLoading] = useState(true)
@@ -413,6 +520,15 @@ export default function SupervisionTimesheetPage() {
 
   const renderDetailContent = (a: Aprobacion) => (
     <>
+      {a.estado !== 'sin_enviar' && (
+        <BancoHorasPanel
+          usuarioId={a.usuario.id}
+          aprobacionId={a.id}
+          semanaInicio={getSemanaRange(a.semana)?.start ?? new Date()}
+          pagadoEnEfectivoInicial={a.pagadoEnEfectivo ?? false}
+          puedeAjustar={puedeAjustarBancoHoras}
+        />
+      )}
       <div className="flex flex-wrap gap-2 py-3">
         {a.proyectos.map((p, i) => (
           <div key={i} className="flex items-center gap-1.5 bg-gray-50 px-3 py-1 rounded-full text-sm">
