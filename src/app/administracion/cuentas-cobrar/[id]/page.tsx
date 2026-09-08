@@ -96,6 +96,37 @@ interface PagoCobro {
   cuentaBancaria: { id: string; nombreBanco: string; numeroCuenta: string } | null
 }
 
+/** Lo que devuelve el lector del Detalle de Liquidación, ya cruzado con las CxC. */
+interface LecturaLiquidacion {
+  operacion: {
+    numeroOperacion: string | null
+    financiera: string | null
+    fechaDesembolso: string | null
+    cantidadDocumentos: number | null
+    comisionEstructuracion: number | null
+    gastosAdicionales: number | null
+    igvGastos: number | null
+    adelantoBanpro: number | null
+    saldoAGirar: number | null
+  }
+  coincidencias: {
+    numeroDocumento: string | null
+    deudor: string | null
+    montoDocumento: number | null
+    valorAFinanciar: number | null
+    excedenteMonto: number | null
+    interesMonto: number | null
+    montoAnticipo: number | null
+    porcentajeAnticipo: number | null
+    diasFinanciamiento: number | null
+    fechaVencimiento: string | null
+    detraccionCalculada: number | null
+    detraccionPct: number | null
+    estado: 'lista' | 'ya_registrada' | 'no_encontrada' | 'ambigua' | 'sin_numero'
+    cxc: { id: string; numeroDocumento: string | null; monto: number; moneda: string; cliente: string | null; proyecto: string | null } | null
+  }[]
+}
+
 /** La operación de factoring vista completa: todas las facturas que agrupa. */
 interface OperacionFactoring {
   numeroOperacion: string
@@ -291,6 +322,16 @@ export default function CxCDetallePage() {
   // invisible: no se ve que faltan facturas por registrar ni que el reparto
   // manual de los costos no cuadra.
   const [operacion, setOperacion] = useState<OperacionFactoring | null>(null)
+
+  // ── Leer el Detalle de Liquidación de toda la operación ──────────────────
+  // Un solo PDF registra las N facturas de la operación. Los importes por
+  // factura los da BANPRO; comisión, gastos, IGV y adelanto se reparten a mano
+  // y la suma tiene que cuadrar con el documento.
+  const [showLiquidacionOp, setShowLiquidacionOp] = useState(false)
+  const [leyendoLiq, setLeyendoLiq] = useState(false)
+  const [liqLectura, setLiqLectura] = useState<LecturaLiquidacion | null>(null)
+  const [reparto, setReparto] = useState<Record<string, { comision: string; gastos: string; igv: string; adelanto: string }>>({})
+  const [aplicandoLiq, setAplicandoLiq] = useState(false)
 
   // ── Verificar contra la factura ──────────────────────────────────────────
   // Sube la factura y COMPARA contra lo guardado, en vez de rellenar. Nace de
@@ -725,6 +766,114 @@ export default function CxCDetallePage() {
       toast.error(e.message || 'Error al procesar el documento')
     } finally {
       setSubiendoDoc(null)
+    }
+  }
+
+  // Lee el Detalle de Liquidación y arma la vista previa de toda la operación.
+  const handleLeerLiquidacionOp = async (file: File) => {
+    setLeyendoLiq(true)
+    setLiqLectura(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/administracion/operaciones-factoring/leer', { method: 'POST', body: fd })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'No se pudo leer el documento') }
+      const data: LecturaLiquidacion = await res.json()
+      setLiqLectura(data)
+
+      // Reparto sugerido: proporcional al monto anticipo de cada factura, que
+      // es como Administración lo hace ("de acuerdo a la suma de la factura").
+      // La última fila absorbe el redondeo para que la suma dé exacta. Es solo
+      // un punto de partida — si BANPRO repartió distinto, se edita.
+      const aplicables = data.coincidencias.filter(c => c.estado === 'lista' && c.cxc)
+      const baseTotal = aplicables.reduce((a, c) => a + (c.montoAnticipo ?? 0), 0)
+      const nuevo: Record<string, { comision: string; gastos: string; igv: string; adelanto: string }> = {}
+      const reparte = (total: number | null, idx: number, acumulado: number) => {
+        if (total == null || baseTotal <= 0) return ''
+        const esUltima = idx === aplicables.length - 1
+        const v = esUltima ? total - acumulado : Math.round(total * ((aplicables[idx].montoAnticipo ?? 0) / baseTotal) * 100) / 100
+        return (Math.round(v * 100) / 100).toFixed(2)
+      }
+      let accCom = 0, accGas = 0, accIgv = 0, accAde = 0
+      aplicables.forEach((c, i) => {
+        const com = reparte(data.operacion.comisionEstructuracion, i, accCom)
+        const gas = reparte(data.operacion.gastosAdicionales, i, accGas)
+        const igv = reparte(data.operacion.igvGastos, i, accIgv)
+        const ade = reparte(data.operacion.adelantoBanpro, i, accAde)
+        accCom += parseFloat(com) || 0; accGas += parseFloat(gas) || 0
+        accIgv += parseFloat(igv) || 0; accAde += parseFloat(ade) || 0
+        nuevo[c.cxc!.id] = { comision: com, gastos: gas, igv, adelanto: ade }
+      })
+      setReparto(nuevo)
+
+      const listas = aplicables.length
+      const problemas = data.coincidencias.length - listas
+      if (listas === 0) toast.error('Ninguna de las facturas del documento se pudo cruzar con una CxC')
+      else toast.success(`${listas} factura(s) listas para registrar${problemas > 0 ? `, ${problemas} con problemas` : ''}`)
+    } catch (e: any) {
+      toast.error(e.message || 'Error al leer la liquidación')
+    } finally {
+      setLeyendoLiq(false)
+    }
+  }
+
+  // Suma del reparto, para contrastarla contra los totales del documento.
+  const sumaReparto = (campo: 'comision' | 'gastos' | 'igv' | 'adelanto') =>
+    Math.round(Object.values(reparto).reduce((a, r) => a + (parseFloat(r[campo]) || 0), 0) * 100) / 100
+
+  const repartoCuadra = liqLectura ? (
+    Math.abs(sumaReparto('comision') - (liqLectura.operacion.comisionEstructuracion ?? 0)) <= 0.05 &&
+    Math.abs(sumaReparto('gastos') - (liqLectura.operacion.gastosAdicionales ?? 0)) <= 0.05 &&
+    Math.abs(sumaReparto('igv') - (liqLectura.operacion.igvGastos ?? 0)) <= 0.05 &&
+    Math.abs(sumaReparto('adelanto') - (liqLectura.operacion.adelantoBanpro ?? 0)) <= 0.05
+  ) : false
+
+  const handleAplicarLiquidacionOp = async () => {
+    if (!liqLectura) return
+    const aplicables = liqLectura.coincidencias.filter(c => c.estado === 'lista' && c.cxc)
+    if (aplicables.length === 0) { toast.error('No hay facturas para registrar'); return }
+    setAplicandoLiq(true)
+    try {
+      const res = await fetch('/api/administracion/operaciones-factoring/aplicar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          numeroOperacion: liqLectura.operacion.numeroOperacion,
+          financiera: liqLectura.operacion.financiera,
+          fechaDesembolso: liqLectura.operacion.fechaDesembolso,
+          totales: {
+            comisionEstructuracion: liqLectura.operacion.comisionEstructuracion ?? 0,
+            gastosAdicionales: liqLectura.operacion.gastosAdicionales ?? 0,
+            igvGastos: liqLectura.operacion.igvGastos ?? 0,
+            adelantoBanpro: liqLectura.operacion.adelantoBanpro ?? 0,
+          },
+          facturas: aplicables.map(c => ({
+            cuentaPorCobrarId: c.cxc!.id,
+            detraccionPct: c.detraccionPct,
+            detraccionMonto: c.detraccionCalculada,
+            excedentePct: c.porcentajeAnticipo != null ? Math.round((100 - c.porcentajeAnticipo) * 100) / 100 : null,
+            excedenteMonto: c.excedenteMonto,
+            valorAFinanciar: c.valorAFinanciar ?? 0,
+            interesMonto: c.interesMonto ?? 0,
+            diasFinanciamiento: c.diasFinanciamiento,
+            fechaVencimiento: c.fechaVencimiento,
+            comisionEstructuracion: parseFloat(reparto[c.cxc!.id]?.comision) || 0,
+            gastosAdicionales: parseFloat(reparto[c.cxc!.id]?.gastos) || 0,
+            igvGastos: parseFloat(reparto[c.cxc!.id]?.igv) || 0,
+            adelantoBanpro: parseFloat(reparto[c.cxc!.id]?.adelanto) || 0,
+          })),
+        }),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error([body.error, ...(body.descuadres ?? [])].filter(Boolean).join(' — '))
+      toast.success(`${body.registradas} factura(s) registradas en la operación ${body.numeroOperacion}`)
+      setShowLiquidacionOp(false)
+      setLiqLectura(null)
+      load(true)
+    } catch (e: any) {
+      toast.error(e.message || 'Error al registrar')
+    } finally {
+      setAplicandoLiq(false)
     }
   }
 
@@ -1188,6 +1337,16 @@ export default function CxCDetallePage() {
               title="Sube la factura y compara con lo que está guardado — no modifica nada por su cuenta"
             >
               <ScanLine className="h-4 w-4 mr-1" /> Verificar factura
+            </Button>
+          )}
+          {cxc.estado !== 'anulada' && !cxc.valorizacion?.cobro && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setLiqLectura(null); setReparto({}); setShowLiquidacionOp(true) }}
+              title="Sube el Detalle de Liquidación y registra todas las facturas de la operación de una vez"
+            >
+              <Building2 className="h-4 w-4 mr-1" /> Registrar operación
             </Button>
           )}
           {(cxc.estado === 'pendiente' || cxc.estado === 'parcial' || cxc.estado === 'vencida') && (
@@ -2432,6 +2591,157 @@ export default function CxCDetallePage() {
       </Dialog>
 
       {/* ── Dialog Editar ── */}
+      {/* Detalle de Liquidación de toda la operación: registra las N facturas
+          de una vez, con los importes por documento que da la financiera. */}
+      <Dialog open={showLiquidacionOp} onOpenChange={open => { setShowLiquidacionOp(open); if (!open) { setLiqLectura(null); setReparto({}) } }}>
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Registrar operación desde el Detalle de Liquidación</DialogTitle>
+            <DialogDescription>
+              Sube el Detalle de Liquidación de la financiera y se registran todas las facturas de la operación de una vez.
+              Los importes por factura los da el documento; comisión, gastos, IGV y adelanto se cobran por la operación
+              completa y hay que repartirlos.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div
+            className="rounded-lg border border-dashed p-3"
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => { e.preventDefault(); if (leyendoLiq) return; const f = e.dataTransfer.files?.[0]; if (f) handleLeerLiquidacionOp(f) }}
+          >
+            <label className={`inline-flex items-center gap-1.5 rounded-md border px-3 h-8 text-xs font-medium cursor-pointer hover:bg-accent ${leyendoLiq ? 'opacity-50 pointer-events-none' : ''}`}>
+              {leyendoLiq ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ScanLine className="h-3.5 w-3.5" />}
+              {leyendoLiq ? 'Leyendo…' : liqLectura ? 'Subir otro documento' : 'Subir Detalle de Liquidación'}
+              <input type="file" accept=".pdf,image/*" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) handleLeerLiquidacionOp(f) }} />
+            </label>
+            <span className="text-xs text-muted-foreground ml-2">o arrástralo acá</span>
+          </div>
+
+          {liqLectura && (() => {
+            const op = liqLectura.operacion
+            const problemas = liqLectura.coincidencias.filter(c => c.estado !== 'lista')
+            const etiquetaProblema: Record<string, string> = {
+              ya_registrada: 'ya tiene un cobro registrado',
+              no_encontrada: 'no se encontró una CxC con ese número',
+              ambigua: 'hay más de una CxC con ese número',
+              sin_numero: 'no se pudo leer el N° de documento',
+            }
+            const fila = (etiqueta: string, campo: 'comision' | 'gastos' | 'igv' | 'adelanto', total: number | null) => {
+              const s = sumaReparto(campo)
+              const cuadra = Math.abs(s - (total ?? 0)) <= 0.05
+              return (
+                <td className={`px-2 py-2 text-right font-mono ${cuadra ? 'text-green-700' : 'text-red-600 font-semibold'}`}>
+                  {s.toFixed(2)}
+                  <div className="text-muted-foreground font-normal">de {(total ?? 0).toFixed(2)}</div>
+                </td>
+              )
+            }
+            return (
+              <div className="space-y-3">
+                <div className="text-sm">
+                  <span className="font-medium">Operación {op.numeroOperacion ?? '—'}</span>
+                  {op.financiera && <span className="text-muted-foreground"> · {op.financiera}</span>}
+                  {op.fechaDesembolso && <span className="text-muted-foreground"> · desembolso {op.fechaDesembolso}</span>}
+                  <span className="text-muted-foreground"> · {liqLectura.coincidencias.length} factura(s) en el documento</span>
+                </div>
+
+                {problemas.length > 0 && (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                    {problemas.map((p, i) => (
+                      <div key={i} className="flex items-start gap-1.5">
+                        <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                        <span>Documento {p.numeroDocumento ?? '(sin número)'}: {etiquetaProblema[p.estado]} — no se va a registrar.</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="border rounded-lg overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50 text-muted-foreground">
+                      <tr>
+                        <th className="px-2 py-2 text-left font-medium">Factura</th>
+                        <th className="px-2 py-2 text-right font-medium">Detracción</th>
+                        <th className="px-2 py-2 text-right font-medium">A Financiar</th>
+                        <th className="px-2 py-2 text-right font-medium">Excedente</th>
+                        <th className="px-2 py-2 text-right font-medium">Interés</th>
+                        <th className="px-2 py-2 text-right font-medium w-24">Comisión</th>
+                        <th className="px-2 py-2 text-right font-medium w-20">Gastos</th>
+                        <th className="px-2 py-2 text-right font-medium w-20">IGV</th>
+                        <th className="px-2 py-2 text-right font-medium w-28">Adelanto</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {liqLectura.coincidencias.filter(c => c.estado === 'lista' && c.cxc).map(c => {
+                        const id = c.cxc!.id
+                        const inp = (campo: 'comision' | 'gastos' | 'igv' | 'adelanto') => (
+                          <Input
+                            className="h-7 text-xs text-right"
+                            type="number"
+                            value={reparto[id]?.[campo] ?? ''}
+                            onChange={e => setReparto(r => ({ ...r, [id]: { ...(r[id] ?? { comision: '', gastos: '', igv: '', adelanto: '' }), [campo]: e.target.value } }))}
+                          />
+                        )
+                        return (
+                          <tr key={id} className="border-t">
+                            <td className="px-2 py-2">
+                              <div className="font-medium">{c.cxc!.numeroDocumento}</div>
+                              <div className="text-muted-foreground">{c.cxc!.proyecto} · {c.cxc!.cliente?.slice(0, 22)}</div>
+                              {c.diasFinanciamiento != null && <div className="text-muted-foreground">{c.diasFinanciamiento} días</div>}
+                            </td>
+                            <td className="px-2 py-2 text-right font-mono">
+                              {c.detraccionCalculada?.toFixed(2) ?? '—'}
+                              {c.detraccionPct != null && <div className="text-muted-foreground">{c.detraccionPct}%</div>}
+                            </td>
+                            <td className="px-2 py-2 text-right font-mono">{c.valorAFinanciar?.toFixed(2) ?? '—'}</td>
+                            <td className="px-2 py-2 text-right font-mono">{c.excedenteMonto?.toFixed(2) ?? '—'}</td>
+                            <td className="px-2 py-2 text-right font-mono">{c.interesMonto?.toFixed(2) ?? '—'}</td>
+                            <td className="px-2 py-2">{inp('comision')}</td>
+                            <td className="px-2 py-2">{inp('gastos')}</td>
+                            <td className="px-2 py-2">{inp('igv')}</td>
+                            <td className="px-2 py-2">{inp('adelanto')}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t bg-gray-50 font-semibold">
+                        <td className="px-2 py-2" colSpan={5}>Reparto — tiene que sumar el total del documento</td>
+                        {fila('Comisión', 'comision', op.comisionEstructuracion)}
+                        {fila('Gastos', 'gastos', op.gastosAdicionales)}
+                        {fila('IGV', 'igv', op.igvGastos)}
+                        {fila('Adelanto', 'adelanto', op.adelantoBanpro)}
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  El reparto viene sugerido en proporción al monto anticipo de cada factura — ajústalo si la financiera lo
+                  repartió distinto. El <strong>adelanto es un solo depósito</strong> de {(op.adelantoBanpro ?? 0).toFixed(2)},
+                  así que la suma tiene que dar exacto.
+                </p>
+              </div>
+            )
+          })()}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLiquidacionOp(false)}>Cancelar</Button>
+            {liqLectura && (
+              <Button
+                onClick={handleAplicarLiquidacionOp}
+                disabled={aplicandoLiq || !repartoCuadra || liqLectura.coincidencias.filter(c => c.estado === 'lista').length === 0}
+                title={!repartoCuadra ? 'El reparto no suma los totales del documento' : undefined}
+              >
+                {aplicandoLiq ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                Registrar {liqLectura.coincidencias.filter(c => c.estado === 'lista').length} factura(s)
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Verificar contra la factura — compara, no rellena. */}
       <Dialog open={showVerificar} onOpenChange={open => { setShowVerificar(open); if (!open) setVerifResultado(null) }}>
         <DialogContent className="max-w-2xl">
