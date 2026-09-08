@@ -2422,7 +2422,35 @@ model CobroValorizacion {
   adelantoBanpro         Float? // si ya se giró un adelanto
   saldoAGirar            Float? // = montoADesembolsar - adelantoBanpro
   numeroFacturaInteres   String? // N° de factura emitida por la financiera por el interés
+  fechaFacturaInteres    DateTime?
   numeroFacturaGastos    String? // N° de factura emitida por la financiera por comisión/gastos
+  fechaFacturaGastos     DateTime?
+
+  // ── Cierre de la operación ────────────────────────────────────────────────
+  // Lo que pasa DESPUÉS del desembolso, cuando el cliente paga y la financiera
+  // liquida. Van en dos bloques, cada uno contra un evento del Cronograma:
+  //
+  //   Saldo a Girar − Interés Reliquidación = Líquido a Girar
+  //   Excedente + Mora + Com. Interés + Diferencia + Otros = Total Excedente
+  //
+  // Los dos resultados son derivados, no se guardan: son el monto real de los
+  // eventos 'saldo_girar' y 'excedente'. Acá solo van los descuentos, que son
+  // el dato nuevo — hasta ahora la diferencia entre lo esperado y lo recibido
+  // se registraba sin decir por qué.
+  //
+  // Van CON SIGNO como los manda BANPRO en el Informe de Excedentes: la mora
+  // llega negativa y la diferencia puede ser de cualquier signo (+0.12 en una
+  // operación, −0.04 en otra).
+  interesReliquidacion   Float? // recálculo del interés según la fecha real de pago
+  mora                   Float? // penalidad de la financiera por pago tardío del cliente
+  comisionInteres        Float? // cuando el cliente pide plazo adicional
+  diferencia             Float? // redondeos o el monto que finalmente reconoce el cliente
+  otros                  Float?
+  // La financiera factura la reliquidación y la mora por separado.
+  numeroFacturaReliquidacion String?
+  fechaFacturaReliquidacion  DateTime?
+  numeroFacturaMora          String?
+  fechaFacturaMora           DateTime?
   // Legacy (mantener para compatibilidad)
   montoDescontado        Float? // total costos/descuentos
   montoNeto              Float? // = montoADesembolsar (alias)

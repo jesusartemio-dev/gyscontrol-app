@@ -41,6 +41,20 @@ const CobroSchema = z.object({
   montoADesembolsar: z.number().min(0).optional().nullable(),
   adelantoBanpro: z.number().min(0).optional().nullable(),
   saldoAGirar: z.number().optional().nullable(),
+  // Cierre de la operación. Van CON SIGNO como los manda la financiera en el
+  // Informe de Excedentes: la mora llega negativa y la diferencia puede ser de
+  // cualquier signo, así que no llevan .min(0).
+  interesReliquidacion: z.number().optional().nullable(),
+  mora: z.number().optional().nullable(),
+  comisionInteres: z.number().optional().nullable(),
+  diferencia: z.number().optional().nullable(),
+  otros: z.number().optional().nullable(),
+  numeroFacturaReliquidacion: z.string().max(100).optional().nullable(),
+  fechaFacturaReliquidacion: z.string().optional().nullable(),
+  numeroFacturaMora: z.string().max(100).optional().nullable(),
+  fechaFacturaMora: z.string().optional().nullable(),
+  fechaFacturaInteres: z.string().optional().nullable(),
+  fechaFacturaGastos: z.string().optional().nullable(),
   // Legacy aliases
   montoDescontado: z.number().min(0).optional().nullable(),
   montoNeto: z.number().min(0).optional().nullable(),
@@ -79,6 +93,18 @@ function buildUpsertPayload(data: CobroData) {
     montoADesembolsar: data.montoADesembolsar ?? null,
     adelantoBanpro: data.adelantoBanpro ?? null,
     saldoAGirar: data.saldoAGirar ?? null,
+    // Cierre de la operación
+    interesReliquidacion: data.interesReliquidacion ?? null,
+    mora: data.mora ?? null,
+    comisionInteres: data.comisionInteres ?? null,
+    diferencia: data.diferencia ?? null,
+    otros: data.otros ?? null,
+    numeroFacturaReliquidacion: data.numeroFacturaReliquidacion ?? null,
+    fechaFacturaReliquidacion: data.fechaFacturaReliquidacion ? new Date(data.fechaFacturaReliquidacion) : null,
+    numeroFacturaMora: data.numeroFacturaMora ?? null,
+    fechaFacturaMora: data.fechaFacturaMora ? new Date(data.fechaFacturaMora) : null,
+    fechaFacturaInteres: data.fechaFacturaInteres ? new Date(data.fechaFacturaInteres) : null,
+    fechaFacturaGastos: data.fechaFacturaGastos ? new Date(data.fechaFacturaGastos) : null,
     // Legacy
     montoDescontado: data.montoDescontado ?? null,
     montoNeto: data.montoNeto ?? null,

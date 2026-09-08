@@ -62,6 +62,14 @@ interface CobroValorizacion {
   montoADesembolsar: number | null
   adelantoBanpro: number | null
   saldoAGirar: number | null
+  // Cierre de la operación
+  interesReliquidacion: number | null
+  mora: number | null
+  comisionInteres: number | null
+  diferencia: number | null
+  otros: number | null
+  numeroFacturaReliquidacion: string | null
+  numeroFacturaMora: string | null
   montoNetoDirecto: number | null
   confirmacionCliente: string | null
   fechaVencimientoPago: string | null
@@ -386,6 +394,13 @@ export default function CxCDetallePage() {
   const [cobroGastos, setCobroGastos]                   = useState('')
   const [cobroIgvGastos, setCobroIgvGastos]             = useState('')
   const [cobroAdelantoBanpro, setCobroAdelantoBanpro]   = useState('')
+  // Cierre de la operación: lo que descuenta la financiera después del
+  // desembolso. Llegan del Informe de Excedentes y de sus facturas.
+  const [cobroInteresReliquidacion, setCobroInteresReliquidacion] = useState('')
+  const [cobroMora, setCobroMora]                       = useState('')
+  const [cobroComisionInteres, setCobroComisionInteres] = useState('')
+  const [cobroDiferencia, setCobroDiferencia]           = useState('')
+  const [cobroOtros, setCobroOtros]                     = useState('')
   // Cobro directo — mini liquidación (Neto/Detracción/Retención), mismo
   // Cronograma de Cobro que factoring pero sin Adelanto/Saldo a Girar/
   // Excedente (mecánica exclusiva de la financiera).
@@ -512,6 +527,11 @@ export default function CxCDetallePage() {
         setCobroGastos(cobro.gastosAdicionales?.toString() || '')
         setCobroIgvGastos(cobro.igvGastos?.toString() || '')
         setCobroAdelantoBanpro(cobro.adelantoBanpro?.toString() || '')
+        setCobroInteresReliquidacion(cobro.interesReliquidacion?.toString() || '')
+        setCobroMora(cobro.mora?.toString() || '')
+        setCobroComisionInteres(cobro.comisionInteres?.toString() || '')
+        setCobroDiferencia(cobro.diferencia?.toString() || '')
+        setCobroOtros(cobro.otros?.toString() || '')
         setCobroMontoNetoDirecto(cobro.montoNetoDirecto?.toString() || '')
         setCobroConfirmacion(cobro.confirmacionCliente || '')
         setCobroFechaVencPago(cobro.fechaVencimientoPago ? cobro.fechaVencimientoPago.split('T')[0] : '')
@@ -593,13 +613,34 @@ export default function CxCDetallePage() {
     const sumaEventos = adelanto + saldo + totalCostos + excMonto + detMonto + retMonto
     const descuadre = base - sumaEventos
 
+    // ── Cierre de la operación ──────────────────────────────────────────────
+    // El anticipo antes de descontar comisión y gastos: es el "MTO.ANT.
+    // S/DESCTO" del Detalle de Liquidación.
+    const montoAnticipo = aFinanciar - interes
+
+    // La financiera liquida en dos momentos y contra dos eventos distintos:
+    // la reliquidación del interés sale del Saldo a Girar, y la mora y el
+    // resto salen del Excedente.
+    const interesReliq = n(cobroInteresReliquidacion)
+    const liquidoAGirar = saldo - interesReliq
+
+    // Con signo, como los manda BANPRO: la mora llega negativa y la diferencia
+    // puede ser de cualquier signo. Por eso se suman, no se restan.
+    const mora = n(cobroMora)
+    const comInteres = n(cobroComisionInteres)
+    const diferencia = n(cobroDiferencia)
+    const otros = n(cobroOtros)
+    const totalExcedente = excMonto + mora + comInteres + diferencia + otros
+
     return {
       base, detMonto, retMonto, valorNeto, excMonto, aFinanciar, totalCostos, aDesembolsar, saldo,
       refInteres, refInteresDisponible, detEsperada, detraccionSospechosa, sumaEventos, descuadre,
+      montoAnticipo, interesReliq, liquidoAGirar, mora, comInteres, diferencia, otros, totalExcedente,
     }
   }, [cxc, cobroDetraccionPct, cobroDetraccionMonto, cobroRetencionPct, cobroRetencionMonto, cobroExcedentePct, cobroExcedenteMonto,
       cobroValorAFinanciar, cobroInteres, cobroComision, cobroGastos, cobroIgvGastos,
-      cobroAdelantoBanpro, cobroTasa, cobroDias])
+      cobroAdelantoBanpro, cobroTasa, cobroDias,
+      cobroInteresReliquidacion, cobroMora, cobroComisionInteres, cobroDiferencia, cobroOtros])
 
   // ── Mini liquidación cobro directo (Neto = Base − Detracción − Retención) ──
   const liqDirecto = useMemo(() => {
@@ -1053,6 +1094,11 @@ export default function CxCDetallePage() {
         body.igvGastos           = cobroIgvGastos ? parseFloat(cobroIgvGastos) : null
         body.montoADesembolsar   = liq.aDesembolsar
         body.adelantoBanpro      = cobroAdelantoBanpro ? parseFloat(cobroAdelantoBanpro) : null
+        body.interesReliquidacion = cobroInteresReliquidacion ? parseFloat(cobroInteresReliquidacion) : null
+        body.mora                = cobroMora ? parseFloat(cobroMora) : null
+        body.comisionInteres     = cobroComisionInteres ? parseFloat(cobroComisionInteres) : null
+        body.diferencia          = cobroDiferencia ? parseFloat(cobroDiferencia) : null
+        body.otros               = cobroOtros ? parseFloat(cobroOtros) : null
         body.saldoAGirar         = liq.saldo
         body.montoDescontado     = liq.totalCostos
         body.montoNeto           = liq.aDesembolsar
@@ -1541,6 +1587,28 @@ export default function CxCDetallePage() {
                         'Operación',
                         `N° ${operacion.numeroOperacion} — ${operacion.facturas.length} facturas`
                       )}
+                      {/* Cierre de la operación: solo aparece si la financiera
+                          ya liquidó algo. Antes de que el cliente pague, estos
+                          campos están vacíos y no tiene sentido mostrarlos. */}
+                      {cobro.interesReliquidacion != null && labelRow(
+                        'Interés Reliquidación',
+                        `${formatCurrency(cobro.interesReliquidacion, cxc.moneda)}${cobro.numeroFacturaReliquidacion ? ` · fact. ${cobro.numeroFacturaReliquidacion}` : ''}`
+                      )}
+                      {cobro.mora != null && labelRow(
+                        'Mora',
+                        `${formatCurrency(cobro.mora, cxc.moneda)}${cobro.numeroFacturaMora ? ` · fact. ${cobro.numeroFacturaMora}` : ''}`
+                      )}
+                      {cobro.comisionInteres != null && labelRow('Com. Interés', formatCurrency(cobro.comisionInteres, cxc.moneda))}
+                      {cobro.diferencia != null && labelRow('Diferencia', formatCurrency(cobro.diferencia, cxc.moneda))}
+                      {cobro.otros != null && labelRow('Otros', formatCurrency(cobro.otros, cxc.moneda))}
+                      {(cobro.mora != null || cobro.diferencia != null || cobro.comisionInteres != null || cobro.otros != null) &&
+                        cobro.excedenteMonto != null && labelRow(
+                          'Total Excedente',
+                          formatCurrency(
+                            cobro.excedenteMonto + (cobro.mora ?? 0) + (cobro.comisionInteres ?? 0) + (cobro.diferencia ?? 0) + (cobro.otros ?? 0),
+                            cxc.moneda
+                          )
+                        )}
                     </> : <>
                       {labelRow('Fecha de Cobro', cobro.fechaDesembolso ? formatDate(cobro.fechaDesembolso) : null)}
                       {labelRow('Detracción', detraccionResumen)}
@@ -1860,6 +1928,16 @@ export default function CxCDetallePage() {
                                   )}
                                 </td>
                               </tr>
+                              {/* Va acá y no después del IGV como en la hoja de
+                                  Administración: sale de Valor a Financiar −
+                                  Interés, así la columna se lee como una
+                                  cascada. Es el orden del propio documento de
+                                  BANPRO ("MTO.ANT. S/DESCTO"). */}
+                              <tr className="border-b font-medium">
+                                <td className="px-3 py-2">Monto Anticipo</td>
+                                <td className="px-3 py-2 text-right">{formatCurrency(liq.montoAnticipo, cxc.moneda)}</td>
+                                <td></td>
+                              </tr>
                               <tr className="border-b bg-gray-50">
                                 <td className="px-3 py-2 text-muted-foreground">Comisión</td>
                                 <td className="px-3 py-2 text-right text-red-600">− {formatCurrency(n(cobroComision), cxc.moneda)}</td>
@@ -1883,12 +1961,67 @@ export default function CxCDetallePage() {
                               <tr className="border-b bg-gray-50">
                                 <td className="px-3 py-2 text-muted-foreground">Adelanto Banpro</td>
                                 <td className="px-3 py-2 text-right text-red-600">− {formatCurrency(n(cobroAdelantoBanpro), cxc.moneda)}</td>
+                                {/* marcador-adelanto */}
                                 <td className="px-3 py-2"><Input className="h-7 text-xs" type="number" placeholder="0.00" value={cobroAdelantoBanpro} onChange={e => setCobroAdelantoBanpro(e.target.value)} /></td>
                               </tr>
                               <tr className="font-bold text-base">
                                 <td className="px-3 py-2">Saldo a Girar</td>
                                 <td className="px-3 py-2 text-right text-blue-700">{formatCurrency(liq.saldo, cxc.moneda)}</td>
                                 <td></td>
+                              </tr>
+
+                              {/* Cierre de la operación: la financiera liquida
+                                  cuando el cliente paga. La reliquidación baja
+                                  el Saldo a Girar; la mora y el resto bajan el
+                                  Excedente. Van con signo, como los manda el
+                                  Informe de Excedentes. */}
+                              <tr className="border-b border-t-2">
+                                <td className="px-3 py-2 text-muted-foreground">Interés Reliquidación</td>
+                                <td className="px-3 py-2 text-right text-red-600">{liq.interesReliq ? `− ${formatCurrency(liq.interesReliq, cxc.moneda)}` : formatCurrency(0, cxc.moneda)}</td>
+                                <td className="px-3 py-2">
+                                  <Input className="h-7 text-xs" type="number" placeholder="0.00" value={cobroInteresReliquidacion} onChange={e => setCobroInteresReliquidacion(e.target.value)} />
+                                </td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="px-3 py-2 font-medium">Líquido a Girar</td>
+                                <td className="px-3 py-2 text-right font-medium text-blue-700">{formatCurrency(liq.liquidoAGirar, cxc.moneda)}</td>
+                                <td></td>
+                              </tr>
+                              <tr className="border-b bg-gray-50">
+                                <td className="px-3 py-2 text-muted-foreground">Mora</td>
+                                <td className="px-3 py-2 text-right text-red-600">{formatCurrency(liq.mora, cxc.moneda)}</td>
+                                <td className="px-3 py-2">
+                                  <Input className="h-7 text-xs" type="number" placeholder="0.00" value={cobroMora} onChange={e => setCobroMora(e.target.value)} />
+                                </td>
+                              </tr>
+                              <tr className="border-b bg-gray-50">
+                                <td className="px-3 py-2 text-muted-foreground">Com. Interés</td>
+                                <td className="px-3 py-2 text-right">{formatCurrency(liq.comInteres, cxc.moneda)}</td>
+                                <td className="px-3 py-2">
+                                  <Input className="h-7 text-xs" type="number" placeholder="0.00" value={cobroComisionInteres} onChange={e => setCobroComisionInteres(e.target.value)} />
+                                </td>
+                              </tr>
+                              <tr className="border-b bg-gray-50">
+                                <td className="px-3 py-2 text-muted-foreground">
+                                  Diferencia
+                                  <span className="block text-xs">redondeos — puede ser + o −</span>
+                                </td>
+                                <td className="px-3 py-2 text-right">{formatCurrency(liq.diferencia, cxc.moneda)}</td>
+                                <td className="px-3 py-2">
+                                  <Input className="h-7 text-xs" type="number" placeholder="0.00" value={cobroDiferencia} onChange={e => setCobroDiferencia(e.target.value)} />
+                                </td>
+                              </tr>
+                              <tr className="border-b bg-gray-50">
+                                <td className="px-3 py-2 text-muted-foreground">Otros</td>
+                                <td className="px-3 py-2 text-right">{formatCurrency(liq.otros, cxc.moneda)}</td>
+                                <td className="px-3 py-2">
+                                  <Input className="h-7 text-xs" type="number" placeholder="0.00" value={cobroOtros} onChange={e => setCobroOtros(e.target.value)} />
+                                </td>
+                              </tr>
+                              <tr className="bg-emerald-50">
+                                <td className="px-3 py-2 font-semibold">Total Excedente</td>
+                                <td className="px-3 py-2 text-right font-semibold text-emerald-700">{formatCurrency(liq.totalExcedente, cxc.moneda)}</td>
+                                <td className="px-3 py-2 text-xs text-muted-foreground">a devolver a GYS</td>
                               </tr>
                             </tbody>
                           </table>
