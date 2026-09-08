@@ -104,6 +104,30 @@ interface PagoCobro {
   cuentaBancaria: { id: string; nombreBanco: string; numeroCuenta: string } | null
 }
 
+/** Lo que devuelve el lector del Informe de Excedentes, ya cruzado con las CxC. */
+interface LecturaExcedentes {
+  informe: { financiera: string | null; fechaInforme: string | null; totalGeneral: number | null; filas: number }
+  observaciones: string | null
+  coincidencias: {
+    numeroOperacion: string | null
+    numeroDocumento: string | null
+    deudor: string | null
+    fechaRecaudacion: string | null
+    montoExcedente: number | null
+    mora: number | null
+    comisionInteres: number | null
+    diferencia: number | null
+    otros: number | null
+    total: number | null
+    sumado: number
+    cuadraTotal: boolean
+    estado: 'lista' | 'ya_cerrada' | 'sin_cobro' | 'operacion_distinta' | 'no_encontrada' | 'ambigua' | 'sin_numero'
+    cobroId?: string | null
+    excedenteEsperado?: number | null
+    cxc: { id: string; numeroDocumento: string | null; moneda: string; cliente: string | null; proyecto: string | null } | null
+  }[]
+}
+
 /** Lo que devuelve el lector del Detalle de Liquidación, ya cruzado con las CxC. */
 interface LecturaLiquidacion {
   operacion: {
@@ -340,6 +364,15 @@ export default function CxCDetallePage() {
   const [liqLectura, setLiqLectura] = useState<LecturaLiquidacion | null>(null)
   const [reparto, setReparto] = useState<Record<string, { comision: string; gastos: string; igv: string; adelanto: string }>>({})
   const [aplicandoLiq, setAplicandoLiq] = useState(false)
+
+  // ── Informe de Excedentes ────────────────────────────────────────────────
+  // Llega el día siguiente de que el cliente paga y liquida el excedente por
+  // FACTURA, no por operación: la misma operación aparece en informes
+  // distintos según cuándo se cobró cada una.
+  const [showExcedentes, setShowExcedentes] = useState(false)
+  const [leyendoExc, setLeyendoExc] = useState(false)
+  const [excLectura, setExcLectura] = useState<LecturaExcedentes | null>(null)
+  const [aplicandoExc, setAplicandoExc] = useState(false)
 
   // ── Verificar contra la factura ──────────────────────────────────────────
   // Sube la factura y COMPARA contra lo guardado, en vez de rellenar. Nace de
@@ -807,6 +840,58 @@ export default function CxCDetallePage() {
       toast.error(e.message || 'Error al procesar el documento')
     } finally {
       setSubiendoDoc(null)
+    }
+  }
+
+  const handleLeerExcedentes = async (file: File) => {
+    setLeyendoExc(true)
+    setExcLectura(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/administracion/operaciones-factoring/leer-excedentes', { method: 'POST', body: fd })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'No se pudo leer el informe') }
+      const data: LecturaExcedentes = await res.json()
+      setExcLectura(data)
+      const listas = data.coincidencias.filter(c => c.estado === 'lista').length
+      if (data.observaciones) toast(`Nota del lector: ${data.observaciones}`, { icon: '⚠️' })
+      if (listas === 0) toast.error('Ninguna fila del informe se pudo aplicar')
+      else toast.success(`${listas} de ${data.coincidencias.length} fila(s) listas para cerrar`)
+    } catch (e: any) {
+      toast.error(e.message || 'Error al leer el informe')
+    } finally {
+      setLeyendoExc(false)
+    }
+  }
+
+  const handleAplicarExcedentes = async () => {
+    if (!excLectura) return
+    const listas = excLectura.coincidencias.filter(c => c.estado === 'lista' && c.cobroId)
+    if (listas.length === 0) { toast.error('No hay filas para aplicar'); return }
+    setAplicandoExc(true)
+    try {
+      const res = await fetch('/api/administracion/operaciones-factoring/aplicar-excedentes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cierres: listas.map(c => ({
+            cobroId: c.cobroId,
+            mora: c.mora, comisionInteres: c.comisionInteres,
+            diferencia: c.diferencia, otros: c.otros,
+            fechaRecaudacion: c.fechaRecaudacion,
+          })),
+        }),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error([body.error, ...(body.descuadres ?? [])].filter(Boolean).join(' — '))
+      toast.success(`${body.cerradas} factura(s) cerradas con el informe`)
+      setShowExcedentes(false)
+      setExcLectura(null)
+      load(true)
+    } catch (e: any) {
+      toast.error(e.message || 'Error al aplicar el informe')
+    } finally {
+      setAplicandoExc(false)
     }
   }
 
@@ -1393,6 +1478,16 @@ export default function CxCDetallePage() {
               title="Sube el Detalle de Liquidación y registra todas las facturas de la operación de una vez"
             >
               <Building2 className="h-4 w-4 mr-1" /> Registrar operación
+            </Button>
+          )}
+          {cxc.estado !== 'anulada' && cxc.valorizacion?.cobro?.tipo === 'factoring' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setExcLectura(null); setShowExcedentes(true) }}
+              title="Sube el Informe de Excedentes y cierra las facturas que el cliente ya pagó"
+            >
+              <ScanLine className="h-4 w-4 mr-1" /> Informe de Excedentes
             </Button>
           )}
           {(cxc.estado === 'pendiente' || cxc.estado === 'parcial' || cxc.estado === 'vencida') && (
@@ -2724,6 +2819,115 @@ export default function CxCDetallePage() {
       </Dialog>
 
       {/* ── Dialog Editar ── */}
+      {/* Informe de Excedentes: cierra las facturas que el cliente ya pagó. */}
+      <Dialog open={showExcedentes} onOpenChange={open => { setShowExcedentes(open); if (!open) setExcLectura(null) }}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Cerrar con el Informe de Excedentes</DialogTitle>
+            <DialogDescription>
+              Sube el informe que manda la financiera al día siguiente de que el cliente paga. Liquida el excedente
+              por factura, así que un mismo informe puede cerrar varias — incluso de operaciones distintas.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div
+            className="rounded-lg border border-dashed p-3"
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => { e.preventDefault(); if (leyendoExc) return; const f = e.dataTransfer.files?.[0]; if (f) handleLeerExcedentes(f) }}
+          >
+            <label className={`inline-flex items-center gap-1.5 rounded-md border px-3 h-8 text-xs font-medium cursor-pointer hover:bg-accent ${leyendoExc ? 'opacity-50 pointer-events-none' : ''}`}>
+              {leyendoExc ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ScanLine className="h-3.5 w-3.5" />}
+              {leyendoExc ? 'Leyendo…' : excLectura ? 'Subir otro informe' : 'Subir Informe de Excedentes'}
+              <input type="file" accept=".pdf,image/*" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) handleLeerExcedentes(f) }} />
+            </label>
+            <span className="text-xs text-muted-foreground ml-2">o arrástralo acá</span>
+          </div>
+
+          {excLectura && (() => {
+            const etiqueta: Record<string, string> = {
+              ya_cerrada: 'ya tiene el cierre cargado',
+              sin_cobro: 'la factura no tiene factoring registrado',
+              operacion_distinta: 'la operación del informe no coincide con la registrada',
+              no_encontrada: 'no se encontró una CxC con ese número',
+              ambigua: 'hay más de una CxC con ese número',
+              sin_numero: 'no se pudo leer el N° de documento',
+            }
+            return (
+              <div className="space-y-3">
+                <div className="text-sm text-muted-foreground">
+                  {excLectura.informe.financiera ?? 'Informe'} · {excLectura.informe.fechaInforme ?? 'sin fecha'} ·
+                  {' '}{excLectura.informe.filas} fila(s)
+                  {excLectura.informe.totalGeneral != null && ` · total general ${excLectura.informe.totalGeneral.toFixed(2)}`}
+                </div>
+
+                <div className="border rounded-lg overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50 text-muted-foreground">
+                      <tr>
+                        <th className="px-2 py-2 text-left font-medium">Factura</th>
+                        <th className="px-2 py-2 text-left font-medium">Recaudación</th>
+                        <th className="px-2 py-2 text-right font-medium">Excedente</th>
+                        <th className="px-2 py-2 text-right font-medium">Mora</th>
+                        <th className="px-2 py-2 text-right font-medium">Com. Int.</th>
+                        <th className="px-2 py-2 text-right font-medium">Diferencia</th>
+                        <th className="px-2 py-2 text-right font-medium">Otros</th>
+                        <th className="px-2 py-2 text-right font-medium">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {excLectura.coincidencias.map((c, i) => (
+                        <tr key={i} className={`border-t ${c.estado === 'lista' ? '' : 'bg-amber-50 text-muted-foreground'}`}>
+                          <td className="px-2 py-2">
+                            <div className="font-medium">{c.cxc?.numeroDocumento ?? c.numeroDocumento ?? '—'}</div>
+                            <div>{c.cxc ? `${c.cxc.proyecto} · ${c.cxc.cliente?.slice(0, 20)}` : (c.deudor?.slice(0, 26) ?? '')}</div>
+                            {c.estado !== 'lista' && (
+                              <div className="text-amber-800 flex items-start gap-1 mt-0.5">
+                                <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                                <span>{etiqueta[c.estado]} — no se aplica</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-2 py-2">{c.fechaRecaudacion ?? '—'}</td>
+                          <td className="px-2 py-2 text-right font-mono">{c.montoExcedente?.toFixed(2) ?? '—'}</td>
+                          <td className="px-2 py-2 text-right font-mono text-red-600">{c.mora?.toFixed(2) ?? '—'}</td>
+                          <td className="px-2 py-2 text-right font-mono">{c.comisionInteres?.toFixed(2) ?? '—'}</td>
+                          <td className="px-2 py-2 text-right font-mono">{c.diferencia?.toFixed(2) ?? '—'}</td>
+                          <td className="px-2 py-2 text-right font-mono">{c.otros?.toFixed(2) ?? '—'}</td>
+                          <td className={`px-2 py-2 text-right font-mono font-semibold ${c.cuadraTotal ? 'text-emerald-700' : 'text-red-600'}`}>
+                            {c.total?.toFixed(2) ?? '—'}
+                            {!c.cuadraTotal && <div className="font-normal">suma {c.sumado.toFixed(2)}</div>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  Se guarda el desglose y la fecha en que el cliente pagó. <strong>No marca el excedente como recibido</strong>:
+                  el informe dice cuánto va a devolver la financiera, no que ya lo haya depositado. Eso se confirma desde el
+                  Cronograma cuando entra la plata, y ahí el Total ya aparece calculado.
+                </p>
+              </div>
+            )
+          })()}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowExcedentes(false)}>Cancelar</Button>
+            {excLectura && (
+              <Button
+                onClick={handleAplicarExcedentes}
+                disabled={aplicandoExc || excLectura.coincidencias.filter(c => c.estado === 'lista').length === 0}
+              >
+                {aplicandoExc ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                Cerrar {excLectura.coincidencias.filter(c => c.estado === 'lista').length} factura(s)
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Detalle de Liquidación de toda la operación: registra las N facturas
           de una vez, con los importes por documento que da la financiera. */}
       <Dialog open={showLiquidacionOp} onOpenChange={open => { setShowLiquidacionOp(open); if (!open) { setLiqLectura(null); setReparto({}) } }}>

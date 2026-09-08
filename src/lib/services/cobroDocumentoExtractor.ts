@@ -10,7 +10,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getModelForTask } from '@/lib/agente/models'
 import { trackUsage } from '@/lib/agente/usageTracker'
 
-export type TipoDocumentoCobro = 'factura' | 'liquidacion_factoring' | 'voucher_transferencia'
+export type TipoDocumentoCobro = 'factura' | 'liquidacion_factoring' | 'voucher_transferencia' | 'informe_excedentes'
 /** 'auto' = que el modelo identifique cuál de los 3 documentos es (se usa al
  *  pegar una captura o arrastrar un archivo, donde el usuario no eligió tipo). */
 export type TipoDocumentoCobroInput = TipoDocumentoCobro | 'auto'
@@ -91,6 +91,41 @@ export interface ExtraccionLiquidacion {
   saldoAGirar: number | null
 }
 
+/**
+ * Una fila del Informe de Excedentes: el cierre de UNA factura. La financiera
+ * lo manda al día siguiente de que el cliente paga, y liquida el excedente
+ * descontando la mora y el resto.
+ *
+ *   TOTAL = MONTO EXC. + MORA + COM.INTER. + DIFERENCIA + OTROS
+ *
+ * Los descuentos vienen CON SIGNO (la mora negativa; la diferencia de
+ * cualquier signo), así que la fórmula es una suma.
+ */
+export interface ExcedenteFila {
+  deudor: string | null
+  numeroOperacion: string | null
+  numeroDocumento: string | null
+  moneda: 'PEN' | 'USD' | null
+  fechaVencimiento: string | null
+  fechaRecaudacion: string | null   // cuándo pagó el cliente de verdad
+  montoNeto: number | null
+  montoAnticipado: number | null
+  montoExcedente: number | null
+  mora: number | null
+  comisionInteres: number | null
+  diferencia: number | null
+  otros: number | null
+  total: number | null              // lo que la financiera devuelve a GYS
+}
+
+/** Informe de Excedentes: liquida varias operaciones/facturas a la vez. */
+export interface ExtraccionInformeExcedentes {
+  financiera: string | null
+  fechaInforme: string | null
+  filas: ExcedenteFila[]
+  totalGeneral: number | null
+}
+
 /** Voucher de transferencia bancaria (solo cobro directo). */
 export interface ExtraccionVoucher {
   fechaOperacion: string | null
@@ -105,6 +140,7 @@ export type ResultadoExtraccion =
   | { tipo: 'factura'; datos: ExtraccionFactura; confianza: Confianza; observaciones: string | null }
   | { tipo: 'liquidacion_factoring'; datos: ExtraccionLiquidacion; confianza: Confianza; observaciones: string | null }
   | { tipo: 'voucher_transferencia'; datos: ExtraccionVoucher; confianza: Confianza; observaciones: string | null }
+  | { tipo: 'informe_excedentes'; datos: ExtraccionInformeExcedentes; confianza: Confianza; observaciones: string | null }
   | { tipo: 'desconocido'; datos: null; confianza: Confianza; observaciones: string | null }
 
 export type Confianza = 'alta' | 'media' | 'baja'
@@ -210,6 +246,54 @@ Equivalencias de nombres (la financiera usa sus propias etiquetas):
 }
 
 "documentos" lleva UNA entrada por cada fila de la tabla, sin la fila TOTAL.`,
+  },
+  informe_excedentes: {
+    system: `${SYSTEM_BASE}
+
+Estás leyendo un INFORME DE EXCEDENTES de una financiera (normalmente BANPRO). Es el documento que manda al día siguiente de que el cliente paga una factura, y liquida el excedente que le devuelve a GYS.
+
+Es una TABLA CON VARIAS FILAS: cada fila es UNA factura de UNA operación, y pueden ser de operaciones y deudores distintos. Devuelve TODAS las filas. NO incluyas la fila del total general como si fuera una factura — ese número va en "totalGeneral".
+
+Columnas:
+- "NOMBRE DEUDOR" = el cliente que pagó.
+- "OPERACIÓN" = N° de operación de factoring. Puede repetirse entre filas cuando la operación cubrió varias facturas.
+- "DOCUMENTO" = N° de la factura (suelen ser los últimos dígitos, ej. 1719).
+- "FECHA VTO." = vencimiento pactado. "FECHA RECAUDACIÓN" = cuándo pagó el cliente de verdad.
+- "MONTO NETO" = la factura neta de detracción. "MONTO ANT." = lo que se anticipó. "MONTO EXC." = el excedente retenido.
+- "MORA", "COM. INTER.", "DIFERENCIA", "OTROS" = descuentos sobre el excedente.
+- "TOTAL" = lo que la financiera devuelve a GYS por esa factura.
+
+MUY IMPORTANTE — los signos:
+Copia los importes TAL COMO APARECEN, con su signo. La mora suele venir negativa (ej. -255.44) y la diferencia puede ser positiva o negativa (+0.12 en una fila, -0.04 en otra). NO les cambies el signo ni los conviertas a positivos: se verifica que MONTO EXC. + MORA + COM.INTER. + DIFERENCIA + OTROS dé el TOTAL de esa fila.`,
+    user: `Extrae todas las filas de este Informe de Excedentes y devuelve ÚNICAMENTE este JSON:
+
+{
+  "financiera": "string (ej: BANPRO) o null",
+  "fechaInforme": "YYYY-MM-DD o null",
+  "filas": [
+    {
+      "deudor": "string o null",
+      "numeroOperacion": "string o null",
+      "numeroDocumento": "string o null",
+      "moneda": "PEN|USD o null",
+      "fechaVencimiento": "YYYY-MM-DD o null",
+      "fechaRecaudacion": "YYYY-MM-DD o null",
+      "montoNeto": number o null,
+      "montoAnticipado": number o null,
+      "montoExcedente": number o null,
+      "mora": number o null,
+      "comisionInteres": number o null,
+      "diferencia": number o null,
+      "otros": number o null,
+      "total": number o null
+    }
+  ],
+  "totalGeneral": number o null,
+  "confianza": "alta|media|baja",
+  "observaciones": "string si algo no se pudo leer bien, null si todo OK"
+}
+
+"filas" lleva una entrada por cada factura de la tabla, sin la fila del total general.`,
   },
   voucher_transferencia: {
     system: `${SYSTEM_BASE}
@@ -390,6 +474,9 @@ export async function extraerDocumentoCobro(
     if (tipo === 'voucher_transferencia') {
       return { tipo, ...vacio, datos: { fechaOperacion: null, numeroOperacion: null, montoTotal: null, montoTransferido: null, comision: null, moneda: null } }
     }
+    if (tipo === 'informe_excedentes') {
+      return { tipo, ...vacio, datos: { financiera: null, fechaInforme: null, filas: [], totalGeneral: null } }
+    }
     return { tipo: 'desconocido', datos: null, ...vacio }
   }
 
@@ -440,6 +527,43 @@ export async function extraerDocumentoCobro(
         detraccionMontoPEN: num(campos.detraccionMontoPEN),
         retencionPct: num(campos.retencionPct),
         retencionMonto: num(campos.retencionMonto),
+      },
+    }
+  }
+
+  if (tipoFinal === 'informe_excedentes') {
+    const crudas = Array.isArray(campos.filas) ? (campos.filas as unknown[]) : []
+    const filas: ExcedenteFila[] = crudas
+      .filter((f): f is Record<string, unknown> => !!f && typeof f === 'object')
+      .map(f => ({
+        deudor: str(f.deudor),
+        numeroOperacion: str(f.numeroOperacion),
+        numeroDocumento: str(f.numeroDocumento),
+        moneda: moneda(f.moneda),
+        fechaVencimiento: str(f.fechaVencimiento),
+        fechaRecaudacion: str(f.fechaRecaudacion),
+        montoNeto: num(f.montoNeto),
+        montoAnticipado: num(f.montoAnticipado),
+        montoExcedente: num(f.montoExcedente),
+        mora: num(f.mora),
+        comisionInteres: num(f.comisionInteres),
+        diferencia: num(f.diferencia),
+        otros: num(f.otros),
+        total: num(f.total),
+      }))
+      // Sin operación ni documento la fila no se puede cruzar con nada; suele
+      // ser la del total general, que el prompt pide excluir.
+      .filter(f => f.numeroOperacion != null || f.numeroDocumento != null)
+
+    return {
+      tipo: tipoFinal,
+      confianza,
+      observaciones,
+      datos: {
+        financiera: str(campos.financiera),
+        fechaInforme: str(campos.fechaInforme),
+        filas,
+        totalGeneral: num(campos.totalGeneral),
       },
     }
   }
