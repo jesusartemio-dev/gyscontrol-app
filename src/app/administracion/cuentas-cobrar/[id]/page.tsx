@@ -104,6 +104,25 @@ interface PagoCobro {
   cuentaBancaria: { id: string; nombreBanco: string; numeroCuenta: string } | null
 }
 
+/** Factura que la financiera le emite a GYS por un cargo de la operación. */
+interface LecturaFacturaFinanciera {
+  extraccion: {
+    financiera: string | null
+    numeroFactura: string | null
+    fechaEmision: string | null
+    numeroOperacion: string | null
+    numeroDocumento: string | null
+    concepto: 'reliquidacion' | 'mora' | 'interes' | 'gastos' | 'otro' | null
+    descripcion: string | null
+    monto: number | null
+    moneda: string | null
+  }
+  observaciones: string | null
+  destino: string | null
+  estado: 'lista' | 'sin_documento' | 'no_encontrada' | 'ambigua' | 'sin_cobro' | 'operacion_distinta' | 'concepto_desconocido'
+  cxc: { id: string; numeroDocumento: string | null; moneda: string; cliente: string | null; proyecto: string | null; cobroId: string | null; operacionRegistrada: string | null } | null
+}
+
 /** Lo que devuelve el lector del Informe de Excedentes, ya cruzado con las CxC. */
 interface LecturaExcedentes {
   informe: { financiera: string | null; fechaInforme: string | null; totalGeneral: number | null; filas: number }
@@ -373,6 +392,14 @@ export default function CxCDetallePage() {
   const [leyendoExc, setLeyendoExc] = useState(false)
   const [excLectura, setExcLectura] = useState<LecturaExcedentes | null>(null)
   const [aplicandoExc, setAplicandoExc] = useState(false)
+
+  // ── Factura de la financiera ─────────────────────────────────────────────
+  // BANPRO factura por separado el interés, los gastos, la reliquidación y la
+  // mora. Cada una nombra la operación y la factura de GYS a la que aplica.
+  const [showFactFin, setShowFactFin] = useState(false)
+  const [leyendoFactFin, setLeyendoFactFin] = useState(false)
+  const [factFin, setFactFin] = useState<LecturaFacturaFinanciera | null>(null)
+  const [aplicandoFactFin, setAplicandoFactFin] = useState(false)
 
   // ── Verificar contra la factura ──────────────────────────────────────────
   // Sube la factura y COMPARA contra lo guardado, en vez de rellenar. Nace de
@@ -840,6 +867,54 @@ export default function CxCDetallePage() {
       toast.error(e.message || 'Error al procesar el documento')
     } finally {
       setSubiendoDoc(null)
+    }
+  }
+
+  const handleLeerFacturaFinanciera = async (file: File) => {
+    setLeyendoFactFin(true)
+    setFactFin(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/administracion/operaciones-factoring/factura-financiera', { method: 'POST', body: fd })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'No se pudo leer la factura') }
+      const data: LecturaFacturaFinanciera = await res.json()
+      setFactFin(data)
+      if (data.observaciones) toast(`Nota del lector: ${data.observaciones}`, { icon: '⚠️' })
+      if (data.estado === 'lista') toast.success(`${data.destino}: ${data.extraccion.numeroFactura ?? 'sin N°'}`)
+      else toast.error('La factura se leyó pero no se pudo atribuir — revisa el detalle')
+    } catch (e: any) {
+      toast.error(e.message || 'Error al leer la factura')
+    } finally {
+      setLeyendoFactFin(false)
+    }
+  }
+
+  const handleAplicarFacturaFinanciera = async () => {
+    if (!factFin?.cxc?.cobroId || !factFin.extraccion.concepto) return
+    setAplicandoFactFin(true)
+    try {
+      const res = await fetch('/api/administracion/operaciones-factoring/factura-financiera?aplicar=1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cobroId: factFin.cxc.cobroId,
+          concepto: factFin.extraccion.concepto,
+          numeroFactura: factFin.extraccion.numeroFactura,
+          fechaEmision: factFin.extraccion.fechaEmision,
+          monto: factFin.extraccion.monto,
+        }),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'Error')
+      toast.success(`Guardado en ${body.aplicado}`)
+      setShowFactFin(false)
+      setFactFin(null)
+      load(true)
+    } catch (e: any) {
+      toast.error(e.message || 'Error al aplicar')
+    } finally {
+      setAplicandoFactFin(false)
     }
   }
 
@@ -1488,6 +1563,16 @@ export default function CxCDetallePage() {
               title="Sube el Informe de Excedentes y cierra las facturas que el cliente ya pagó"
             >
               <ScanLine className="h-4 w-4 mr-1" /> Informe de Excedentes
+            </Button>
+          )}
+          {cxc.estado !== 'anulada' && cxc.valorizacion?.cobro?.tipo === 'factoring' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setFactFin(null); setShowFactFin(true) }}
+              title="Sube una factura de la financiera (reliquidación, mora, interés o gastos)"
+            >
+              <ScanLine className="h-4 w-4 mr-1" /> Factura financiera
             </Button>
           )}
           {(cxc.estado === 'pendiente' || cxc.estado === 'parcial' || cxc.estado === 'vencida') && (
@@ -2819,6 +2904,83 @@ export default function CxCDetallePage() {
       </Dialog>
 
       {/* ── Dialog Editar ── */}
+      {/* Factura de la financiera: reliquidación, mora, interés o gastos. */}
+      <Dialog open={showFactFin} onOpenChange={open => { setShowFactFin(open); if (!open) setFactFin(null) }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Registrar factura de la financiera</DialogTitle>
+            <DialogDescription>
+              La financiera factura por separado el interés, los gastos, la reliquidación y la mora. Sube la factura y se
+              guarda en el campo que corresponda, con su N° y fecha de emisión.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div
+            className="rounded-lg border border-dashed p-3"
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => { e.preventDefault(); if (leyendoFactFin) return; const f = e.dataTransfer.files?.[0]; if (f) handleLeerFacturaFinanciera(f) }}
+          >
+            <label className={`inline-flex items-center gap-1.5 rounded-md border px-3 h-8 text-xs font-medium cursor-pointer hover:bg-accent ${leyendoFactFin ? 'opacity-50 pointer-events-none' : ''}`}>
+              {leyendoFactFin ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ScanLine className="h-3.5 w-3.5" />}
+              {leyendoFactFin ? 'Leyendo…' : factFin ? 'Subir otra factura' : 'Subir factura de la financiera'}
+              <input type="file" accept=".pdf,image/*" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) handleLeerFacturaFinanciera(f) }} />
+            </label>
+            <span className="text-xs text-muted-foreground ml-2">o arrástrala acá</span>
+          </div>
+
+          {factFin && (() => {
+            const e = factFin.extraccion
+            const problema: Record<string, string> = {
+              sin_documento: 'La factura no dice a qué documento de GYS corresponde — cárgala a mano en la Hoja de Liquidación.',
+              no_encontrada: `No se encontró una CxC con el documento ${e.numeroDocumento}.`,
+              ambigua: `Hay más de una CxC con el documento ${e.numeroDocumento}.`,
+              sin_cobro: 'Esa factura todavía no tiene el factoring registrado.',
+              operacion_distinta: `La factura dice operación ${e.numeroOperacion} y la registrada es ${factFin.cxc?.operacionRegistrada}.`,
+              concepto_desconocido: 'No se pudo clasificar el cargo (reliquidación, mora, interés o gastos).',
+            }
+            const dato = (k: string, v: string | null) => (
+              <div className="flex justify-between"><span className="text-muted-foreground">{k}</span><span className="font-mono">{v ?? '—'}</span></div>
+            )
+            return (
+              <div className="space-y-2 text-sm">
+                <div className="rounded-lg border p-3 space-y-1 text-xs">
+                  {dato('Financiera', e.financiera)}
+                  {dato('N° Factura', e.numeroFactura)}
+                  {dato('Fecha de emisión', e.fechaEmision)}
+                  {dato('Operación', e.numeroOperacion)}
+                  {dato('Documento', e.numeroDocumento)}
+                  {dato('Monto', e.monto != null ? formatCurrency(e.monto, e.moneda ?? cxc.moneda) : null)}
+                  {e.descripcion && <p className="text-muted-foreground pt-1 border-t">{e.descripcion}</p>}
+                </div>
+                {factFin.estado === 'lista' ? (
+                  <div className="rounded-md border border-emerald-300 bg-emerald-50 p-2 text-xs text-emerald-900">
+                    Se guardará en <strong>{factFin.destino}</strong> de {factFin.cxc?.numeroDocumento} ({factFin.cxc?.proyecto}).
+                    {e.concepto === 'reliquidacion' && ' El monto baja el Saldo a Girar.'}
+                    {(e.concepto === 'interes' || e.concepto === 'gastos') && ' Solo se guarda la referencia: el monto ya viene de la liquidación.'}
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 flex items-start gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>{problema[factFin.estado]}</span>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFactFin(false)}>Cancelar</Button>
+            {factFin?.estado === 'lista' && (
+              <Button onClick={handleAplicarFacturaFinanciera} disabled={aplicandoFactFin}>
+                {aplicandoFactFin ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                Guardar en {factFin.destino}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Informe de Excedentes: cierra las facturas que el cliente ya pagó. */}
       <Dialog open={showExcedentes} onOpenChange={open => { setShowExcedentes(open); if (!open) setExcLectura(null) }}>
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">

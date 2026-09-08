@@ -10,7 +10,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getModelForTask } from '@/lib/agente/models'
 import { trackUsage } from '@/lib/agente/usageTracker'
 
-export type TipoDocumentoCobro = 'factura' | 'liquidacion_factoring' | 'voucher_transferencia' | 'informe_excedentes'
+export type TipoDocumentoCobro = 'factura' | 'liquidacion_factoring' | 'voucher_transferencia' | 'informe_excedentes' | 'factura_financiera'
 /** 'auto' = que el modelo identifique cuál de los 3 documentos es (se usa al
  *  pegar una captura o arrastrar un archivo, donde el usuario no eligió tipo). */
 export type TipoDocumentoCobroInput = TipoDocumentoCobro | 'auto'
@@ -126,6 +126,27 @@ export interface ExtraccionInformeExcedentes {
   totalGeneral: number | null
 }
 
+/**
+ * Factura que la FINANCIERA le emite a GYS por un cargo de la operación.
+ * BANPRO factura por separado el interés, los gastos, la reliquidación y la
+ * mora, y cada una referencia la operación y —cuando aplica— la factura
+ * concreta ("INTERES RELIQUIDACIÓN OP.48507 NRO.DOC.1719").
+ *
+ * El interés y la reliquidación van inafectos de IGV; la comisión y los gastos
+ * sí lo llevan.
+ */
+export interface ExtraccionFacturaFinanciera {
+  financiera: string | null
+  numeroFactura: string | null      // ej. FR01-00006534
+  fechaEmision: string | null
+  numeroOperacion: string | null
+  numeroDocumento: string | null    // la factura de GYS a la que se refiere, si la nombra
+  concepto: 'reliquidacion' | 'mora' | 'interes' | 'gastos' | 'otro' | null
+  descripcion: string | null
+  monto: number | null
+  moneda: 'PEN' | 'USD' | null
+}
+
 /** Voucher de transferencia bancaria (solo cobro directo). */
 export interface ExtraccionVoucher {
   fechaOperacion: string | null
@@ -141,6 +162,7 @@ export type ResultadoExtraccion =
   | { tipo: 'liquidacion_factoring'; datos: ExtraccionLiquidacion; confianza: Confianza; observaciones: string | null }
   | { tipo: 'voucher_transferencia'; datos: ExtraccionVoucher; confianza: Confianza; observaciones: string | null }
   | { tipo: 'informe_excedentes'; datos: ExtraccionInformeExcedentes; confianza: Confianza; observaciones: string | null }
+  | { tipo: 'factura_financiera'; datos: ExtraccionFacturaFinanciera; confianza: Confianza; observaciones: string | null }
   | { tipo: 'desconocido'; datos: null; confianza: Confianza; observaciones: string | null }
 
 export type Confianza = 'alta' | 'media' | 'baja'
@@ -294,6 +316,40 @@ Copia los importes TAL COMO APARECEN, con su signo. La mora suele venir negativa
 }
 
 "filas" lleva una entrada por cada factura de la tabla, sin la fila del total general.`,
+  },
+  factura_financiera: {
+    system: `${SYSTEM_BASE}
+
+Estás leyendo una FACTURA QUE LA FINANCIERA (normalmente BANPRO) LE EMITE A GYS por un cargo de una operación de factoring. Ojo: acá GYS es el CLIENTE que recibe la factura, no quien la emite.
+
+Cada cargo de la operación se factura por separado. El detalle del ítem dice de cuál se trata y suele nombrar la operación y la factura concreta, por ejemplo:
+  "INTERES RELIQUIDACIÓN OP.48507 NRO.DOC.1719"
+
+Clasifica el cargo en "concepto":
+- "reliquidacion" — si dice "reliquidación" o "interés reliquidación". Es el recálculo del interés según la fecha real en que pagó el cliente.
+- "mora" — si dice "mora" o "interés moratorio".
+- "interes" — interés del financiamiento, sin mencionar reliquidación. También "diferencia de precio".
+- "gastos" — comisión, comisión de estructuración, gasto legal, portes.
+- "otro" — cualquier otra cosa.
+
+De "OBSERVACIONES" o del detalle del ítem saca el N° de operación (ej. 48507) y el N° del documento de GYS al que se refiere (ej. 1719). Si el documento no aparece, devuelve null — no lo inventes: sin él el cargo no se puede atribuir a una factura concreta.
+
+El monto es el TOTAL de la factura. El interés y la reliquidación van inafectos de IGV, así que el total suele coincidir con "OP. INAFECTA".`,
+    user: `Extrae los datos de esta factura de la financiera y devuelve ÚNICAMENTE este JSON:
+
+{
+  "financiera": "string (ej: BANPRO) o null",
+  "numeroFactura": "string (ej: FR01-00006534) o null",
+  "fechaEmision": "YYYY-MM-DD o null",
+  "numeroOperacion": "string o null",
+  "numeroDocumento": "string o null",
+  "concepto": "reliquidacion|mora|interes|gastos|otro o null",
+  "descripcion": "el detalle del ítem, tal cual, o null",
+  "monto": number o null,
+  "moneda": "PEN|USD o null",
+  "confianza": "alta|media|baja",
+  "observaciones": "string si algo no se pudo leer bien, null si todo OK"
+}`,
   },
   voucher_transferencia: {
     system: `${SYSTEM_BASE}
@@ -477,6 +533,9 @@ export async function extraerDocumentoCobro(
     if (tipo === 'informe_excedentes') {
       return { tipo, ...vacio, datos: { financiera: null, fechaInforme: null, filas: [], totalGeneral: null } }
     }
+    if (tipo === 'factura_financiera') {
+      return { tipo, ...vacio, datos: { financiera: null, numeroFactura: null, fechaEmision: null, numeroOperacion: null, numeroDocumento: null, concepto: null, descripcion: null, monto: null, moneda: null } }
+    }
     return { tipo: 'desconocido', datos: null, ...vacio }
   }
 
@@ -527,6 +586,28 @@ export async function extraerDocumentoCobro(
         detraccionMontoPEN: num(campos.detraccionMontoPEN),
         retencionPct: num(campos.retencionPct),
         retencionMonto: num(campos.retencionMonto),
+      },
+    }
+  }
+
+  if (tipoFinal === 'factura_financiera') {
+    const permitidos = ['reliquidacion', 'mora', 'interes', 'gastos', 'otro'] as const
+    const crudo = str(campos.concepto)
+    const concepto = permitidos.includes(crudo as never) ? (crudo as typeof permitidos[number]) : null
+    return {
+      tipo: tipoFinal,
+      confianza,
+      observaciones,
+      datos: {
+        financiera: str(campos.financiera),
+        numeroFactura: str(campos.numeroFactura),
+        fechaEmision: str(campos.fechaEmision),
+        numeroOperacion: str(campos.numeroOperacion),
+        numeroDocumento: str(campos.numeroDocumento),
+        concepto,
+        descripcion: str(campos.descripcion),
+        monto: num(campos.monto),
+        moneda: moneda(campos.moneda),
       },
     }
   }
