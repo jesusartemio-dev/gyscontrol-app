@@ -1137,13 +1137,19 @@ export default function CxCDetallePage() {
           nota: 'El monto de la CxC no se edita desde acá: arrastra saldo y pagos.',
         }),
         comparar('Detracción %', 'detraccionPct', cxc.detraccionPct, d.detraccionPct),
-        comparar(`Detracción (${cxc.moneda})`, 'detraccionMonto', cxc.detraccionMonto, d.detraccionMonto, { moneda: true, tolerancia: 0.5 }),
+        // Tolerancia ajustada (antes 0.5): con esa holgura, un desfase real de
+        // 8 centavos (509.98 guardado vs 510.06 de la factura, el caso real de
+        // FMK01) se clasificaba como "igual" y no dejaba seleccionar el campo
+        // — exactamente el tipo de diferencia que este verificador existe
+        // para detectar. 0.02 sigue tolerando ruido de redondeo del lector,
+        // sin esconder una diferencia real de centavos.
+        comparar(`Detracción (${cxc.moneda})`, 'detraccionMonto', cxc.detraccionMonto, d.detraccionMonto, { moneda: true, tolerancia: 0.02 }),
         comparar('Retención %', 'retencionPct', cxc.retencionPct, d.retencionPct),
-        comparar(`Retención (${cxc.moneda})`, 'retencionMonto', cxc.retencionMonto, d.retencionMonto, { moneda: true, tolerancia: 0.5 }),
+        comparar(`Retención (${cxc.moneda})`, 'retencionMonto', cxc.retencionMonto, d.retencionMonto, { moneda: true, tolerancia: 0.02 }),
       ]
       if (cxc.moneda !== 'PEN') {
         filas.push(comparar('Depósito al BN (S/)', 'detraccionMontoPEN', cxc.detraccionMontoPEN, d.detraccionMontoPEN, {
-          tolerancia: 0.5,
+          tolerancia: 0.02,
           nota: 'Importe del depósito. No entra al cálculo del cobro.',
         }))
       }
