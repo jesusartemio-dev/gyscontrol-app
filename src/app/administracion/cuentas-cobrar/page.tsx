@@ -768,9 +768,14 @@ export default function CuentasCobrarPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => exportarCxCContable(filtered)}>
-                Formato contable
-              </DropdownMenuItem>
+              {/* "Formato contable" (sin unificar moneda) se quitó: hoy TODA la
+                  cartera de CxC está en USD, y "todo en USD" no convierte una
+                  factura que ya está en USD (mismo-moneda = mismo número) —
+                  asi que los dos daban exactamente el mismo archivo. Si algún
+                  día hay una CxC en soles, "todo en USD"/"todo en PEN" siguen
+                  siendo la opción correcta: el "contable" sin unificar mezclaría
+                  PEN y USD en la misma fila de totales, dando una suma sin
+                  sentido — no había ningún caso donde conviniera usarlo. */}
               <DropdownMenuItem onClick={() => handleExportarContableMoneda('USD')}>
                 Formato contable — todo en USD
               </DropdownMenuItem>
