@@ -276,6 +276,10 @@ const formatCurrency = (n: number, moneda: string) =>
   new Intl.NumberFormat('es-PE', { style: 'currency', currency: moneda }).format(n)
 
 const n = (v: string) => parseFloat(v) || 0
+// Los montos que llegan de la base pueden tener floats sin redondear (ej.
+// 8177.118048 de un 99% calculado) — sin esto, el input de edición mostraba
+// ese número crudo en vez de "8177.12", ilegible para Administración.
+const r2s = (v: number | null | undefined) => v == null ? '' : String(Math.round(v * 100) / 100)
 const round2 = (v: number) => Math.round(v * 100) / 100
 
 /**
@@ -552,20 +556,20 @@ export default function CxCDetallePage() {
         bancoFinanciera: data.bancoFinanciera ?? '',
         numeroNegociacion: data.numeroNegociacion ?? '',
         observaciones: data.observaciones ?? '',
-        detraccionPct: data.detraccionPct != null ? String(data.detraccionPct) : '',
-        detraccionMonto: data.detraccionMonto != null ? String(data.detraccionMonto) : '',
-        detraccionMontoPEN: data.detraccionMontoPEN != null ? String(data.detraccionMontoPEN) : '',
+        detraccionPct: r2s(data.detraccionPct),
+        detraccionMonto: r2s(data.detraccionMonto),
+        detraccionMontoPEN: r2s(data.detraccionMontoPEN),
         detraccionCodigo: data.detraccionCodigo ?? '',
-        retencionPct: data.retencionPct != null ? String(data.retencionPct) : '',
-        retencionMonto: data.retencionMonto != null ? String(data.retencionMonto) : '',
+        retencionPct: r2s(data.retencionPct),
+        retencionMonto: r2s(data.retencionMonto),
       })
       // Detracción y retención vienen de la factura, capturadas al facturar.
       // Son el punto de partida del cobro: si la CxC ya las trae, no hay que
       // volver a subir la factura acá. Un cobro ya guardado las pisa, porque
       // esa es la foto de la liquidación que se cerró.
-      setCobroDetraccionPct(data.detraccionPct != null ? String(data.detraccionPct) : '12')
-      setCobroDetraccionMonto(data.detraccionMonto != null ? String(data.detraccionMonto) : '')
-      setCobroDetraccionMontoPEN(data.detraccionMontoPEN != null ? String(data.detraccionMontoPEN) : '')
+      setCobroDetraccionPct(r2s(data.detraccionPct) || '12')
+      setCobroDetraccionMonto(r2s(data.detraccionMonto))
+      setCobroDetraccionMontoPEN(r2s(data.detraccionMontoPEN))
       setCobroDetraccionMontoPEN(data.detraccionMontoPEN != null ? String(data.detraccionMontoPEN) : '')
       setCobroRetencionPct(data.retencionPct != null ? String(data.retencionPct) : '')
       setCobroRetencionMonto(data.retencionMonto != null ? String(data.retencionMonto) : '')
@@ -575,32 +579,32 @@ export default function CxCDetallePage() {
       if (cobro) {
         setCobroTipo((cobro.tipo as 'factoring' | 'directo') || 'factoring')
         setCobroFinanciera(cobro.financiera || '')
-        setCobroTasa(cobro.tasaDescuentoPct?.toString() || '')
+        setCobroTasa(r2s(cobro.tasaDescuentoPct) || '')
         setCobroFechaDesembolso(cobro.fechaDesembolso ? cobro.fechaDesembolso.split('T')[0] : '')
         setCobroFechaVencimiento(cobro.fechaVencimiento ? cobro.fechaVencimiento.split('T')[0] : '')
         setFechaVencimientoEsSugerida(false)
         setCobroNumeroOperacion(cobro.numeroOperacion || '')
         setCobroNumDocumentos(cobro.numeroDocumentos?.toString() || '')
         setCobroDias(cobro.diasFinanciamiento?.toString() || '')
-        setCobroDetraccionPct(cobro.detraccionPct?.toString() || '12')
-        setCobroDetraccionMonto(cobro.detraccionMonto?.toString() || '')
-        setCobroRetencionPct(cobro.retencionPct?.toString() || '')
-        setCobroRetencionMonto(cobro.retencionMonto?.toString() || '')
-        setCobroExcedentePct(cobro.excedentePct?.toString() || '1')
-        setCobroExcedenteMonto(cobro.excedenteMonto?.toString() || '')
-        setCobroValorAFinanciar(cobro.valorAFinanciar?.toString() || '')
-        setCobroInteres(cobro.interesMonto?.toString() || '')
+        setCobroDetraccionPct(r2s(cobro.detraccionPct) || '12')
+        setCobroDetraccionMonto(r2s(cobro.detraccionMonto))
+        setCobroRetencionPct(r2s(cobro.retencionPct))
+        setCobroRetencionMonto(r2s(cobro.retencionMonto))
+        setCobroExcedentePct(r2s(cobro.excedentePct) || '1')
+        setCobroExcedenteMonto(r2s(cobro.excedenteMonto))
+        setCobroValorAFinanciar(r2s(cobro.valorAFinanciar))
+        setCobroInteres(r2s(cobro.interesMonto))
         setInteresEsSugerido(false)
-        setCobroComision(cobro.comisionEstructuracion?.toString() || '')
-        setCobroGastos(cobro.gastosAdicionales?.toString() || '')
-        setCobroIgvGastos(cobro.igvGastos?.toString() || '')
-        setCobroAdelantoBanpro(cobro.adelantoBanpro?.toString() || '')
-        setCobroInteresReliquidacion(cobro.interesReliquidacion?.toString() || '')
-        setCobroMora(cobro.mora?.toString() || '')
-        setCobroComisionInteres(cobro.comisionInteres?.toString() || '')
-        setCobroDiferencia(cobro.diferencia?.toString() || '')
-        setCobroOtros(cobro.otros?.toString() || '')
-        setCobroMontoNetoDirecto(cobro.montoNetoDirecto?.toString() || '')
+        setCobroComision(r2s(cobro.comisionEstructuracion))
+        setCobroGastos(r2s(cobro.gastosAdicionales))
+        setCobroIgvGastos(r2s(cobro.igvGastos))
+        setCobroAdelantoBanpro(r2s(cobro.adelantoBanpro))
+        setCobroInteresReliquidacion(r2s(cobro.interesReliquidacion))
+        setCobroMora(r2s(cobro.mora))
+        setCobroComisionInteres(r2s(cobro.comisionInteres))
+        setCobroDiferencia(r2s(cobro.diferencia))
+        setCobroOtros(r2s(cobro.otros))
+        setCobroMontoNetoDirecto(r2s(cobro.montoNetoDirecto))
         setCobroConfirmacion(cobro.confirmacionCliente || '')
         setCobroFechaVencPago(cobro.fechaVencimientoPago ? cobro.fechaVencimientoPago.split('T')[0] : '')
         setCobroObs(cobro.observaciones || '')
@@ -1539,6 +1543,65 @@ export default function CxCDetallePage() {
     </div>
   )
 
+  // Celda de un grid de resumen: etiqueta chica arriba, valor abajo. En vez
+  // de una fila por dato (labelRow apilado), varios caben en el ancho de la
+  // tarjeta — es lo que compacta la altura de "Factoring / Cobro con
+  // Financiera", que antes era una lista larga de una sola columna.
+  const statCell = (label: string, value: React.ReactNode, opts: { span?: boolean; muted?: boolean } = {}) => (
+    <div className={opts.span ? 'col-span-2 sm:col-span-3' : ''}>
+      <p className="text-[11px] text-muted-foreground leading-tight">{label}</p>
+      <p className={`text-sm font-medium leading-snug ${opts.muted ? 'text-muted-foreground' : ''}`}>{value ?? '—'}</p>
+    </div>
+  )
+
+  // Fila de un resultado calculado, sin input: antes convivía con una 3ra
+  // columna casi siempre vacía. Ahora la tabla de liquidación es de 2
+  // columnas parejas en todas las filas — esta es para las que NO se editan.
+  const filaCalc = (
+    label: React.ReactNode, value: React.ReactNode,
+    opts: { bg?: string; bold?: boolean; big?: boolean; color?: string; borderTop?: boolean } = {}
+  ) => (
+    <tr className={`${opts.bg ?? ''} ${opts.borderTop ? 'border-t-2' : 'border-b'}`}>
+      <td className={`px-3 py-2 ${opts.bold ? 'font-semibold' : 'text-muted-foreground'}`}>{label}</td>
+      <td className={`px-3 py-2 text-right ${opts.big ? 'text-base font-bold' : opts.bold ? 'font-semibold' : 'font-medium'} ${opts.color ?? ''}`}>
+        {value}
+      </td>
+    </tr>
+  )
+
+  // Fila editable: antes tenía una columna roja mostrando el mismo número
+  // que el input de al lado — no se distinguía cuál era "el valor real".
+  // Ahora el input ES el valor: una sola columna, con su unidad (% / moneda)
+  // como rótulo chico arriba de cada campo, en vez de un placeholder que
+  // desaparece apenas se escribe algo.
+  const filaEdit = (
+    label: React.ReactNode,
+    campos: { unidad: string; value: string; onChange: (v: string) => void; width?: string; placeholder?: string }[],
+    opts: { helper?: React.ReactNode; emphasis?: boolean; bg?: string } = {}
+  ) => (
+    <tr className={opts.emphasis ? 'font-bold text-base' : `border-b ${opts.bg ?? 'bg-gray-50'}`}>
+      <td className={`px-3 py-2 align-top ${opts.emphasis ? '' : 'text-muted-foreground'}`}>{label}</td>
+      <td className="px-3 py-2 align-top">
+        <div className="flex items-end justify-end gap-2 flex-wrap">
+          {campos.map((c, i) => (
+            <div key={i} className="flex flex-col items-end">
+              <span className="text-[10px] text-muted-foreground leading-none mb-0.5 font-normal">{c.unidad}</span>
+              <Input
+                className={`h-8 text-sm text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${c.width ?? 'w-24'}`}
+                type="number"
+                step="0.01"
+                placeholder={c.placeholder ?? '0.00'}
+                value={c.value}
+                onChange={e => c.onChange(e.target.value)}
+              />
+            </div>
+          ))}
+        </div>
+        {opts.helper}
+      </td>
+    </tr>
+  )
+
   return (
     <div className="space-y-6 p-6 max-w-6xl mx-auto">
 
@@ -1774,56 +1837,69 @@ export default function CxCDetallePage() {
                       ? `· depósito BN S/ ${detPEN.toFixed(2)}${cxc.tipoCambio ? ` · TC ${cxc.tipoCambio}` : ''}`
                       : null,
                   ].filter(Boolean).join(' ')
+                  const hayCierre = cobro.interesReliquidacion != null || cobro.mora != null || cobro.comisionInteres != null || cobro.diferencia != null || cobro.otros != null
                   return (
-                  <div className="space-y-0">
+                  <div className="space-y-3">
                     {cobro.tipo === 'factoring' ? <>
-                      {labelRow('Financiera', cobro.financiera)}
-                      {labelRow('Tasa', cobro.tasaDescuentoPct != null ? `${cobro.tasaDescuentoPct}%` : null)}
-                      {labelRow('Fecha Desembolso', cobro.fechaDesembolso ? formatDate(cobro.fechaDesembolso) : null)}
-                      {labelRow('N° Operación', cobro.numeroOperacion)}
-                      {/* Detracción y retención también en factoring: son
-                          descuentos de la factura y aplican igual, se cobre
-                          por financiera o directo. */}
-                      {labelRow('Detracción', detraccionResumen)}
-                      {labelRow('Retención', cobro.retencionMonto != null ? formatCurrency(cobro.retencionMonto, cxc.moneda) : null)}
-                      {labelRow('Monto a Desembolsar', cobro.montoADesembolsar != null ? formatCurrency(cobro.montoADesembolsar, cxc.moneda) : null)}
-                      {labelRow('Adelanto Banpro', cobro.adelantoBanpro != null ? formatCurrency(cobro.adelantoBanpro, cxc.moneda) : null)}
-                      {labelRow('Saldo a Girar', cobro.saldoAGirar != null ? formatCurrency(cobro.saldoAGirar, cxc.moneda) : null)}
-                      {labelRow('Fecha Confirmación', cobro.fechaConfirmacion ? formatDate(cobro.fechaConfirmacion) : null)}
-                      {operacion && operacion.facturas.length > 1 && labelRow(
-                        'Operación',
-                        `N° ${operacion.numeroOperacion} — ${operacion.facturas.length} facturas`
+                      {operacion && operacion.facturas.length > 1 && (
+                        <p className="text-xs text-muted-foreground -mb-1">
+                          Operación <span className="font-medium text-foreground">N° {operacion.numeroOperacion}</span> — {operacion.facturas.length} facturas
+                        </p>
                       )}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
+                        {statCell('Financiera', cobro.financiera)}
+                        {statCell('Tasa', cobro.tasaDescuentoPct != null ? `${cobro.tasaDescuentoPct}%` : null)}
+                        {statCell('Fecha Desembolso', cobro.fechaDesembolso ? formatDate(cobro.fechaDesembolso) : null)}
+                        {/* Detracción y retención también en factoring: son
+                            descuentos de la factura y aplican igual, se cobre
+                            por financiera o directo. */}
+                        {statCell('Detracción', detraccionResumen, { span: true })}
+                        {statCell('Retención', cobro.retencionMonto != null ? formatCurrency(cobro.retencionMonto, cxc.moneda) : null)}
+                        {statCell('Monto a Desembolsar', cobro.montoADesembolsar != null ? formatCurrency(cobro.montoADesembolsar, cxc.moneda) : null)}
+                        {statCell('Adelanto Banpro', cobro.adelantoBanpro != null ? formatCurrency(cobro.adelantoBanpro, cxc.moneda) : null)}
+                        {statCell('Saldo a Girar', cobro.saldoAGirar != null ? formatCurrency(cobro.saldoAGirar, cxc.moneda) : null)}
+                        {statCell('Fecha Confirmación', cobro.fechaConfirmacion ? formatDate(cobro.fechaConfirmacion) : null, { muted: cobro.fechaConfirmacion == null })}
+                      </div>
                       {/* Cierre de la operación: solo aparece si la financiera
                           ya liquidó algo. Antes de que el cliente pague, estos
                           campos están vacíos y no tiene sentido mostrarlos. */}
-                      {cobro.interesReliquidacion != null && labelRow(
-                        'Interés Reliquidación',
-                        `${formatCurrency(cobro.interesReliquidacion, cxc.moneda)}${cobro.numeroFacturaReliquidacion ? ` · fact. ${cobro.numeroFacturaReliquidacion}` : ''}`
+                      {hayCierre && (
+                        <div className="pt-3 border-t">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Cierre de la operación</p>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
+                            {cobro.interesReliquidacion != null && statCell(
+                              'Interés Reliquidación',
+                              <>{formatCurrency(cobro.interesReliquidacion, cxc.moneda)}{cobro.numeroFacturaReliquidacion && <span className="block text-[11px] text-muted-foreground font-normal">fact. {cobro.numeroFacturaReliquidacion}</span>}</>
+                            )}
+                            {cobro.mora != null && statCell(
+                              'Mora',
+                              <>{formatCurrency(cobro.mora, cxc.moneda)}{cobro.numeroFacturaMora && <span className="block text-[11px] text-muted-foreground font-normal">fact. {cobro.numeroFacturaMora}</span>}</>
+                            )}
+                            {cobro.comisionInteres != null && statCell('Com. Interés', formatCurrency(cobro.comisionInteres, cxc.moneda))}
+                            {cobro.diferencia != null && statCell('Diferencia', formatCurrency(cobro.diferencia, cxc.moneda))}
+                            {cobro.otros != null && statCell('Otros', formatCurrency(cobro.otros, cxc.moneda))}
+                            {cobro.excedenteMonto != null && statCell(
+                              'Total Excedente',
+                              <span className="text-emerald-700 font-semibold">
+                                {formatCurrency(
+                                  cobro.excedenteMonto + (cobro.mora ?? 0) + (cobro.comisionInteres ?? 0) + (cobro.diferencia ?? 0) + (cobro.otros ?? 0),
+                                  cxc.moneda
+                                )}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       )}
-                      {cobro.mora != null && labelRow(
-                        'Mora',
-                        `${formatCurrency(cobro.mora, cxc.moneda)}${cobro.numeroFacturaMora ? ` · fact. ${cobro.numeroFacturaMora}` : ''}`
-                      )}
-                      {cobro.comisionInteres != null && labelRow('Com. Interés', formatCurrency(cobro.comisionInteres, cxc.moneda))}
-                      {cobro.diferencia != null && labelRow('Diferencia', formatCurrency(cobro.diferencia, cxc.moneda))}
-                      {cobro.otros != null && labelRow('Otros', formatCurrency(cobro.otros, cxc.moneda))}
-                      {(cobro.mora != null || cobro.diferencia != null || cobro.comisionInteres != null || cobro.otros != null) &&
-                        cobro.excedenteMonto != null && labelRow(
-                          'Total Excedente',
-                          formatCurrency(
-                            cobro.excedenteMonto + (cobro.mora ?? 0) + (cobro.comisionInteres ?? 0) + (cobro.diferencia ?? 0) + (cobro.otros ?? 0),
-                            cxc.moneda
-                          )
-                        )}
                     </> : <>
-                      {labelRow('Fecha de Cobro', cobro.fechaDesembolso ? formatDate(cobro.fechaDesembolso) : null)}
-                      {labelRow('Detracción', detraccionResumen)}
-                      {labelRow('Retención', cobro.retencionMonto != null ? formatCurrency(cobro.retencionMonto, cxc.moneda) : null)}
-                      {labelRow('Neto Cobrado', cobro.montoNetoDirecto != null ? formatCurrency(cobro.montoNetoDirecto, cxc.moneda) : null)}
-                      {labelRow('Confirmación Cliente', cobro.confirmacionCliente)}
-                      {labelRow('Fecha Venc. Pago', cobro.fechaVencimientoPago ? formatDate(cobro.fechaVencimientoPago) : null)}
-                      {labelRow('Observaciones', cobro.observaciones)}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
+                        {statCell('Fecha de Cobro', cobro.fechaDesembolso ? formatDate(cobro.fechaDesembolso) : null)}
+                        {statCell('Detracción', detraccionResumen, { span: true })}
+                        {statCell('Retención', cobro.retencionMonto != null ? formatCurrency(cobro.retencionMonto, cxc.moneda) : null)}
+                        {statCell('Neto Cobrado', cobro.montoNetoDirecto != null ? formatCurrency(cobro.montoNetoDirecto, cxc.moneda) : null)}
+                        {statCell('Confirmación Cliente', cobro.confirmacionCliente)}
+                        {statCell('Fecha Venc. Pago', cobro.fechaVencimientoPago ? formatDate(cobro.fechaVencimientoPago) : null)}
+                        {cobro.observaciones && statCell('Observaciones', cobro.observaciones, { span: true, muted: true })}
+                      </div>
                     </>}
                   </div>
                   )
@@ -2043,193 +2119,117 @@ export default function CxCDetallePage() {
                           </div>
                           <table className="w-full text-sm">
                             <tbody>
-                              <tr className="border-b">
-                                <td className="px-3 py-2 text-muted-foreground">Base (Monto Factura)</td>
-                                <td className="px-3 py-2 text-right font-medium">{formatCurrency(liq.base, cxc.moneda)}</td>
-                                <td className="px-3 py-2 w-40"></td>
-                              </tr>
-                              <tr className="border-b bg-gray-50">
-                                <td className="px-3 py-2 text-muted-foreground align-top">
+                              {filaCalc('Base (Monto Factura)', formatCurrency(liq.base, cxc.moneda))}
+
+                              {filaEdit(
+                                <>
                                   Detracción
                                   {/* La detracción se deposita en soles en el Banco de la
                                       Nación aunque la factura sea en otra moneda. Es un dato
                                       del depósito: no entra al cálculo de arriba. */}
                                   {cxc.moneda !== 'PEN' && (
-                                    <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                                      <span>Depósito BN</span>
-                                      <span>S/</span>
-                                      <Input
-                                        className="h-6 text-xs w-24"
-                                        type="number"
-                                        placeholder={liq.detMonto > 0 && cxc.tipoCambio ? (liq.detMonto * cxc.tipoCambio).toFixed(2) : '0.00'}
-                                        value={cobroDetraccionMontoPEN}
-                                        onChange={e => setCobroDetraccionMontoPEN(e.target.value)}
-                                      />
-                                      {cxc.tipoCambio ? <span>· TC {cxc.tipoCambio}</span> : null}
-                                    </div>
-                                  )}
-                                  {cxc.moneda !== 'PEN' && !cobroDetraccionMontoPEN && liq.detMonto > 0 && cxc.tipoCambio ? (
-                                    <p className="text-xs text-muted-foreground mt-0.5">
-                                      Al TC de la CxC serían ≈ S/ {(liq.detMonto * cxc.tipoCambio).toFixed(2)} — pon el importe exacto que dice la factura.
+                                    <p className="text-[11px] text-muted-foreground mt-1 font-normal">
+                                      Se resta {formatCurrency(liq.detMonto, cxc.moneda)} del Valor Neto
                                     </p>
-                                  ) : null}
-                                </td>
-                                <td className="px-3 py-2 text-right text-red-600 align-top">− {formatCurrency(liq.detMonto, cxc.moneda)}</td>
-                                <td className="px-3 py-2 align-top">
-                                  <div className="flex gap-1">
-                                    <Input className="h-7 text-xs w-16" type="number" placeholder="%" value={cobroDetraccionPct} onChange={e => setCobroDetraccionPct(e.target.value)} />
-                                    <Input className="h-7 text-xs" type="number" placeholder="Monto" value={cobroDetraccionMonto} onChange={e => setCobroDetraccionMonto(e.target.value)} />
-                                  </div>
-                                </td>
-                              </tr>
-                              <tr className="border-b bg-gray-50">
-                                <td className="px-3 py-2 text-muted-foreground">Retención</td>
-                                <td className="px-3 py-2 text-right text-red-600">− {formatCurrency(liq.retMonto, cxc.moneda)}</td>
-                                <td className="px-3 py-2">
-                                  <div className="flex gap-1">
-                                    <Input className="h-7 text-xs w-16" type="number" placeholder="%" value={cobroRetencionPct} onChange={e => setCobroRetencionPct(e.target.value)} />
-                                    <Input className="h-7 text-xs" type="number" placeholder="Monto" value={cobroRetencionMonto} onChange={e => setCobroRetencionMonto(e.target.value)} />
-                                  </div>
-                                </td>
-                              </tr>
-                              <tr className="border-b">
-                                <td className="px-3 py-2 text-muted-foreground">Valor Neto</td>
-                                <td className="px-3 py-2 text-right font-medium">{formatCurrency(liq.valorNeto, cxc.moneda)}</td>
-                                <td></td>
-                              </tr>
-                              <tr className="border-b bg-gray-50">
-                                <td className="px-3 py-2 text-muted-foreground">Excedente</td>
-                                <td className="px-3 py-2 text-right text-red-600">− {formatCurrency(liq.excMonto, cxc.moneda)}</td>
-                                <td className="px-3 py-2">
-                                  <div className="flex gap-1">
-                                    <Input className="h-7 text-xs w-16" type="number" placeholder="%" value={cobroExcedentePct} onChange={e => setCobroExcedentePct(e.target.value)} />
-                                    <Input className="h-7 text-xs" type="number" placeholder="Monto" value={cobroExcedenteMonto} onChange={e => setCobroExcedenteMonto(e.target.value)} />
-                                  </div>
-                                </td>
-                              </tr>
-                              <tr className="border-b">
-                                <td className="px-3 py-2 text-muted-foreground">Valor a Financiar</td>
-                                <td className="px-3 py-2 text-right font-medium">{formatCurrency(liq.aFinanciar, cxc.moneda)}</td>
-                                <td className="px-3 py-2">
-                                  <Input className="h-7 text-xs" type="number" placeholder="Manual" value={cobroValorAFinanciar} onChange={e => setCobroValorAFinanciar(e.target.value)} />
-                                </td>
-                              </tr>
-                              <tr className="border-b bg-gray-50">
-                                <td className="px-3 py-2 text-muted-foreground">
+                                  )}
+                                </>,
+                                [
+                                  { unidad: '%', value: cobroDetraccionPct, onChange: setCobroDetraccionPct, width: 'w-16' },
+                                  { unidad: cxc.moneda, value: cobroDetraccionMonto, onChange: setCobroDetraccionMonto },
+                                ],
+                                {
+                                  helper: cxc.moneda !== 'PEN' && (
+                                    <div className="mt-2 pt-2 border-t border-dashed flex flex-col items-end gap-1">
+                                      <div className="flex items-end gap-2">
+                                        <div className="flex flex-col items-end">
+                                          <span className="text-[10px] text-muted-foreground leading-none mb-0.5">Depósito BN — S/</span>
+                                          <Input
+                                            className="h-8 text-sm text-right w-28"
+                                            type="number"
+                                            placeholder={liq.detMonto > 0 && cxc.tipoCambio ? (liq.detMonto * cxc.tipoCambio).toFixed(2) : '0.00'}
+                                            value={cobroDetraccionMontoPEN}
+                                            onChange={e => setCobroDetraccionMontoPEN(e.target.value)}
+                                          />
+                                        </div>
+                                      </div>
+                                      {cxc.tipoCambio && <span className="text-[11px] text-muted-foreground">TC {cxc.tipoCambio}</span>}
+                                      {!cobroDetraccionMontoPEN && liq.detMonto > 0 && cxc.tipoCambio && (
+                                        <p className="text-[11px] text-muted-foreground text-right max-w-[220px]">
+                                          Al TC de la CxC serían ≈ S/ {(liq.detMonto * cxc.tipoCambio).toFixed(2)} — pon el importe exacto de la factura.
+                                        </p>
+                                      )}
+                                    </div>
+                                  ),
+                                }
+                              )}
+
+                              {filaEdit('Retención', [
+                                { unidad: '%', value: cobroRetencionPct, onChange: setCobroRetencionPct, width: 'w-16' },
+                                { unidad: cxc.moneda, value: cobroRetencionMonto, onChange: setCobroRetencionMonto },
+                              ])}
+
+                              {filaCalc('Valor Neto', formatCurrency(liq.valorNeto, cxc.moneda))}
+
+                              {filaEdit('Excedente', [
+                                { unidad: '%', value: cobroExcedentePct, onChange: setCobroExcedentePct, width: 'w-16' },
+                                { unidad: cxc.moneda, value: cobroExcedenteMonto, onChange: setCobroExcedenteMonto },
+                              ])}
+
+                              {filaEdit('Valor a Financiar', [
+                                { unidad: cxc.moneda, value: cobroValorAFinanciar, onChange: setCobroValorAFinanciar },
+                              ])}
+
+                              {filaEdit(
+                                <>
                                   Interés
                                   {interesEsSugerido && cobroInteres !== '' && (
                                     <span className="ml-1.5 text-[10px] font-normal text-gray-400 align-middle">(sugerido)</span>
                                   )}
-                                </td>
-                                <td className="px-3 py-2 text-right text-red-600">− {formatCurrency(n(cobroInteres), cxc.moneda)}</td>
-                                <td className="px-3 py-2">
-                                  <Input
-                                    className="h-7 text-xs"
-                                    type="number"
-                                    placeholder="0.00"
-                                    value={cobroInteres}
-                                    onChange={e => { setCobroInteres(e.target.value); setInteresEsSugerido(false) }}
-                                  />
-                                  {liq.refInteresDisponible && !interesEsSugerido && Math.abs(n(cobroInteres) - liq.refInteres) > 0.01 && (
-                                    <p className="text-xs text-muted-foreground mt-0.5">Ref: {formatCurrency(liq.refInteres, cxc.moneda)}</p>
-                                  )}
-                                </td>
-                              </tr>
+                                </>,
+                                [{ unidad: cxc.moneda, value: cobroInteres, onChange: v => { setCobroInteres(v); setInteresEsSugerido(false) } }],
+                                {
+                                  helper: liq.refInteresDisponible && !interesEsSugerido && Math.abs(n(cobroInteres) - liq.refInteres) > 0.01 && (
+                                    <p className="text-[11px] text-muted-foreground mt-1 text-right">Ref: {formatCurrency(liq.refInteres, cxc.moneda)}</p>
+                                  ),
+                                }
+                              )}
+
                               {/* Va acá y no después del IGV como en la hoja de
                                   Administración: sale de Valor a Financiar −
                                   Interés, así la columna se lee como una
                                   cascada. Es el orden del propio documento de
                                   BANPRO ("MTO.ANT. S/DESCTO"). */}
-                              <tr className="border-b font-medium">
-                                <td className="px-3 py-2">Monto Anticipo</td>
-                                <td className="px-3 py-2 text-right">{formatCurrency(liq.montoAnticipo, cxc.moneda)}</td>
-                                <td></td>
-                              </tr>
-                              <tr className="border-b bg-gray-50">
-                                <td className="px-3 py-2 text-muted-foreground">Comisión</td>
-                                <td className="px-3 py-2 text-right text-red-600">− {formatCurrency(n(cobroComision), cxc.moneda)}</td>
-                                <td className="px-3 py-2"><Input className="h-7 text-xs" type="number" placeholder="0.00" value={cobroComision} onChange={e => setCobroComision(e.target.value)} /></td>
-                              </tr>
-                              <tr className="border-b bg-gray-50">
-                                <td className="px-3 py-2 text-muted-foreground">Gastos</td>
-                                <td className="px-3 py-2 text-right text-red-600">− {formatCurrency(n(cobroGastos), cxc.moneda)}</td>
-                                <td className="px-3 py-2"><Input className="h-7 text-xs" type="number" placeholder="0.00" value={cobroGastos} onChange={e => setCobroGastos(e.target.value)} /></td>
-                              </tr>
-                              <tr className="border-b bg-gray-50">
-                                <td className="px-3 py-2 text-muted-foreground">IGV Gastos</td>
-                                <td className="px-3 py-2 text-right text-red-600">− {formatCurrency(n(cobroIgvGastos), cxc.moneda)}</td>
-                                <td className="px-3 py-2"><Input className="h-7 text-xs" type="number" placeholder="0.00" value={cobroIgvGastos} onChange={e => setCobroIgvGastos(e.target.value)} /></td>
-                              </tr>
-                              <tr className="border-b font-semibold">
-                                <td className="px-3 py-2">Monto a Desembolsar</td>
-                                <td className="px-3 py-2 text-right text-green-700">{formatCurrency(liq.aDesembolsar, cxc.moneda)}</td>
-                                <td></td>
-                              </tr>
-                              <tr className="border-b bg-gray-50">
-                                <td className="px-3 py-2 text-muted-foreground">Adelanto Banpro</td>
-                                <td className="px-3 py-2 text-right text-red-600">− {formatCurrency(n(cobroAdelantoBanpro), cxc.moneda)}</td>
-                                {/* marcador-adelanto */}
-                                <td className="px-3 py-2"><Input className="h-7 text-xs" type="number" placeholder="0.00" value={cobroAdelantoBanpro} onChange={e => setCobroAdelantoBanpro(e.target.value)} /></td>
-                              </tr>
-                              <tr className="font-bold text-base">
-                                <td className="px-3 py-2">Saldo a Girar</td>
-                                <td className="px-3 py-2 text-right text-blue-700">{formatCurrency(liq.saldo, cxc.moneda)}</td>
-                                <td></td>
-                              </tr>
+                              {filaCalc('Monto Anticipo', formatCurrency(liq.montoAnticipo, cxc.moneda), { bold: true })}
+
+                              {filaEdit('Comisión', [{ unidad: cxc.moneda, value: cobroComision, onChange: setCobroComision }])}
+                              {filaEdit('Gastos', [{ unidad: cxc.moneda, value: cobroGastos, onChange: setCobroGastos }])}
+                              {filaEdit('IGV Gastos', [{ unidad: cxc.moneda, value: cobroIgvGastos, onChange: setCobroIgvGastos }])}
+
+                              {filaCalc('Monto a Desembolsar', formatCurrency(liq.aDesembolsar, cxc.moneda), { bold: true, color: 'text-green-700' })}
+
+                              {filaEdit('Adelanto Banpro', [{ unidad: cxc.moneda, value: cobroAdelantoBanpro, onChange: setCobroAdelantoBanpro }])}
+
+                              {filaCalc('Saldo a Girar', formatCurrency(liq.saldo, cxc.moneda), { big: true, color: 'text-blue-700' })}
 
                               {/* Cierre de la operación: la financiera liquida
                                   cuando el cliente paga. La reliquidación baja
                                   el Saldo a Girar; la mora y el resto bajan el
                                   Excedente. Van con signo, como los manda el
                                   Informe de Excedentes. */}
-                              <tr className="border-b border-t-2">
-                                <td className="px-3 py-2 text-muted-foreground">Interés Reliquidación</td>
-                                <td className="px-3 py-2 text-right text-red-600">{liq.interesReliq ? `− ${formatCurrency(liq.interesReliq, cxc.moneda)}` : formatCurrency(0, cxc.moneda)}</td>
-                                <td className="px-3 py-2">
-                                  <Input className="h-7 text-xs" type="number" placeholder="0.00" value={cobroInteresReliquidacion} onChange={e => setCobroInteresReliquidacion(e.target.value)} />
-                                </td>
-                              </tr>
-                              <tr className="border-b">
-                                <td className="px-3 py-2 font-medium">Líquido a Girar</td>
-                                <td className="px-3 py-2 text-right font-medium text-blue-700">{formatCurrency(liq.liquidoAGirar, cxc.moneda)}</td>
-                                <td></td>
-                              </tr>
-                              <tr className="border-b bg-gray-50">
-                                <td className="px-3 py-2 text-muted-foreground">Mora</td>
-                                <td className="px-3 py-2 text-right text-red-600">{formatCurrency(liq.mora, cxc.moneda)}</td>
-                                <td className="px-3 py-2">
-                                  <Input className="h-7 text-xs" type="number" placeholder="0.00" value={cobroMora} onChange={e => setCobroMora(e.target.value)} />
-                                </td>
-                              </tr>
-                              <tr className="border-b bg-gray-50">
-                                <td className="px-3 py-2 text-muted-foreground">Com. Interés</td>
-                                <td className="px-3 py-2 text-right">{formatCurrency(liq.comInteres, cxc.moneda)}</td>
-                                <td className="px-3 py-2">
-                                  <Input className="h-7 text-xs" type="number" placeholder="0.00" value={cobroComisionInteres} onChange={e => setCobroComisionInteres(e.target.value)} />
-                                </td>
-                              </tr>
-                              <tr className="border-b bg-gray-50">
-                                <td className="px-3 py-2 text-muted-foreground">
-                                  Diferencia
-                                  <span className="block text-xs">redondeos — puede ser + o −</span>
-                                </td>
-                                <td className="px-3 py-2 text-right">{formatCurrency(liq.diferencia, cxc.moneda)}</td>
-                                <td className="px-3 py-2">
-                                  <Input className="h-7 text-xs" type="number" placeholder="0.00" value={cobroDiferencia} onChange={e => setCobroDiferencia(e.target.value)} />
-                                </td>
-                              </tr>
-                              <tr className="border-b bg-gray-50">
-                                <td className="px-3 py-2 text-muted-foreground">Otros</td>
-                                <td className="px-3 py-2 text-right">{formatCurrency(liq.otros, cxc.moneda)}</td>
-                                <td className="px-3 py-2">
-                                  <Input className="h-7 text-xs" type="number" placeholder="0.00" value={cobroOtros} onChange={e => setCobroOtros(e.target.value)} />
-                                </td>
-                              </tr>
-                              <tr className="bg-emerald-50">
-                                <td className="px-3 py-2 font-semibold">Total Excedente</td>
-                                <td className="px-3 py-2 text-right font-semibold text-emerald-700">{formatCurrency(liq.totalExcedente, cxc.moneda)}</td>
-                                <td className="px-3 py-2 text-xs text-muted-foreground">a devolver a GYS</td>
-                              </tr>
+                              {filaEdit('Interés Reliquidación', [{ unidad: cxc.moneda, value: cobroInteresReliquidacion, onChange: setCobroInteresReliquidacion }])}
+                              {filaCalc('Líquido a Girar', formatCurrency(liq.liquidoAGirar, cxc.moneda), { bold: true, color: 'text-blue-700' })}
+                              {filaEdit('Mora', [{ unidad: cxc.moneda, value: cobroMora, onChange: setCobroMora }])}
+                              {filaEdit('Com. Interés', [{ unidad: cxc.moneda, value: cobroComisionInteres, onChange: setCobroComisionInteres }])}
+                              {filaEdit(
+                                <>Diferencia<span className="block text-[11px] font-normal">redondeos — puede ser + o −</span></>,
+                                [{ unidad: cxc.moneda, value: cobroDiferencia, onChange: setCobroDiferencia }]
+                              )}
+                              {filaEdit('Otros', [{ unidad: cxc.moneda, value: cobroOtros, onChange: setCobroOtros }])}
+                              {filaCalc(
+                                'Total Excedente',
+                                <>{formatCurrency(liq.totalExcedente, cxc.moneda)}<span className="block text-[11px] font-normal text-muted-foreground">a devolver a GYS</span></>,
+                                { bold: true, color: 'text-emerald-700', bg: 'bg-emerald-50' }
+                              )}
                             </tbody>
                           </table>
                         </div>
@@ -2283,40 +2283,20 @@ export default function CxCDetallePage() {
                           <div className="bg-gray-800 text-white text-xs px-3 py-2 font-semibold">Liquidación (Cobro Directo)</div>
                           <table className="w-full text-sm">
                             <tbody>
-                              <tr className="border-b">
-                                <td className="px-3 py-2 text-muted-foreground">Base (Monto Factura)</td>
-                                <td className="px-3 py-2 text-right font-medium">{formatCurrency(liqDirecto.base, cxc.moneda)}</td>
-                                <td className="px-3 py-2 w-40"></td>
-                              </tr>
-                              <tr className="border-b bg-gray-50">
-                                <td className="px-3 py-2 text-muted-foreground">Detracción</td>
-                                <td className="px-3 py-2 text-right text-red-600">− {formatCurrency(liqDirecto.detMonto, cxc.moneda)}</td>
-                                <td className="px-3 py-2">
-                                  <div className="flex gap-1">
-                                    <Input className="h-7 text-xs w-16" type="number" placeholder="%" value={cobroDetraccionPct} onChange={e => setCobroDetraccionPct(e.target.value)} />
-                                    <Input className="h-7 text-xs" type="number" placeholder="Monto" value={cobroDetraccionMonto} onChange={e => setCobroDetraccionMonto(e.target.value)} />
-                                  </div>
-                                </td>
-                              </tr>
-                              <tr className="border-b bg-gray-50">
-                                <td className="px-3 py-2 text-muted-foreground">Retención</td>
-                                <td className="px-3 py-2 text-right text-red-600">− {formatCurrency(liqDirecto.retMonto, cxc.moneda)}</td>
-                                <td className="px-3 py-2">
-                                  <div className="flex gap-1">
-                                    <Input className="h-7 text-xs w-16" type="number" placeholder="%" value={cobroRetencionPct} onChange={e => setCobroRetencionPct(e.target.value)} />
-                                    <Input className="h-7 text-xs" type="number" placeholder="Monto" value={cobroRetencionMonto} onChange={e => setCobroRetencionMonto(e.target.value)} />
-                                  </div>
-                                </td>
-                              </tr>
-                              <tr className="font-bold text-base">
-                                <td className="px-3 py-2">Neto a Cobrar</td>
-                                <td className="px-3 py-2 text-right text-green-700">
-                                  {formatCurrency(n(cobroMontoNetoDirecto) || liqDirecto.neto, cxc.moneda)}
-                                </td>
-                                <td className="px-3 py-2">
-                                  <Input className="h-7 text-xs" type="number" placeholder={liqDirecto.neto.toFixed(2)} value={cobroMontoNetoDirecto} onChange={e => setCobroMontoNetoDirecto(e.target.value)} />
-                                </td>
-                              </tr>
+                              {filaCalc('Base (Monto Factura)', formatCurrency(liqDirecto.base, cxc.moneda))}
+                              {filaEdit('Detracción', [
+                                { unidad: '%', value: cobroDetraccionPct, onChange: setCobroDetraccionPct, width: 'w-16' },
+                                { unidad: cxc.moneda, value: cobroDetraccionMonto, onChange: setCobroDetraccionMonto },
+                              ])}
+                              {filaEdit('Retención', [
+                                { unidad: '%', value: cobroRetencionPct, onChange: setCobroRetencionPct, width: 'w-16' },
+                                { unidad: cxc.moneda, value: cobroRetencionMonto, onChange: setCobroRetencionMonto },
+                              ])}
+                              {filaEdit(
+                                'Neto a Cobrar',
+                                [{ unidad: cxc.moneda, value: cobroMontoNetoDirecto, onChange: setCobroMontoNetoDirecto, placeholder: liqDirecto.neto.toFixed(2), width: 'w-32' }],
+                                { emphasis: true }
+                              )}
                             </tbody>
                           </table>
                         </div>
