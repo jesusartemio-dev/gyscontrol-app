@@ -119,7 +119,53 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
 
     data.updatedAt = new Date()
-    const updated = await prisma.cuentaPorCobrar.update({ where: { id }, data })
+
+    // La detracción/retención se guarda en 3 lugares que pueden desincronizarse:
+    // CuentaPorCobrar (donde escribe este endpoint), CobroValorizacion (lo que
+    // muestra y edita la Hoja de Liquidación una vez que ya hay un cobro
+    // registrado — y esos valores GANAN sobre los de la CxC al cargar el
+    // formulario) y AbonoValorizacion.montoEsperado (lo que muestra el
+    // Cronograma). Sin esto, "Verificar factura" corrige la CxC pero la
+    // pantalla sigue mostrando el número viejo — exactamente lo que pasó con
+    // FMK01: corregido a 510.06 acá, pero la Hoja de Liquidación y el
+    // Cronograma seguían en 509.98.
+    const camposCobro: Record<string, number | null> = {}
+    for (const campo of ['detraccionPct', 'detraccionMonto', 'retencionPct', 'retencionMonto'] as const) {
+      if (campo in data) camposCobro[campo] = data[campo]
+    }
+
+    const updated = await prisma.$transaction(async tx => {
+      const cxc = await tx.cuentaPorCobrar.update({ where: { id }, data })
+
+      if (Object.keys(camposCobro).length > 0 && cxc.valorizacionId) {
+        const cobro = await tx.cobroValorizacion.findUnique({ where: { valorizacionId: cxc.valorizacionId } })
+        if (cobro) {
+          await tx.cobroValorizacion.update({
+            where: { id: cobro.id },
+            data: { ...camposCobro, updatedAt: new Date() },
+          })
+          // El Cronograma solo se corrige mientras el evento sigue pendiente
+          // — un evento ya 'recibido' cerró con el monto real que se le puso
+          // en su momento, y reescribir su esperado después sería reescribir
+          // historia.
+          if ('detraccionMonto' in camposCobro) {
+            await tx.abonoValorizacion.updateMany({
+              where: { cobroId: cobro.id, tipo: 'detraccion', estado: 'pendiente' },
+              data: { montoEsperado: camposCobro.detraccionMonto },
+            })
+          }
+          if ('retencionMonto' in camposCobro) {
+            await tx.abonoValorizacion.updateMany({
+              where: { cobroId: cobro.id, tipo: 'retencion', estado: 'pendiente' },
+              data: { montoEsperado: camposCobro.retencionMonto },
+            })
+          }
+        }
+      }
+
+      return cxc
+    })
+
     return NextResponse.json(updated)
   } catch (error) {
     console.error('Error al actualizar CxC:', error)
