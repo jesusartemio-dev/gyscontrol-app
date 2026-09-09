@@ -819,6 +819,7 @@ export interface CxCRichRow {
     detraccionPorcentaje?: number | null
     detraccionMonto?: number | null
     detraccionFechaPago?: string | null
+    detraccionMontoPEN?: number | null
     numeroConstanciaBN?: string | null
     esRetencion?: boolean
     retencionPorcentaje?: number | null
@@ -971,17 +972,27 @@ export function calcularCobradoEfectivo(cxc: CxCRichRow): number {
 /**
  * Monto de DETRACCIÓN convertido a soles (PEN) para mostrar en el reporte Contable.
  *
- * SUPUESTO DE MONEDA: los PagoCobro no tienen campo moneda propio; se registran en
- * la misma moneda que la CxC padre (el cálculo "monto × %det" se aplica al monto de
- * la factura en su moneda original). Por lo tanto:
+ * Prioriza `detraccionMontoPEN` — el importe REAL que Administración cargó al
+ * confirmar el evento (la constancia del Banco de la Nación) — sobre el
+ * cálculo teórico "monto × TC". Son distintos casi siempre: el TC del depósito
+ * real casi nunca coincide al centavo con el TC guardado en la CxC (ver
+ * QRM15/FMK01: hasta 8 centavos de diferencia). Usar el teórico cuando SÍ hay
+ * un valor real cargado mostraría el número equivocado en el reporte.
+ * El cálculo por TC queda solo de fallback, para registros viejos que nunca
+ * tuvieron el campo (todo lo confirmado antes de que existiera).
+ *
+ * SUPUESTO DE MONEDA en el fallback: los PagoCobro no tienen campo moneda
+ * propio; se registran en la misma moneda que la CxC padre. Por lo tanto:
  *   - Factura PEN → detracción ya está en soles.
  *   - Factura USD → detracción está en USD; se convierte × tipoCambio (PEN/USD).
- * Si la factura es USD y no hay tipoCambio registrado, se devuelve el monto original
- * sin convertir (el valor vendrá en USD pero es lo mejor que podemos mostrar).
+ * Si la factura es USD y no hay tipoCambio registrado, se devuelve el monto
+ * original sin convertir (el valor vendrá en USD pero es lo mejor que podemos
+ * mostrar).
  */
 export function detraccionEnSoles(cxc: CxCRichRow): number | null {
   const pago = cxc.pagos?.find(p => p.esDetraccion && !p.anulado) ?? null
   if (!pago) return null
+  if (pago.detraccionMontoPEN != null) return Math.round(pago.detraccionMontoPEN)
   const monto = pago.detraccionMonto ?? pago.monto
   // SUNAT RS 183-2004: depósito de detracciones siempre en enteros (sin decimales)
   if (cxc.moneda === 'PEN') return Math.round(monto)
@@ -1356,7 +1367,11 @@ export async function exportarCxCContable(
       // Detracción
       [22, detraccion?.numeroConstanciaBN ?? ''],
       [23, detSoles,             FMT_INT],    // SUNAT: detracción sin decimales (S/)
-      [24, detraccion?.detraccionFechaPago ? new Date(detraccion.detraccionFechaPago) : null, FMT_DATE],
+      // `detraccionFechaPago` es un campo legacy que "Marcar recibido" nunca
+      // llena — la fecha real en que se confirmó la detracción es fechaPago
+      // (la fecha del PagoCobro), igual que ya se usa para Retención (fila de
+      // abajo). Sin esto la columna Fecha del reporte quedaba siempre vacía.
+      [24, detraccion?.fechaPago ? new Date(detraccion.fechaPago) : null, FMT_DATE],
       // Retención
       [25, retencion?.retencionNumeroConstancia ?? ''],
       [26, retSoles,             FMT_MONEY],  // Siempre en S/

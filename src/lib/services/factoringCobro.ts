@@ -411,6 +411,19 @@ export async function marcarAbonoFactoringRecibido(
 
   await recalcularCuentaPorCobrar(cxc.id, tx)
 
+  // El comprobante en soles queda en el PagoCobro (el registro de la
+  // confirmación), pero la card de resumen y el panel "Editar" solo leen
+  // CuentaPorCobrar.detraccionMontoPEN — sin este paso, Administración carga
+  // el número real acá y en la pantalla sigue sin verse, aunque el reporte sí
+  // lo tenga. Se sobrescribe (no solo si estaba vacío): una vez confirmada la
+  // detracción con la constancia real, ese es el número definitivo.
+  if (abono.tipo === 'detraccion' && detraccionMontoPEN != null) {
+    await tx.cuentaPorCobrar.update({
+      where: { id: cxc.id },
+      data: { detraccionMontoPEN, updatedAt: new Date() },
+    })
+  }
+
   if (abono.tipo === 'excedente') {
     await tx.cobroValorizacion.update({
       where: { id: cobro.id },
