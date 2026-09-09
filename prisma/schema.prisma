@@ -4924,6 +4924,12 @@ model PagoCobro {
   detraccionMonto           Float?
   detraccionFechaPago       DateTime?
   numeroConstanciaBN        String?
+  // Importe del depósito en el Banco de la Nación, cuando la CxC no está en
+  // soles. `monto`/`detraccionMonto` siguen en la moneda de la CxC (lo que
+  // cancela el evento); este es solo el comprobante en soles, para que no se
+  // confunda el uno con el otro al "Marcar recibido" — mismo patrón que
+  // CuentaPorCobrar.detraccionMontoPEN en la Hoja de Liquidación.
+  detraccionMontoPEN        Float?
   esRetencion               Boolean   @default(false)
   retencionPorcentaje       Float?
   retencionMonto            Float?

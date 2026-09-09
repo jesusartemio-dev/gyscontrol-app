@@ -16,6 +16,10 @@ const RecibirSchema = z.object({
   observaciones: z.string().max(300).optional().nullable(),
   numeroConstanciaBN: z.string().max(100).optional().nullable(),
   numeroComprobanteRetencion: z.string().max(100).optional().nullable(),
+  // Comprobante en soles del depósito al Banco de la Nación, cuando la CxC no
+  // está en soles — separado de montoReal para que no se mezclen las dos
+  // monedas (ver PagoCobro.detraccionMontoPEN).
+  detraccionMontoPEN: z.number().positive().optional().nullable(),
 })
 
 // POST /api/proyectos/:id/valorizaciones/:valId/cobro/abonos/:abonoId/recibir
@@ -51,7 +55,8 @@ export async function POST(request: NextRequest, { params }: Ctx) {
         tx,
         data.observaciones,
         data.numeroConstanciaBN,
-        data.numeroComprobanteRetencion
+        data.numeroComprobanteRetencion,
+        data.detraccionMontoPEN
       )
     })
 

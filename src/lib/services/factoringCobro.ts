@@ -283,7 +283,8 @@ export async function marcarAbonoFactoringRecibido(
   tx: PrismaClientOrTx,
   observaciones?: string | null,
   numeroConstanciaBN?: string | null,
-  numeroComprobanteRetencion?: string | null
+  numeroComprobanteRetencion?: string | null,
+  detraccionMontoPEN?: number | null
 ) {
   const abono = await tx.abonoValorizacion.findUnique({
     where: { id: abonoId },
@@ -349,6 +350,10 @@ export async function marcarAbonoFactoringRecibido(
       medioPago,
       esDetraccion: abono.tipo === 'detraccion',
       numeroConstanciaBN: abono.tipo === 'detraccion' ? (numeroConstanciaBN || null) : null,
+      // `monto`/detraccionMontoPEN acá abajo: monto SIEMPRE en la moneda de la
+      // CxC (lo que cancela el evento), y el comprobante en soles va aparte —
+      // si se mezclan, el saldo de la CxC queda mal (ver detraccionMontoPEN).
+      detraccionMontoPEN: abono.tipo === 'detraccion' ? (detraccionMontoPEN ?? null) : null,
       esRetencion: abono.tipo === 'retencion',
       retencionNumeroConstancia: abono.tipo === 'retencion' ? (numeroComprobanteRetencion || null) : null,
       observaciones: observaciones || `${etiqueta} factoring${cobro.financiera ? ` ${cobro.financiera}` : ''}`,
@@ -356,22 +361,41 @@ export async function marcarAbonoFactoringRecibido(
     },
   })
 
-  // Ajuste por mora: si llegó menos de lo esperado, la diferencia cierra el
-  // saldo como costo/pérdida (esAjusteMora), no como dinero recibido.
+  // Ajuste: si llegó menos de lo esperado, la diferencia cierra el saldo como
+  // costo/pérdida (esAjusteMora), no como dinero recibido.
+  //
+  // La CAUSA no es la misma según el evento — Administración lo confirmó:
+  // "BANPRO realiza una liquidación provisional... una vez que el cliente
+  // confirma la fecha efectiva de pago, BANPRO recalcula el interés y cobra
+  // la diferencia" sobre el Saldo a Girar (interés de reliquidación, no
+  // mora), mientras que en el Excedente sí es mora real. Antes esto se
+  // etiquetaba igual en los dos casos ("mora"), y esa etiqueta alimentaba la
+  // tarjeta "Ajuste por mora" del resumen — mezclando interés con mora ahí.
   const diferencia = abono.montoEsperado != null ? round2(abono.montoEsperado - montoReal) : 0
   if (diferencia > 0.01) {
+    const esReliquidacionInteres = abono.tipo === 'saldo_girar'
     await tx.pagoCobro.create({
       data: {
         cuentaPorCobrarId: cxc.id,
         cuentaBancariaId: null,
         monto: diferencia,
         fechaPago: fechaReal,
-        medioPago: 'factoring_ajuste_mora',
+        medioPago: esReliquidacionInteres ? 'factoring_ajuste_interes' : 'factoring_ajuste_mora',
         esAjusteMora: true,
-        observaciones: `Ajuste por mora — ${etiqueta.toLowerCase()} esperado ${abono.montoEsperado}, recibido ${montoReal}`,
+        observaciones: esReliquidacionInteres
+          ? `Interés de reliquidación — saldo a girar esperado ${abono.montoEsperado}, recibido ${montoReal}`
+          : `Ajuste por mora — ${etiqueta.toLowerCase()} esperado ${abono.montoEsperado}, recibido ${montoReal}`,
         updatedAt: new Date(),
       },
     })
+    // Se refleja también en la Hoja de Liquidación, sin pisar un valor que
+    // Administración ya haya cargado ahí a mano.
+    if (esReliquidacionInteres && cobro.interesReliquidacion == null) {
+      await tx.cobroValorizacion.update({
+        where: { id: cobro.id },
+        data: { interesReliquidacion: diferencia, updatedAt: new Date() },
+      })
+    }
   }
 
   const abonoActualizado = await tx.abonoValorizacion.update({

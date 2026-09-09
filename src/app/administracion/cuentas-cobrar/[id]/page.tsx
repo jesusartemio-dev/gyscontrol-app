@@ -91,6 +91,7 @@ interface PagoCobro {
   detraccionMonto: number | null
   detraccionFechaPago: string | null
   numeroConstanciaBN: string | null
+  detraccionMontoPEN: number | null
   esRetencion: boolean
   retencionPorcentaje: number | null
   retencionMonto: number | null
@@ -493,6 +494,13 @@ export default function CxCDetallePage() {
   // cobro directo (PagoCobro.numeroConstanciaBN), antes no se pedía acá y
   // todo caía genérico en observaciones.
   const [constanciaRecibir, setConstanciaRecibir] = useState('')
+  // Solo aplica a 'detraccion' cuando la CxC no está en soles: el comprobante
+  // en soles del depósito, separado del monto en la moneda de la CxC — mismo
+  // caso que ya resolvimos en la Hoja de Liquidación (detraccionMontoPEN),
+  // pero acá era donde de verdad se mezclaba: E001-1719 quedó "pagada" con
+  // 10 mil dólares de más porque se tecleó 14,248 (el voucher en soles) en
+  // el campo de monto en dólares.
+  const [montoRecibirPEN, setMontoRecibirPEN] = useState('')
   const [savingRecibir, setSavingRecibir]     = useState(false)
 
   // Revertir (Sub-fase E) — Caso 1 (desembolso completo, nada recibido
@@ -1295,7 +1303,16 @@ export default function CxCDetallePage() {
     setFechaRecibir(new Date().toISOString().split('T')[0])
     setObsRecibir('')
     setConstanciaRecibir('')
+    setMontoRecibirPEN('')
   }
+
+  // Si el monto tecleado es mucho más grande que lo esperado, probablemente
+  // se escribió el comprobante en soles en el campo de monto (en la moneda de
+  // la CxC) — el error real que dejó E001-1719 sobrepagada en USD 10,008.83.
+  const montoRecibirSospechoso =
+    abonoRecibiendo?.tipo === 'detraccion' && cxc?.moneda !== 'PEN' &&
+    n(montoRecibir) > 0 && abonoRecibiendo?.montoEsperado != null && abonoRecibiendo.montoEsperado > 0 &&
+    n(montoRecibir) / abonoRecibiendo.montoEsperado > 2
 
   const handleMarcarRecibido = async () => {
     if (!cxc?.valorizacion || !abonoRecibiendo || !montoRecibir || !fechaRecibir) return
@@ -1308,6 +1325,7 @@ export default function CxCDetallePage() {
             montoReal: parseFloat(montoRecibir), fechaReal: fechaRecibir, observaciones: obsRecibir || null,
             numeroConstanciaBN: abonoRecibiendo.tipo === 'detraccion' ? (constanciaRecibir || null) : undefined,
             numeroComprobanteRetencion: abonoRecibiendo.tipo === 'retencion' ? (constanciaRecibir || null) : undefined,
+            detraccionMontoPEN: abonoRecibiendo.tipo === 'detraccion' && montoRecibirPEN ? parseFloat(montoRecibirPEN) : undefined,
           }) }
       )
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error') }
@@ -1489,8 +1507,11 @@ export default function CxCDetallePage() {
   const totalPendienteEsperado = eventosPendientes.reduce((s, a) => s + (a.montoEsperado ?? 0), 0)
   // anulado excluido — un pago revertido ya no cuenta, ni en el resumen ni en
   // las listas de abajo (queda visible tachado en el historial completo).
-  const totalCostoFinanciamiento = cxc.pagos.filter(p => p.esCostoFinanciamiento && !p.anulado).reduce((s, p) => s + p.monto, 0)
-  const totalAjusteMora = cxc.pagos.filter(p => p.esAjusteMora && !p.anulado).reduce((s, p) => s + p.monto, 0)
+  // El interés de reliquidación (Saldo a Girar) va al costo de financiamiento
+  // — es interés, no una penalidad. La tarjeta "Ajuste por mora" queda solo
+  // con mora real (Excedente y el resto), que es lo que su nombre promete.
+  const totalCostoFinanciamiento = cxc.pagos.filter(p => (p.esCostoFinanciamiento || p.medioPago === 'factoring_ajuste_interes') && !p.anulado).reduce((s, p) => s + p.monto, 0)
+  const totalAjusteMora = cxc.pagos.filter(p => p.esAjusteMora && p.medioPago !== 'factoring_ajuste_interes' && !p.anulado).reduce((s, p) => s + p.monto, 0)
 
   const pagosCobro = cxc.pagos.filter(p => !p.esDetraccion && !p.esRetencion && !p.anulado)
   const pagosDetraccion = cxc.pagos.filter(p => p.esDetraccion && !p.anulado)
@@ -2451,7 +2472,13 @@ export default function CxCDetallePage() {
                                 <TableCell className="text-right text-sm">
                                   {a.montoReal != null ? formatCurrency(a.montoReal, cxc.moneda) : '—'}
                                   {a.montoReal != null && a.montoEsperado != null && a.montoEsperado - a.montoReal > 0.01 && (
-                                    <p className="text-[11px] text-red-600">−{formatCurrency(a.montoEsperado - a.montoReal, cxc.moneda)} mora</p>
+                                    <p className="text-[11px] text-red-600">
+                                      −{formatCurrency(a.montoEsperado - a.montoReal, cxc.moneda)}{' '}
+                                      {/* Saldo a Girar: es interés de reliquidación (BANPRO recalcula el
+                                          interés según la fecha real de pago). Excedente y el resto: sí es
+                                          mora — la financiera la descuenta del excedente disponible. */}
+                                      {a.tipo === 'saldo_girar' ? 'interés' : 'mora'}
+                                    </p>
                                   )}
                                 </TableCell>
                                 <TableCell className="text-xs">
@@ -2641,6 +2668,15 @@ export default function CxCDetallePage() {
             <div>
               <Label>Monto real recibido ({cxc.moneda}) *</Label>
               <Input type="number" step="0.01" value={montoRecibir} onChange={e => setMontoRecibir(e.target.value)} />
+              {montoRecibirSospechoso && (
+                <p className="text-xs text-amber-700 flex items-start gap-1 mt-1">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <span>
+                    Es mucho más que lo esperado ({formatCurrency(abonoRecibiendo?.montoEsperado ?? 0, cxc.moneda)}).
+                    ¿Es el comprobante en soles? Va en el campo de abajo — acá va el monto en {cxc.moneda}.
+                  </span>
+                </p>
+              )}
             </div>
             <div>
               <Label>Fecha real *</Label>
@@ -2654,6 +2690,15 @@ export default function CxCDetallePage() {
                   onChange={e => setConstanciaRecibir(e.target.value)}
                   placeholder={abonoRecibiendo.tipo === 'detraccion' ? 'Ej: 298887985' : 'Ej: C001-123'}
                 />
+              </div>
+            )}
+            {abonoRecibiendo?.tipo === 'detraccion' && cxc.moneda !== 'PEN' && (
+              <div>
+                <Label>Depósito al Banco de la Nación (S/)</Label>
+                <Input type="number" step="0.01" placeholder="14248.00" value={montoRecibirPEN} onChange={e => setMontoRecibirPEN(e.target.value)} />
+                <p className="text-xs text-muted-foreground mt-1">
+                  El importe en soles del voucher, solo para referencia — no se usa para calcular el saldo.
+                </p>
               </div>
             )}
             <div>
