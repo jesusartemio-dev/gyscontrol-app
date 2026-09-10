@@ -24,6 +24,9 @@ import {
 } from '@/components/ui/select'
 import { getAllPedidoEquipos, deletePedidoEquipo } from '@/lib/services/pedidoEquipo'
 import LogisticaPedidosTable from '@/components/logistica/LogisticaPedidosTable'
+import { LogisticaPedidosTabSwitcher, type LogisticaPedidosTab } from '@/components/logistica/LogisticaPedidosTabSwitcher'
+import { PedidoItemsView } from '@/components/proyectos/PedidoItemsView'
+import { PedidoConsolidadoView } from '@/components/proyectos/PedidoConsolidadoView'
 import type { PedidoEquipo } from '@/types'
 
 const ESTADOS_PEDIDO = [
@@ -56,6 +59,23 @@ function LogisticaPedidosContent() {
   const [refreshing, setRefreshing] = useState(false)
 
   const searchParams = useSearchParams()
+
+  // Tab
+  const tabParam = searchParams?.get('tab') ?? 'pedidos'
+  const [tab, setTabState] = useState<LogisticaPedidosTab>(
+    tabParam === 'items' || tabParam === 'consolidado' ? tabParam : 'pedidos'
+  )
+
+  const setTab = (next: LogisticaPedidosTab) => {
+    setTabState(next)
+    const url = new URL(window.location.href)
+    if (next === 'pedidos') {
+      url.searchParams.delete('tab')
+    } else {
+      url.searchParams.set('tab', next)
+    }
+    router.replace(url.pathname + url.search)
+  }
 
   // Filters
   const [search, setSearch] = useState('')
@@ -163,7 +183,8 @@ function LogisticaPedidosContent() {
     <div className="min-h-screen bg-gray-50/50">
       {/* Header sticky */}
       <div className="bg-white border-b sticky top-0 z-10">
-        <div className="px-4 py-3">
+        <div className="px-4 py-3 space-y-2">
+          <LogisticaPedidosTabSwitcher activeTab={tab} onTabChange={setTab} />
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="h-8 w-8 rounded-lg bg-green-100 flex items-center justify-center">
@@ -192,6 +213,21 @@ function LogisticaPedidosContent() {
       </div>
 
       <div className="p-4 space-y-4">
+      {tab === 'items' ? (
+        <PedidoItemsView
+          estadosPedido={ESTADOS_VISIBLES_LOGISTICA}
+          mostrarFiltroTipo
+          hrefPedido={(pedidoId) => `/logistica/pedidos/${pedidoId}`}
+        />
+      ) : tab === 'consolidado' ? (
+        <PedidoConsolidadoView
+          estadosPedido={ESTADOS_VISIBLES_LOGISTICA}
+          mostrarFiltroTipo
+          modoCompra
+          hrefPedido={(pedidoId) => `/logistica/pedidos/${pedidoId}`}
+        />
+      ) : (
+      <>
         {/* Banner when filtered by ventaEquipoId */}
         {ventaEquipoId && (
           <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-2.5 flex items-center justify-between text-sm">
@@ -326,6 +362,8 @@ function LogisticaPedidosContent() {
             onDelete={puedeEliminar ? handleDelete : undefined}
           />
         </div>
+      </>
+      )}
       </div>
 
     </div>
