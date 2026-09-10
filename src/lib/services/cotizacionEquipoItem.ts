@@ -205,3 +205,24 @@ export async function buscarCotizacionEquipoItems(
 
   return { data: result.data || [], pagination }
 }
+
+// ✅ Ítems de equipo cotizados vinculados al catálogo, sin paginar (para consolidar en el cliente)
+export async function obtenerCotizacionEquipoItemsConsolidado(
+  params: { estado?: string } = {}
+): Promise<CotizacionEquipoItemBusqueda[]> {
+  const query = new URLSearchParams()
+  if (params.estado && params.estado !== 'all') query.set('estado', params.estado)
+
+  const res = await fetch(`${buildApiUrl('/api/cotizacion-equipo-item/consolidado')}?${query.toString()}`, {
+    cache: 'no-store',
+    credentials: 'include',
+  })
+
+  if (res.status === 401) {
+    if (typeof window !== 'undefined') window.location.href = '/login'
+    throw new Error('No autorizado')
+  }
+  if (!res.ok) throw new Error('Error al obtener el consolidado de equipos cotizados')
+
+  return res.json()
+}
