@@ -205,6 +205,28 @@ export const PAGINATION_CONFIGS = {
     defaultSortBy: 'fechaPedido',
     searchFields: ['codigo', 'proyecto.nombre', 'user.name']
   },
+  cotizacionEquipoItems: {
+    defaultLimit: 25,
+    maxLimit: 100,
+    defaultSortBy: 'createdAt',
+    searchFields: [
+      'codigo', 'descripcion', 'marca',
+      'cotizacionEquipo.cotizacion.codigo',
+      'cotizacionEquipo.cotizacion.nombre',
+      'cotizacionEquipo.cotizacion.cliente.nombre',
+    ]
+  },
+  cotizacionServicioItems: {
+    defaultLimit: 25,
+    maxLimit: 100,
+    defaultSortBy: 'createdAt',
+    searchFields: [
+      'nombre', 'descripcion', 'recursoNombre',
+      'cotizacionServicio.cotizacion.codigo',
+      'cotizacionServicio.cotizacion.nombre',
+      'cotizacionServicio.cotizacion.cliente.nombre',
+    ]
+  },
   timeline: {
     defaultLimit: 30,
     maxLimit: 200,

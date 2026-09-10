@@ -10,9 +10,102 @@
 
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 import type { CotizacionServicioItemPayload } from '@/types'
 import { recalcularTotalesCotizacion } from '@/lib/utils/recalculoCotizacion'
 import { randomUUID } from 'crypto'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import {
+  parsePaginationParams,
+  paginateQuery,
+  PAGINATION_CONFIGS
+} from '@/lib/utils/pagination'
+import { EstadoCotizacion } from '@prisma/client'
+
+const ESTADOS_COTIZACION_VALIDOS = new Set(Object.values(EstadoCotizacion))
+
+// ✅ Buscar ítems de servicio a través de todas las cotizaciones (paginado)
+export async function GET(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(req.url)
+    const paginationParams = parsePaginationParams(searchParams, PAGINATION_CONFIGS.cotizacionServicioItems)
+
+    const cotizacionId = searchParams.get('cotizacionId')
+    const estado = searchParams.get('estado')
+    const soloCatalogo = searchParams.get('soloCatalogo') === 'true'
+
+    if (estado && !ESTADOS_COTIZACION_VALIDOS.has(estado as EstadoCotizacion)) {
+      return NextResponse.json({ error: `Estado de cotización inválido: ${estado}` }, { status: 400 })
+    }
+
+    const cotizacionServicioWhere: any = {}
+    if (cotizacionId) cotizacionServicioWhere.cotizacionId = cotizacionId
+    if (estado) cotizacionServicioWhere.cotizacion = { estado: estado as EstadoCotizacion }
+
+    const additionalWhere: any = {}
+    if (Object.keys(cotizacionServicioWhere).length > 0) additionalWhere.cotizacionServicio = cotizacionServicioWhere
+    if (soloCatalogo) additionalWhere.catalogoServicioId = { not: null }
+
+    const queryFn = async ({ skip, take, where, orderBy }: any) => {
+      return prisma.cotizacionServicioItem.findMany({
+        where,
+        select: {
+          id: true,
+          nombre: true,
+          descripcion: true,
+          recursoNombre: true,
+          unidadServicioNombre: true,
+          cantidad: true,
+          horaTotal: true,
+          costoHora: true,
+          costoInterno: true,
+          costoCliente: true,
+          catalogoServicioId: true,
+          createdAt: true,
+          cotizacionServicio: {
+            select: {
+              id: true,
+              nombre: true,
+              cotizacion: {
+                select: {
+                  id: true,
+                  codigo: true,
+                  nombre: true,
+                  estado: true,
+                  cliente: { select: { id: true, nombre: true } },
+                },
+              },
+            },
+          },
+        },
+        orderBy,
+        skip,
+        take,
+      })
+    }
+
+    const countFn = async (where: any) => prisma.cotizacionServicioItem.count({ where })
+
+    const result = await paginateQuery(
+      queryFn,
+      countFn,
+      paginationParams,
+      [...PAGINATION_CONFIGS.cotizacionServicioItems.searchFields],
+      additionalWhere
+    )
+
+    return NextResponse.json(result)
+  } catch (error) {
+    console.error('❌ Error al buscar ítems de servicio de cotización:', error)
+    return NextResponse.json({ error: 'Error al buscar ítems de servicio de cotización' }, { status: 500 })
+  }
+}
 
 export async function POST(req: Request) {
   try {

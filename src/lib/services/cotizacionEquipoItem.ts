@@ -1,5 +1,5 @@
 import type { CotizacionEquipoItem } from '@/types'
-import type { CotizacionEquipoItemUpdatePayload } from '@/types/payloads'
+import type { CotizacionEquipoItemUpdatePayload, PaginationMeta } from '@/types/payloads'
 import { buildApiUrl } from '@/lib/utils'
 
 // ===================================================
@@ -123,4 +123,85 @@ export async function deleteCotizacionEquipoItem(id: string): Promise<void> {
     console.error('❌ deleteCotizacionEquipoItem:', error)
     throw error
   }
+}
+
+// ===================================================
+// Búsqueda de ítems a través de todas las cotizaciones
+// ===================================================
+
+export interface CotizacionEquipoItemBusqueda {
+  id: string
+  codigo: string
+  descripcion: string
+  categoria: string
+  marca: string
+  unidad: string
+  cantidad: number
+  precioCliente: number
+  costoCliente: number
+  costoInterno: number
+  catalogoEquipoId: string | null
+  createdAt: string
+  cotizacionEquipo: {
+    id: string
+    nombre: string
+    cotizacion: {
+      id: string
+      codigo: string
+      nombre: string
+      estado: string
+      cliente: { id: string; nombre: string } | null
+    }
+  }
+}
+
+export interface BuscarCotizacionEquipoItemsParams {
+  page?: number
+  limit?: number
+  search?: string
+  cotizacionId?: string
+  estado?: string
+  soloCatalogo?: boolean
+}
+
+export interface BuscarCotizacionEquipoItemsResult {
+  data: CotizacionEquipoItemBusqueda[]
+  pagination: PaginationMeta
+}
+
+// ✅ Buscar ítems de equipo cotizados en todas las cotizaciones (paginado)
+export async function buscarCotizacionEquipoItems(
+  params: BuscarCotizacionEquipoItemsParams = {}
+): Promise<BuscarCotizacionEquipoItemsResult> {
+  const query = new URLSearchParams()
+  if (params.page) query.set('page', params.page.toString())
+  if (params.limit) query.set('limit', params.limit.toString())
+  if (params.search) query.set('search', params.search)
+  if (params.cotizacionId) query.set('cotizacionId', params.cotizacionId)
+  if (params.estado && params.estado !== 'all') query.set('estado', params.estado)
+  if (params.soloCatalogo) query.set('soloCatalogo', 'true')
+
+  const res = await fetch(`${buildApiUrl('/api/cotizacion-equipo-item')}?${query.toString()}`, {
+    cache: 'no-store',
+    credentials: 'include',
+  })
+
+  if (res.status === 401) {
+    if (typeof window !== 'undefined') window.location.href = '/login'
+    throw new Error('No autorizado')
+  }
+  if (!res.ok) throw new Error('Error al buscar ítems de equipo')
+
+  const result = await res.json()
+  const apiPagination = result.pagination || {}
+  const pagination: PaginationMeta = {
+    page: apiPagination.page || 1,
+    limit: apiPagination.limit || 25,
+    total: apiPagination.total || 0,
+    totalPages: apiPagination.totalPages || 1,
+    hasNextPage: apiPagination.hasNext ?? false,
+    hasPrevPage: apiPagination.hasPrev ?? false,
+  }
+
+  return { data: result.data || [], pagination }
 }
