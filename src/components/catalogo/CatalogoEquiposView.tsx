@@ -191,7 +191,8 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
 
   // Memoized filter values
   const categorias = useMemo(() =>
-    [...new Set(equipos.map(eq => eq.categoriaEquipo?.nombre).filter(Boolean))] as string[],
+    ([...new Set(equipos.map(eq => eq.categoriaEquipo?.nombre).filter(Boolean))] as string[])
+      .sort((a, b) => a.localeCompare(b, 'es')),
     [equipos]
   )
 
