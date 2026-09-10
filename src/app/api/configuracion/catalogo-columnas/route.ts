@@ -25,17 +25,21 @@ const DEFAULTS: Record<Vista, { columnas: string[], permisos: Record<string, any
     }
   },
   logistica: {
-    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'precioInterno', 'precioLogistica', 'precioReal', 'estado', 'updatedAt'],
+    // precioReal oculto: solo Admin/Gerente lo ven/editan (vista admin).
+    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'precioInterno', 'precioLogistica', 'estado', 'updatedAt'],
     permisos: {
       canCreate: true, canEdit: true, canDelete: true, canImport: true, canExport: true,
       camposEditables: ['codigo', 'descripcion', 'marca', 'categoriaId', 'unidadId', 'estado', 'precioLogistica']
     }
   },
   proyectos: {
-    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'uso', 'precioLogistica', 'precioReal', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'estado', 'updatedAt'],
+    // precioReal oculto: solo Admin/Gerente lo ven/editan (vista admin).
+    // precioLogistica se mantiene visible; su edición queda restringida por
+    // rol (Admin/Gerente) directamente en el componente y en la API.
+    columnas: ['codigo', 'descripcion', 'categoria', 'unidad', 'marca', 'uso', 'precioLogistica', 'precioLista', 'factorCosto', 'factorVenta', 'precioInterno', 'precioVenta', 'estado', 'updatedAt'],
     permisos: {
       canCreate: true, canEdit: true, canDelete: true, canImport: true, canExport: true,
-      camposEditables: ['codigo', 'descripcion', 'marca', 'categoriaId', 'unidadId', 'estado', 'precioLista', 'factorCosto', 'factorVenta', 'precioLogistica', 'precioReal']
+      camposEditables: ['codigo', 'descripcion', 'marca', 'categoriaId', 'unidadId', 'estado', 'precioLista', 'factorCosto', 'factorVenta', 'precioLogistica']
     }
   }
 }

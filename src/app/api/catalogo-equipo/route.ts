@@ -3,8 +3,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createId } from '@paralleldrive/cuid2'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { tieneRol } from '@/lib/auth/roles'
 
 const VALID_VISTAS = ['admin', 'comercial', 'logistica', 'proyectos']
+// precioLogistica/precioReal reflejan flujos de compras (cotización ganadora,
+// OC confirmada). Definirlos a mano al crear un ítem solo debe poder hacerlo
+// Admin/Gerente, igual que al editar.
+const CAMPOS_SOLO_ADMIN_GERENTE = ['precioLogistica', 'precioReal']
 
 function buildPrismaSelect(columnas: string[]) {
   const select: Record<string, any> = { id: true, createdAt: true, updatedAt: true }
@@ -137,6 +142,16 @@ export async function POST(req: NextRequest) {
     for (const field of requiredFields) {
       if (!(field in data)) {
         return NextResponse.json({ error: `Falta el campo obligatorio: ${field}` }, { status: 400 })
+      }
+    }
+
+    // precioLogistica/precioReal: solo Admin/Gerente, sin importar la vista
+    for (const field of CAMPOS_SOLO_ADMIN_GERENTE) {
+      if (data[field] != null && !tieneRol(session, ['admin', 'gerente'])) {
+        return NextResponse.json(
+          { error: `Solo Admin/Gerente puede definir el campo: ${field}` },
+          { status: 403 }
+        )
       }
     }
 

@@ -22,10 +22,16 @@ interface CatalogoEquipoFormProps {
   equipo?: Partial<CatalogoEquipo>
   vista?: Vista
   camposEditables?: string[]
+  /** Campos visibles en el formulario. Si se omite, se muestran todos. */
+  camposVisibles?: string[]
+  /** precioLogistica/precioReal solo los edita Admin/Gerente. Default true (no restringe) para no romper otros llamadores. */
+  puedeEditarPreciosSensibles?: boolean
   onCreated?: (equipo: any) => void
   onUpdated?: (equipo: any) => void
   onCancel?: () => void
 }
+
+const CAMPOS_SOLO_ADMIN_GERENTE = ['precioLogistica', 'precioReal']
 
 const schema = z.object({
   categoriaId: z.string().min(1, 'Categoría requerida'),
@@ -57,7 +63,7 @@ const STATUS_OPTIONS = [
   { value: 'rechazado', label: 'Rechazado', icon: XCircle, color: 'text-red-700' },
 ]
 
-export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onCreated, onUpdated, onCancel }: CatalogoEquipoFormProps) {
+export default function CatalogoEquipoForm({ equipo, vista, camposEditables, camposVisibles, puedeEditarPreciosSensibles = true, onCreated, onUpdated, onCancel }: CatalogoEquipoFormProps) {
   const isEditMode = !!equipo?.id
   const [categorias, setCategorias] = useState<{ value: string; label: string }[]>([])
   const [unidades, setUnidades] = useState<{ value: string; label: string }[]>([])
@@ -65,7 +71,12 @@ export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onC
   const [loading, setLoading] = useState(true)
 
   // Field-level permission helper
-  const canEditField = (field: string) => !camposEditables || camposEditables.includes(field)
+  const canEditField = (field: string) => {
+    if (CAMPOS_SOLO_ADMIN_GERENTE.includes(field) && !puedeEditarPreciosSensibles) return false
+    return !camposEditables || camposEditables.includes(field)
+  }
+  // Field-level visibility helper (distinto de editable: un campo puede estar oculto por completo)
+  const isFieldVisible = (field: string) => !camposVisibles || camposVisibles.includes(field)
 
   const {
     register,
@@ -368,7 +379,7 @@ export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onC
 
         {/* Precio Logística, Precio Real y Precio Gerencia */}
         <div className="mt-2 pt-2 border-t border-gray-200 grid grid-cols-2 gap-2">
-          <div className="flex items-center gap-2">
+          <div className={cn("flex items-center gap-2", !isFieldVisible('precioReal') && "col-span-2")}>
             <Label className="text-[10px] text-muted-foreground whitespace-nowrap">P.Logística</Label>
             <Input
               type="number"
@@ -381,19 +392,21 @@ export default function CatalogoEquipoForm({ equipo, vista, camposEditables, onC
               disabled={!canEditField('precioLogistica')}
             />
           </div>
-          <div className="flex items-center gap-2">
-            <Label className="text-[10px] text-muted-foreground whitespace-nowrap">P.Real</Label>
-            <Input
-              type="number"
-              min={0}
-              step="any"
-              {...register('precioReal', { setValueAs: v => v === '' || v === null ? undefined : Number(v) })}
-              onFocus={(e) => e.target.select()}
-              placeholder="0.00"
-              className={cn("h-7 text-xs font-mono flex-1", !canEditField('precioReal') && disabledClass)}
-              disabled={!canEditField('precioReal')}
-            />
-          </div>
+          {isFieldVisible('precioReal') && (
+            <div className="flex items-center gap-2">
+              <Label className="text-[10px] text-muted-foreground whitespace-nowrap">P.Real</Label>
+              <Input
+                type="number"
+                min={0}
+                step="any"
+                {...register('precioReal', { setValueAs: v => v === '' || v === null ? undefined : Number(v) })}
+                onFocus={(e) => e.target.select()}
+                placeholder="0.00"
+                className={cn("h-7 text-xs font-mono flex-1", !canEditField('precioReal') && disabledClass)}
+                disabled={!canEditField('precioReal')}
+              />
+            </div>
+          )}
           {canEditField('precioGerencia') && (
             <div className="flex items-center gap-2 col-span-2">
               <Label className="text-[10px] text-purple-700 whitespace-nowrap font-medium">P.Gerencia</Label>

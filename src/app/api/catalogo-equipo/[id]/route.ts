@@ -4,9 +4,14 @@ import type { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { registrarActualizacion } from '@/lib/services/audit'
+import { tieneRol } from '@/lib/auth/roles'
 
 const VALID_VISTAS = ['admin', 'comercial', 'logistica', 'proyectos']
 const CAMPOS_PRECIO = ['precioLista', 'precioLogistica', 'precioReal', 'precioGerencia', 'factorCosto', 'factorVenta']
+// precioLogistica/precioReal reflejan flujos de compras (cotización ganadora,
+// OC confirmada). Editarlos a mano en el catálogo solo debe poder hacerlo
+// Admin/Gerente, sin importar la vista desde la que se edite.
+const CAMPOS_SOLO_ADMIN_GERENTE = ['precioLogistica', 'precioReal']
 
 export async function GET(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params
@@ -85,6 +90,16 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
             { status: 403 }
           )
         }
+      }
+    }
+
+    // precioLogistica/precioReal: solo Admin/Gerente, sin importar la vista
+    for (const field of CAMPOS_SOLO_ADMIN_GERENTE) {
+      if (field in payload && !tieneRol(session, ['admin', 'gerente'])) {
+        return NextResponse.json(
+          { error: `Solo Admin/Gerente puede editar el campo: ${field}` },
+          { status: 403 }
+        )
       }
     }
 

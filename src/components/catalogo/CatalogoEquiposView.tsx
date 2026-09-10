@@ -4,7 +4,9 @@ import { normalizeStr } from '@/lib/utils'
 
 import { useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
+import { tieneRol } from '@/lib/auth/roles'
 import CatalogoEquipoForm from '@/components/catalogo/CatalogoEquipoForm'
 import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
 import { ModalExportarCatalogo } from '@/components/catalogo/ModalExportarCatalogo'
@@ -102,6 +104,8 @@ interface CatalogoEquiposViewProps {
 }
 
 export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps) {
+  const { data: session } = useSession()
+  const puedeEditarPreciosSensibles = tieneRol(session, ['admin', 'gerente'])
   const [equipos, setEquipos] = useState<Partial<CatalogoEquipo>[]>([])
   const [loading, setLoading] = useState(true)
   const [vistaConfig, setVistaConfig] = useState<VistaConfig | null>(null)
@@ -639,7 +643,14 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
                     <DialogTitle>Nuevo Equipo</DialogTitle>
                     <DialogDescription>Agrega un equipo al catálogo</DialogDescription>
                   </DialogHeader>
-                  <CatalogoEquipoForm onCreated={handleCreated} onCancel={() => setShowCreateModal(false)} />
+                  <CatalogoEquipoForm
+                    vista={vista}
+                    camposEditables={camposEditables}
+                    camposVisibles={vistaConfig?.columnas}
+                    puedeEditarPreciosSensibles={puedeEditarPreciosSensibles}
+                    onCreated={handleCreated}
+                    onCancel={() => setShowCreateModal(false)}
+                  />
                 </DialogContent>
               </Dialog>
             )}
@@ -1139,7 +1150,16 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
               <DialogDescription>Modifica los datos del equipo <span className="font-mono font-medium">{editTarget?.codigo}</span></DialogDescription>
             </DialogHeader>
             {editTarget && (
-              <CatalogoEquipoForm key={editTarget.id} equipo={editTarget} vista={vista} camposEditables={camposEditables} onUpdated={handleUpdated} onCancel={() => setEditTarget(null)} />
+              <CatalogoEquipoForm
+                key={editTarget.id}
+                equipo={editTarget}
+                vista={vista}
+                camposEditables={camposEditables}
+                camposVisibles={vistaConfig?.columnas}
+                puedeEditarPreciosSensibles={puedeEditarPreciosSensibles}
+                onUpdated={handleUpdated}
+                onCancel={() => setEditTarget(null)}
+              />
             )}
           </DialogContent>
         </Dialog>
