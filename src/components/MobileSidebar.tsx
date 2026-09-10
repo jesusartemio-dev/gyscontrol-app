@@ -180,6 +180,8 @@ export default function MobileSidebar() {
       links: [
         { href: '/comercial/plantillas', label: 'Plantillas', icon: FileText },
         { href: '/comercial/cotizaciones', label: 'Cotizaciones', icon: Calculator, badge: 'cotizaciones-pendientes' as NotificationBadgeType },
+        { href: '/comercial/equipos', label: 'Equipos Cotizados', icon: Package },
+        { href: '/comercial/servicios', label: 'Servicios Cotizados', icon: ClipboardList },
         { href: '/comercial/ventas-equipos', label: 'Ventas de Equipos', icon: ShoppingCart },
         { href: '/comercial/catalogo', label: 'Catálogo Equipos', icon: Wrench },
       ],
