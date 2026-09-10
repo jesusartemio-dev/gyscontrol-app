@@ -6,6 +6,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
+import Link from 'next/link'
 import { tieneRol } from '@/lib/auth/roles'
 import CatalogoEquipoForm from '@/components/catalogo/CatalogoEquipoForm'
 import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
@@ -424,21 +425,42 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
     const l = counts?.listaEquipoItem || 0
     if (c + p + l === 0) return <span className="text-muted-foreground text-xs">—</span>
     return (
-      <div className="flex items-center justify-center gap-1">
+      <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
         {c > 0 && (
           <Tooltip><TooltipTrigger asChild>
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700">{c}C</span>
-          </TooltipTrigger><TooltipContent>{c} cotizaci{c === 1 ? 'ón' : 'ones'}</TooltipContent></Tooltip>
+            <Link
+              href={`/comercial/equipos?tab=consolidado&catalogoEquipoId=${eq.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 cursor-pointer"
+            >
+              {c}C
+            </Link>
+          </TooltipTrigger><TooltipContent>Ver en {c} cotizaci{c === 1 ? 'ón' : 'ones'}</TooltipContent></Tooltip>
         )}
         {p > 0 && (
           <Tooltip><TooltipTrigger asChild>
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">{p}P</span>
-          </TooltipTrigger><TooltipContent>{p} proyecto{p === 1 ? '' : 's'}</TooltipContent></Tooltip>
+            <Link
+              href={`/proyectos/equipos?tab=consolidado&catalogoEquipoId=${eq.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 cursor-pointer"
+            >
+              {p}P
+            </Link>
+          </TooltipTrigger><TooltipContent>Ver en {p} proyecto{p === 1 ? '' : 's'}</TooltipContent></Tooltip>
         )}
         {l > 0 && (
           <Tooltip><TooltipTrigger asChild>
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-700">{l}L</span>
-          </TooltipTrigger><TooltipContent>{l} lista{l === 1 ? '' : 's'}</TooltipContent></Tooltip>
+            <Link
+              href={`/proyectos/listas?tab=consolidado&catalogoEquipoId=${eq.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-700 hover:bg-emerald-200 cursor-pointer"
+            >
+              {l}L
+            </Link>
+          </TooltipTrigger><TooltipContent>Ver en {l} lista{l === 1 ? '' : 's'}</TooltipContent></Tooltip>
         )}
       </div>
     )

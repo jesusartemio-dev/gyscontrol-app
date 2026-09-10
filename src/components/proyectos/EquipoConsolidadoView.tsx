@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, Fragment } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -21,6 +22,7 @@ import {
   Layers,
   Copy,
   Check,
+  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -49,6 +51,10 @@ const formatCurrency = (amount: number): string => {
 }
 
 export function EquipoConsolidadoView() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const catalogoEquipoIdParam = searchParams?.get('catalogoEquipoId') || null
+
   const [items, setItems] = useState<any[]>([])
   const [proyectos, setProyectos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,6 +62,12 @@ export function EquipoConsolidadoView() {
   const [selectedProyecto, setSelectedProyecto] = useState('todos')
   const [selectedCategoria, setSelectedCategoria] = useState('todos')
   const [copied, setCopied] = useState(false)
+
+  const limpiarFiltroEquipo = () => {
+    const url = new URL(window.location.href)
+    url.searchParams.delete('catalogoEquipoId')
+    router.replace(url.pathname + url.search)
+  }
 
   useEffect(() => {
     const loadData = async () => {
@@ -184,6 +196,12 @@ export function EquipoConsolidadoView() {
 
   // Filter consolidated items
   const filteredConsolidated = useMemo(() => {
+    // Deep-link desde el catálogo (badge "NP"): filtra por ID, sin depender
+    // de que el texto del código coincida con lo que quedó guardado en cada ítem.
+    if (catalogoEquipoIdParam) {
+      return consolidated.filter(item => item.groupKey === `cat::${catalogoEquipoIdParam}`)
+    }
+
     let result = consolidated
 
     if (selectedCategoria !== 'todos') {
@@ -205,7 +223,7 @@ export function EquipoConsolidadoView() {
       if (catCompare !== 0) return catCompare
       return a.codigo.localeCompare(b.codigo)
     })
-  }, [consolidated, selectedCategoria, searchTerm])
+  }, [consolidated, selectedCategoria, searchTerm, catalogoEquipoIdParam])
 
   // Group by category for visual separators
   const groupedByCategory = useMemo(() => {
@@ -259,6 +277,19 @@ export function EquipoConsolidadoView() {
 
   return (
     <div className="space-y-3">
+      {/* Banner de filtro por equipo (deep-link desde el catálogo) */}
+      {catalogoEquipoIdParam && (
+        <div className="flex items-center justify-between gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm">
+          <span className="text-blue-800">
+            Mostrando solo {filteredConsolidated[0] ? `«${filteredConsolidated[0].codigo}»` : 'este equipo'} del catálogo
+          </span>
+          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-blue-700 hover:text-blue-900" onClick={limpiarFiltroEquipo}>
+            <X className="h-3.5 w-3.5" />
+            Ver todos
+          </Button>
+        </div>
+      )}
+
       {/* Stats Bar */}
       <div className="flex items-center gap-3 flex-wrap">
         <Badge variant="outline" className="text-xs font-medium">
@@ -287,42 +318,48 @@ export function EquipoConsolidadoView() {
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            placeholder="Buscar por codigo, descripcion, marca..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 h-9"
-          />
-        </div>
+        {!catalogoEquipoIdParam && (
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Buscar por codigo, descripcion, marca..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 h-9"
+            />
+          </div>
+        )}
 
-        <Select value={selectedProyecto} onValueChange={setSelectedProyecto}>
-          <SelectTrigger className="w-full sm:w-48 h-9">
-            <SelectValue placeholder="Todos los proyectos" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos los proyectos</SelectItem>
-            {proyectos.map((p: any) => (
-              <SelectItem key={p.id} value={p.id}>
-                <span className="font-medium">{p.codigo}</span>
-                <span className="text-muted-foreground ml-1.5 text-xs">{p.nombre}</span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {!catalogoEquipoIdParam && (
+          <Select value={selectedProyecto} onValueChange={setSelectedProyecto}>
+            <SelectTrigger className="w-full sm:w-48 h-9">
+              <SelectValue placeholder="Todos los proyectos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los proyectos</SelectItem>
+              {proyectos.map((p: any) => (
+                <SelectItem key={p.id} value={p.id}>
+                  <span className="font-medium">{p.codigo}</span>
+                  <span className="text-muted-foreground ml-1.5 text-xs">{p.nombre}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
-        <Select value={selectedCategoria} onValueChange={setSelectedCategoria}>
-          <SelectTrigger className="w-full sm:w-44 h-9">
-            <SelectValue placeholder="Todas las categorias" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todas las categorias</SelectItem>
-            {categorias.map((cat) => (
-              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {!catalogoEquipoIdParam && (
+          <Select value={selectedCategoria} onValueChange={setSelectedCategoria}>
+            <SelectTrigger className="w-full sm:w-44 h-9">
+              <SelectValue placeholder="Todas las categorias" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas las categorias</SelectItem>
+              {categorias.map((cat) => (
+                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         <Button
           variant="outline"
