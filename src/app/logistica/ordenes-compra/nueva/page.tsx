@@ -144,6 +144,8 @@ function NuevaOrdenCompraContent() {
 
   // Leer query params: proyectoId | centroCostoId | ventaEquipoId + pedidoItems (IDs separados por coma)
   useEffect(() => {
+    if (searchParams.get('multiProyecto') === 'true') setMultiProyecto(true)
+
     const proyectoIdParam = searchParams.get('proyectoId') || null
     const centroCostoIdParam = searchParams.get('centroCostoId') || null
     const ventaEquipoIdParam = searchParams.get('ventaEquipoId') || null
