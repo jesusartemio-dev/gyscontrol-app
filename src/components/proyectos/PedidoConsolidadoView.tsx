@@ -34,11 +34,14 @@ interface ConsolidadoPedidoItem {
   categoria: string
   cantidadPedidaTotal: number
   cantidadAtendidaTotal: number
+  cantidadPendienteTotal: number
   costoTotal: number
   origenes: {
     pedidoId: string
     pedidoCodigo: string
+    pedidoEstado: string
     proyectoId: string
+    origenLabel: string
     cantidadPedida: number
   }[]
 }
@@ -47,21 +50,41 @@ const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount)
 }
 
-export function PedidoConsolidadoView() {
+interface PedidoConsolidadoViewProps {
+  /** Estados de pedido a incluir. Si se omite, trae todos. */
+  estadosPedido?: string[]
+  /** Muestra el selector de tipo (proyecto / interno / venta equipos). */
+  mostrarFiltroTipo?: boolean
+  /** Construye el href al detalle del pedido. Default: ruta de proyectos. */
+  hrefPedido?: (pedidoId: string, proyectoId: string) => string
+  /** Muestra el botón "Generar OC" y la columna Pendiente. Para logística. */
+  modoCompra?: boolean
+}
+
+export function PedidoConsolidadoView({ estadosPedido, mostrarFiltroTipo, hrefPedido, modoCompra }: PedidoConsolidadoViewProps = {}) {
   const [items, setItems] = useState<any[]>([])
   const [proyectos, setProyectos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedProyecto, setSelectedProyecto] = useState('todos')
   const [selectedCategoria, setSelectedCategoria] = useState('todos')
+  const [selectedTipo, setSelectedTipo] = useState('todos')
   const [copied, setCopied] = useState(false)
+
+  const buildQuery = () => {
+    const params = new URLSearchParams()
+    if (selectedProyecto !== 'todos') params.set('proyectoId', selectedProyecto)
+    if (estadosPedido?.length) params.set('estados', estadosPedido.join(','))
+    if (selectedTipo !== 'todos') params.set('tipo', selectedTipo)
+    return params.toString()
+  }
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true)
       try {
         const [itemsRes, proyectosRes] = await Promise.all([
-          fetch('/api/pedido-equipo-item', { cache: 'no-store' }),
+          fetch(`/api/pedido-equipo-item?${buildQuery()}`, { cache: 'no-store' }),
           fetch('/api/proyecto', { cache: 'no-store' }),
         ])
         if (itemsRes.ok) setItems(await itemsRes.json())
@@ -73,23 +96,21 @@ export function PedidoConsolidadoView() {
       }
     }
     loadData()
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Refetch when project filter changes
+  // Refetch when project/tipo filter changes
   useEffect(() => {
     if (loading) return
     const loadItems = async () => {
       try {
-        const params = new URLSearchParams()
-        if (selectedProyecto !== 'todos') params.set('proyectoId', selectedProyecto)
-        const res = await fetch(`/api/pedido-equipo-item?${params}`, { cache: 'no-store' })
+        const res = await fetch(`/api/pedido-equipo-item?${buildQuery()}`, { cache: 'no-store' })
         if (res.ok) setItems(await res.json())
       } catch {
         toast.error('Error al filtrar items')
       }
     }
     loadItems()
-  }, [selectedProyecto]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedProyecto, selectedTipo]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Consolidation logic
   const consolidated = useMemo(() => {
@@ -117,6 +138,7 @@ export function PedidoConsolidadoView() {
           categoria,
           cantidadPedidaTotal: 0,
           cantidadAtendidaTotal: 0,
+          cantidadPendienteTotal: 0,
           costoTotal: 0,
           origenes: [],
         })
@@ -129,7 +151,17 @@ export function PedidoConsolidadoView() {
 
       group.cantidadPedidaTotal += cantPedida
       group.cantidadAtendidaTotal += cantAtendida
+      group.cantidadPendienteTotal += Math.max(0, cantPedida - cantAtendida)
       group.costoTotal += costo
+
+      // Origin label: proyecto > centro de costo > venta de equipo
+      const origenLabel = pedido.proyecto?.codigo
+        ? pedido.proyecto.codigo
+        : pedido.centroCosto?.nombre
+        ? `CC: ${pedido.centroCosto.nombre}`
+        : pedido.ventaEquipo?.codigo
+        ? `Venta: ${pedido.ventaEquipo.codigo}`
+        : 'Sin origen'
 
       // Track origin pedido
       const existingOrigen = group.origenes.find(o => o.pedidoId === pedido.id)
@@ -139,7 +171,9 @@ export function PedidoConsolidadoView() {
         group.origenes.push({
           pedidoId: pedido.id,
           pedidoCodigo: pedido.codigo || 'Sin codigo',
+          pedidoEstado: pedido.estado || 'borrador',
           proyectoId: pedido.proyectoId || pedido.proyecto?.id || '',
+          origenLabel,
           cantidadPedida: cantPedida,
         })
       }
@@ -277,8 +311,32 @@ export function PedidoConsolidadoView() {
           />
         </div>
 
-        <Select value={selectedProyecto} onValueChange={setSelectedProyecto}>
-          <SelectTrigger className="w-full sm:w-48 h-9">
+        {mostrarFiltroTipo && (
+          <Select
+            value={selectedTipo}
+            onValueChange={(v) => {
+              setSelectedTipo(v)
+              if (v === 'interno' || v === 'equipo') setSelectedProyecto('todos')
+            }}
+          >
+            <SelectTrigger className="w-full sm:w-40 h-9">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los tipos</SelectItem>
+              <SelectItem value="proyecto">De proyecto</SelectItem>
+              <SelectItem value="interno">Internos (CC)</SelectItem>
+              <SelectItem value="equipo">Venta Equipos</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+
+        <Select
+          value={selectedProyecto}
+          onValueChange={setSelectedProyecto}
+          disabled={selectedTipo === 'interno' || selectedTipo === 'equipo'}
+        >
+          <SelectTrigger className="w-full sm:w-48 h-9 disabled:opacity-40">
             <SelectValue placeholder="Todos los proyectos" />
           </SelectTrigger>
           <SelectContent>
@@ -313,6 +371,20 @@ export function PedidoConsolidadoView() {
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
           {copied ? 'Copiado' : 'Copiar'}
         </Button>
+
+        {modoCompra && (
+          <Button
+            variant="default"
+            size="sm"
+            className="h-9 text-xs gap-1.5"
+            asChild
+          >
+            <Link href="/logistica/ordenes-compra/nueva?multiProyecto=true">
+              <ShoppingCart className="h-3.5 w-3.5" />
+              Generar OC
+            </Link>
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -331,6 +403,9 @@ export function PedidoConsolidadoView() {
                 <TableHead className="text-xs font-medium hidden sm:table-cell">Unidad</TableHead>
                 <TableHead className="text-xs font-medium text-center w-24">Pedida</TableHead>
                 <TableHead className="text-xs font-medium text-center w-24">Atendida</TableHead>
+                {modoCompra && (
+                  <TableHead className="text-xs font-medium text-center w-24">Pendiente</TableHead>
+                )}
                 <TableHead className="text-xs font-medium text-right w-24">Costo Total</TableHead>
                 <TableHead className="text-xs font-medium">Origenes</TableHead>
               </TableRow>
@@ -340,7 +415,7 @@ export function PedidoConsolidadoView() {
                 <Fragment key={`cat-${catGroup.categoria}`}>
                   {/* Category separator row */}
                   <TableRow className="bg-blue-50/80 hover:bg-blue-50/80 border-l-[3px] border-l-blue-500">
-                    <TableCell colSpan={7} className="py-2 px-4">
+                    <TableCell colSpan={modoCompra ? 8 : 7} className="py-2 px-4">
                       <div className="flex items-center gap-2">
                         <div className="h-5 w-5 rounded bg-blue-100 flex items-center justify-center">
                           <Layers className="h-3 w-3 text-blue-600" />
@@ -377,6 +452,16 @@ export function PedidoConsolidadoView() {
                             {item.cantidadAtendidaTotal}
                           </span>
                         </TableCell>
+                        {modoCompra && (
+                          <TableCell className="text-center">
+                            <span className={cn(
+                              'text-sm font-bold',
+                              item.cantidadPendienteTotal > 0 ? 'text-amber-600' : 'text-gray-400'
+                            )}>
+                              {item.cantidadPendienteTotal}
+                            </span>
+                          </TableCell>
+                        )}
                         <TableCell className="text-xs text-right font-medium text-emerald-600">
                           {formatCurrency(item.costoTotal)}
                         </TableCell>
@@ -385,14 +470,14 @@ export function PedidoConsolidadoView() {
                             {item.origenes.map((origen) => (
                               <Link
                                 key={origen.pedidoId}
-                                href={`/proyectos/${origen.proyectoId}/pedidos/${origen.pedidoId}`}
+                                href={hrefPedido ? hrefPedido(origen.pedidoId, origen.proyectoId) : `/proyectos/${origen.proyectoId}/pedidos/${origen.pedidoId}`}
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <Badge
                                   variant="outline"
                                   className="text-[10px] px-1.5 py-0 cursor-pointer hover:bg-blue-50 hover:border-blue-300 whitespace-nowrap"
                                 >
-                                  {origen.pedidoCodigo} ({origen.cantidadPedida})
+                                  {origen.origenLabel} · {origen.pedidoCodigo} ({origen.cantidadPedida})
                                 </Badge>
                               </Link>
                             ))}

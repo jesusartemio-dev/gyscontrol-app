@@ -99,6 +99,15 @@ interface PedidoItem {
       codigo: string
       nombre: string
     }
+    centroCosto?: {
+      id: string
+      nombre: string
+    } | null
+    ventaEquipo?: {
+      id: string
+      codigo: string
+      nombre: string
+    } | null
     user?: {
       id: string
       name: string
@@ -121,6 +130,8 @@ interface PedidoGroup {
   proyectoId: string
   proyectoNombre: string
   proyectoCodigo: string
+  centroCostoNombre?: string
+  ventaEquipoCodigo?: string
   items: PedidoItem[]
   montoTotal: number
 }
@@ -129,21 +140,39 @@ const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount)
 }
 
-export function PedidoItemsView() {
+interface PedidoItemsViewProps {
+  /** Estados de pedido a incluir. Si se omite, trae todos. */
+  estadosPedido?: string[]
+  /** Muestra el selector de tipo (proyecto / interno / venta equipos). */
+  mostrarFiltroTipo?: boolean
+  /** Construye el href al detalle del pedido. Default: ruta de proyectos. */
+  hrefPedido?: (pedidoId: string, proyectoId: string) => string
+}
+
+export function PedidoItemsView({ estadosPedido, mostrarFiltroTipo, hrefPedido }: PedidoItemsViewProps = {}) {
   const [items, setItems] = useState<PedidoItem[]>([])
   const [proyectos, setProyectos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedProyecto, setSelectedProyecto] = useState('todos')
   const [selectedEstado, setSelectedEstado] = useState('todos')
+  const [selectedTipo, setSelectedTipo] = useState('todos')
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+
+  const buildQuery = () => {
+    const params = new URLSearchParams()
+    if (selectedProyecto !== 'todos') params.set('proyectoId', selectedProyecto)
+    if (estadosPedido?.length) params.set('estados', estadosPedido.join(','))
+    if (selectedTipo !== 'todos') params.set('tipo', selectedTipo)
+    return params.toString()
+  }
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true)
       try {
         const [itemsRes, proyectosRes] = await Promise.all([
-          fetch('/api/pedido-equipo-item', { cache: 'no-store' }),
+          fetch(`/api/pedido-equipo-item?${buildQuery()}`, { cache: 'no-store' }),
           fetch('/api/proyecto', { cache: 'no-store' }),
         ])
         if (itemsRes.ok) setItems(await itemsRes.json())
@@ -155,23 +184,21 @@ export function PedidoItemsView() {
       }
     }
     loadData()
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Refetch when project filter changes
+  // Refetch when project/tipo filter changes
   useEffect(() => {
     if (loading) return
     const loadItems = async () => {
       try {
-        const params = new URLSearchParams()
-        if (selectedProyecto !== 'todos') params.set('proyectoId', selectedProyecto)
-        const res = await fetch(`/api/pedido-equipo-item?${params}`, { cache: 'no-store' })
+        const res = await fetch(`/api/pedido-equipo-item?${buildQuery()}`, { cache: 'no-store' })
         if (res.ok) setItems(await res.json())
       } catch {
         toast.error('Error al filtrar items')
       }
     }
     loadItems()
-  }, [selectedProyecto]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedProyecto, selectedTipo]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredItems = useMemo(() => {
     let result = items
@@ -210,6 +237,8 @@ export function PedidoItemsView() {
           proyectoId: pedido.proyectoId || '',
           proyectoNombre: pedido.proyecto?.nombre || '',
           proyectoCodigo: pedido.proyecto?.codigo || '',
+          centroCostoNombre: pedido.centroCosto?.nombre,
+          ventaEquipoCodigo: pedido.ventaEquipo?.codigo,
           items: [],
           montoTotal: 0,
         })
@@ -307,8 +336,32 @@ export function PedidoItemsView() {
           />
         </div>
 
-        <Select value={selectedProyecto} onValueChange={setSelectedProyecto}>
-          <SelectTrigger className="w-full sm:w-48 h-9">
+        {mostrarFiltroTipo && (
+          <Select
+            value={selectedTipo}
+            onValueChange={(v) => {
+              setSelectedTipo(v)
+              if (v === 'interno' || v === 'equipo') setSelectedProyecto('todos')
+            }}
+          >
+            <SelectTrigger className="w-full sm:w-40 h-9">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos los tipos</SelectItem>
+              <SelectItem value="proyecto">De proyecto</SelectItem>
+              <SelectItem value="interno">Internos (CC)</SelectItem>
+              <SelectItem value="equipo">Venta Equipos</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+
+        <Select
+          value={selectedProyecto}
+          onValueChange={setSelectedProyecto}
+          disabled={selectedTipo === 'interno' || selectedTipo === 'equipo'}
+        >
+          <SelectTrigger className="w-full sm:w-48 h-9 disabled:opacity-40">
             <SelectValue placeholder="Todos los proyectos" />
           </SelectTrigger>
           <SelectContent>
@@ -375,19 +428,29 @@ export function PedidoItemsView() {
                           </span>
                         )}
                       </div>
-                      {group.proyectoNombre && (
+                      {group.proyectoNombre ? (
                         <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                           <Building2 className="h-3 w-3" />
                           <span>{group.proyectoCodigo} - {group.proyectoNombre}</span>
                         </div>
-                      )}
+                      ) : group.centroCostoNombre ? (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                          <Building2 className="h-3 w-3" />
+                          <span>CC: {group.centroCostoNombre}</span>
+                        </div>
+                      ) : group.ventaEquipoCodigo ? (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                          <Building2 className="h-3 w-3" />
+                          <span>Venta: {group.ventaEquipoCodigo}</span>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0 text-xs">
                     <span className="text-muted-foreground">{group.items.length} items</span>
                     <span className="font-semibold text-emerald-600">{formatCurrency(group.montoTotal)}</span>
                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0" asChild onClick={(e) => e.stopPropagation()}>
-                      <Link href={`/proyectos/${group.proyectoId}/pedidos/${group.pedidoId}`}>
+                      <Link href={hrefPedido ? hrefPedido(group.pedidoId, group.proyectoId) : `/proyectos/${group.proyectoId}/pedidos/${group.pedidoId}`}>
                         <Eye className="h-3.5 w-3.5 text-gray-500" />
                       </Link>
                     </Button>
