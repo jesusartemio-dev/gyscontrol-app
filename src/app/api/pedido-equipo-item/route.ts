@@ -8,17 +8,39 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { EstadoPedido } from '@prisma/client'
 import type { PedidoEquipoItemPayload } from '@/types'
+
+const ESTADOS_PEDIDO_VALIDOS = new Set(Object.values(EstadoPedido))
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const proyectoId = searchParams.get('proyectoId')
+    const estadosParam = searchParams.get('estados')
+    const tipo = searchParams.get('tipo')
+
+    const pedidoWhere: any = {}
+    if (proyectoId) pedidoWhere.proyectoId = proyectoId
+
+    if (estadosParam) {
+      const estados = estadosParam.split(',').filter(Boolean)
+      const estadosInvalidos = estados.filter(e => !ESTADOS_PEDIDO_VALIDOS.has(e as EstadoPedido))
+      if (estadosInvalidos.length > 0) {
+        return NextResponse.json(
+          { error: `Estado(s) de pedido inválido(s): ${estadosInvalidos.join(', ')}` },
+          { status: 400 }
+        )
+      }
+      if (estados.length > 0) pedidoWhere.estado = { in: estados as EstadoPedido[] }
+    }
+
+    if (tipo === 'proyecto') pedidoWhere.proyectoId = { not: null }
+    if (tipo === 'interno') pedidoWhere.centroCostoId = { not: null }
+    if (tipo === 'equipo') pedidoWhere.ventaEquipoId = { not: null }
 
     const whereClause: any = {}
-    if (proyectoId) {
-      whereClause.pedidoEquipo = { proyectoId }
-    }
+    if (Object.keys(pedidoWhere).length > 0) whereClause.pedidoEquipo = pedidoWhere
 
     const data = await prisma.pedidoEquipoItem.findMany({
       where: whereClause,
@@ -26,6 +48,8 @@ export async function GET(request: Request) {
         pedidoEquipo: {
           include: {
             proyecto: { select: { id: true, codigo: true, nombre: true } },
+            centroCosto: { select: { id: true, nombre: true } },
+            ventaEquipo: { select: { id: true, codigo: true, nombre: true } },
             user: { select: { id: true, name: true } },
           },
         },
@@ -36,6 +60,13 @@ export async function GET(request: Request) {
             marca: true,
             catalogoEquipoId: true,
             proveedor: { select: { id: true, nombre: true } },
+          },
+        },
+        ordenCompraItems: {
+          select: {
+            id: true,
+            cantidad: true,
+            ordenCompra: { select: { id: true, numero: true, estado: true } },
           },
         },
       },
