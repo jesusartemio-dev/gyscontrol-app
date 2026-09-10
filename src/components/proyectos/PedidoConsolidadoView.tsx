@@ -21,10 +21,13 @@ import {
   Layers,
   Copy,
   Check,
+  FileSpreadsheet,
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import * as XLSX from 'xlsx'
+import { format } from 'date-fns'
 
 interface ConsolidadoPedidoItem {
   groupKey: string
@@ -261,6 +264,55 @@ export function PedidoConsolidadoView({ estadosPedido, mostrarFiltroTipo, hrefPe
     }
   }
 
+  const handleExportExcel = () => {
+    if (filteredConsolidated.length === 0) {
+      toast.warning('No hay items para exportar')
+      return
+    }
+
+    try {
+      const data = filteredConsolidated.map(item => {
+        const row: Record<string, string | number> = {
+          'Codigo': item.codigo,
+          'Descripcion': item.descripcion,
+          'Categoria': item.categoria,
+          'Unidad': item.unidad,
+          'Cant. Pedida': item.cantidadPedidaTotal,
+          'Cant. Atendida': item.cantidadAtendidaTotal,
+        }
+        if (modoCompra) row['Cant. Pendiente'] = item.cantidadPendienteTotal
+        row['Costo Total'] = Number(item.costoTotal.toFixed(2))
+        row['Origenes'] = item.origenes.map(o => `${o.origenLabel} · ${o.pedidoCodigo}(${o.cantidadPedida})`).join(', ')
+        return row
+      })
+
+      const ws = XLSX.utils.json_to_sheet(data)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Consolidado')
+
+      const colWidths = [
+        { wch: 14 }, // Codigo
+        { wch: 40 }, // Descripcion
+        { wch: 18 }, // Categoria
+        { wch: 10 }, // Unidad
+        { wch: 12 }, // Cant. Pedida
+        { wch: 12 }, // Cant. Atendida
+        ...(modoCompra ? [{ wch: 14 }] : []), // Cant. Pendiente
+        { wch: 14 }, // Costo Total
+        { wch: 50 }, // Origenes
+      ]
+      ws['!cols'] = colWidths
+
+      const fileName = `consolidado-pedidos-${format(new Date(), 'yyyyMMdd-HHmm')}.xlsx`
+      XLSX.writeFile(wb, fileName)
+
+      toast.success('Excel exportado correctamente')
+    } catch (error) {
+      console.error('Error al exportar:', error)
+      toast.error('Error al exportar Excel')
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -370,6 +422,16 @@ export function PedidoConsolidadoView({ estadosPedido, mostrarFiltroTipo, hrefPe
         >
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
           {copied ? 'Copiado' : 'Copiar'}
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 text-xs gap-1.5"
+          onClick={handleExportExcel}
+        >
+          <FileSpreadsheet className="h-3.5 w-3.5 text-green-600" />
+          Excel
         </Button>
 
         {modoCompra && (
