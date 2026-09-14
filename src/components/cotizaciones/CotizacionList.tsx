@@ -133,9 +133,13 @@ type ViewMode = 'table' | 'cards'
 // Estados disponibles para filtro
 const ESTADOS_OPTIONS = ['borrador', 'enviada', 'aprobada', 'rechazada', 'cancelada']
 
-// Años disponibles para filtro
+// Años disponibles para filtro — llega hasta 2015 por la carga de cotizaciones históricas
 const currentYear = new Date().getFullYear()
-const YEAR_OPTIONS = Array.from({ length: 5 }, (_, i) => (currentYear - i).toString())
+const PRIMER_ANIO = 2015
+const YEAR_OPTIONS = Array.from(
+  { length: currentYear - PRIMER_ANIO + 1 },
+  (_, i) => (currentYear - i).toString()
+)
 
 export default function CotizacionList({
   cotizaciones,

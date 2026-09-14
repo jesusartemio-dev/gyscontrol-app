@@ -6,8 +6,12 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { createId } from '@paralleldrive/cuid2'
-import { generateNextCotizacionCode } from '@/lib/utils/cotizacionCodeGenerator'
+import {
+  generateNextCotizacionCode,
+  parseCotizacionCode,
+} from '@/lib/utils/cotizacionCodeGenerator'
 import { recalcularTotalesCotizacion } from '@/lib/utils/recalculoCotizacion'
+import { tieneRol } from '@/lib/auth/roles'
 import type {
   ExcelEquipoGrupo,
   ExcelServicioGrupo,
@@ -15,6 +19,8 @@ import type {
 } from '@/lib/agente/excelExtractor'
 
 export const maxDuration = 60
+
+const ROLES_PERMITIDOS = ['admin']
 
 // ── Request types ─────────────────────────────────────────
 
@@ -54,6 +60,14 @@ interface ConfirmarRequest {
   moneda?: string
   notas?: string
 
+  // Importación histórica: si vienen, reemplazan el código autogenerado y la fecha de hoy
+  codigoManual?: string
+  fechaManual?: string
+
+  /// Si viene, los grupos se agregan a esta cotización existente en vez de crear una nueva.
+  /// Caso de uso: varias propuestas (POS10, POS20, …) que el cliente cerró con una sola OC.
+  cotizacionIdDestino?: string
+
   // Per-item catalog selections: keys like "0-0", "0-2", "1-1" (grupoIdx-itemIdx)
   catalogItems: string[]
 
@@ -79,6 +93,12 @@ export async function POST(request: NextRequest) {
   if (!session?.user) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
+  if (!tieneRol(session, ROLES_PERMITIDOS)) {
+    return NextResponse.json(
+      { error: 'Solo un administrador puede importar cotizaciones desde Excel.' },
+      { status: 403 }
+    )
+  }
 
   let body: ConfirmarRequest
   try {
@@ -102,18 +122,31 @@ export async function POST(request: NextRequest) {
     exclusiones,
     formaPago,
     validezOferta,
+    codigoManual,
+    fechaManual,
+    cotizacionIdDestino,
   } = body
 
-  // Validaciones básicas
-  if (!clienteId) {
-    return NextResponse.json({ error: 'Se requiere clienteId' }, { status: 400 })
+  // Validaciones básicas — solo aplican al crear una cotización nueva:
+  // al agregar a una existente, la cabecera ya está definida.
+  if (!cotizacionIdDestino) {
+    if (!clienteId) {
+      return NextResponse.json({ error: 'Se requiere clienteId' }, { status: 400 })
+    }
+    if (!nombreCotizacion) {
+      return NextResponse.json(
+        { error: 'Se requiere nombreCotizacion' },
+        { status: 400 }
+      )
+    }
   }
-  if (!nombreCotizacion) {
-    return NextResponse.json(
-      { error: 'Se requiere nombreCotizacion' },
-      { status: 400 }
-    )
+
+  const fechaCotizacion = fechaManual ? new Date(fechaManual) : null
+  if (fechaManual && Number.isNaN(fechaCotizacion!.getTime())) {
+    return NextResponse.json({ error: 'fechaManual inválida' }, { status: 400 })
   }
+
+  const codigoLimpio = codigoManual?.trim()
 
   const comercialId = body.comercialId || (session.user as { id: string }).id
 
@@ -132,9 +165,50 @@ export async function POST(request: NextRequest) {
   const catalogItemSet = new Set(catalogItems)
 
   try {
-    // Generar código de cotización
-    const { codigo, numeroSecuencia } = await generateNextCotizacionCode()
-    const cotizacionId = genId('cot')
+    // Destino: agregar a una cotización existente o crear una nueva
+    const destino = cotizacionIdDestino
+      ? await prisma.cotizacion.findUnique({
+          where: { id: cotizacionIdDestino },
+          select: { id: true, codigo: true },
+        })
+      : null
+
+    if (cotizacionIdDestino && !destino) {
+      return NextResponse.json(
+        { error: 'La cotización destino no existe' },
+        { status: 404 }
+      )
+    }
+
+    let codigo: string
+    let numeroSecuencia = 0
+
+    if (destino) {
+      codigo = destino.codigo
+    } else if (codigoLimpio) {
+      const codigoEnUso = await prisma.cotizacion.findUnique({
+        where: { codigo: codigoLimpio },
+        select: { id: true },
+      })
+      if (codigoEnUso) {
+        return NextResponse.json(
+          { error: `El código ${codigoLimpio} ya está en uso` },
+          { status: 409 }
+        )
+      }
+      codigo = codigoLimpio
+      // El correlativo se toma del código tecleado para que ambos queden coherentes;
+      // si no sigue el patrón GYS-XXXX-AA, cae al automático.
+      numeroSecuencia =
+        parseCotizacionCode(codigoLimpio)?.numeroSecuencia ??
+        (await generateNextCotizacionCode()).numeroSecuencia
+    } else {
+      const generado = await generateNextCotizacionCode()
+      codigo = generado.codigo
+      numeroSecuencia = generado.numeroSecuencia
+    }
+
+    const cotizacionId = destino?.id ?? genId('cot')
 
     // Obtener unidad por defecto para equipos
     let defaultUnidadId: string | null = null
@@ -231,33 +305,35 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 2. Crear Cotización
-      await tx.cotizacion.create({
-        data: {
-          id: cotizacionId,
-          codigo,
-          numeroSecuencia,
-          nombre: nombreCotizacion,
-          clienteId,
-          comercialId,
-          estado: 'borrador',
-          moneda,
-          notas: notas || null,
-          formaPago: formaPago || null,
-          validezOferta: validezOferta || 15,
-          fecha: now(),
-          updatedAt: now(),
-          totalEquiposInterno: 0,
-          totalEquiposCliente: 0,
-          totalServiciosInterno: 0,
-          totalServiciosCliente: 0,
-          totalGastosInterno: 0,
-          totalGastosCliente: 0,
-          totalInterno: 0,
-          totalCliente: 0,
-          grandTotal: 0,
-        },
-      })
+      // 2. Crear Cotización (se omite si los grupos van a una cotización existente)
+      if (!destino) {
+        await tx.cotizacion.create({
+          data: {
+            id: cotizacionId,
+            codigo,
+            numeroSecuencia,
+            nombre: nombreCotizacion,
+            clienteId,
+            comercialId,
+            estado: 'borrador',
+            moneda,
+            notas: notas || null,
+            formaPago: formaPago || null,
+            validezOferta: validezOferta || 15,
+            fecha: fechaCotizacion ?? now(),
+            updatedAt: now(),
+            totalEquiposInterno: 0,
+            totalEquiposCliente: 0,
+            totalServiciosInterno: 0,
+            totalServiciosCliente: 0,
+            totalGastosInterno: 0,
+            totalGastosCliente: 0,
+            totalInterno: 0,
+            totalCliente: 0,
+            grandTotal: 0,
+          },
+        })
+      }
 
       // 3. Crear grupos de equipos + items
       let equipoItemCount = 0
@@ -399,6 +475,9 @@ export async function POST(request: NextRequest) {
 
       // 6. Crear condiciones (del PDF)
       if (condiciones && condiciones.length > 0) {
+        const ordenBase = destino
+          ? await tx.cotizacionCondicion.count({ where: { cotizacionId } })
+          : 0
         for (let i = 0; i < condiciones.length; i++) {
           await tx.cotizacionCondicion.create({
             data: {
@@ -406,7 +485,7 @@ export async function POST(request: NextRequest) {
               cotizacionId,
               descripcion: condiciones[i].texto,
               tipo: condiciones[i].tipo || null,
-              orden: i,
+              orden: ordenBase + i,
               updatedAt: now(),
             },
           })
@@ -415,13 +494,16 @@ export async function POST(request: NextRequest) {
 
       // 7. Crear exclusiones (del PDF)
       if (exclusiones && exclusiones.length > 0) {
+        const ordenBase = destino
+          ? await tx.cotizacionExclusion.count({ where: { cotizacionId } })
+          : 0
         for (let i = 0; i < exclusiones.length; i++) {
           await tx.cotizacionExclusion.create({
             data: {
               id: genId('cot-excl'),
               cotizacionId,
               descripcion: exclusiones[i].texto,
-              orden: i,
+              orden: ordenBase + i,
               updatedAt: now(),
             },
           })
@@ -438,6 +520,7 @@ export async function POST(request: NextRequest) {
       ok: true,
       cotizacionId: result.cotizacionId,
       codigo: result.codigo,
+      agregadoAExistente: !!destino,
     })
   } catch (error) {
     console.error('Error confirmar-importacion:', error)

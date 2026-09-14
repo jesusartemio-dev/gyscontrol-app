@@ -25,6 +25,8 @@ import { ExcelImportWizard } from '@/components/agente/ExcelImportWizard'
 import { usePagination } from '@/components/ui/data-pagination'
 import { exportarCotizacionesAExcel } from '@/lib/utils/cotizacionListExcel'
 import { toast } from 'sonner'
+import { useSession } from 'next-auth/react'
+import { tieneRol } from '@/lib/auth/roles'
 
 const formatCurrencyKPI = (amount: number): string => {
   if (amount >= 1000000) {
@@ -44,12 +46,16 @@ export default function CotizacionesPage() {
   const [importEnabled, setImportEnabled] = useState(true)
   const [exporting, setExporting] = useState(false)
 
+  const { data: session } = useSession()
+  const puedeImportar = tieneRol(session, ['admin'])
+
   useEffect(() => {
+    if (!puedeImportar) return
     fetch('/api/agente/features')
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => { if (data) setImportEnabled(data.importacionExcel !== false) })
       .catch(() => {})
-  }, [])
+  }, [puedeImportar])
 
   // Filtros
   const [search, setSearch] = useState('')
@@ -175,7 +181,7 @@ export default function CotizacionesPage() {
             </div>
           </div>
 
-          {importEnabled && (
+          {puedeImportar && importEnabled && (
             <Button variant="outline" size="sm" className="h-8" onClick={() => setImportOpen(true)}>
               <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />
               Importar Excel

@@ -16,6 +16,9 @@ interface Props {
   edtsTotal: number
   condicionesCount: number
   exclusionesCount: number
+  codigoManual: string
+  fechaManual: string
+  destinoCodigo: string | null
 }
 
 export function ConfirmStep({
@@ -31,6 +34,9 @@ export function ConfirmStep({
   edtsTotal,
   condicionesCount,
   exclusionesCount,
+  codigoManual,
+  fechaManual,
+  destinoCodigo,
 }: Props) {
   const equipoCount = data.equipos.reduce((s, g) => s + g.items.length, 0)
   const servicioCount = data.servicios.reduce((s, g) => s + g.actividades.length, 0)
@@ -53,14 +59,33 @@ export function ConfirmStep({
       <div className="rounded-lg border bg-white p-4 space-y-3">
         <h3 className="text-sm font-semibold text-gray-800">Resumen de importación</h3>
 
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="text-gray-500">Nombre:</div>
-          <div className="font-medium">{nombreCotizacion}</div>
-          <div className="text-gray-500">Cliente:</div>
-          <div className="font-medium">{clienteNombre}</div>
-          <div className="text-gray-500">Moneda:</div>
-          <div className="font-medium">{moneda}</div>
-        </div>
+        {destinoCodigo ? (
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="text-gray-500">Se agrega a:</div>
+            <div className="font-medium">{destinoCodigo}</div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="text-gray-500">Nombre:</div>
+            <div className="font-medium">{nombreCotizacion}</div>
+            <div className="text-gray-500">Cliente:</div>
+            <div className="font-medium">{clienteNombre}</div>
+            <div className="text-gray-500">Moneda:</div>
+            <div className="font-medium">{moneda}</div>
+            {codigoManual && (
+              <>
+                <div className="text-gray-500">Código:</div>
+                <div className="font-medium">{codigoManual}</div>
+              </>
+            )}
+            {fechaManual && (
+              <>
+                <div className="text-gray-500">Fecha:</div>
+                <div className="font-medium">{fechaManual}</div>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="border-t pt-3 space-y-2">
           <div className="flex items-center gap-2 text-xs">
@@ -138,8 +163,11 @@ export function ConfirmStep({
       {/* Ready */}
       <div className="flex items-center gap-2 rounded-lg bg-green-50 p-3 text-xs text-green-700">
         <CheckCircle2 className="h-4 w-4" />
-        Se creará una cotización con código auto-generado (GYS-XXXX-XX).
-        Los totales se recalcularán automáticamente.
+        {destinoCodigo
+          ? `Los grupos se agregarán a ${destinoCodigo}. Los totales se recalcularán automáticamente.`
+          : codigoManual
+            ? `Se creará la cotización con el código ${codigoManual}. Los totales se recalcularán automáticamente.`
+            : 'Se creará una cotización con código auto-generado (GYS-XXXX-XX). Los totales se recalcularán automáticamente.'}
       </div>
     </div>
   )

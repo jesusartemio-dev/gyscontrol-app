@@ -10,9 +10,12 @@ import { readExcelSheets, extractWithClaude } from '@/lib/agente/excelExtractor'
 import { extractPdfProposal } from '@/lib/agente/pdfProposalExtractor'
 import type { PropuestaExtraida } from '@/lib/agente/pdfProposalExtractor'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
+import { tieneRol } from '@/lib/auth/roles'
 
 // Allow up to 300 seconds for Claude API processing of large Excel files
 export const maxDuration = 300
+
+const ROLES_PERMITIDOS = ['admin']
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB
 
@@ -58,6 +61,12 @@ export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+  if (!tieneRol(session, ROLES_PERMITIDOS)) {
+    return NextResponse.json(
+      { error: 'Solo un administrador puede importar cotizaciones desde Excel.' },
+      { status: 403 }
+    )
   }
 
   // Parse and validate FormData before starting the stream

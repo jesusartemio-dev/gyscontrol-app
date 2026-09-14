@@ -19,6 +19,7 @@ import { MappingStep } from './steps/MappingStep'
 import { ConfigStep } from './steps/ConfigStep'
 import { ConfirmStep } from './steps/ConfirmStep'
 
+import type { CotizacionDestino } from './steps/ConfigStep'
 import type { CatalogSelections } from './steps/PreviewStep'
 import type { ExcelExtraido } from '@/lib/agente/excelExtractor'
 import type { PropuestaExtraida } from '@/lib/agente/pdfProposalExtractor'
@@ -135,6 +136,9 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
   const [clienteId, setClienteId] = useState('')
   const [moneda, setMoneda] = useState('USD')
   const [notas, setNotas] = useState('')
+  const [codigoManual, setCodigoManual] = useState('')
+  const [fechaManual, setFechaManual] = useState('')
+  const [destino, setDestino] = useState<CotizacionDestino | null>(null)
 
   // Error state
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -208,6 +212,15 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
         setMoneda(data.excel.resumen.moneda)
       }
 
+      // El código y la fecha impresos en el PDF mandan sobre el correlativo automático:
+      // es lo que hace que una propuesta de 2019 entre con su identidad real.
+      if (data.pdf?.codigoOriginal) {
+        setCodigoManual(data.pdf.codigoOriginal)
+      }
+      if (data.pdf?.fechaEmision) {
+        setFechaManual(data.pdf.fechaEmision)
+      }
+
       setStep(1)
       toast.success('Datos extraídos correctamente')
     } catch (err) {
@@ -251,6 +264,9 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
           moneda,
           catalogItems,
           notas: notas || undefined,
+          codigoManual: codigoManual.trim() || undefined,
+          fechaManual: fechaManual || undefined,
+          cotizacionIdDestino: destino?.id,
           condiciones: extractData.pdf?.condiciones.map((c) => ({
             texto: c.texto,
             tipo: c.tipo,
@@ -269,7 +285,11 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
       }
 
       const result = await res.json()
-      toast.success(`Cotización ${result.codigo} creada exitosamente`)
+      toast.success(
+        result.agregadoAExistente
+          ? `Grupos agregados a la cotización ${result.codigo}`
+          : `Cotización ${result.codigo} creada exitosamente`
+      )
       onOpenChange(false)
       router.push(`/comercial/cotizaciones/${result.cotizacionId}`)
     } catch (err) {
@@ -283,6 +303,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
   }, [
     extractData, recursoMappings, edtMappings, clienteId,
     nombreCotizacion, moneda, catalogSelections, notas,
+    codigoManual, fechaManual, destino,
     onOpenChange, router,
   ])
 
@@ -293,7 +314,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
       case 0: return !!excelFile
       case 1: return !!extractData
       case 2: return true // Mapeo es opcional
-      case 3: return !!nombreCotizacion && !!clienteId
+      case 3: return destino ? true : !!nombreCotizacion && !!clienteId
       case 4: return true
       default: return false
     }
@@ -430,12 +451,18 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
                   clienteId={clienteId}
                   moneda={moneda}
                   notas={notas}
+                  codigoManual={codigoManual}
+                  fechaManual={fechaManual}
+                  destino={destino}
                   clientes={extractData.catalogos.clientes}
                   clienteSugerido={extractData.mapeo.clienteSugerido}
                   onNombreChange={setNombreCotizacion}
                   onClienteChange={setClienteId}
                   onMonedaChange={setMoneda}
                   onNotasChange={setNotas}
+                  onCodigoManualChange={setCodigoManual}
+                  onFechaManualChange={setFechaManual}
+                  onDestinoChange={setDestino}
                 />
               )}
               {step === 4 && extractData && (
@@ -452,6 +479,9 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
                   edtsTotal={extractData.mapeo.edts.length}
                   condicionesCount={extractData.pdf?.condiciones.length || 0}
                   exclusionesCount={extractData.pdf?.exclusiones.length || 0}
+                  codigoManual={codigoManual}
+                  fechaManual={fechaManual}
+                  destinoCodigo={destino?.codigo || null}
                 />
               )}
             </>

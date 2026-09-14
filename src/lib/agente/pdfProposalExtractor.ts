@@ -24,6 +24,8 @@ export interface PropuestaExtraida {
   clienteRuc?: string
   nombreProyecto?: string
   codigoOriginal?: string
+  /** Fecha de emisión impresa en la propuesta, normalizada a YYYY-MM-DD. */
+  fechaEmision?: string
   moneda?: 'USD' | 'PEN'
   formaPago?: string
   validezDias?: number
@@ -54,7 +56,9 @@ INSTRUCCIONES:
 - IGNORA los términos genéricos/boilerplate de la página 6 (condiciones de pago estándar 30/40/30, garantías estándar 12 meses)
 - Si una condición es personalizada para el proyecto, extráela con tipo sugerido: "pago", "entrega", "garantia", "soporte", "capacitacion", "alcance", "otro"
 - Extrae el nombre del cliente y RUC del encabezado
-- Identifica el código de cotización (formato GYS-XXXX-YY)
+- Identifica el código de cotización (formato GYS-XXXX-YY) TAL CUAL aparece impreso, sin corregirlo
+- Identifica la fecha de emisión de la propuesta y devuélvela como YYYY-MM-DD (las propuestas
+  suelen escribirla en texto, ej. "Lima, 14 de marzo de 2019" → "2019-03-14")
 - Identifica la moneda (USD o PEN)
 - Si hay un alcance de proyecto personalizado (no boilerplate), extráelo`
 
@@ -65,6 +69,7 @@ const USER_PROMPT = `Analiza esta propuesta comercial de GYS Control y devuelve 
   "clienteRuc": "RUC de 11 dígitos o null",
   "nombreProyecto": "nombre/referencia del proyecto o null",
   "codigoOriginal": "código GYS-XXXX-YY o null",
+  "fechaEmision": "fecha de la propuesta en formato YYYY-MM-DD o null",
   "moneda": "USD o PEN",
   "formaPago": "forma de pago personalizada o null",
   "validezDias": 15,
@@ -173,6 +178,10 @@ function parseResponse(text: string): PropuestaExtraida {
       clienteRuc: raw.clienteRuc || undefined,
       nombreProyecto: raw.nombreProyecto || undefined,
       codigoOriginal: raw.codigoOriginal || undefined,
+      // Solo se acepta ISO: alimenta un <input type="date">, que rechaza cualquier otro formato.
+      fechaEmision: /^\d{4}-\d{2}-\d{2}$/.test(raw.fechaEmision)
+        ? raw.fechaEmision
+        : undefined,
       moneda: raw.moneda === 'PEN' ? 'PEN' : 'USD',
       formaPago: raw.formaPago || undefined,
       validezDias: typeof raw.validezDias === 'number' ? raw.validezDias : undefined,
