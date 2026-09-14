@@ -11,7 +11,11 @@ import { Prisma, EstadoFase, EstadoTarea, EstadoActividad, EstadoEdt } from '@pr
 import { randomUUID } from 'crypto'
 import { calcularCompletitudGeneral } from '@/lib/tdr/completitud'
 import type { TdrAnalisisCore } from '@/types/tdr'
-import { esCodigoClienteAutomatico, generarCodigoProyectoDesdeCliente } from '@/lib/utils/clienteCodeGenerator'
+import {
+  esCodigoClienteAutomatico,
+  siguienteCodigoProyecto,
+  secuenciaDeCodigoProyecto,
+} from '@/lib/utils/clienteCodeGenerator'
 
 // ✅ Tipo explícito para cotización con includes (5 niveles sin zonas)
 type CotizacionConIncludes = Prisma.CotizacionGetPayload<{
@@ -124,6 +128,7 @@ export async function POST(request: NextRequest) {
       nombre,
       fechaInicio,
       fechaFin,
+      codigo: codigoManual,
       gestorId,
       estado = 'creado',
       totalEquiposInterno,
@@ -206,14 +211,44 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    const currentSequence = cliente.numeroSecuencia || 1
-    const generatedCodigo = generarCodigoProyectoDesdeCliente(cliente)
-
-    // 🔁 Update client's sequence number for next project
-    await prisma.cliente.update({
-      where: { id: cliente.id },
-      data: { numeroSecuencia: currentSequence + 1 }
+    const codigosExistentes = await prisma.proyecto.findMany({
+      where: { codigo: { startsWith: cliente.codigo } },
+      select: { codigo: true },
     })
+
+    const generatedCodigo =
+      codigoManual ||
+      siguienteCodigoProyecto(
+        cliente.codigo,
+        codigosExistentes.map((p) => p.codigo),
+        cliente.numeroSecuencia
+      )
+
+    // El código de proyecto no tiene índice único en la BD, así que la unicidad
+    // se garantiza aquí: repetirlo rompería la trazabilidad con el cliente.
+    const codigoEnUso = await prisma.proyecto.findFirst({
+      where: { codigo: generatedCodigo },
+      select: { id: true, nombre: true },
+    })
+    if (codigoEnUso) {
+      return NextResponse.json({
+        error: `El código ${generatedCodigo} ya está en uso por el proyecto "${codigoEnUso.nombre}"`
+      }, { status: 409 })
+    }
+
+    // 🔁 El contador del cliente se mantiene por encima del correlativo más alto
+    // usado. Cargar un proyecto histórico (CJM01) no debe empujarlo.
+    const secuenciaUsada = secuenciaDeCodigoProyecto(cliente.codigo, generatedCodigo)
+    const secuenciaObjetivo = Math.max(
+      cliente.numeroSecuencia || 1,
+      secuenciaUsada !== null ? secuenciaUsada + 1 : 0
+    )
+    if (secuenciaObjetivo !== cliente.numeroSecuencia) {
+      await prisma.cliente.update({
+        where: { id: cliente.id },
+        data: { numeroSecuencia: secuenciaObjetivo }
+      })
+    }
 
     // 🔁 Calculate totals from request data or cotización data as fallback
     const finalTotalEquiposInterno = totalEquiposInterno ?? cotizacion.cotizacionEquipo.reduce((sum: number, grupo: any) => sum + grupo.subtotalInterno, 0)

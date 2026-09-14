@@ -449,7 +449,7 @@ export interface ProyectoPayload {
   descuento: number
   grandTotal: number
 
-  codigo?: string // ✅ Código automático - se genera basado en cliente.codigo + cliente.numeroSecuencia
+  codigo?: string // ✅ Si se omite, se sugiere el siguiente libre del cliente (cliente.codigo + correlativo)
   estado: string
   fechaInicio: string
   fechaFin?: string

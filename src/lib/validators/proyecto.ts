@@ -25,6 +25,9 @@ export const createProyectoFromCotizacionSchema = z.object({
   nombre: z.string().min(1, 'Nombre es requerido'),
   fechaInicio: z.string().min(1, 'Fecha de inicio es requerida'),
   fechaFin: z.string().optional(),
+  /// Si viene, reemplaza al correlativo sugerido. Permite cargar proyectos
+  /// históricos con su código real (p. ej. CJM01) en vez del siguiente libre.
+  codigo: z.string().trim().min(1).optional(),
   gestorId: z.string().min(1, 'Gestor es requerido'),
   supervisorId: z.string().optional(),
   liderId: z.string().optional(),

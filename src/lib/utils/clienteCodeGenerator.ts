@@ -137,11 +137,47 @@ export function esCodigoClienteAutomatico(codigo: string): boolean {
  * cálculo real al crear el proyecto.
  */
 export function generarCodigoProyectoDesdeCliente(cliente: { codigo: string; numeroSecuencia: number | null }): string {
-  const currentSequence = cliente.numeroSecuencia || 1
-  const formattedSequence = currentSequence < 100
-    ? currentSequence.toString().padStart(2, '0')
-    : currentSequence.toString().padStart(3, '0')
-  return `${cliente.codigo}${formattedSequence}`
+  return formatearCodigoProyecto(cliente.codigo, cliente.numeroSecuencia || 1)
+}
+
+export function formatearCodigoProyecto(codigoCliente: string, secuencia: number): string {
+  const formateada = secuencia < 100
+    ? secuencia.toString().padStart(2, '0')
+    : secuencia.toString().padStart(3, '0')
+  return `${codigoCliente}${formateada}`
+}
+
+/** Extrae el correlativo de un código de proyecto ("CJM49" → 49). */
+export function secuenciaDeCodigoProyecto(codigoCliente: string, codigoProyecto: string): number | null {
+  if (!codigoProyecto.startsWith(codigoCliente)) return null
+  const sufijo = codigoProyecto.slice(codigoCliente.length)
+  if (!/^\d+$/.test(sufijo)) return null
+  return parseInt(sufijo, 10)
+}
+
+/**
+ * Siguiente código libre para un cliente, calculado a partir de los códigos de
+ * proyecto que **realmente existen**, no del contador `numeroSecuencia`.
+ *
+ * El contador se desincroniza: en producción el cliente CJM tenía secuencia 13
+ * con proyectos que iban del CJM27 al CJM49, así que la sugerencia basada en él
+ * proponía códigos ya usados o fuera de orden. Los códigos existentes sí son la
+ * verdad. El contador queda solo como respaldo para clientes sin proyectos.
+ */
+export function siguienteCodigoProyecto(
+  codigoCliente: string,
+  codigosExistentes: string[],
+  numeroSecuencia: number | null
+): string {
+  const secuencias = codigosExistentes
+    .map((c) => secuenciaDeCodigoProyecto(codigoCliente, c))
+    .filter((n): n is number => n !== null)
+
+  const siguiente = secuencias.length
+    ? Math.max(...secuencias) + 1
+    : numeroSecuencia || 1
+
+  return formatearCodigoProyecto(codigoCliente, siguiente)
 }
 
 /**

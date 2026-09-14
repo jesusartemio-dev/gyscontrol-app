@@ -36,6 +36,8 @@ export default function CrearProyectoDesdeCotizacionModal({
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [fechaInicio, setFechaInicio] = useState('')
+  const [fechaFin, setFechaFin] = useState('')
+  const [codigo, setCodigo] = useState('')
   const [loading, setLoading] = useState(false)
   const [preview, setPreview] = useState<PreviewCodigo | null>(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
@@ -53,13 +55,19 @@ export default function CrearProyectoDesdeCotizacionModal({
     setLoadingPreview(true)
     fetch(`/api/proyecto/from-cotizacion/preview-codigo?clienteId=${cotizacion.cliente.id}`)
       .then(res => res.json())
-      .then(setPreview)
+      .then((data: PreviewCodigo) => {
+        setPreview(data)
+        // El sugerido es solo el valor inicial: se puede sobrescribir con el
+        // código real si se está cargando un proyecto antiguo.
+        if (data?.codigoGenerado) setCodigo(data.codigoGenerado)
+      })
       .catch(() => setPreview(null))
       .finally(() => setLoadingPreview(false))
   }, [open, cotizacion.cliente?.id])
 
   // ✅ Validación: fecha requerida + condiciones de negocio + no loading + cliente con código propio
-  const puedeCrear = puedeCrearProyecto && fechaInicio && !loading && !loadingPreview && !preview?.esAutomatico
+  const puedeCrear =
+    puedeCrearProyecto && fechaInicio && codigo.trim() && !loading && !loadingPreview && !preview?.esAutomatico
 
   const handleCrear = async () => {
     if (!puedeCrear) return
@@ -82,7 +90,8 @@ export default function CrearProyectoDesdeCotizacionModal({
         grandTotal: cotizacion.grandTotal,
         estado: 'creado', // ✅ Use correct enum value
         fechaInicio,
-        fechaFin: undefined
+        fechaFin: fechaFin || undefined,
+        codigo: codigo.trim()
       })
 
       toast.success('Proyecto creado exitosamente')
@@ -90,6 +99,8 @@ export default function CrearProyectoDesdeCotizacionModal({
 
       // Reset form
       setFechaInicio('')
+      setFechaFin('')
+      setCodigo('')
 
       // Navigate to the new project (client-side navigation)
       router.push(`/proyectos/${proyecto.id}`)
@@ -213,24 +224,51 @@ export default function CrearProyectoDesdeCotizacionModal({
                 <p className="text-xs text-blue-600 mt-1">
                   Basado en la cotización: {cotizacion.codigo}
                 </p>
-                {preview?.codigoGenerado && (
-                  <p className="text-xs text-blue-600 mt-1">
-                    Código de proyecto que se generará: <strong>{preview.codigoGenerado}</strong>
-                  </p>
-                )}
               </div>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="fechaInicio">Fecha de inicio *</Label>
+            <Label htmlFor="codigoProyecto">Código del proyecto *</Label>
             <Input
-              id="fechaInicio"
-              type="date"
-              value={fechaInicio}
-              onChange={(e) => setFechaInicio(e.target.value)}
+              id="codigoProyecto"
+              value={codigo}
+              onChange={(e) => setCodigo(e.target.value)}
+              placeholder={preview?.clienteCodigo ? `${preview.clienteCodigo}01` : 'Ej: CJM01'}
               className="w-full"
             />
+            <p className="text-xs text-muted-foreground">
+              {preview?.codigoGenerado
+                ? `Sugerido: ${preview.codigoGenerado}. Cámbialo si estás cargando un proyecto antiguo con su código real.`
+                : 'Cámbialo si estás cargando un proyecto antiguo con su código real.'}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="fechaInicio">Fecha de inicio *</Label>
+              <Input
+                id="fechaInicio"
+                type="date"
+                value={fechaInicio}
+                onChange={(e) => setFechaInicio(e.target.value)}
+                className="w-full"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fechaFin">Fecha de fin</Label>
+              <Input
+                id="fechaFin"
+                type="date"
+                value={fechaFin}
+                onChange={(e) => setFechaFin(e.target.value)}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Opcional. Útil para proyectos históricos ya terminados.
+              </p>
+            </div>
           </div>
         </div>
 

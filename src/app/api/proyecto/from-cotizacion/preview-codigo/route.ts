@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { esCodigoClienteAutomatico, generarCodigoProyectoDesdeCliente } from '@/lib/utils/clienteCodeGenerator'
+import { esCodigoClienteAutomatico, siguienteCodigoProyecto } from '@/lib/utils/clienteCodeGenerator'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -28,10 +28,23 @@ export async function GET(request: NextRequest) {
 
   const esAutomatico = esCodigoClienteAutomatico(cliente.codigo)
 
+  const existentes = esAutomatico
+    ? []
+    : await prisma.proyecto.findMany({
+        where: { codigo: { startsWith: cliente.codigo } },
+        select: { codigo: true },
+      })
+
   return NextResponse.json({
     clienteNombre: cliente.nombre,
     clienteCodigo: cliente.codigo,
     esAutomatico,
-    codigoGenerado: esAutomatico ? null : generarCodigoProyectoDesdeCliente(cliente),
+    codigoGenerado: esAutomatico
+      ? null
+      : siguienteCodigoProyecto(
+          cliente.codigo,
+          existentes.map((p) => p.codigo),
+          cliente.numeroSecuencia
+        ),
   })
 }

@@ -87,7 +87,12 @@ export async function crearProyectoDesdeCotizacion(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ cotizacionId, ...data }),
   })
-  if (!res.ok) throw new Error('Error al crear proyecto desde cotización')
+  if (!res.ok) {
+    // El backend explica el motivo (código duplicado, cliente sin código propio…);
+    // perderlo dejaba al usuario sin saber qué corregir.
+    const detalle = await res.json().catch(() => null)
+    throw new Error(detalle?.error || 'Error al crear proyecto desde cotización')
+  }
   return res.json()
 }
 
