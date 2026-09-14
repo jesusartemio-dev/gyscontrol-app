@@ -7,6 +7,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { readExcelSheets, extractWithClaude } from '@/lib/agente/excelExtractor'
+import type { ExcelExtraido } from '@/lib/agente/excelExtractor'
 import { extractPdfProposal } from '@/lib/agente/pdfProposalExtractor'
 import type { PropuestaExtraida } from '@/lib/agente/pdfProposalExtractor'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
@@ -35,6 +36,57 @@ function similarity(a: string, b: string): number {
   const common = wordsA.filter((w) => wordsB.some((wb) => wb.includes(w) || w.includes(wb)))
   if (common.length === 0) return 0
   return common.length / Math.max(wordsA.length, wordsB.length)
+}
+
+/**
+ * Arma el equivalente a un Excel extraído cuando solo hay PDF: una cotización
+ * histórica de la que ya no se conserva la hoja de costeo interna. Cada posición
+ * del cuadro económico entra como un ítem de suma alzada, y el costo interno
+ * queda en cero porque el PDF nunca lo trae — es el documento del cliente.
+ */
+function construirDesdePdf(pdf: PropuestaExtraida): ExcelExtraido {
+  const partidas = pdf.partidas.length
+    ? pdf.partidas
+    : pdf.montoTotal
+      ? [{ descripcion: pdf.nombreProyecto || 'Alcance total de la propuesta', monto: pdf.montoTotal }]
+      : []
+
+  const total = partidas.reduce((suma, p) => suma + p.monto, 0)
+
+  return {
+    equipos: partidas.length
+      ? [
+          {
+            grupo: pdf.codigoOriginal ? `Propuesta ${pdf.codigoOriginal}` : 'Propuesta',
+            hoja: 'PDF',
+            items: partidas.map((p) => ({
+              descripcion: p.descripcion,
+              categoria: 'Histórico',
+              unidad: 'Glb',
+              marca: '',
+              cantidad: 1,
+              precioLista: p.monto,
+              precioInterno: 0,
+              precioCliente: p.monto,
+              factorCosto: 1,
+              factorVenta: 1,
+            })),
+          },
+        ]
+      : [],
+    servicios: [],
+    gastos: [],
+    resumen: {
+      totalInterno: 0,
+      totalCliente: total,
+      moneda: pdf.moneda,
+      nombreProyecto: pdf.nombreProyecto,
+      clienteNombre: pdf.clienteNombre,
+    },
+    recursosUnicos: [],
+    edtsUnicos: [],
+    hojas: [],
+  }
 }
 
 // ── SSE helpers ──────────────────────────────────────────
@@ -70,7 +122,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Parse and validate FormData before starting the stream
-  let excelBuffer: Buffer
+  let excelBuffer: Buffer | null = null
   let pdfBuffer: Buffer | null = null
   let hasPdf = false
 
@@ -79,30 +131,37 @@ export async function POST(request: NextRequest) {
     const excelFile = formData.get('excel') as File | null
     const pdfFile = formData.get('pdf') as File | null
 
-    if (!excelFile) {
-      return NextResponse.json({ error: 'Se requiere un archivo Excel' }, { status: 400 })
-    }
-
-    const excelTypes = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
-      'application/octet-stream',
-    ]
-    if (!excelTypes.includes(excelFile.type) && !excelFile.name.match(/\.xlsx?$/i)) {
+    // Basta con uno de los dos: las cotizaciones antiguas suelen conservar
+    // solo el PDF que se le envió al cliente.
+    if (!excelFile && !pdfFile) {
       return NextResponse.json(
-        { error: 'El archivo debe ser un Excel (.xlsx o .xls)' },
+        { error: 'Se requiere un archivo Excel o un PDF de propuesta' },
         { status: 400 }
       )
     }
 
-    if (excelFile.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: `Excel demasiado grande (${(excelFile.size / 1024 / 1024).toFixed(1)}MB). Máximo: 20MB` },
-        { status: 400 }
-      )
-    }
+    if (excelFile) {
+      const excelTypes = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel',
+        'application/octet-stream',
+      ]
+      if (!excelTypes.includes(excelFile.type) && !excelFile.name.match(/\.xlsx?$/i)) {
+        return NextResponse.json(
+          { error: 'El archivo debe ser un Excel (.xlsx o .xls)' },
+          { status: 400 }
+        )
+      }
 
-    excelBuffer = Buffer.from(await excelFile.arrayBuffer())
+      if (excelFile.size > MAX_FILE_SIZE) {
+        return NextResponse.json(
+          { error: `Excel demasiado grande (${(excelFile.size / 1024 / 1024).toFixed(1)}MB). Máximo: 20MB` },
+          { status: 400 }
+        )
+      }
+
+      excelBuffer = Buffer.from(await excelFile.arrayBuffer())
+    }
 
     if (pdfFile && pdfFile.size > 0) {
       if (pdfFile.type !== 'application/pdf' && !pdfFile.name.endsWith('.pdf')) {
@@ -127,22 +186,28 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        // 1. Read Excel sheets
-        writeSSE(controller, encoder, 'progress', { message: 'Leyendo hojas del Excel...' })
-        const sheets = readExcelSheets(excelBuffer)
-
-        if (sheets.length === 0) {
-          writeSSE(controller, encoder, 'error', { error: 'El archivo Excel no contiene hojas con datos' })
-          controller.close()
-          return
-        }
-
-        // 2. Extract data with Claude (per-sheet, with progress)
         const importUserId = (session.user as { id: string }).id
-        const excelData = await extractWithClaude(sheets, (message) => {
-          writeSSE(controller, encoder, 'progress', { message })
-        }, importUserId)
-        excelData.hojas = sheets.map((s) => s.name)
+
+        // 1. Read Excel sheets (si lo hay)
+        let sheets: ReturnType<typeof readExcelSheets> = []
+        let excelData: ExcelExtraido | null = null
+
+        if (excelBuffer) {
+          writeSSE(controller, encoder, 'progress', { message: 'Leyendo hojas del Excel...' })
+          sheets = readExcelSheets(excelBuffer)
+
+          if (sheets.length === 0) {
+            writeSSE(controller, encoder, 'error', { error: 'El archivo Excel no contiene hojas con datos' })
+            controller.close()
+            return
+          }
+
+          // 2. Extract data with Claude (per-sheet, with progress)
+          excelData = await extractWithClaude(sheets, (message) => {
+            writeSSE(controller, encoder, 'progress', { message })
+          }, importUserId)
+          excelData.hojas = sheets.map((s) => s.name)
+        }
 
         // 3. Process PDF if provided
         let pdfData: PropuestaExtraida | null = null
@@ -150,6 +215,15 @@ export async function POST(request: NextRequest) {
           writeSSE(controller, encoder, 'progress', { message: 'Analizando PDF de propuesta...' })
           const pdfBase64 = pdfBuffer.toString('base64')
           pdfData = await extractPdfProposal(pdfBase64, importUserId)
+        }
+
+        if (!excelData) {
+          if (!pdfData) {
+            writeSSE(controller, encoder, 'error', { error: 'No se pudo extraer información de los archivos' })
+            controller.close()
+            return
+          }
+          excelData = construirDesdePdf(pdfData)
         }
 
         // 4. Query catalogs for mapping suggestions

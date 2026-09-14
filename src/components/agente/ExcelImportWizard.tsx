@@ -146,7 +146,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
   // ── Handlers ──────────────────────────────────────────
 
   const handleExtract = useCallback(async () => {
-    if (!excelFile) return
+    if (!excelFile && !pdfFile) return
 
     setLoading(true)
     setErrorMessage(null)
@@ -154,7 +154,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
 
     try {
       const formData = new FormData()
-      formData.append('excel', excelFile)
+      if (excelFile) formData.append('excel', excelFile)
       if (pdfFile) formData.append('pdf', pdfFile)
 
       const res = await fetch('/api/agente/importar-excel', {
@@ -172,11 +172,12 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
       const data = await parseSSEStream(res, (msg) => setLoadingMessage(msg))
       setExtractData(data)
 
-      // Auto-populate catalog selections using heuristic
+      // Auto-populate catalog selections using heuristic.
+      // Sin Excel los ítems son sumas alzadas del PDF, no equipos reales: no van al catálogo.
       const autoSelections: CatalogSelections = {}
       data.excel.equipos.forEach((grupo, gi) => {
         grupo.items.forEach((item, ii) => {
-          autoSelections[`${gi}-${ii}`] = shouldSuggestCatalog(item)
+          autoSelections[`${gi}-${ii}`] = excelFile ? shouldSuggestCatalog(item) : false
         })
       })
       setCatalogSelections(autoSelections)
@@ -311,7 +312,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
 
   const canNext = () => {
     switch (step) {
-      case 0: return !!excelFile
+      case 0: return !!excelFile || !!pdfFile
       case 1: return !!extractData
       case 2: return true // Mapeo es opcional
       case 3: return destino ? true : !!nombreCotizacion && !!clienteId

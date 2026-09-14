@@ -18,10 +18,18 @@ export function UploadStep({ excelFile, pdfFile, onExcelChange, onPdfChange }: P
 
   return (
     <div className="space-y-4">
+      <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
+        Sube al menos uno de los dos. Con el Excel interno se importa el detalle completo
+        de equipos, servicios y costos. Solo con el PDF se importa el cuadro económico como
+        suma alzada, sin costo interno — pensado para cotizaciones antiguas de las que ya no
+        se conserva la hoja de costeo.
+      </p>
+
       {/* Excel upload */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-gray-700">
-          Excel de cotización interna <span className="text-red-500">*</span>
+          Excel de cotización interna{' '}
+          <span className="text-xs text-gray-400">(recomendado)</span>
         </label>
         <input
           ref={excelInputRef}
@@ -75,7 +83,7 @@ export function UploadStep({ excelFile, pdfFile, onExcelChange, onPdfChange }: P
       <div>
         <label className="mb-1.5 block text-sm font-medium text-gray-700">
           PDF de propuesta comercial{' '}
-          <span className="text-xs text-gray-400">(opcional)</span>
+          <span className="text-xs text-gray-400">(opcional si subes el Excel)</span>
         </label>
         <input
           ref={pdfInputRef}
@@ -117,7 +125,7 @@ export function UploadStep({ excelFile, pdfFile, onExcelChange, onPdfChange }: P
             <FileText className="h-5 w-5 text-gray-300" />
             <div className="text-center">
               <p className="text-sm text-gray-500">
-                Subir PDF para extraer condiciones y exclusiones
+                Subir PDF para extraer código, fecha, condiciones y exclusiones
               </p>
               <p className="text-xs text-gray-400">PDF (.pdf)</p>
             </div>

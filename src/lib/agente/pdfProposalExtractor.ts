@@ -19,6 +19,16 @@ export interface PdfExclusion {
   confianza: 'alta' | 'media' | 'baja'
 }
 
+/**
+ * Una posición del cuadro económico (POS10, POS20, …) o, si la propuesta no se
+ * desglosa, el alcance completo como una sola línea. Solo precio de venta: el
+ * costo interno nunca aparece en el documento que ve el cliente.
+ */
+export interface PdfPartida {
+  descripcion: string
+  monto: number
+}
+
 export interface PropuestaExtraida {
   clienteNombre?: string
   clienteRuc?: string
@@ -31,6 +41,8 @@ export interface PropuestaExtraida {
   validezDias?: number
   tiempoEntrega?: string
   incluyeIGV?: boolean
+  montoTotal?: number
+  partidas: PdfPartida[]
   condiciones: PdfCondicion[]
   exclusiones: PdfExclusion[]
   alcance?: string
@@ -60,7 +72,16 @@ INSTRUCCIONES:
 - Identifica la fecha de emisión de la propuesta y devuélvela como YYYY-MM-DD (las propuestas
   suelen escribirla en texto, ej. "Lima, 14 de marzo de 2019" → "2019-03-14")
 - Identifica la moneda (USD o PEN)
-- Si hay un alcance de proyecto personalizado (no boilerplate), extráelo`
+- Si hay un alcance de proyecto personalizado (no boilerplate), extráelo
+
+CUADRO ECONÓMICO (importante para propuestas antiguas, donde el PDF es la única fuente):
+- Extrae el monto total de la propuesta y, si el cuadro se desglosa por posiciones
+  (POS10, POS20, PARTIDA 1, ÍTEM 1…), extrae cada posición con su descripción y su monto
+- Usa montos SIN IGV (subtotal). Si el PDF solo muestra el total con IGV incluido,
+  devuelve ese monto y marca "incluyeIGV": true
+- Los montos van como número puro, sin símbolo de moneda ni separadores de miles
+- Si no logras leer el cuadro económico con seguridad, devuelve montoTotal null y partidas []
+  — es preferible vacío a un monto inventado`
 
 const USER_PROMPT = `Analiza esta propuesta comercial de GYS Control y devuelve ÚNICAMENTE un JSON válido:
 
@@ -75,6 +96,13 @@ const USER_PROMPT = `Analiza esta propuesta comercial de GYS Control y devuelve 
   "validezDias": 15,
   "tiempoEntrega": "tiempo de entrega si difiere del estándar o null",
   "incluyeIGV": false,
+  "montoTotal": 125000.50,
+  "partidas": [
+    {
+      "descripcion": "POS10 - descripcion de la posicion",
+      "monto": 85000.00
+    }
+  ],
   "condiciones": [
     {
       "texto": "texto completo de la condición específica",
@@ -187,6 +215,16 @@ function parseResponse(text: string): PropuestaExtraida {
       validezDias: typeof raw.validezDias === 'number' ? raw.validezDias : undefined,
       tiempoEntrega: raw.tiempoEntrega || undefined,
       incluyeIGV: typeof raw.incluyeIGV === 'boolean' ? raw.incluyeIGV : false,
+      montoTotal: typeof raw.montoTotal === 'number' ? raw.montoTotal : undefined,
+      partidas: (raw.partidas || [])
+        .filter(
+          (p: Record<string, unknown>) =>
+            typeof p?.monto === 'number' && typeof p?.descripcion === 'string'
+        )
+        .map((p: Record<string, unknown>) => ({
+          descripcion: p.descripcion as string,
+          monto: p.monto as number,
+        })),
       condiciones: (raw.condiciones || []).map(
         (c: Record<string, unknown>) => ({
           texto: c.texto as string,
@@ -212,6 +250,7 @@ function parseResponse(text: string): PropuestaExtraida {
     }
   } catch {
     return {
+      partidas: [],
       condiciones: [],
       exclusiones: [],
       confianzaGeneral: 'baja',
