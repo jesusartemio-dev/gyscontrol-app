@@ -28,10 +28,10 @@ interface Props {
   edtMappings: Record<string, string>
   onRecursoMap: (excelName: string, recursoId: string) => void
   onEdtMap: (excelName: string, edtId: string) => void
-  partidas?: Array<{ descripcion: string; monto: number }>
-  clasificacion?: Record<number, ClasificacionPartida>
+  partidas?: Array<{ clave: string; descripcion: string; monto: number; origen: string }>
+  clasificacion?: Record<string, ClasificacionPartida>
   moneda?: string
-  onClasificacionChange?: (indice: number, valor: ClasificacionPartida) => void
+  onClasificacionChange?: (clave: string, valor: ClasificacionPartida) => void
 }
 
 export function MappingStep({
@@ -61,57 +61,76 @@ export function MappingStep({
             El PDF solo trae montos cerrados. Indica qué es cada partida; las de servicio
             necesitan un EDT y se cargan como 1 hora de un recurso marcador a ese monto.
           </p>
-          <div className="space-y-2">
-            {partidas.map((p, i) => {
-              const actual = clasificacion[i] || { bucket: 'equipo' as BucketPartida }
-              const faltaEdt = actual.bucket === 'servicio' && !actual.edtId
-              return (
-                <div key={i} className="rounded-lg border bg-white p-2.5 space-y-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="flex-1 text-xs text-gray-700">{p.descripcion}</p>
-                    <span className="shrink-0 text-xs font-semibold text-green-700">
-                      {moneda} {p.monto.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={actual.bucket}
-                      onChange={(e) =>
-                        onClasificacionChange?.(i, {
-                          ...actual,
-                          bucket: e.target.value as BucketPartida,
-                        })
+          <div className="space-y-3">
+            {[...new Set(partidas.map((p) => p.origen))].map((origen) => (
+              <div key={origen}>
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                  {origen}
+                </p>
+                <div className="space-y-2">
+                  {partidas
+                    .filter((p) => p.origen === origen)
+                    .map((p) => {
+                      const actual = clasificacion[p.clave] || {
+                        bucket: 'equipo' as BucketPartida,
                       }
-                      className="rounded-md border px-2 py-1.5 text-xs"
-                    >
-                      <option value="equipo">Equipo</option>
-                      <option value="servicio">Servicio</option>
-                      <option value="gasto">Gasto</option>
-                    </select>
+                      const faltaEdt = actual.bucket === 'servicio' && !actual.edtId
+                      return (
+                        <div key={p.clave} className="rounded-lg border bg-white p-2.5 space-y-2">
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="flex-1 text-xs text-gray-700">{p.descripcion}</p>
+                            <span className="shrink-0 text-xs font-semibold text-green-700">
+                              {moneda}{' '}
+                              {p.monto.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={actual.bucket}
+                              onChange={(e) =>
+                                onClasificacionChange?.(p.clave, {
+                                  ...actual,
+                                  bucket: e.target.value as BucketPartida,
+                                })
+                              }
+                              className="rounded-md border px-2 py-1.5 text-xs"
+                            >
+                              <option value="equipo">Equipo</option>
+                              <option value="servicio">Servicio</option>
+                              <option value="gasto">Gasto</option>
+                            </select>
 
-                    {actual.bucket === 'servicio' && (
-                      <select
-                        value={actual.edtId || ''}
-                        onChange={(e) =>
-                          onClasificacionChange?.(i, { ...actual, edtId: e.target.value })
-                        }
-                        className={cn(
-                          'flex-1 rounded-md border px-2 py-1.5 text-xs',
-                          faltaEdt ? 'border-amber-300 bg-amber-50' : 'border-green-300 bg-green-50'
-                        )}
-                      >
-                        <option value="">— Elegir EDT —</option>
-                        {catalogoEdts.map((e) => (
-                          <option key={e.id} value={e.id}>
-                            {e.nombre}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
+                            {actual.bucket === 'servicio' && (
+                              <select
+                                value={actual.edtId || ''}
+                                onChange={(e) =>
+                                  onClasificacionChange?.(p.clave, {
+                                    ...actual,
+                                    edtId: e.target.value,
+                                  })
+                                }
+                                className={cn(
+                                  'flex-1 rounded-md border px-2 py-1.5 text-xs',
+                                  faltaEdt
+                                    ? 'border-amber-300 bg-amber-50'
+                                    : 'border-green-300 bg-green-50'
+                                )}
+                              >
+                                <option value="">— Elegir EDT —</option>
+                                {catalogoEdts.map((e) => (
+                                  <option key={e.id} value={e.id}>
+                                    {e.nombre}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
                 </div>
-              )
-            })}
+              </div>
+            ))}
           </div>
         </div>
       )}

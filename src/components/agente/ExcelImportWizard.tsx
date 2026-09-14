@@ -40,7 +40,7 @@ interface MappingSuggestion {
 
 interface ExtractResponse {
   excel: ExcelExtraido
-  pdf: PropuestaExtraida | null
+  pdfs: PropuestaExtraida[]
   hojas: Array<{ name: string; rowCount: number }>
   mapeo: {
     recursos: MappingSuggestion[]
@@ -113,6 +113,53 @@ async function parseSSEStream(
 
 // ── Importación histórica desde PDF ───────────────────────
 
+/** Una partida con su procedencia, para no perder de qué propuesta salió cada monto. */
+interface PartidaConOrigen extends PdfPartida {
+  clave: string
+  origen: string
+}
+
+function aplanarPartidas(pdfs: PropuestaExtraida[]): PartidaConOrigen[] {
+  return pdfs.flatMap((pdf, pi) =>
+    pdf.partidas.map((p, i) => ({
+      ...p,
+      clave: `${pi}-${i}`,
+      origen: pdf.codigoOriginal || pdf.archivo || `Propuesta ${pi + 1}`,
+    }))
+  )
+}
+
+/**
+ * Funde varias propuestas en la cabecera de una sola cotización: los datos de
+ * identidad salen de la primera y las condiciones/exclusiones se acumulan sin
+ * repetir, porque el boilerplate legal de GYS se repite casi igual en cada PDF.
+ */
+function fusionarPdfs(pdfs: PropuestaExtraida[]): PropuestaExtraida | null {
+  if (pdfs.length === 0) return null
+  if (pdfs.length === 1) return pdfs[0]
+
+  const normalizar = (t: string) => t.trim().toLowerCase().replace(/\s+/g, ' ')
+  const condiciones: PropuestaExtraida['condiciones'] = []
+  const exclusiones: PropuestaExtraida['exclusiones'] = []
+  const vistasCond = new Set<string>()
+  const vistasExcl = new Set<string>()
+
+  for (const pdf of pdfs) {
+    for (const c of pdf.condiciones) {
+      if (vistasCond.has(normalizar(c.texto))) continue
+      vistasCond.add(normalizar(c.texto))
+      condiciones.push(c)
+    }
+    for (const e of pdf.exclusiones) {
+      if (vistasExcl.has(normalizar(e.texto))) continue
+      vistasExcl.add(normalizar(e.texto))
+      exclusiones.push(e)
+    }
+  }
+
+  return { ...pdfs[0], condiciones, exclusiones }
+}
+
 /**
  * Convierte las partidas del cuadro económico de un PDF en los grupos que espera el
  * endpoint, según cómo las clasificó el admin. Los montos entran cerrados y con el
@@ -120,10 +167,9 @@ async function parseSSEStream(
  * así que el margen de estas cotizaciones queda en 0% como marca de "costo desconocido".
  */
 function construirGruposDesdePartidas(
-  partidas: PdfPartida[],
-  clasificacion: Record<number, ClasificacionPartida>,
-  catalogoEdts: Array<{ id: string; nombre: string }>,
-  etiqueta: string
+  partidas: PartidaConOrigen[],
+  clasificacion: Record<string, ClasificacionPartida>,
+  catalogoEdts: Array<{ id: string; nombre: string }>
 ): {
   equipos: ExcelEquipoGrupo[]
   servicios: ExcelServicioGrupo[]
@@ -131,48 +177,62 @@ function construirGruposDesdePartidas(
   edtMappings: Record<string, string>
   usaRecursoMarcador: boolean
 } {
-  const itemsEquipo: ExcelEquipoGrupo['items'] = []
-  const itemsGasto: ExcelGastoGrupo['items'] = []
-  const porEdt = new Map<string, PdfPartida[]>()
+  // Se agrupa por propuesta de origen para que en la cotización se vea qué aportó cada POS.
+  const equiposPorOrigen = new Map<string, ExcelEquipoGrupo['items']>()
+  const gastosPorOrigen = new Map<string, ExcelGastoGrupo['items']>()
+  const serviciosPorOrigenEdt = new Map<string, PartidaConOrigen[]>()
 
-  partidas.forEach((p, i) => {
-    const clase = clasificacion[i]
+  for (const p of partidas) {
+    const clase = clasificacion[p.clave]
+
     if (clase?.bucket === 'servicio' && clase.edtId) {
-      porEdt.set(clase.edtId, [...(porEdt.get(clase.edtId) ?? []), p])
-      return
+      const llave = `${p.origen}||${clase.edtId}`
+      serviciosPorOrigenEdt.set(llave, [...(serviciosPorOrigenEdt.get(llave) ?? []), p])
+      continue
     }
+
     if (clase?.bucket === 'gasto') {
-      itemsGasto.push({
-        nombre: p.descripcion,
-        cantidad: 1,
-        precioUnitario: p.monto,
-        costoInterno: p.monto,
-        costoCliente: p.monto,
-      })
-      return
+      gastosPorOrigen.set(p.origen, [
+        ...(gastosPorOrigen.get(p.origen) ?? []),
+        {
+          nombre: p.descripcion,
+          cantidad: 1,
+          precioUnitario: p.monto,
+          costoInterno: p.monto,
+          costoCliente: p.monto,
+        },
+      ])
+      continue
     }
-    itemsEquipo.push({
-      descripcion: p.descripcion,
-      categoria: 'Histórico',
-      unidad: 'Glb',
-      marca: '',
-      cantidad: 1,
-      precioLista: p.monto,
-      precioInterno: p.monto,
-      precioCliente: p.monto,
-      factorCosto: 1,
-      factorVenta: 1,
-    })
-  })
+
+    equiposPorOrigen.set(p.origen, [
+      ...(equiposPorOrigen.get(p.origen) ?? []),
+      {
+        descripcion: p.descripcion,
+        categoria: 'Histórico',
+        unidad: 'Glb',
+        marca: '',
+        cantidad: 1,
+        precioLista: p.monto,
+        precioInterno: p.monto,
+        precioCliente: p.monto,
+        factorCosto: 1,
+        factorVenta: 1,
+      },
+    ])
+  }
 
   const servicios: ExcelServicioGrupo[] = []
   const edtMappings: Record<string, string> = {}
 
-  for (const [edtId, items] of porEdt) {
+  for (const [llave, items] of serviciosPorOrigenEdt) {
+    const [origen, edtId] = llave.split('||')
     const nombreEdt = catalogoEdts.find((e) => e.id === edtId)?.nombre || edtId
+    // El endpoint resuelve el EDT por `edtSugerido`, así que varios grupos de
+    // distintas propuestas pueden compartir el mismo EDT sin pisarse.
     edtMappings[nombreEdt] = edtId
     servicios.push({
-      grupo: nombreEdt,
+      grupo: `${origen} · ${nombreEdt}`,
       hoja: 'PDF',
       edtSugerido: nombreEdt,
       // Neutros: el monto del PDF ya es el precio final, no se le aplica margen ni contingencia.
@@ -197,9 +257,17 @@ function construirGruposDesdePartidas(
   }
 
   return {
-    equipos: itemsEquipo.length ? [{ grupo: etiqueta, hoja: 'PDF', items: itemsEquipo }] : [],
+    equipos: [...equiposPorOrigen].map(([origen, items]) => ({
+      grupo: `Propuesta ${origen}`,
+      hoja: 'PDF',
+      items,
+    })),
     servicios,
-    gastos: itemsGasto.length ? [{ grupo: etiqueta, hoja: 'PDF', items: itemsGasto }] : [],
+    gastos: [...gastosPorOrigen].map(([origen, items]) => ({
+      grupo: `Propuesta ${origen}`,
+      hoja: 'PDF',
+      items,
+    })),
     edtMappings,
     usaRecursoMarcador: servicios.length > 0,
   }
@@ -222,7 +290,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
 
   // Step 1: Files
   const [excelFile, setExcelFile] = useState<File | null>(null)
-  const [pdfFile, setPdfFile] = useState<File | null>(null)
+  const [pdfFiles, setPdfFiles] = useState<File[]>([])
 
   // Step 2: Preview (populated after extraction)
   const [extractData, setExtractData] = useState<ExtractResponse | null>(null)
@@ -231,7 +299,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
   // Step 3: Mappings
   const [recursoMappings, setRecursoMappings] = useState<Record<string, string>>({})
   const [edtMappings, setEdtMappings] = useState<Record<string, string>>({})
-  const [clasificacion, setClasificacion] = useState<Record<number, ClasificacionPartida>>({})
+  const [clasificacion, setClasificacion] = useState<Record<string, ClasificacionPartida>>({})
 
   // Step 4: Config
   const [nombreCotizacion, setNombreCotizacion] = useState('')
@@ -245,27 +313,28 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
   // Error state
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  // Importación histórica: sin Excel, el contenido sale del cuadro económico del PDF.
-  const esImportPdf = !excelFile && !!extractData?.pdf?.partidas.length
-  const partidasPdf = esImportPdf ? extractData!.pdf!.partidas : []
+  // Importación histórica: sin Excel, el contenido sale del cuadro económico de los PDFs.
+  const partidasPdf = useMemo(
+    () => (!excelFile && extractData ? aplanarPartidas(extractData.pdfs) : []),
+    [excelFile, extractData]
+  )
+  const pdfFusionado = useMemo(
+    () => (extractData ? fusionarPdfs(extractData.pdfs) : null),
+    [extractData]
+  )
 
   const gruposDesdePdf = useMemo(
     () =>
-      esImportPdf && extractData
-        ? construirGruposDesdePartidas(
-            extractData.pdf!.partidas,
-            clasificacion,
-            extractData.catalogos.edts,
-            codigoManual.trim() ? `Propuesta ${codigoManual.trim()}` : 'Propuesta'
-          )
+      partidasPdf.length && extractData
+        ? construirGruposDesdePartidas(partidasPdf, clasificacion, extractData.catalogos.edts)
         : null,
-    [esImportPdf, extractData, clasificacion, codigoManual]
+    [partidasPdf, extractData, clasificacion]
   )
 
   // ── Handlers ──────────────────────────────────────────
 
   const handleExtract = useCallback(async () => {
-    if (!excelFile && !pdfFile) return
+    if (!excelFile && pdfFiles.length === 0) return
 
     setLoading(true)
     setErrorMessage(null)
@@ -274,7 +343,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
     try {
       const formData = new FormData()
       if (excelFile) formData.append('excel', excelFile)
-      if (pdfFile) formData.append('pdf', pdfFile)
+      for (const pdf of pdfFiles) formData.append('pdf', pdf)
 
       const res = await fetch('/api/agente/importar-excel', {
         method: 'POST',
@@ -318,12 +387,15 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
       }
       setEdtMappings(autoEdts)
 
-      // Auto-populate config from extracted data
+      // Auto-populate config from extracted data. Con varias propuestas, la identidad
+      // de la cotización la define la primera: es una sola OC.
+      const principal = data.pdfs[0]
+
       if (data.excel.resumen.nombreProyecto) {
         setNombreCotizacion(data.excel.resumen.nombreProyecto)
       }
-      if (data.pdf?.nombreProyecto && !data.excel.resumen.nombreProyecto) {
-        setNombreCotizacion(data.pdf.nombreProyecto)
+      if (principal?.nombreProyecto && !data.excel.resumen.nombreProyecto) {
+        setNombreCotizacion(principal.nombreProyecto)
       }
       if (data.mapeo.clienteSugerido) {
         setClienteId(data.mapeo.clienteSugerido.id)
@@ -334,23 +406,23 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
 
       // Sin Excel, las partidas del PDF se clasifican a mano. Se presume servicio cuando
       // la descripción lo dice, que es el caso habitual en las propuestas antiguas.
-      if (!excelFile && data.pdf?.partidas.length) {
-        const auto: Record<number, ClasificacionPartida> = {}
-        data.pdf.partidas.forEach((p, i) => {
-          auto[i] = /servicio|mano de obra|programaci|ingenier/i.test(p.descripcion)
+      if (!excelFile) {
+        const auto: Record<string, ClasificacionPartida> = {}
+        for (const p of aplanarPartidas(data.pdfs)) {
+          auto[p.clave] = /servicio|mano de obra|programaci|ingenier/i.test(p.descripcion)
             ? { bucket: 'servicio' }
             : { bucket: 'equipo' }
-        })
+        }
         setClasificacion(auto)
       }
 
       // El código y la fecha impresos en el PDF mandan sobre el correlativo automático:
       // es lo que hace que una propuesta de 2019 entre con su identidad real.
-      if (data.pdf?.codigoOriginal) {
-        setCodigoManual(data.pdf.codigoOriginal)
+      if (principal?.codigoOriginal) {
+        setCodigoManual(principal.codigoOriginal)
       }
-      if (data.pdf?.fechaEmision) {
-        setFechaManual(data.pdf.fechaEmision)
+      if (principal?.fechaEmision) {
+        setFechaManual(principal.fechaEmision)
       }
 
       setStep(1)
@@ -363,7 +435,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
       setLoading(false)
       setLoadingMessage('')
     }
-  }, [excelFile, pdfFile])
+  }, [excelFile, pdfFiles])
 
   const handleConfirm = useCallback(async () => {
     if (!extractData) return
@@ -406,15 +478,15 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
           codigoManual: codigoManual.trim() || undefined,
           fechaManual: fechaManual || undefined,
           cotizacionIdDestino: destino?.id,
-          condiciones: extractData.pdf?.condiciones.map((c) => ({
+          condiciones: pdfFusionado?.condiciones.map((c) => ({
             texto: c.texto,
             tipo: c.tipo,
           })),
-          exclusiones: extractData.pdf?.exclusiones.map((e) => ({
+          exclusiones: pdfFusionado?.exclusiones.map((e) => ({
             texto: e.texto,
           })),
-          formaPago: extractData.pdf?.formaPago,
-          validezOferta: extractData.pdf?.validezDias,
+          formaPago: pdfFusionado?.formaPago,
+          validezOferta: pdfFusionado?.validezDias,
         }),
       })
 
@@ -443,7 +515,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
     extractData, recursoMappings, edtMappings, clienteId,
     nombreCotizacion, moneda, catalogSelections, notas,
     codigoManual, fechaManual, destino,
-    gruposDesdePdf,
+    gruposDesdePdf, pdfFusionado,
     onOpenChange, router,
   ])
 
@@ -451,12 +523,13 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
 
   const canNext = () => {
     switch (step) {
-      case 0: return !!excelFile || !!pdfFile
+      case 0: return !!excelFile || pdfFiles.length > 0
       case 1: return !!extractData
       case 2:
         // Una partida marcada como servicio sin EDT se descartaría en silencio al importar.
         return !partidasPdf.some(
-          (_, i) => clasificacion[i]?.bucket === 'servicio' && !clasificacion[i]?.edtId
+          (p) =>
+            clasificacion[p.clave]?.bucket === 'servicio' && !clasificacion[p.clave]?.edtId
         )
       case 3: return destino ? true : !!nombreCotizacion && !!clienteId
       case 4: return true
@@ -560,15 +633,15 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
               {step === 0 && (
                 <UploadStep
                   excelFile={excelFile}
-                  pdfFile={pdfFile}
+                  pdfFiles={pdfFiles}
                   onExcelChange={setExcelFile}
-                  onPdfChange={setPdfFile}
+                  onPdfFilesChange={setPdfFiles}
                 />
               )}
               {step === 1 && extractData && (
                 <PreviewStep
                   data={extractData.excel}
-                  pdfData={extractData.pdf}
+                  pdfData={pdfFusionado}
                   catalogSelections={catalogSelections}
                   onCatalogSelectionsChange={setCatalogSelections}
                 />
@@ -590,8 +663,8 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
                   partidas={partidasPdf}
                   clasificacion={clasificacion}
                   moneda={moneda}
-                  onClasificacionChange={(i, valor) =>
-                    setClasificacion((prev) => ({ ...prev, [i]: valor }))
+                  onClasificacionChange={(clave, valor) =>
+                    setClasificacion((prev) => ({ ...prev, [clave]: valor }))
                   }
                 />
               )}
@@ -636,8 +709,8 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
                   recursosTotal={extractData.mapeo.recursos.length}
                   edtsMapeados={Object.keys(edtMappings).length}
                   edtsTotal={extractData.mapeo.edts.length}
-                  condicionesCount={extractData.pdf?.condiciones.length || 0}
-                  exclusionesCount={extractData.pdf?.exclusiones.length || 0}
+                  condicionesCount={pdfFusionado?.condiciones.length || 0}
+                  exclusionesCount={pdfFusionado?.exclusiones.length || 0}
                   codigoManual={codigoManual}
                   fechaManual={fechaManual}
                   destinoCodigo={destino?.codigo || null}

@@ -30,6 +30,8 @@ export interface PdfPartida {
 }
 
 export interface PropuestaExtraida {
+  /** Nombre del archivo de origen. Lo pone el llamador, no el modelo. */
+  archivo?: string
   clienteNombre?: string
   clienteRuc?: string
   nombreProyecto?: string

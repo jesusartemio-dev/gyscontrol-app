@@ -20,6 +20,9 @@ const ROLES_PERMITIDOS = ['admin']
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20MB
 
+// Cada PDF es una llamada a Claude de ~15-30s; con más de esto se acerca al maxDuration.
+const MAX_PDFS = 8
+
 interface MappingSuggestion {
   excelName: string
   matches: Array<{ id: string; nombre: string; score: number }>
@@ -50,44 +53,51 @@ function similarity(a: string, b: string): number {
  * Consecuencia asumida: el margen de estas cotizaciones sale 0% — marca de "costo
  * desconocido", no de venta sin utilidad.
  */
-function construirDesdePdf(pdf: PropuestaExtraida): ExcelExtraido {
-  const partidas = pdf.partidas.length
-    ? pdf.partidas
-    : pdf.montoTotal
-      ? [{ descripcion: pdf.nombreProyecto || 'Alcance total de la propuesta', monto: pdf.montoTotal }]
-      : []
+function construirDesdePdf(pdfs: PropuestaExtraida[]): ExcelExtraido {
+  const equipos = []
+  let total = 0
 
-  const total = partidas.reduce((suma, p) => suma + p.monto, 0)
+  for (const pdf of pdfs) {
+    // Una propuesta sin cuadro desglosado pero con total sí es cargable: una sola línea.
+    const partidas = pdf.partidas.length
+      ? pdf.partidas
+      : pdf.montoTotal
+        ? [{ descripcion: pdf.nombreProyecto || 'Alcance total de la propuesta', monto: pdf.montoTotal }]
+        : []
+
+    if (!partidas.length) continue
+    total += partidas.reduce((suma, p) => suma + p.monto, 0)
+
+    equipos.push({
+      grupo: `Propuesta ${pdf.codigoOriginal || pdf.archivo || 'sin código'}`,
+      hoja: 'PDF',
+      items: partidas.map((p) => ({
+        descripcion: p.descripcion,
+        categoria: 'Histórico',
+        unidad: 'Glb',
+        marca: '',
+        cantidad: 1,
+        precioLista: p.monto,
+        precioInterno: p.monto,
+        precioCliente: p.monto,
+        factorCosto: 1,
+        factorVenta: 1,
+      })),
+    })
+  }
+
+  const principal = pdfs[0]
 
   return {
-    equipos: partidas.length
-      ? [
-          {
-            grupo: pdf.codigoOriginal ? `Propuesta ${pdf.codigoOriginal}` : 'Propuesta',
-            hoja: 'PDF',
-            items: partidas.map((p) => ({
-              descripcion: p.descripcion,
-              categoria: 'Histórico',
-              unidad: 'Glb',
-              marca: '',
-              cantidad: 1,
-              precioLista: p.monto,
-              precioInterno: p.monto,
-              precioCliente: p.monto,
-              factorCosto: 1,
-              factorVenta: 1,
-            })),
-          },
-        ]
-      : [],
+    equipos,
     servicios: [],
     gastos: [],
     resumen: {
       totalInterno: total,
       totalCliente: total,
-      moneda: pdf.moneda,
-      nombreProyecto: pdf.nombreProyecto,
-      clienteNombre: pdf.clienteNombre,
+      moneda: principal?.moneda,
+      nombreProyecto: principal?.nombreProyecto,
+      clienteNombre: principal?.clienteNombre,
     },
     recursosUnicos: [],
     edtsUnicos: [],
@@ -129,19 +139,29 @@ export async function POST(request: NextRequest) {
 
   // Parse and validate FormData before starting the stream
   let excelBuffer: Buffer | null = null
-  let pdfBuffer: Buffer | null = null
-  let hasPdf = false
+  const pdfEntradas: Array<{ buffer: Buffer; nombre: string }> = []
 
   try {
     const formData = await request.formData()
     const excelFile = formData.get('excel') as File | null
-    const pdfFile = formData.get('pdf') as File | null
+    // Varias propuestas (POS10, POS20, …) que el cliente cerró con una sola OC
+    // entran juntas y forman una única cotización.
+    const pdfFiles = formData
+      .getAll('pdf')
+      .filter((f): f is File => f instanceof File && f.size > 0)
 
     // Basta con uno de los dos: las cotizaciones antiguas suelen conservar
     // solo el PDF que se le envió al cliente.
-    if (!excelFile && !pdfFile) {
+    if (!excelFile && pdfFiles.length === 0) {
       return NextResponse.json(
         { error: 'Se requiere un archivo Excel o un PDF de propuesta' },
+        { status: 400 }
+      )
+    }
+
+    if (pdfFiles.length > MAX_PDFS) {
+      return NextResponse.json(
+        { error: `Máximo ${MAX_PDFS} PDFs por importación (subiste ${pdfFiles.length})` },
         { status: 400 }
       )
     }
@@ -169,18 +189,23 @@ export async function POST(request: NextRequest) {
       excelBuffer = Buffer.from(await excelFile.arrayBuffer())
     }
 
-    if (pdfFile && pdfFile.size > 0) {
+    for (const pdfFile of pdfFiles) {
       if (pdfFile.type !== 'application/pdf' && !pdfFile.name.endsWith('.pdf')) {
-        return NextResponse.json({ error: 'El archivo PDF debe ser un .pdf' }, { status: 400 })
-      }
-      if (pdfFile.size > MAX_FILE_SIZE) {
         return NextResponse.json(
-          { error: `PDF demasiado grande (${(pdfFile.size / 1024 / 1024).toFixed(1)}MB). Máximo: 20MB` },
+          { error: `"${pdfFile.name}" no es un .pdf` },
           { status: 400 }
         )
       }
-      pdfBuffer = Buffer.from(await pdfFile.arrayBuffer())
-      hasPdf = true
+      if (pdfFile.size > MAX_FILE_SIZE) {
+        return NextResponse.json(
+          { error: `PDF "${pdfFile.name}" demasiado grande (${(pdfFile.size / 1024 / 1024).toFixed(1)}MB). Máximo: 20MB` },
+          { status: 400 }
+        )
+      }
+      pdfEntradas.push({
+        buffer: Buffer.from(await pdfFile.arrayBuffer()),
+        nombre: pdfFile.name,
+      })
     }
   } catch {
     return NextResponse.json({ error: 'Error leyendo archivos' }, { status: 400 })
@@ -215,21 +240,27 @@ export async function POST(request: NextRequest) {
           excelData.hojas = sheets.map((s) => s.name)
         }
 
-        // 3. Process PDF if provided
-        let pdfData: PropuestaExtraida | null = null
-        if (hasPdf && pdfBuffer) {
-          writeSSE(controller, encoder, 'progress', { message: 'Analizando PDF de propuesta...' })
-          const pdfBase64 = pdfBuffer.toString('base64')
-          pdfData = await extractPdfProposal(pdfBase64, importUserId)
+        // 3. Process PDFs if provided
+        const pdfs: PropuestaExtraida[] = []
+        for (let i = 0; i < pdfEntradas.length; i++) {
+          const entrada = pdfEntradas[i]
+          writeSSE(controller, encoder, 'progress', {
+            message:
+              pdfEntradas.length > 1
+                ? `Analizando PDF ${i + 1} de ${pdfEntradas.length}: ${entrada.nombre}`
+                : 'Analizando PDF de propuesta...',
+          })
+          const extraido = await extractPdfProposal(entrada.buffer.toString('base64'), importUserId)
+          pdfs.push({ ...extraido, archivo: entrada.nombre })
         }
 
         if (!excelData) {
-          if (!pdfData) {
+          if (pdfs.length === 0) {
             writeSSE(controller, encoder, 'error', { error: 'No se pudo extraer información de los archivos' })
             controller.close()
             return
           }
-          excelData = construirDesdePdf(pdfData)
+          excelData = construirDesdePdf(pdfs)
         }
 
         // 4. Query catalogs for mapping suggestions
@@ -268,10 +299,11 @@ export async function POST(request: NextRequest) {
           })
         )
 
-        // 6. Client suggestion
+        // 6. Client suggestion — la cabecera sale de la primera propuesta
+        const principal = pdfs[0] ?? null
         let clienteSugerido: { id: string; nombre: string } | null = null
-        const clienteNombre = pdfData?.clienteNombre || excelData.resumen.clienteNombre
-        const clienteRuc = pdfData?.clienteRuc
+        const clienteNombre = principal?.clienteNombre || excelData.resumen.clienteNombre
+        const clienteRuc = principal?.clienteRuc
 
         if (clienteRuc) {
           const match = clientes.find((c) => c.ruc === clienteRuc)
@@ -285,7 +317,7 @@ export async function POST(request: NextRequest) {
         // 7. Send final result
         writeSSE(controller, encoder, 'result', {
           excel: excelData,
-          pdf: pdfData,
+          pdfs,
           hojas: sheets.map((s) => ({ name: s.name, rowCount: s.rowCount })),
           mapeo: {
             recursos: recursoSugerencias,
