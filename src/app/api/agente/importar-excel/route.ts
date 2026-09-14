@@ -41,8 +41,14 @@ function similarity(a: string, b: string): number {
 /**
  * Arma el equivalente a un Excel extraído cuando solo hay PDF: una cotización
  * histórica de la que ya no se conserva la hoja de costeo interna. Cada posición
- * del cuadro económico entra como un ítem de suma alzada, y el costo interno
- * queda en cero porque el PDF nunca lo trae — es el documento del cliente.
+ * del cuadro económico entra como un ítem de suma alzada.
+ *
+ * El costo interno se iguala al precio de venta con factorVenta 1 en vez de dejarlo
+ * en cero: los subtotales se derivan de `precioInterno × factorVenta` (ver
+ * calcularSubtotal), así que un costo cero arrastra el total de la cotización a cero
+ * y se pierde el único dato real que trae el PDF, el monto que pagó el cliente.
+ * Consecuencia asumida: el margen de estas cotizaciones sale 0% — marca de "costo
+ * desconocido", no de venta sin utilidad.
  */
 function construirDesdePdf(pdf: PropuestaExtraida): ExcelExtraido {
   const partidas = pdf.partidas.length
@@ -66,7 +72,7 @@ function construirDesdePdf(pdf: PropuestaExtraida): ExcelExtraido {
               marca: '',
               cantidad: 1,
               precioLista: p.monto,
-              precioInterno: 0,
+              precioInterno: p.monto,
               precioCliente: p.monto,
               factorCosto: 1,
               factorVenta: 1,
@@ -77,7 +83,7 @@ function construirDesdePdf(pdf: PropuestaExtraida): ExcelExtraido {
     servicios: [],
     gastos: [],
     resumen: {
-      totalInterno: 0,
+      totalInterno: total,
       totalCliente: total,
       moneda: pdf.moneda,
       nombreProyecto: pdf.nombreProyecto,

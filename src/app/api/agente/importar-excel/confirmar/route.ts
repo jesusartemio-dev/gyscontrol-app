@@ -12,6 +12,7 @@ import {
 } from '@/lib/utils/cotizacionCodeGenerator'
 import { recalcularTotalesCotizacion } from '@/lib/utils/recalculoCotizacion'
 import { tieneRol } from '@/lib/auth/roles'
+import { RECURSO_SUMA_ALZADA, NOMBRE_RECURSO_SUMA_ALZADA } from '@/lib/agente/sumaAlzada'
 import type {
   ExcelEquipoGrupo,
   ExcelServicioGrupo,
@@ -154,6 +155,26 @@ export async function POST(request: NextRequest) {
   const recursoMap = new Map<string, string>()
   for (const rm of recursoMappings) {
     recursoMap.set(rm.excelName, rm.recursoId)
+  }
+
+  // Las partidas de suma alzada llegan con un centinela en vez de un recursoId:
+  // se resuelve (creándolo la primera vez) al recurso marcador inactivo.
+  if ([...recursoMap.values()].includes(RECURSO_SUMA_ALZADA)) {
+    const marcador =
+      (await prisma.recurso.findFirst({ where: { nombre: NOMBRE_RECURSO_SUMA_ALZADA } })) ??
+      (await prisma.recurso.create({
+        data: {
+          nombre: NOMBRE_RECURSO_SUMA_ALZADA,
+          costoHora: 0,
+          activo: false,
+          descripcion:
+            'Marcador para cotizaciones históricas importadas desde PDF, donde solo se conoce el monto cerrado. No usar en cotizaciones nuevas.',
+        },
+      }))
+
+    for (const [nombre, id] of recursoMap) {
+      if (id === RECURSO_SUMA_ALZADA) recursoMap.set(nombre, marcador.id)
+    }
   }
 
   const edtMap = new Map<string, string>()

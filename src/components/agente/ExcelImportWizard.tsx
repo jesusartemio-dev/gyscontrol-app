@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { Loader2, ChevronLeft, ChevronRight, Check, FileSpreadsheet, AlertTriangle } from 'lucide-react'
 import {
   Dialog,
@@ -20,9 +20,16 @@ import { ConfigStep } from './steps/ConfigStep'
 import { ConfirmStep } from './steps/ConfirmStep'
 
 import type { CotizacionDestino } from './steps/ConfigStep'
+import type { ClasificacionPartida } from './steps/MappingStep'
 import type { CatalogSelections } from './steps/PreviewStep'
-import type { ExcelExtraido } from '@/lib/agente/excelExtractor'
-import type { PropuestaExtraida } from '@/lib/agente/pdfProposalExtractor'
+import type {
+  ExcelExtraido,
+  ExcelEquipoGrupo,
+  ExcelServicioGrupo,
+  ExcelGastoGrupo,
+} from '@/lib/agente/excelExtractor'
+import type { PropuestaExtraida, PdfPartida } from '@/lib/agente/pdfProposalExtractor'
+import { RECURSO_SUMA_ALZADA, NOMBRE_RECURSO_SUMA_ALZADA } from '@/lib/agente/sumaAlzada'
 
 // ── Types for API response ────────────────────────────────
 
@@ -104,6 +111,100 @@ async function parseSSEStream(
   return result
 }
 
+// ── Importación histórica desde PDF ───────────────────────
+
+/**
+ * Convierte las partidas del cuadro económico de un PDF en los grupos que espera el
+ * endpoint, según cómo las clasificó el admin. Los montos entran cerrados y con el
+ * costo interno igual a la venta: el PDF es el documento del cliente y no trae costos,
+ * así que el margen de estas cotizaciones queda en 0% como marca de "costo desconocido".
+ */
+function construirGruposDesdePartidas(
+  partidas: PdfPartida[],
+  clasificacion: Record<number, ClasificacionPartida>,
+  catalogoEdts: Array<{ id: string; nombre: string }>,
+  etiqueta: string
+): {
+  equipos: ExcelEquipoGrupo[]
+  servicios: ExcelServicioGrupo[]
+  gastos: ExcelGastoGrupo[]
+  edtMappings: Record<string, string>
+  usaRecursoMarcador: boolean
+} {
+  const itemsEquipo: ExcelEquipoGrupo['items'] = []
+  const itemsGasto: ExcelGastoGrupo['items'] = []
+  const porEdt = new Map<string, PdfPartida[]>()
+
+  partidas.forEach((p, i) => {
+    const clase = clasificacion[i]
+    if (clase?.bucket === 'servicio' && clase.edtId) {
+      porEdt.set(clase.edtId, [...(porEdt.get(clase.edtId) ?? []), p])
+      return
+    }
+    if (clase?.bucket === 'gasto') {
+      itemsGasto.push({
+        nombre: p.descripcion,
+        cantidad: 1,
+        precioUnitario: p.monto,
+        costoInterno: p.monto,
+        costoCliente: p.monto,
+      })
+      return
+    }
+    itemsEquipo.push({
+      descripcion: p.descripcion,
+      categoria: 'Histórico',
+      unidad: 'Glb',
+      marca: '',
+      cantidad: 1,
+      precioLista: p.monto,
+      precioInterno: p.monto,
+      precioCliente: p.monto,
+      factorCosto: 1,
+      factorVenta: 1,
+    })
+  })
+
+  const servicios: ExcelServicioGrupo[] = []
+  const edtMappings: Record<string, string> = {}
+
+  for (const [edtId, items] of porEdt) {
+    const nombreEdt = catalogoEdts.find((e) => e.id === edtId)?.nombre || edtId
+    edtMappings[nombreEdt] = edtId
+    servicios.push({
+      grupo: nombreEdt,
+      hoja: 'PDF',
+      edtSugerido: nombreEdt,
+      // Neutros: el monto del PDF ya es el precio final, no se le aplica margen ni contingencia.
+      factorSeguridad: 1,
+      margen: 1,
+      actividades: items.map((p) => ({
+        nombre: p.descripcion,
+        descripcion: p.descripcion,
+        recursos: [
+          {
+            recursoNombre: NOMBRE_RECURSO_SUMA_ALZADA,
+            tipo: 'oficina' as const,
+            costoHora: p.monto,
+            horas: 1,
+          },
+        ],
+        horasTotal: 1,
+        costoInterno: p.monto,
+        costoCliente: p.monto,
+      })),
+    })
+  }
+
+  return {
+    equipos: itemsEquipo.length ? [{ grupo: etiqueta, hoja: 'PDF', items: itemsEquipo }] : [],
+    servicios,
+    gastos: itemsGasto.length ? [{ grupo: etiqueta, hoja: 'PDF', items: itemsGasto }] : [],
+    edtMappings,
+    usaRecursoMarcador: servicios.length > 0,
+  }
+}
+
 // ── Component ─────────────────────────────────────────────
 
 const STEPS = ['Archivos', 'Preview', 'Mapeo', 'Config', 'Confirmar'] as const
@@ -130,6 +231,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
   // Step 3: Mappings
   const [recursoMappings, setRecursoMappings] = useState<Record<string, string>>({})
   const [edtMappings, setEdtMappings] = useState<Record<string, string>>({})
+  const [clasificacion, setClasificacion] = useState<Record<number, ClasificacionPartida>>({})
 
   // Step 4: Config
   const [nombreCotizacion, setNombreCotizacion] = useState('')
@@ -142,6 +244,23 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
 
   // Error state
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  // Importación histórica: sin Excel, el contenido sale del cuadro económico del PDF.
+  const esImportPdf = !excelFile && !!extractData?.pdf?.partidas.length
+  const partidasPdf = esImportPdf ? extractData!.pdf!.partidas : []
+
+  const gruposDesdePdf = useMemo(
+    () =>
+      esImportPdf && extractData
+        ? construirGruposDesdePartidas(
+            extractData.pdf!.partidas,
+            clasificacion,
+            extractData.catalogos.edts,
+            codigoManual.trim() ? `Propuesta ${codigoManual.trim()}` : 'Propuesta'
+          )
+        : null,
+    [esImportPdf, extractData, clasificacion, codigoManual]
+  )
 
   // ── Handlers ──────────────────────────────────────────
 
@@ -213,6 +332,18 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
         setMoneda(data.excel.resumen.moneda)
       }
 
+      // Sin Excel, las partidas del PDF se clasifican a mano. Se presume servicio cuando
+      // la descripción lo dice, que es el caso habitual en las propuestas antiguas.
+      if (!excelFile && data.pdf?.partidas.length) {
+        const auto: Record<number, ClasificacionPartida> = {}
+        data.pdf.partidas.forEach((p, i) => {
+          auto[i] = /servicio|mano de obra|programaci|ingenier/i.test(p.descripcion)
+            ? { bucket: 'servicio' }
+            : { bucket: 'equipo' }
+        })
+        setClasificacion(auto)
+      }
+
       // El código y la fecha impresos en el PDF mandan sobre el correlativo automático:
       // es lo que hace que una propuesta de 2019 entre con su identidad real.
       if (data.pdf?.codigoOriginal) {
@@ -247,17 +378,24 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
         .filter(([, v]) => v)
         .map(([k]) => k)
 
+      // Con Excel mandan los grupos extraídos; sin él, los arma la clasificación de partidas.
+      const desdePdf = gruposDesdePdf
+
+      const recursosFinales = desdePdf?.usaRecursoMarcador
+        ? { ...recursoMappings, [NOMBRE_RECURSO_SUMA_ALZADA]: RECURSO_SUMA_ALZADA }
+        : recursoMappings
+
       const res = await fetch('/api/agente/importar-excel/confirmar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          equipos: extractData.excel.equipos,
-          servicios: extractData.excel.servicios,
-          gastos: extractData.excel.gastos,
-          recursoMappings: Object.entries(recursoMappings).map(
+          equipos: desdePdf ? desdePdf.equipos : extractData.excel.equipos,
+          servicios: desdePdf ? desdePdf.servicios : extractData.excel.servicios,
+          gastos: desdePdf ? desdePdf.gastos : extractData.excel.gastos,
+          recursoMappings: Object.entries(recursosFinales).map(
             ([excelName, recursoId]) => ({ excelName, recursoId })
           ),
-          edtMappings: Object.entries(edtMappings).map(
+          edtMappings: Object.entries(desdePdf ? desdePdf.edtMappings : edtMappings).map(
             ([excelEdtName, edtId]) => ({ excelEdtName, edtId })
           ),
           clienteId,
@@ -305,6 +443,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
     extractData, recursoMappings, edtMappings, clienteId,
     nombreCotizacion, moneda, catalogSelections, notas,
     codigoManual, fechaManual, destino,
+    gruposDesdePdf,
     onOpenChange, router,
   ])
 
@@ -314,7 +453,11 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
     switch (step) {
       case 0: return !!excelFile || !!pdfFile
       case 1: return !!extractData
-      case 2: return true // Mapeo es opcional
+      case 2:
+        // Una partida marcada como servicio sin EDT se descartaría en silencio al importar.
+        return !partidasPdf.some(
+          (_, i) => clasificacion[i]?.bucket === 'servicio' && !clasificacion[i]?.edtId
+        )
       case 3: return destino ? true : !!nombreCotizacion && !!clienteId
       case 4: return true
       default: return false
@@ -444,6 +587,12 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
                   onEdtMap={(name, id) =>
                     setEdtMappings((p) => ({ ...p, [name]: id }))
                   }
+                  partidas={partidasPdf}
+                  clasificacion={clasificacion}
+                  moneda={moneda}
+                  onClasificacionChange={(i, valor) =>
+                    setClasificacion((prev) => ({ ...prev, [i]: valor }))
+                  }
                 />
               )}
               {step === 3 && extractData && (
@@ -468,7 +617,16 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
               )}
               {step === 4 && extractData && (
                 <ConfirmStep
-                  data={extractData.excel}
+                  data={
+                    gruposDesdePdf
+                      ? {
+                          ...extractData.excel,
+                          equipos: gruposDesdePdf.equipos,
+                          servicios: gruposDesdePdf.servicios,
+                          gastos: gruposDesdePdf.gastos,
+                        }
+                      : extractData.excel
+                  }
                   nombreCotizacion={nombreCotizacion}
                   clienteNombre={clienteNombre}
                   moneda={moneda}
