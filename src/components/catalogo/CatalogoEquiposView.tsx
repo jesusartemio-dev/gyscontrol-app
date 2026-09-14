@@ -436,7 +436,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
             >
               {c}C
             </Link>
-          </TooltipTrigger><TooltipContent>Ver en {c} cotizaci{c === 1 ? 'ón' : 'ones'}</TooltipContent></Tooltip>
+          </TooltipTrigger><TooltipContent>{c} ítem{c === 1 ? '' : 's'} en cotizaciones (puede repetirse dentro de una misma cotización)</TooltipContent></Tooltip>
         )}
         {p > 0 && (
           <Tooltip><TooltipTrigger asChild>
@@ -448,7 +448,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
             >
               {p}P
             </Link>
-          </TooltipTrigger><TooltipContent>Ver en {p} proyecto{p === 1 ? '' : 's'}</TooltipContent></Tooltip>
+          </TooltipTrigger><TooltipContent>{p} ítem{p === 1 ? '' : 's'} en proyectos (puede repetirse dentro de un mismo proyecto)</TooltipContent></Tooltip>
         )}
         {l > 0 && (
           <Tooltip><TooltipTrigger asChild>
@@ -460,7 +460,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
             >
               {l}L
             </Link>
-          </TooltipTrigger><TooltipContent>Ver en {l} lista{l === 1 ? '' : 's'}</TooltipContent></Tooltip>
+          </TooltipTrigger><TooltipContent>{l} ítem{l === 1 ? '' : 's'} en listas (puede repetirse dentro de una misma lista)</TooltipContent></Tooltip>
         )}
       </div>
     )
