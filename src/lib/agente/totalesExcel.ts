@@ -31,15 +31,49 @@ export interface BloqueDeclarado {
   items: ItemBloque[]
 }
 
+/**
+ * Las hojas de servicios y gastos no son tablas de ítems sino una matriz:
+ * columnas = recursos o conceptos con su costo unitario, filas = actividades con
+ * sus horas o cantidades, y una fila TOTALES que cierra. La IA se equivoca aquí de
+ * forma sistemática (ignora un factor, o aplica un margen que la hoja no aplica),
+ * así que se lee de frente.
+ */
+export interface ColumnaMatriz {
+  nombre: string
+  costoUnitario: number
+  tipo: 'oficina' | 'campo'
+  total: number
+}
+
+export interface FilaMatriz {
+  nombre: string
+  /** Valor por columna, en el mismo orden que `columnas`. */
+  valores: number[]
+}
+
+export interface MatrizHoja {
+  columnas: ColumnaMatriz[]
+  filas: FilaMatriz[]
+  margenSeguridad: number
+  /** Suma sin margen, de la fila TOTALES. */
+  totalInterno: number | null
+  /** Total con el margen aplicado: lo que se le cobra al cliente. */
+  totalCliente: number | null
+}
+
 export interface TotalesHoja {
   hoja: string
   /** Total de la hoja según su fila "TOTAL GLOBAL US" o "TOTALES". null si no la declara. */
   totalCliente: number | null
   bloques: BloqueDeclarado[]
+  /** Solo en hojas matriciales (servicios y gastos). */
+  matriz: MatrizHoja | null
 }
 
 function texto(celda: unknown): string {
-  return celda === null || celda === undefined ? '' : String(celda).trim()
+  // Las cabeceras traen saltos de línea dentro de la celda ("MOVILIZACION\n(4X2)")
+  if (celda === null || celda === undefined) return ''
+  return String(celda).replace(/\s*\n\s*/g, ' ').trim()
 }
 
 function aNumero(celda: unknown): number | null {
@@ -130,6 +164,77 @@ function leerItem(fila: unknown[], col: Columnas): ItemBloque | null {
   }
 }
 
+/**
+ * Lee una hoja matricial. Devuelve null si no tiene la forma esperada (cabecera con
+ * ACTIVIDADES y una fila de costos unitarios), para no romper con otras plantillas.
+ */
+function leerMatriz(filas: unknown[][]): MatrizHoja | null {
+  const iCabecera = filas.findIndex((f) =>
+    f.some((c) => /^ACTIVIDADES$/i.test(texto(c)))
+  )
+  if (iCabecera < 0) return null
+
+  const cabecera = filas[iCabecera]
+  const iCostos = filas.findIndex(
+    (f, i) => i > iCabecera && /^costo\s+(por\s+hh|unitario)/i.test(texto(f[0]))
+  )
+  if (iCostos < 0) return null
+
+  // La franja superior separa trabajo de oficina y de campo
+  const franja = iCabecera > 0 ? filas[iCabecera - 1] : []
+  let tipoActual: 'oficina' | 'campo' = 'oficina'
+  const tipoPorColumna: Array<'oficina' | 'campo'> = []
+  for (let c = 0; c < cabecera.length; c++) {
+    const marca = texto(franja[c]).toUpperCase()
+    if (/OFICINA/.test(marca)) tipoActual = 'oficina'
+    else if (/CAMPO/.test(marca)) tipoActual = 'campo'
+    tipoPorColumna[c] = tipoActual
+  }
+
+  const iTotales = filas.findIndex((f, i) => i > iCostos && /^totales$/i.test(texto(f[0])))
+  const filaTotales = iTotales >= 0 ? filas[iTotales] : []
+
+  // Columnas de concepto/recurso: las que tienen nombre y un costo unitario numérico
+  const columnas: ColumnaMatriz[] = []
+  const indices: number[] = []
+  for (let c = 0; c < cabecera.length; c++) {
+    const nombre = texto(cabecera[c])
+    if (!nombre || /^(it|actividades|total|sub\s*total|margen)/i.test(nombre)) continue
+    const costo = aNumero(filas[iCostos][c])
+    if (costo === null) continue
+    columnas.push({
+      nombre,
+      costoUnitario: costo,
+      tipo: tipoPorColumna[c] ?? 'oficina',
+      total: aNumero(filaTotales[c]) ?? 0,
+    })
+    indices.push(c)
+  }
+  if (columnas.length === 0) return null
+
+  const iMargen = cabecera.findIndex((c) => /margen/i.test(texto(c)))
+  const margenSeguridad = (iMargen >= 0 ? aNumero(filas[iCostos][iMargen]) : null) ?? 1
+
+  // Filas de actividad: tienen nombre propio y algún valor en las columnas
+  const filasMatriz: FilaMatriz[] = []
+  for (let i = iCostos + 1; i < filas.length; i++) {
+    if (iTotales >= 0 && i >= iTotales) break
+    const fila = filas[i]
+    const nombre = texto(fila[1]) || texto(fila[0])
+    if (!nombre || /^cantidad\s+de/i.test(nombre)) continue
+    const valores = indices.map((c) => aNumero(fila[c]) ?? 0)
+    if (valores.every((v) => v === 0)) continue
+    filasMatriz.push({ nombre, valores })
+  }
+
+  const numerosTotales = numerosDe(filaTotales)
+  const totalInterno = columnas.reduce((s, c) => s + c.total, 0) || null
+  const totalCliente =
+    numerosTotales.length > 0 ? numerosTotales[numerosTotales.length - 1] : null
+
+  return { columnas, filas: filasMatriz, margenSeguridad, totalInterno, totalCliente }
+}
+
 /** Fila de título de bloque: texto sin ninguna cifra y que no es la cabecera de la tabla. */
 function esTitulo(fila: unknown[]): boolean {
   const primera = texto(fila[0])
@@ -213,7 +318,7 @@ export function leerTotalesDeclarados(buffer: Buffer): TotalesHoja[] {
       totalCliente = bloques.reduce((s, b) => s + b.totalCliente, 0)
     }
 
-    resultado.push({ hoja, totalCliente, bloques })
+    resultado.push({ hoja, totalCliente, bloques, matriz: leerMatriz(filas) })
   }
 
   return resultado

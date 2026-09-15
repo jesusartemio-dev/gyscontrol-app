@@ -162,7 +162,84 @@ function reconciliarConElArchivo(
     }
   }
 
-  return { excel: { ...excelData, equipos }, recuperados }
+  // Hojas matriciales: servicios y gastos no son tablas de ítems y el modelo se
+  // equivoca de forma sistemática (omite un factor de la matriz, o aplica un
+  // margen que la hoja no aplica). Se reconstruyen desde la matriz.
+  const servicios = [...excelData.servicios]
+  const gastos = [...excelData.gastos]
+
+  for (const hoja of totalesExcel) {
+    const matriz = hoja.matriz
+    if (!matriz || !matriz.totalCliente) continue
+
+    const esServicio = matriz.filas.length > 0
+
+    if (esServicio) {
+      const indice = servicios.findIndex((g) => g.hoja === hoja.hoja)
+      const extraido =
+        indice >= 0
+          ? servicios[indice].actividades.reduce((s, a) => s + a.costoCliente, 0)
+          : null
+      if (extraido !== null && Math.abs(extraido - matriz.totalCliente) < 0.5) continue
+
+      const previo = indice >= 0 ? servicios[indice] : null
+      const grupo = {
+        grupo: previo?.grupo || hoja.hoja,
+        hoja: hoja.hoja,
+        edtSugerido: previo?.edtSugerido || hoja.hoja,
+        factorSeguridad: matriz.margenSeguridad,
+        margen: previo?.margen || 1.35,
+        actividades: matriz.filas.map((fila) => {
+          const recursos = fila.valores
+            .map((horas, i) => ({
+              recursoNombre: matriz.columnas[i].nombre,
+              tipo: matriz.columnas[i].tipo,
+              costoHora: matriz.columnas[i].costoUnitario,
+              horas,
+            }))
+            .filter((r) => r.horas > 0)
+          const costoCliente =
+            recursos.reduce((s, r) => s + r.horas * r.costoHora, 0) * matriz.margenSeguridad
+          return {
+            nombre: fila.nombre,
+            descripcion: fila.nombre,
+            recursos,
+            horasTotal: recursos.reduce((s, r) => s + r.horas, 0),
+            costoInterno: +(costoCliente / (previo?.margen || 1.35)).toFixed(2),
+            costoCliente: +costoCliente.toFixed(2),
+          }
+        }),
+      }
+      if (indice >= 0) servicios[indice] = grupo
+      else servicios.push(grupo)
+      recuperados.push(`${hoja.hoja} (${matriz.totalCliente.toFixed(2)})`)
+      continue
+    }
+
+    const indice = gastos.findIndex((g) => g.hoja === hoja.hoja)
+    const extraido =
+      indice >= 0 ? gastos[indice].items.reduce((s, i) => s + i.costoCliente, 0) : null
+    if (extraido !== null && Math.abs(extraido - matriz.totalCliente) < 0.5) continue
+
+    const grupo = {
+      grupo: gastos[indice]?.grupo || hoja.hoja,
+      hoja: hoja.hoja,
+      items: matriz.columnas
+        .filter((c) => c.total > 0)
+        .map((c) => ({
+          nombre: c.nombre,
+          cantidad: c.costoUnitario > 0 ? +(c.total / c.costoUnitario).toFixed(2) : 1,
+          precioUnitario: c.costoUnitario,
+          costoInterno: c.total,
+          costoCliente: +(c.total * matriz.margenSeguridad).toFixed(2),
+        })),
+    }
+    if (indice >= 0) gastos[indice] = grupo
+    else gastos.push(grupo)
+    recuperados.push(`${hoja.hoja} (${matriz.totalCliente.toFixed(2)})`)
+  }
+
+  return { excel: { ...excelData, equipos, servicios, gastos }, recuperados }
 }
 
 // ── SSE helpers ──────────────────────────────────────────
