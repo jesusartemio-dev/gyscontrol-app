@@ -103,6 +103,19 @@ export interface SheetTextData {
 const MAX_SHEETS = 12
 const MAX_CHARS_PER_SHEET = 80_000
 
+/**
+ * Una celda como texto de una sola línea. Las cabeceras de la plantilla traen
+ * saltos de línea dentro de la celda ("TOTAL\nPRICE"), y `sheet_to_csv` los
+ * conserva: la fila de cabecera se partía en cinco "líneas" y tanto el troceado
+ * como el modelo perdían la correspondencia entre columna y valor.
+ */
+function celdaATexto(valor: unknown): string {
+  if (valor === null || valor === undefined) return ''
+  const texto = String(valor).replace(/\s*\n\s*/g, ' ').trim()
+  if (!texto.includes(',') && !texto.includes('"')) return texto
+  return `"${texto.replace(/"/g, '""')}"`
+}
+
 export function readExcelSheets(buffer: Buffer): SheetTextData[] {
   const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false })
   const sheets: SheetTextData[] = []
@@ -111,8 +124,14 @@ export function readExcelSheets(buffer: Buffer): SheetTextData[] {
     const sheet = workbook.Sheets[name]
     if (!sheet) continue
 
-    const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false })
-    const rowCount = csv.split('\n').filter((line) => line.trim()).length
+    const filas = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+      header: 1,
+      blankrows: false,
+      defval: '',
+    })
+
+    const csv = filas.map((fila) => fila.map(celdaATexto).join(',')).join('\n')
+    const rowCount = filas.length
 
     if (rowCount <= 1) continue
 
@@ -331,18 +350,50 @@ const SYSTEM_PROMPT = `You are a JSON extraction API. You ONLY respond with vali
 
 You are an expert in industrial automation quotations from GYS Control Industrial (Peru). You extract structured data from internal quotation Excel files.
 
-FORMAT CONTEXT:
-- EQUIPOS sheets (MAT. ELECTRICOS, MAT. TABLEROS, SOFTWARE): items with código, descripción, unidad, marca, cantidad, precio lista, factors
-- Columns "GYS CONTROL" or "INTEGRADOR" = precioInterno. Column "CLIENTE" = precioCliente
-- factorCosto = precioInterno / precioLista. factorVenta = precioCliente / precioInterno
-- SERVICIOS sheets (SERV. ING., SERV. CON, SERV. PRO): hours×resource matrices
-- Resources: Senior A/B, Semisenior A/B, Junior A/B with OFICINA and CAMPO rates
-- GASTOS sheets (COVID, MOVIL., OPERAT.): items with cantidad, precio unitario, totals
+SHEET STRUCTURE:
+- A sheet usually starts with a "RESUMEN ECONÓMICO TOTAL" block: an INDEX listing each
+  block of the sheet with its total. It is NOT a list of items — never extract items from it.
+  Use it to know which blocks carry an amount in this quotation.
+- After it come one or more BLOCKS. Each block = a title row in the first column, then a
+  header row (It, CAT, DESCRIPCION, UNID, QTY, UNIT PRICE, TOTAL PRICE, UNIT PRICE,
+  TOTAL PRICE, Renta %, LIST PRICE, COD., INTEGRADOR, CLIENTE), then numbered rows, then a
+  "TOTAL US ($)" row with the block total.
+- The first UNIT PRICE / TOTAL PRICE pair is under "CLIENTE". The second pair is under
+  "GYS CONTROL IND." (internal cost).
 
-RULES:
-- Extract ALL items, do not omit rows
-- If a field has no clear data, use null
-- Defaults: factorCosto=1.00, factorVenta=1.25
+COLUMN MAPPING (equipos/materiales):
+- cantidad = QTY
+- precioCliente = UNIT PRICE under CLIENTE
+- precioInterno = UNIT PRICE under GYS CONTROL IND.
+- precioLista = LIST PRICE when present, otherwise precioInterno
+- factorCosto = INTEGRADOR column, factorVenta = CLIENTE column (the numeric factors near the end)
+
+HARD RULES — the workbook is a REUSED TEMPLATE and contains leftovers:
+1. NEVER invent a value. There are no default prices or factors. Missing data = 0 or null.
+2. Only the columns under the header row are valid. IGNORE any number sitting in columns to
+   the RIGHT of the CLIENTE factor column: those are leftovers from previous quotations and
+   are NOT prices. This is the single most common mistake — do not take a price from an
+   unlabeled column.
+3. "TOTAL PRICE" decides whether a row belongs to this quotation. A row with QTY empty or 0,
+   or with TOTAL PRICE 0, is NOT part of it. If such a row still has a description or a code,
+   return it with cantidad 0 and ALL prices 0, so the user can see it was left out. NEVER use
+   its UNIT PRICE as the price.
+4. Skip rows with no description AND no code: they are empty template rows.
+5. The sum of (precioCliente × cantidad) over a block MUST equal that block's "TOTAL US ($)".
+   If your extraction does not add up, re-read the columns before answering.
+6. A block whose total is 0 must come back with every item at 0. Never fill it in.
+
+SERVICIOS sheets (SERV. ING., SERV. CON, SERV. PRO): a matrix of activities × resources.
+- The header names the resources, split into TRABAJOS OFICINA and TRABAJO CAMPO.
+- The "COSTO POR HH" row gives each resource's hourly rate. Use it verbatim.
+- Each numbered row is an activity; the numbers under the resource columns are HOURS.
+- Rows in caps with no number (e.g. "PUESTA EN MARCHA") are section titles, not activities.
+- Only activities with at least one hour > 0 count. An activity whose TOTAL shows "$-" has no
+  hours: leave it out.
+- The "TOTALES" row is the ground truth: hours per resource and the total amount.
+
+GASTOS sheets (MOVIL., OPERAT., COVID): same rules as equipos — the total column decides.
+
 - Preserve resource names exactly as they appear
 - CRITICAL: Respond ONLY with the raw JSON object. No text before or after. No markdown. No code fences. Just the JSON.`
 
@@ -359,7 +410,11 @@ Responde ÚNICAMENTE con el JSON. No agregues texto antes ni después. No uses m
 }
 
 function buildEquipoPrompt(sheet: SheetTextData, resumenCtx: string): string {
-  return `Extrae los EQUIPOS/MATERIALES de esta hoja. Extrae TODOS los items sin omitir ninguno.
+  return `Extrae los EQUIPOS/MATERIALES de esta hoja, un "grupo" por cada bloque.
+
+Recuerda: la columna TOTAL PRICE manda. Los ítems con QTY 0 o TOTAL PRICE 0 van con
+cantidad 0 y precios 0. No tomes números de columnas sin cabecera: son restos de la
+plantilla. La suma de cada bloque debe dar su "TOTAL US ($)".
 ${resumenCtx}
 --- HOJA: "${sheet.name}" (${sheet.rowCount} filas) ---
 ${sheet.csv}
@@ -369,7 +424,10 @@ Responde ÚNICAMENTE con el JSON. No agregues texto antes ni después. No uses m
 }
 
 function buildServicioPrompt(sheet: SheetTextData, resumenCtx: string): string {
-  return `Extrae los SERVICIOS de esta hoja. Identifica actividades con su matriz de horas×recurso.
+  return `Extrae los SERVICIOS de esta hoja: actividades con su matriz de horas×recurso.
+
+Solo cuentan las actividades que tienen al menos una hora > 0. Las tarifas salen de la fila
+"COSTO POR HH". La suma de tus actividades debe dar el monto de la fila "TOTALES".
 ${resumenCtx}
 --- HOJA: "${sheet.name}" (${sheet.rowCount} filas) ---
 ${sheet.csv}
