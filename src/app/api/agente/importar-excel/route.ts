@@ -8,6 +8,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { readExcelSheets, extractWithClaude } from '@/lib/agente/excelExtractor'
 import type { ExcelExtraido } from '@/lib/agente/excelExtractor'
+import { leerTotalesDeclarados } from '@/lib/agente/totalesExcel'
+import type { TotalesHoja } from '@/lib/agente/totalesExcel'
 import { extractPdfProposal } from '@/lib/agente/pdfProposalExtractor'
 import type { PropuestaExtraida } from '@/lib/agente/pdfProposalExtractor'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
@@ -222,8 +224,12 @@ export async function POST(request: NextRequest) {
         // 1. Read Excel sheets (si lo hay)
         let sheets: ReturnType<typeof readExcelSheets> = []
         let excelData: ExcelExtraido | null = null
+        // Los totales que el propio archivo declara, sin IA: sirven de contraste
+        // contra lo que el modelo extrae.
+        let totalesExcel: TotalesHoja[] = []
 
         if (excelBuffer) {
+          totalesExcel = leerTotalesDeclarados(excelBuffer)
           writeSSE(controller, encoder, 'progress', { message: 'Leyendo hojas del Excel...' })
           sheets = readExcelSheets(excelBuffer)
 
@@ -337,6 +343,7 @@ export async function POST(request: NextRequest) {
         // 7. Send final result
         writeSSE(controller, encoder, 'result', {
           excel: excelData,
+          totalesExcel,
           pdfs,
           hojas: sheets.map((s) => ({ name: s.name, rowCount: s.rowCount })),
           mapeo: {

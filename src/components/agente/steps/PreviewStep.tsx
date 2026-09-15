@@ -52,6 +52,7 @@ interface Props {
   onAsignarPartida: (indice: number, seccion: Seccion) => void
   ajustes: Partial<Record<Seccion, number>>
   onCuadrar: (seccion: Seccion) => void
+  declaradoDeGrupo: (hoja: string, grupo: string) => number | null
 }
 
 type TabKey = 'equipos' | 'servicios' | 'gastos' | 'pdf'
@@ -62,6 +63,7 @@ function CabeceraGrupo({
   nombre,
   hoja,
   monto,
+  declarado,
   moneda,
   excluido,
   onToggle,
@@ -70,12 +72,14 @@ function CabeceraGrupo({
   nombre: string
   hoja: string
   monto: number
+  declarado: number | null
   moneda: string
   excluido: boolean
   onToggle: (clave: string) => void
 }) {
+  const discrepa = declarado !== null && Math.abs(monto - declarado) >= 0.5
   return (
-    <div className="mb-1 flex items-center gap-2">
+    <div className="mb-1 flex flex-wrap items-center gap-2">
       <input
         type="checkbox"
         checked={!excluido}
@@ -92,9 +96,22 @@ function CabeceraGrupo({
         {nombre}
         <span className="ml-1 font-normal text-gray-400">({hoja})</span>
       </h4>
-      <span className={cn('text-xs font-semibold', excluido ? 'text-gray-400' : 'text-green-700')}>
+      <span
+        className={cn(
+          'text-xs font-semibold',
+          excluido ? 'text-gray-400' : discrepa ? 'text-red-600' : 'text-green-700'
+        )}
+      >
         {moneda} {monto.toLocaleString('en-US', { minimumFractionDigits: 2 })}
       </span>
+      {discrepa && (
+        <span
+          className="w-full text-right text-[10px] text-red-600"
+          title="Lo que este bloque declara en su fila TOTAL del Excel"
+        >
+          el Excel declara {declarado!.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+        </span>
+      )}
     </div>
   )
 }
@@ -114,6 +131,7 @@ export function PreviewStep({
   onAsignarPartida,
   ajustes,
   onCuadrar,
+  declaradoDeGrupo,
 }: Props) {
   const [tab, setTab] = useState<TabKey>('equipos')
 
@@ -283,6 +301,7 @@ export function PreviewStep({
                   nombre={grupo.grupo}
                   hoja={grupo.hoja}
                   monto={totalGrupoEquipos(grupo, gi, gruposExcluidos)}
+                  declarado={declaradoDeGrupo(grupo.hoja, grupo.grupo)}
                   moneda={moneda}
                   excluido={!!gruposExcluidos[`equipos-${gi}`]}
                   onToggle={onToggleGrupo}
@@ -357,6 +376,7 @@ export function PreviewStep({
                     (s, a, ai) => (gruposExcluidos[`servicios-${gi}-${ai}`] ? s : s + a.costoCliente),
                     0
                   )}
+                  declarado={declaradoDeGrupo(grupo.hoja, grupo.grupo)}
                   moneda={moneda}
                   excluido={!!gruposExcluidos[`servicios-${gi}`]}
                   onToggle={onToggleGrupo}
@@ -405,6 +425,7 @@ export function PreviewStep({
                   nombre={grupo.grupo}
                   hoja={grupo.hoja}
                   monto={totalGrupoGastos(grupo, gi, gruposExcluidos)}
+                  declarado={declaradoDeGrupo(grupo.hoja, grupo.grupo)}
                   moneda={moneda}
                   excluido={!!gruposExcluidos[`gastos-${gi}`]}
                   onToggle={onToggleGrupo}

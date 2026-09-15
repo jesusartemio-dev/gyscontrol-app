@@ -37,6 +37,8 @@ import {
   totalGrupoGastos,
 } from '@/lib/agente/totalesImportacion'
 import type { Seccion, Exclusiones } from '@/lib/agente/totalesImportacion'
+import { normalizarTitulo } from '@/lib/agente/totalesExcel'
+import type { TotalesHoja } from '@/lib/agente/totalesExcel'
 
 // ── Types for API response ────────────────────────────────
 
@@ -47,6 +49,7 @@ interface MappingSuggestion {
 
 interface ExtractResponse {
   excel: ExcelExtraido
+  totalesExcel: TotalesHoja[]
   pdfs: PropuestaExtraida[]
   hojas: Array<{ name: string; rowCount: number }>
   mapeo: {
@@ -118,6 +121,35 @@ async function parseSSEStream(
   if (!result) throw new Error('No se recibió resultado del servidor')
 
   return result
+}
+
+// ── Contraste contra los totales que declara el Excel ─────
+
+/**
+ * Monto que el archivo declara para un grupo, o null si no se puede determinar.
+ * Se busca el bloque por título; si la IA le puso otro nombre, el total de la hoja
+ * solo sirve cuando esa hoja tiene un bloque o ninguno.
+ */
+function totalDeclaradoDeGrupo(
+  totalesExcel: TotalesHoja[],
+  hoja: string,
+  grupo: string
+): number | null {
+  const datosHoja = totalesExcel.find((t) => t.hoja === hoja)
+  if (!datosHoja) return null
+
+  const bloque = datosHoja.bloques.find(
+    (b) => normalizarTitulo(b.titulo) === normalizarTitulo(grupo)
+  )
+  if (bloque) return bloque.totalCliente
+
+  return datosHoja.bloques.length <= 1 ? datosHoja.totalCliente : null
+}
+
+/** Una hoja cuyo total declarado es 0 no aporta nada a esta cotización. */
+function hojaEnCero(totalesExcel: TotalesHoja[], hoja: string): boolean {
+  const datosHoja = totalesExcel.find((t) => t.hoja === hoja)
+  return !!datosHoja && datosHoja.totalCliente === 0
 }
 
 // ── Importación histórica desde PDF ───────────────────────
@@ -439,19 +471,30 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
       })
       setCatalogSelections(autoSelections)
 
-      // Los grupos en cero vienen de hojas de la plantilla que esta propuesta no usa:
-      // no aportan monto y solo ensucian la cotización, así que entran desmarcados.
+      // Se desmarca lo que no forma parte de la propuesta: grupos sin monto, y
+      // sobre todo los que el propio Excel declara en cero — ahí es donde el
+      // modelo se cuelga de números sueltos de la plantilla reusada.
+      const totales = data.totalesExcel || []
       const autoExcluidos: Record<string, boolean> = {}
+
+      const fueraDeAlcance = (hoja: string, grupo: string) =>
+        hojaEnCero(totales, hoja) || totalDeclaradoDeGrupo(totales, hoja, grupo) === 0
+
       data.excel.equipos.forEach((g, i) => {
-        if (totalGrupoEquipos(g) === 0) autoExcluidos[`equipos-${i}`] = true
+        if (totalGrupoEquipos(g) === 0 || fueraDeAlcance(g.hoja, g.grupo)) {
+          autoExcluidos[`equipos-${i}`] = true
+        }
       })
       data.excel.servicios.forEach((g, i) => {
-        if (g.actividades.reduce((s, a) => s + a.costoCliente, 0) === 0) {
+        const suma = g.actividades.reduce((s, a) => s + a.costoCliente, 0)
+        if (suma === 0 || fueraDeAlcance(g.hoja, g.grupo)) {
           autoExcluidos[`servicios-${i}`] = true
         }
       })
       data.excel.gastos.forEach((g, i) => {
-        if (totalGrupoGastos(g) === 0) autoExcluidos[`gastos-${i}`] = true
+        if (totalGrupoGastos(g) === 0 || fueraDeAlcance(g.hoja, g.grupo)) {
+          autoExcluidos[`gastos-${i}`] = true
+        }
       })
       setGruposExcluidos(autoExcluidos)
 
@@ -863,6 +906,9 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
                   }
                   ajustes={ajustes}
                   onCuadrar={cuadrarSeccion}
+                  declaradoDeGrupo={(hoja, grupo) =>
+                    totalDeclaradoDeGrupo(extractData.totalesExcel || [], hoja, grupo)
+                  }
                 />
               )}
               {step === 2 && extractData && (
