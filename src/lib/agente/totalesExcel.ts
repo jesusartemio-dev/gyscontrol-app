@@ -11,9 +11,24 @@
 
 import * as XLSX from 'xlsx'
 
+/** Ítem leído directamente de la tabla, con la forma que espera ExcelEquipoGrupo. */
+export interface ItemBloque {
+  descripcion: string
+  codigo?: string
+  unidad?: string
+  cantidad: number
+  precioLista: number
+  precioInterno: number
+  precioCliente: number
+  factorCosto: number
+  factorVenta: number
+}
+
 export interface BloqueDeclarado {
   titulo: string
   totalCliente: number
+  /** Filas con monto del bloque. Vacío si la cabecera no calzó con el formato conocido. */
+  items: ItemBloque[]
 }
 
 export interface TotalesHoja {
@@ -37,6 +52,82 @@ function aNumero(celda: unknown): number | null {
 
 function numerosDe(fila: unknown[]): number[] {
   return fila.map(aNumero).filter((n): n is number => n !== null)
+}
+
+/**
+ * Índices de columna de la tabla de un bloque, ubicados por el texto de la cabecera.
+ * Devuelve null si la fila no parece la cabecera conocida — la plantilla cambia entre
+ * años y ahí simplemente no se recupera nada, sin romper.
+ */
+interface Columnas {
+  descripcion: number
+  codigo: number
+  unidad: number
+  cantidad: number
+  precioCliente: number
+  totalCliente: number
+  precioInterno: number
+  lista: number
+  factorCosto: number
+  factorVenta: number
+}
+
+function ubicarColumnas(fila: unknown[]): Columnas | null {
+  const encabezados = fila.map((c) => texto(c).toUpperCase())
+  const indiceDe = (patron: RegExp) => encabezados.findIndex((h) => patron.test(h))
+  const todos = (patron: RegExp) =>
+    encabezados.reduce<number[]>((acc, h, i) => (patron.test(h) ? [...acc, i] : acc), [])
+
+  const descripcion = indiceDe(/^DESCRIPCION$|^DESCRIPCIÓN$/)
+  const cantidad = indiceDe(/^QTY$|^CANT/)
+  const unitarios = todos(/^UNIT\s*PRICE$/)
+  const totales = todos(/^TOTAL\s*PRICE$/)
+
+  if (descripcion < 0 || cantidad < 0 || unitarios.length === 0 || totales.length === 0) {
+    return null
+  }
+
+  return {
+    descripcion,
+    codigo: indiceDe(/^CAT$/),
+    unidad: indiceDe(/^UNID$/),
+    cantidad,
+    precioCliente: unitarios[0],
+    totalCliente: totales[0],
+    precioInterno: unitarios[1] ?? -1,
+    lista: indiceDe(/^LIST\s*PRICE$/),
+    factorCosto: indiceDe(/^INTEGRADOR$/),
+    factorVenta: indiceDe(/^CLIENTE$/),
+  }
+}
+
+function leerItem(fila: unknown[], col: Columnas): ItemBloque | null {
+  const totalCliente = aNumero(fila[col.totalCliente]) ?? 0
+  // La columna de total es la que decide: las filas en cero son plantilla vacía o
+  // ítems que quedaron fuera del alcance de esta cotización.
+  if (totalCliente <= 0) return null
+
+  const descripcion = texto(fila[col.descripcion])
+  const codigo = col.codigo >= 0 ? texto(fila[col.codigo]) : ''
+  if (!descripcion && !codigo) return null
+
+  const cantidad = aNumero(fila[col.cantidad]) ?? 1
+  const precioCliente = aNumero(fila[col.precioCliente]) ?? totalCliente
+  const precioInterno =
+    col.precioInterno >= 0 ? aNumero(fila[col.precioInterno]) ?? precioCliente : precioCliente
+  const lista = col.lista >= 0 ? aNumero(fila[col.lista]) : null
+
+  return {
+    descripcion: descripcion || codigo,
+    codigo: codigo || undefined,
+    unidad: col.unidad >= 0 ? texto(fila[col.unidad]) || undefined : undefined,
+    cantidad: cantidad || 1,
+    precioLista: lista ?? precioInterno,
+    precioInterno,
+    precioCliente,
+    factorCosto: (col.factorCosto >= 0 ? aNumero(fila[col.factorCosto]) : null) ?? 1,
+    factorVenta: (col.factorVenta >= 0 ? aNumero(fila[col.factorVenta]) : null) ?? 1,
+  }
 }
 
 /** Fila de título de bloque: texto sin ninguna cifra y que no es la cabecera de la tabla. */
@@ -65,12 +156,29 @@ export function leerTotalesDeclarados(buffer: Buffer): TotalesHoja[] {
     let totalCliente: number | null = null
     const bloques: BloqueDeclarado[] = []
     let tituloActual = ''
+    let columnas: Columnas | null = null
+    let itemsActuales: ItemBloque[] = []
 
     for (const fila of filas) {
       const primera = texto(fila[0])
 
       if (esTitulo(fila)) {
         tituloActual = primera
+        columnas = null
+        itemsActuales = []
+        continue
+      }
+
+      // La cabecera de la tabla abre la zona de datos del bloque
+      if (!columnas) {
+        const ubicadas = ubicarColumnas(fila)
+        if (ubicadas) {
+          columnas = ubicadas
+          continue
+        }
+      } else if (!/^total/i.test(primera)) {
+        const item = leerItem(fila, columnas)
+        if (item) itemsActuales.push(item)
         continue
       }
 
@@ -80,12 +188,14 @@ export function leerTotalesDeclarados(buffer: Buffer): TotalesHoja[] {
         continue
       }
 
-      // Total de un bloque de equipos/gastos
+      // Total de un bloque de equipos/gastos: cierra el bloque en curso
       if (/^total\s+us/i.test(primera)) {
         const valor = numerosDe(fila)[0]
         if (valor !== undefined && tituloActual) {
-          bloques.push({ titulo: tituloActual, totalCliente: valor })
+          bloques.push({ titulo: tituloActual, totalCliente: valor, items: itemsActuales })
         }
+        columnas = null
+        itemsActuales = []
         continue
       }
 

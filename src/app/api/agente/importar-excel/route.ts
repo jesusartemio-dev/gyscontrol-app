@@ -8,7 +8,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { readExcelSheets, extractWithClaude } from '@/lib/agente/excelExtractor'
 import type { ExcelExtraido } from '@/lib/agente/excelExtractor'
-import { leerTotalesDeclarados } from '@/lib/agente/totalesExcel'
+import { leerTotalesDeclarados, normalizarTitulo } from '@/lib/agente/totalesExcel'
 import type { TotalesHoja } from '@/lib/agente/totalesExcel'
 import { extractPdfProposal } from '@/lib/agente/pdfProposalExtractor'
 import type { PropuestaExtraida } from '@/lib/agente/pdfProposalExtractor'
@@ -105,6 +105,64 @@ function construirDesdePdf(pdfs: PropuestaExtraida[]): ExcelExtraido {
     edtsUnicos: [],
     hojas: [],
   }
+}
+
+/**
+ * El archivo manda sobre la IA. Para cada bloque que el Excel declara con monto,
+ * si el modelo no lo extrajo o le puso otra cifra, se reemplaza por las filas
+ * leídas directamente de la tabla.
+ *
+ * Es solo un respaldo: si la cabecera del bloque no calza con el formato conocido
+ * no se recupera nada y queda lo que haya devuelto la IA. La plantilla cambia
+ * entre años y un parser que pretenda ser la vía principal se rompería.
+ */
+function reconciliarConElArchivo(
+  excelData: ExcelExtraido,
+  totalesExcel: TotalesHoja[]
+): { excel: ExcelExtraido; recuperados: string[] } {
+  const equipos = [...excelData.equipos]
+  const recuperados: string[] = []
+
+  for (const hoja of totalesExcel) {
+    for (const bloque of hoja.bloques) {
+      if (bloque.totalCliente <= 0 || bloque.items.length === 0) continue
+
+      const indice = equipos.findIndex(
+        (g) => g.hoja === hoja.hoja && normalizarTitulo(g.grupo) === normalizarTitulo(bloque.titulo)
+      )
+
+      const extraido =
+        indice >= 0
+          ? equipos[indice].items.reduce((s, i) => s + i.precioCliente * i.cantidad, 0)
+          : null
+
+      if (extraido !== null && Math.abs(extraido - bloque.totalCliente) < 0.5) continue
+
+      const grupo = {
+        grupo: bloque.titulo,
+        hoja: hoja.hoja,
+        items: bloque.items.map((i) => ({
+          descripcion: i.descripcion,
+          codigo: i.codigo,
+          categoria: 'General',
+          unidad: i.unidad || 'Und',
+          marca: '',
+          cantidad: i.cantidad,
+          precioLista: i.precioLista,
+          precioInterno: i.precioInterno,
+          precioCliente: i.precioCliente,
+          factorCosto: i.factorCosto,
+          factorVenta: i.factorVenta,
+        })),
+      }
+
+      if (indice >= 0) equipos[indice] = grupo
+      else equipos.push(grupo)
+      recuperados.push(`${bloque.titulo} (${bloque.totalCliente.toFixed(2)})`)
+    }
+  }
+
+  return { excel: { ...excelData, equipos }, recuperados }
 }
 
 // ── SSE helpers ──────────────────────────────────────────
@@ -244,6 +302,14 @@ export async function POST(request: NextRequest) {
             writeSSE(controller, encoder, 'progress', { message })
           }, importUserId)
           excelData.hojas = sheets.map((s) => s.name)
+
+          const reconciliado = reconciliarConElArchivo(excelData, totalesExcel)
+          excelData = reconciliado.excel
+          if (reconciliado.recuperados.length > 0) {
+            writeSSE(controller, encoder, 'progress', {
+              message: `Corregidos desde el archivo: ${reconciliado.recuperados.join(', ')}`,
+            })
+          }
         }
 
         // 3. Process PDFs if provided
