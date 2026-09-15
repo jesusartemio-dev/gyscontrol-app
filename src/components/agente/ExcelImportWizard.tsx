@@ -587,17 +587,18 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
     }
   }, [excelFile, pdfFiles])
 
-  const handleConfirm = useCallback(async () => {
-    if (!extractData) return
+  /**
+   * Lo que se va a crear, ya con exclusiones aplicadas y líneas de ajuste incluidas.
+   * Lo comparten el resumen de Confirmar y el envío: cuando eran dos cálculos
+   * distintos, la pantalla mostraba "0 equipos" mientras el ajuste sí se importaba.
+   */
+  const payloadFinal = useMemo(() => {
+    if (!extractData) return null
 
-    setLoading(true)
-    setErrorMessage(null)
-    setLoadingMessage('Creando cotización...')
+    // Con Excel mandan los grupos extraídos; sin él, los arma la clasificación de partidas.
+    const desdePdf = gruposDesdePdf
 
-    try {
-      // Con Excel mandan los grupos extraídos; sin él, los arma la clasificación de partidas.
-      const desdePdf = gruposDesdePdf
-
+    {
       // Se descartan los grupos excluidos. Las claves del catálogo son por posición
       // (`grupo-item`), así que hay que renumerarlas o apuntarían al grupo equivocado.
       const equiposIncluidos: ExcelEquipoGrupo[] = []
@@ -732,24 +733,46 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
           ? { ...recursoMappings, [NOMBRE_RECURSO_SUMA_ALZADA]: RECURSO_SUMA_ALZADA }
           : recursoMappings
 
+      return {
+        equipos: desdePdf ? desdePdf.equipos : equiposIncluidos,
+        servicios: desdePdf ? desdePdf.servicios : serviciosIncluidos,
+        gastos: desdePdf ? desdePdf.gastos : gastosIncluidos,
+        catalogItems,
+        recursosFinales,
+        edtsFinales: desdePdf ? desdePdf.edtMappings : edtsFinales,
+      }
+    }
+  }, [
+    extractData, gruposDesdePdf, gruposExcluidos, catalogSelections,
+    ajustes, codigoManual, edtMappings, edtAjuste, recursoMappings,
+  ])
+
+  const handleConfirm = useCallback(async () => {
+    if (!extractData || !payloadFinal) return
+
+    setLoading(true)
+    setErrorMessage(null)
+    setLoadingMessage('Creando cotización...')
+
+    try {
       const res = await fetch('/api/agente/importar-excel/confirmar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          equipos: desdePdf ? desdePdf.equipos : equiposIncluidos,
-          servicios: desdePdf ? desdePdf.servicios : serviciosIncluidos,
-          gastos: desdePdf ? desdePdf.gastos : gastosIncluidos,
-          recursoMappings: Object.entries(recursosFinales).map(
+          equipos: payloadFinal.equipos,
+          servicios: payloadFinal.servicios,
+          gastos: payloadFinal.gastos,
+          recursoMappings: Object.entries(payloadFinal.recursosFinales).map(
             ([excelName, recursoId]) => ({ excelName, recursoId })
           ),
-          edtMappings: Object.entries(desdePdf ? desdePdf.edtMappings : edtsFinales).map(
+          edtMappings: Object.entries(payloadFinal.edtsFinales).map(
             ([excelEdtName, edtId]) => ({ excelEdtName, edtId })
           ),
           clienteId,
           comercialId: comercialId || undefined,
           nombreCotizacion,
           moneda,
-          catalogItems,
+          catalogItems: payloadFinal.catalogItems,
           notas: notas || undefined,
           codigoManual: codigoManual.trim() || undefined,
           fechaManual: fechaManual || undefined,
@@ -788,10 +811,9 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
       setLoadingMessage('')
     }
   }, [
-    extractData, recursoMappings, edtMappings, clienteId, comercialId,
-    nombreCotizacion, moneda, catalogSelections, notas,
-    codigoManual, fechaManual, destino,
-    gruposDesdePdf, pdfFusionado, gruposExcluidos, ajustes, edtAjuste,
+    extractData, payloadFinal, clienteId, comercialId,
+    nombreCotizacion, moneda, notas,
+    codigoManual, fechaManual, destino, pdfFusionado,
     onOpenChange, router,
   ])
 
@@ -996,27 +1018,12 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
               )}
               {step === 4 && extractData && (
                 <ConfirmStep
-                  data={
-                    gruposDesdePdf
-                      ? {
-                          ...extractData.excel,
-                          equipos: gruposDesdePdf.equipos,
-                          servicios: gruposDesdePdf.servicios,
-                          gastos: gruposDesdePdf.gastos,
-                        }
-                      : {
-                          ...extractData.excel,
-                          equipos: extractData.excel.equipos.filter(
-                            (_, i) => !gruposExcluidos[`equipos-${i}`]
-                          ),
-                          servicios: extractData.excel.servicios.filter(
-                            (_, i) => !gruposExcluidos[`servicios-${i}`]
-                          ),
-                          gastos: extractData.excel.gastos.filter(
-                            (_, i) => !gruposExcluidos[`gastos-${i}`]
-                          ),
-                        }
-                  }
+                  data={{
+                    ...extractData.excel,
+                    equipos: payloadFinal?.equipos || [],
+                    servicios: payloadFinal?.servicios || [],
+                    gastos: payloadFinal?.gastos || [],
+                  }}
                   nombreCotizacion={nombreCotizacion}
                   clienteNombre={clienteNombre}
                   moneda={moneda}
