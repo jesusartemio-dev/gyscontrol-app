@@ -396,23 +396,32 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
     [partidasPdf, extractData, clasificacion]
   )
 
-  const totales = useMemo(() => {
-    if (!extractData) return { equipos: 0, servicios: 0, gastos: 0, total: 0 }
-    const fuente = gruposDesdePdf
-      ? { ...extractData.excel, ...gruposDesdePdf }
-      : extractData.excel
-    const mapeoEdts = gruposDesdePdf ? gruposDesdePdf.edtMappings : edtMappings
-    const mapeoRecursos = gruposDesdePdf?.usaRecursoMarcador
-      ? { ...recursoMappings, [NOMBRE_RECURSO_SUMA_ALZADA]: RECURSO_SUMA_ALZADA }
-      : recursoMappings
-    return calcularTotalesImportacion(
-      fuente,
-      mapeoRecursos,
-      mapeoEdts,
-      gruposDesdePdf ? {} : gruposExcluidos,
-      gruposDesdePdf ? {} : ajustes
-    )
-  }, [extractData, gruposDesdePdf, recursoMappings, edtMappings, gruposExcluidos, ajustes])
+  const calcularTotales = useCallback(
+    (ignorarMapeos: boolean) => {
+      if (!extractData) return { equipos: 0, servicios: 0, gastos: 0, total: 0 }
+      const fuente = gruposDesdePdf
+        ? { ...extractData.excel, ...gruposDesdePdf }
+        : extractData.excel
+      const mapeoEdts = gruposDesdePdf ? gruposDesdePdf.edtMappings : edtMappings
+      const mapeoRecursos = gruposDesdePdf?.usaRecursoMarcador
+        ? { ...recursoMappings, [NOMBRE_RECURSO_SUMA_ALZADA]: RECURSO_SUMA_ALZADA }
+        : recursoMappings
+      return calcularTotalesImportacion(
+        fuente,
+        mapeoRecursos,
+        mapeoEdts,
+        gruposDesdePdf ? {} : gruposExcluidos,
+        gruposDesdePdf ? {} : ajustes,
+        ignorarMapeos
+      )
+    },
+    [extractData, gruposDesdePdf, recursoMappings, edtMappings, gruposExcluidos, ajustes]
+  )
+
+  // Lo que realmente se importará (descarta servicios sin EDT o recurso mapeado).
+  const totales = useMemo(() => calcularTotales(false), [calcularTotales])
+  // Lo extraído, para el Preview: ahí todavía no se ha pasado por el paso de Mapeo.
+  const totalesPreview = useMemo(() => calcularTotales(true), [calcularTotales])
 
   // Objetivo por sección: las líneas del cuadro resumen del PDF son la referencia,
   // el Excel de costeo está desagregado de otra forma y no cuadra hoja por hoja.
@@ -427,7 +436,8 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
   const cuadrarSeccion = (seccion: Seccion) => {
     if (!objetivosPorSeccion) return
     const yaAjustado = ajustes[seccion] || 0
-    const sinAjuste = totales[seccion] - yaAjustado
+    // Se cuadra contra lo que muestra el Preview, que es donde vive el botón.
+    const sinAjuste = totalesPreview[seccion] - yaAjustado
     const diferencia = Math.round((objetivosPorSeccion[seccion] - sinAjuste) * 100) / 100
     setAjustes((prev) => ({ ...prev, [seccion]: diferencia }))
   }
@@ -898,7 +908,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
                   }
                   moneda={moneda}
                   objetivos={objetivosPorSeccion}
-                  totales={totales}
+                  totales={totalesPreview}
                   partidasPdf={gruposDesdePdf ? [] : pdfFusionado?.partidas || []}
                   asignacionPartidas={asignacionPartidas}
                   onAsignarPartida={(i, seccion) =>

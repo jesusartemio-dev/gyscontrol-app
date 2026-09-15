@@ -81,12 +81,16 @@ export function totalGrupoServicios(
   recursoMappings: Record<string, string>,
   edtMappings: Record<string, string>,
   gi?: number,
-  excluidos: Exclusiones = {}
+  excluidos: Exclusiones = {},
+  ignorarMapeos = false
 ): number {
-  if (!edtMappings[grupo.edtSugerido || grupo.grupo]) return 0
+  if (!ignorarMapeos && !edtMappings[grupo.edtSugerido || grupo.grupo]) return 0
 
   return grupo.actividades.reduce((s, act, ai) => {
     if (gi !== undefined && excluidos[`servicios-${gi}-${ai}`]) return s
+    // Antes del paso de Mapeo todavía no hay EDT ni recursos vinculados: ahí se
+    // muestra lo extraído, si no la sección aparecería en cero sin explicación.
+    if (ignorarMapeos) return s + act.costoCliente
     return (
       s +
       act.recursos.reduce(
@@ -105,7 +109,8 @@ export function calcularTotalesImportacion(
   recursoMappings: Record<string, string>,
   edtMappings: Record<string, string>,
   excluidos: Exclusiones = {},
-  ajustes: Partial<Record<Seccion, number>> = {}
+  ajustes: Partial<Record<Seccion, number>> = {},
+  ignorarMapeos = false
 ): TotalesImportacion {
   const equipos =
     excel.equipos.reduce(
@@ -118,7 +123,7 @@ export function calcularTotalesImportacion(
       (s, g, i) =>
         excluidos[`servicios-${i}`]
           ? s
-          : s + totalGrupoServicios(g, recursoMappings, edtMappings, i, excluidos),
+          : s + totalGrupoServicios(g, recursoMappings, edtMappings, i, excluidos, ignorarMapeos),
       0
     ) + (ajustes.servicios || 0)
 
