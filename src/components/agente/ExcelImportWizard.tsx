@@ -46,12 +46,14 @@ interface ExtractResponse {
     recursos: MappingSuggestion[]
     edts: MappingSuggestion[]
     clienteSugerido: { id: string; nombre: string } | null
+    comercialSugerido: { id: string; nombre: string } | null
   }
   catalogos: {
     recursos: Array<{ id: string; nombre: string; costoHora: number }>
     edts: Array<{ id: string; nombre: string }>
     categoriasEquipo: Array<{ id: string; nombre: string }>
     clientes: Array<{ id: string; nombre: string; ruc?: string | null }>
+    comerciales: Array<{ id: string; nombre: string; email?: string | null }>
   }
 }
 
@@ -304,6 +306,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
   // Step 4: Config
   const [nombreCotizacion, setNombreCotizacion] = useState('')
   const [clienteId, setClienteId] = useState('')
+  const [comercialId, setComercialId] = useState('')
   const [moneda, setMoneda] = useState('USD')
   const [notas, setNotas] = useState('')
   const [codigoManual, setCodigoManual] = useState('')
@@ -400,6 +403,9 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
       if (data.mapeo.clienteSugerido) {
         setClienteId(data.mapeo.clienteSugerido.id)
       }
+      if (data.mapeo.comercialSugerido) {
+        setComercialId(data.mapeo.comercialSugerido.id)
+      }
       if (data.excel.resumen.moneda) {
         setMoneda(data.excel.resumen.moneda)
       }
@@ -471,6 +477,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
             ([excelEdtName, edtId]) => ({ excelEdtName, edtId })
           ),
           clienteId,
+          comercialId: comercialId || undefined,
           nombreCotizacion,
           moneda,
           catalogItems,
@@ -512,7 +519,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
       setLoadingMessage('')
     }
   }, [
-    extractData, recursoMappings, edtMappings, clienteId,
+    extractData, recursoMappings, edtMappings, clienteId, comercialId,
     nombreCotizacion, moneda, catalogSelections, notas,
     codigoManual, fechaManual, destino,
     gruposDesdePdf, pdfFusionado,
@@ -672,15 +679,19 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
                 <ConfigStep
                   nombreCotizacion={nombreCotizacion}
                   clienteId={clienteId}
+                  comercialId={comercialId}
                   moneda={moneda}
                   notas={notas}
                   codigoManual={codigoManual}
                   fechaManual={fechaManual}
                   destino={destino}
                   clientes={extractData.catalogos.clientes}
+                  comerciales={extractData.catalogos.comerciales}
                   clienteSugerido={extractData.mapeo.clienteSugerido}
+                  comercialSugerido={extractData.mapeo.comercialSugerido}
                   onNombreChange={setNombreCotizacion}
                   onClienteChange={setClienteId}
+                  onComercialChange={setComercialId}
                   onMonedaChange={setMoneda}
                   onNotasChange={setNotas}
                   onCodigoManualChange={setCodigoManual}

@@ -266,13 +266,18 @@ export async function POST(request: NextRequest) {
         // 4. Query catalogs for mapping suggestions
         writeSSE(controller, encoder, 'progress', { message: 'Generando sugerencias de mapeo...' })
 
-        const [recursos, edts, categoriasEquipo, clientes] = await Promise.all([
+        const [recursos, edts, categoriasEquipo, clientes, comerciales] = await Promise.all([
           prisma.recurso.findMany({ orderBy: { nombre: 'asc' } }),
           prisma.edt.findMany({ orderBy: { nombre: 'asc' } }),
           prisma.categoriaEquipo.findMany({ orderBy: { nombre: 'asc' } }),
           prisma.cliente.findMany({
             select: { id: true, nombre: true, ruc: true, codigo: true },
             orderBy: { nombre: 'asc' },
+          }),
+          prisma.user.findMany({
+            where: { role: { in: ['comercial', 'admin', 'gerente'] } },
+            select: { id: true, name: true, email: true },
+            orderBy: { name: 'asc' },
           }),
         ])
 
@@ -309,6 +314,21 @@ export async function POST(request: NextRequest) {
           const match = clientes.find((c) => c.ruc === clienteRuc)
           if (match) clienteSugerido = { id: match.id, nombre: match.nombre }
         }
+        // 6b. Comercial: el PDF trae el "EMITIDO POR", que es quien realmente vendió.
+        // Sin esto, las cotizaciones históricas quedan a nombre de quien las importa.
+        let comercialSugerido: { id: string; nombre: string } | null = null
+        const emailEmisor = principal?.emitidoPorEmail?.trim().toLowerCase()
+        if (emailEmisor) {
+          const match = comerciales.find((u) => u.email?.toLowerCase() === emailEmisor)
+          if (match) comercialSugerido = { id: match.id, nombre: match.name || match.email || '' }
+        }
+        if (!comercialSugerido && principal?.emitidoPorNombre) {
+          const match = comerciales.find(
+            (u) => u.name && similarity(principal.emitidoPorNombre!, u.name) > 0.6
+          )
+          if (match) comercialSugerido = { id: match.id, nombre: match.name || '' }
+        }
+
         if (!clienteSugerido && clienteNombre) {
           const match = clientes.find((c) => similarity(clienteNombre, c.nombre) > 0.6)
           if (match) clienteSugerido = { id: match.id, nombre: match.nombre }
@@ -323,6 +343,7 @@ export async function POST(request: NextRequest) {
             recursos: recursoSugerencias,
             edts: edtSugerencias,
             clienteSugerido,
+            comercialSugerido,
           },
           catalogos: {
             recursos: recursos.map((r) => ({
@@ -334,6 +355,11 @@ export async function POST(request: NextRequest) {
             edts: edts.map((e) => ({ id: e.id, nombre: e.nombre })),
             categoriasEquipo: categoriasEquipo.map((c) => ({ id: c.id, nombre: c.nombre })),
             clientes: clientes.map((c) => ({ id: c.id, nombre: c.nombre, ruc: c.ruc })),
+            comerciales: comerciales.map((u) => ({
+              id: u.id,
+              nombre: u.name || u.email || '',
+              email: u.email,
+            })),
           },
         })
 

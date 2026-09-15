@@ -7,8 +7,16 @@
 
 import { prisma } from '@/lib/prisma'
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { tieneRol } from '@/lib/auth/roles'
 
 export const dynamic = 'force-dynamic' // ✅ Previene errores de caché en rutas dinámicas
+
+/// Datos de identidad, no económicos. Un admin puede corregirlos aunque la
+/// cotización esté aprobada: al cargar el histórico, el comercial entra siendo
+/// quien importó y hay que reasignarlo a quien realmente vendió.
+const CAMPOS_IDENTIDAD = ['nombre', 'clienteId', 'comercialId']
 
 // ✅ Obtener cotización por ID
 export async function GET(_: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -134,13 +142,28 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
       return NextResponse.json({ error: 'Cotización no encontrada' }, { status: 404 })
     }
 
-    // Bloquear edición si la cotización está aprobada (excepto cambios de estado)
-    const soloEstado = Object.keys(data).length === 1 && 'estado' in data
-    if (existente.estado === 'aprobada' && !soloEstado) {
+    // Bloquear edición si la cotización está aprobada (excepto cambios de estado,
+    // o correcciones de identidad hechas por un admin)
+    const campos = Object.keys(data)
+    const soloEstado = campos.length === 1 && 'estado' in data
+    const soloIdentidad =
+      campos.length > 0 && campos.every((c) => CAMPOS_IDENTIDAD.includes(c))
+
+    if (existente.estado === 'aprobada' && !soloEstado && !soloIdentidad) {
       return NextResponse.json(
         { error: 'No se puede editar una cotización aprobada' },
         { status: 403 }
       )
+    }
+
+    if (existente.estado === 'aprobada' && soloIdentidad) {
+      const session = await getServerSession(authOptions)
+      if (!tieneRol(session, ['admin'])) {
+        return NextResponse.json(
+          { error: 'Solo un administrador puede corregir datos de una cotización aprobada' },
+          { status: 403 }
+        )
+      }
     }
 
     // Validar unicidad de código si se está cambiando

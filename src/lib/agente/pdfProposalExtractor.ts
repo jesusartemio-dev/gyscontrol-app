@@ -34,6 +34,9 @@ export interface PropuestaExtraida {
   archivo?: string
   clienteNombre?: string
   clienteRuc?: string
+  /** Quién firmó la propuesta ("EMITIDO POR"): es el comercial que la vendió. */
+  emitidoPorNombre?: string
+  emitidoPorEmail?: string
   nombreProyecto?: string
   codigoOriginal?: string
   /** Fecha de emisión impresa en la propuesta, normalizada a YYYY-MM-DD. */
@@ -70,6 +73,8 @@ INSTRUCCIONES:
 - IGNORA los términos genéricos/boilerplate de la página 6 (condiciones de pago estándar 30/40/30, garantías estándar 12 meses)
 - Si una condición es personalizada para el proyecto, extráela con tipo sugerido: "pago", "entrega", "garantia", "soporte", "capacitacion", "alcance", "otro"
 - Extrae el nombre del cliente y RUC del encabezado
+- Extrae el "EMITIDO POR" de la portada (nombre y correo de quien firma la propuesta por GYS).
+  OJO: es el vendedor de GYS, NO confundir con el "ATENCIÓN A", que es el contacto del cliente
 - Identifica el código de cotización (formato GYS-XXXX-YY) TAL CUAL aparece impreso, sin corregirlo
 - Identifica la fecha de emisión de la propuesta y devuélvela como YYYY-MM-DD (las propuestas
   suelen escribirla en texto, ej. "Lima, 14 de marzo de 2019" → "2019-03-14")
@@ -90,6 +95,8 @@ const USER_PROMPT = `Analiza esta propuesta comercial de GYS Control y devuelve 
 {
   "clienteNombre": "nombre del cliente o null",
   "clienteRuc": "RUC de 11 dígitos o null",
+  "emitidoPorNombre": "nombre de quien emite la propuesta por GYS o null",
+  "emitidoPorEmail": "correo de quien emite la propuesta por GYS o null",
   "nombreProyecto": "nombre/referencia del proyecto o null",
   "codigoOriginal": "código GYS-XXXX-YY o null",
   "fechaEmision": "fecha de la propuesta en formato YYYY-MM-DD o null",
@@ -206,6 +213,8 @@ function parseResponse(text: string): PropuestaExtraida {
     return {
       clienteNombre: raw.clienteNombre || undefined,
       clienteRuc: raw.clienteRuc || undefined,
+      emitidoPorNombre: raw.emitidoPorNombre || undefined,
+      emitidoPorEmail: raw.emitidoPorEmail || undefined,
       nombreProyecto: raw.nombreProyecto || undefined,
       codigoOriginal: raw.codigoOriginal || undefined,
       // Solo se acepta ISO: alimenta un <input type="date">, que rechaza cualquier otro formato.

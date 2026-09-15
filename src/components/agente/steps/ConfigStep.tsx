@@ -16,18 +16,28 @@ export interface CotizacionDestino {
   nombre: string
 }
 
+interface ComercialOption {
+  id: string
+  nombre: string
+  email?: string | null
+}
+
 interface Props {
   nombreCotizacion: string
   clienteId: string
+  comercialId: string
   moneda: string
   notas: string
   codigoManual: string
   fechaManual: string
   destino: CotizacionDestino | null
   clientes: ClienteOption[]
+  comerciales: ComercialOption[]
   clienteSugerido: { id: string; nombre: string } | null
+  comercialSugerido: { id: string; nombre: string } | null
   onNombreChange: (v: string) => void
   onClienteChange: (v: string) => void
+  onComercialChange: (v: string) => void
   onMonedaChange: (v: string) => void
   onNotasChange: (v: string) => void
   onCodigoManualChange: (v: string) => void
@@ -38,15 +48,19 @@ interface Props {
 export function ConfigStep({
   nombreCotizacion,
   clienteId,
+  comercialId,
   moneda,
   notas,
   codigoManual,
   fechaManual,
   destino,
   clientes,
+  comerciales,
   clienteSugerido,
+  comercialSugerido,
   onNombreChange,
   onClienteChange,
+  onComercialChange,
   onMonedaChange,
   onNotasChange,
   onCodigoManualChange,
@@ -228,6 +242,31 @@ export function ConfigStep({
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Comercial */}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">Comercial</label>
+            {comercialSugerido && (
+              <p className="mb-1 text-xs text-blue-600">
+                Detectado en el PDF: {comercialSugerido.nombre}
+              </p>
+            )}
+            <select
+              value={comercialId}
+              onChange={(e) => onComercialChange(e.target.value)}
+              className="w-full rounded-md border px-3 py-2 text-sm focus:border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-300"
+            >
+              <option value="">— Yo (quien importa) —</option>
+              {comerciales.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              Quien vendió la cotización, no quien la está cargando.
+            </p>
           </div>
 
           {/* Moneda */}

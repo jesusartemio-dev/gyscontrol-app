@@ -21,6 +21,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { buildApiUrl } from '@/lib/utils'
+import { useSession } from 'next-auth/react'
+import { tieneRol } from '@/lib/auth/roles'
 import type { Cotizacion } from '@/types'
 
 interface Cliente {
@@ -42,7 +44,12 @@ interface Props {
 }
 
 export default function CotizacionEditModal({ cotizacion, open, onOpenChange, onUpdated }: Props) {
-  const isLocked = cotizacion.estado === 'aprobada'
+  const { data: session } = useSession()
+  const esAdmin = tieneRol(session, ['admin'])
+  const aprobada = cotizacion.estado === 'aprobada'
+  // Este modal solo toca identidad (nombre, cliente, comercial), nunca montos ni
+  // ítems, así que un admin puede corregirla aunque esté aprobada.
+  const isLocked = aprobada && !esAdmin
   const [nombre, setNombre] = useState(cotizacion.nombre)
   const [clienteId, setClienteId] = useState('')
   const [comercialId, setComercialId] = useState('')
@@ -145,6 +152,14 @@ export default function CotizacionEditModal({ cotizacion, open, onOpenChange, on
           <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
             <Lock className="h-3.5 w-3.5 flex-shrink-0" />
             Esta cotización está aprobada y no puede ser editada.
+          </div>
+        )}
+
+        {aprobada && esAdmin && (
+          <div className="flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-700">
+            <Lock className="h-3.5 w-3.5 flex-shrink-0" />
+            Cotización aprobada. Como admin puedes corregir nombre, cliente y comercial;
+            los montos e ítems siguen bloqueados.
           </div>
         )}
 
