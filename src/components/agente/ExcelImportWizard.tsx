@@ -30,6 +30,11 @@ import type {
 } from '@/lib/agente/excelExtractor'
 import type { PropuestaExtraida, PdfPartida } from '@/lib/agente/pdfProposalExtractor'
 import { RECURSO_SUMA_ALZADA, NOMBRE_RECURSO_SUMA_ALZADA } from '@/lib/agente/sumaAlzada'
+import {
+  calcularTotalesImportacion,
+  totalGrupoEquipos,
+  totalGrupoGastos,
+} from '@/lib/agente/totalesImportacion'
 
 // ── Types for API response ────────────────────────────────
 
@@ -297,6 +302,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
   // Step 2: Preview (populated after extraction)
   const [extractData, setExtractData] = useState<ExtractResponse | null>(null)
   const [catalogSelections, setCatalogSelections] = useState<CatalogSelections>({})
+  const [gruposExcluidos, setGruposExcluidos] = useState<Record<string, boolean>>({})
 
   // Step 3: Mappings
   const [recursoMappings, setRecursoMappings] = useState<Record<string, string>>({})
@@ -326,6 +332,15 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
     [extractData]
   )
 
+  // El PDF es lo que vio el cliente y manda sobre el monto; el Excel de costeo
+  // está desagregado a más detalle y trae hojas de otros alcances.
+  const totalReferencia = pdfFusionado?.montoTotal ?? extractData?.excel.resumen.totalCliente ?? null
+  const origenReferencia: 'PDF' | 'Excel' | null = pdfFusionado?.montoTotal
+    ? 'PDF'
+    : extractData
+      ? 'Excel'
+      : null
+
   const gruposDesdePdf = useMemo(
     () =>
       partidasPdf.length && extractData
@@ -333,6 +348,23 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
         : null,
     [partidasPdf, extractData, clasificacion]
   )
+
+  const totalImportable = useMemo(() => {
+    if (!extractData) return 0
+    const fuente = gruposDesdePdf
+      ? { ...extractData.excel, ...gruposDesdePdf }
+      : extractData.excel
+    const mapeoEdts = gruposDesdePdf ? gruposDesdePdf.edtMappings : edtMappings
+    const mapeoRecursos = gruposDesdePdf?.usaRecursoMarcador
+      ? { ...recursoMappings, [NOMBRE_RECURSO_SUMA_ALZADA]: RECURSO_SUMA_ALZADA }
+      : recursoMappings
+    return calcularTotalesImportacion(
+      fuente,
+      mapeoRecursos,
+      mapeoEdts,
+      gruposDesdePdf ? {} : gruposExcluidos
+    ).total
+  }, [extractData, gruposDesdePdf, recursoMappings, edtMappings, gruposExcluidos])
 
   // ── Handlers ──────────────────────────────────────────
 
@@ -372,6 +404,22 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
         })
       })
       setCatalogSelections(autoSelections)
+
+      // Los grupos en cero vienen de hojas de la plantilla que esta propuesta no usa:
+      // no aportan monto y solo ensucian la cotización, así que entran desmarcados.
+      const autoExcluidos: Record<string, boolean> = {}
+      data.excel.equipos.forEach((g, i) => {
+        if (totalGrupoEquipos(g) === 0) autoExcluidos[`equipos-${i}`] = true
+      })
+      data.excel.servicios.forEach((g, i) => {
+        if (g.actividades.reduce((s, a) => s + a.costoCliente, 0) === 0) {
+          autoExcluidos[`servicios-${i}`] = true
+        }
+      })
+      data.excel.gastos.forEach((g, i) => {
+        if (totalGrupoGastos(g) === 0) autoExcluidos[`gastos-${i}`] = true
+      })
+      setGruposExcluidos(autoExcluidos)
 
       // Auto-populate mappings from suggestions
       const autoRecursos: Record<string, string> = {}
@@ -451,13 +499,30 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
     setLoadingMessage('Creando cotización...')
 
     try {
-      // Build list of catalog item keys (e.g., ["0-0", "0-2", "1-1"])
-      const catalogItems = Object.entries(catalogSelections)
-        .filter(([, v]) => v)
-        .map(([k]) => k)
-
       // Con Excel mandan los grupos extraídos; sin él, los arma la clasificación de partidas.
       const desdePdf = gruposDesdePdf
+
+      // Se descartan los grupos excluidos. Las claves del catálogo son por posición
+      // (`grupo-item`), así que hay que renumerarlas o apuntarían al grupo equivocado.
+      const equiposIncluidos: ExcelEquipoGrupo[] = []
+      const catalogItems: string[] = []
+      if (!desdePdf) {
+        extractData.excel.equipos.forEach((grupo, gi) => {
+          if (gruposExcluidos[`equipos-${gi}`]) return
+          const nuevoIndice = equiposIncluidos.length
+          equiposIncluidos.push(grupo)
+          grupo.items.forEach((_, ii) => {
+            if (catalogSelections[`${gi}-${ii}`]) catalogItems.push(`${nuevoIndice}-${ii}`)
+          })
+        })
+      }
+
+      const serviciosIncluidos = extractData.excel.servicios.filter(
+        (_, i) => !gruposExcluidos[`servicios-${i}`]
+      )
+      const gastosIncluidos = extractData.excel.gastos.filter(
+        (_, i) => !gruposExcluidos[`gastos-${i}`]
+      )
 
       const recursosFinales = desdePdf?.usaRecursoMarcador
         ? { ...recursoMappings, [NOMBRE_RECURSO_SUMA_ALZADA]: RECURSO_SUMA_ALZADA }
@@ -467,9 +532,9 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          equipos: desdePdf ? desdePdf.equipos : extractData.excel.equipos,
-          servicios: desdePdf ? desdePdf.servicios : extractData.excel.servicios,
-          gastos: desdePdf ? desdePdf.gastos : extractData.excel.gastos,
+          equipos: desdePdf ? desdePdf.equipos : equiposIncluidos,
+          servicios: desdePdf ? desdePdf.servicios : serviciosIncluidos,
+          gastos: desdePdf ? desdePdf.gastos : gastosIncluidos,
           recursoMappings: Object.entries(recursosFinales).map(
             ([excelName, recursoId]) => ({ excelName, recursoId })
           ),
@@ -522,7 +587,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
     extractData, recursoMappings, edtMappings, clienteId, comercialId,
     nombreCotizacion, moneda, catalogSelections, notas,
     codigoManual, fechaManual, destino,
-    gruposDesdePdf, pdfFusionado,
+    gruposDesdePdf, pdfFusionado, gruposExcluidos,
     onOpenChange, router,
   ])
 
@@ -651,6 +716,11 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
                   pdfData={pdfFusionado}
                   catalogSelections={catalogSelections}
                   onCatalogSelectionsChange={setCatalogSelections}
+                  gruposExcluidos={gruposExcluidos}
+                  onToggleGrupo={(clave) =>
+                    setGruposExcluidos((prev) => ({ ...prev, [clave]: !prev[clave] }))
+                  }
+                  moneda={moneda}
                 />
               )}
               {step === 2 && extractData && (
@@ -709,7 +779,18 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
                           servicios: gruposDesdePdf.servicios,
                           gastos: gruposDesdePdf.gastos,
                         }
-                      : extractData.excel
+                      : {
+                          ...extractData.excel,
+                          equipos: extractData.excel.equipos.filter(
+                            (_, i) => !gruposExcluidos[`equipos-${i}`]
+                          ),
+                          servicios: extractData.excel.servicios.filter(
+                            (_, i) => !gruposExcluidos[`servicios-${i}`]
+                          ),
+                          gastos: extractData.excel.gastos.filter(
+                            (_, i) => !gruposExcluidos[`gastos-${i}`]
+                          ),
+                        }
                   }
                   nombreCotizacion={nombreCotizacion}
                   clienteNombre={clienteNombre}
@@ -725,6 +806,9 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
                   codigoManual={codigoManual}
                   fechaManual={fechaManual}
                   destinoCodigo={destino?.codigo || null}
+                  totalImportable={totalImportable}
+                  totalReferencia={totalReferencia}
+                  origenReferencia={origenReferencia}
                 />
               )}
             </>

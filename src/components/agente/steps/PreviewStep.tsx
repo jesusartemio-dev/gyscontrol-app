@@ -5,6 +5,7 @@ import { Package, Wrench, Receipt, BookMarked } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ExcelExtraido } from '@/lib/agente/excelExtractor'
 import type { PropuestaExtraida } from '@/lib/agente/pdfProposalExtractor'
+import { totalGrupoEquipos, totalGrupoGastos } from '@/lib/agente/totalesImportacion'
 
 // Key format: "grupoIdx-itemIdx"
 export type CatalogSelections = Record<string, boolean>
@@ -36,11 +37,65 @@ interface Props {
   pdfData: PropuestaExtraida | null
   catalogSelections: CatalogSelections
   onCatalogSelectionsChange: (selections: CatalogSelections) => void
+  gruposExcluidos: Record<string, boolean>
+  onToggleGrupo: (clave: string) => void
+  moneda?: string
 }
 
 type TabKey = 'equipos' | 'servicios' | 'gastos' | 'pdf'
 
-export function PreviewStep({ data, pdfData, catalogSelections, onCatalogSelectionsChange }: Props) {
+/** Encabezado de grupo con el interruptor para dejarlo fuera de la importación. */
+function CabeceraGrupo({
+  clave,
+  nombre,
+  hoja,
+  monto,
+  moneda,
+  excluido,
+  onToggle,
+}: {
+  clave: string
+  nombre: string
+  hoja: string
+  monto: number
+  moneda: string
+  excluido: boolean
+  onToggle: (clave: string) => void
+}) {
+  return (
+    <div className="mb-1 flex items-center gap-2">
+      <input
+        type="checkbox"
+        checked={!excluido}
+        onChange={() => onToggle(clave)}
+        className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600"
+        title={excluido ? 'No se importará' : 'Se importará'}
+      />
+      <h4
+        className={cn(
+          'flex-1 text-xs font-semibold',
+          excluido ? 'text-gray-400 line-through' : 'text-gray-700'
+        )}
+      >
+        {nombre}
+        <span className="ml-1 font-normal text-gray-400">({hoja})</span>
+      </h4>
+      <span className={cn('text-xs font-semibold', excluido ? 'text-gray-400' : 'text-green-700')}>
+        {moneda} {monto.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+      </span>
+    </div>
+  )
+}
+
+export function PreviewStep({
+  data,
+  pdfData,
+  catalogSelections,
+  onCatalogSelectionsChange,
+  gruposExcluidos,
+  onToggleGrupo,
+  moneda = 'USD',
+}: Props) {
   const [tab, setTab] = useState<TabKey>('equipos')
 
   const equipoCount = data.equipos.reduce((s, g) => s + g.items.length, 0)
@@ -146,11 +201,16 @@ export function PreviewStep({ data, pdfData, catalogSelections, onCatalogSelecti
             </div>
 
             {data.equipos.map((grupo, gi) => (
-              <div key={gi}>
-                <h4 className="mb-1 text-xs font-semibold text-gray-700">
-                  {grupo.grupo}
-                  <span className="ml-1 font-normal text-gray-400">({grupo.hoja})</span>
-                </h4>
+              <div key={gi} className={cn(gruposExcluidos[`equipos-${gi}`] && 'opacity-50')}>
+                <CabeceraGrupo
+                  clave={`equipos-${gi}`}
+                  nombre={grupo.grupo}
+                  hoja={grupo.hoja}
+                  monto={totalGrupoEquipos(grupo)}
+                  moneda={moneda}
+                  excluido={!!gruposExcluidos[`equipos-${gi}`]}
+                  onToggle={onToggleGrupo}
+                />
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b text-left text-gray-500">
@@ -200,11 +260,16 @@ export function PreviewStep({ data, pdfData, catalogSelections, onCatalogSelecti
         {tab === 'servicios' && (
           <div className="space-y-3">
             {data.servicios.map((grupo, gi) => (
-              <div key={gi}>
-                <h4 className="mb-1 text-xs font-semibold text-gray-700">
-                  {grupo.grupo}
-                  <span className="ml-1 font-normal text-gray-400">({grupo.hoja})</span>
-                </h4>
+              <div key={gi} className={cn(gruposExcluidos[`servicios-${gi}`] && 'opacity-50')}>
+                <CabeceraGrupo
+                  clave={`servicios-${gi}`}
+                  nombre={grupo.grupo}
+                  hoja={grupo.hoja}
+                  monto={grupo.actividades.reduce((s, a) => s + a.costoCliente, 0)}
+                  moneda={moneda}
+                  excluido={!!gruposExcluidos[`servicios-${gi}`]}
+                  onToggle={onToggleGrupo}
+                />
                 {grupo.actividades.map((act, ai) => (
                   <div key={ai} className="mb-2 rounded bg-gray-50 p-2">
                     <p className="text-xs font-medium">{act.nombre}</p>
@@ -225,11 +290,16 @@ export function PreviewStep({ data, pdfData, catalogSelections, onCatalogSelecti
         {tab === 'gastos' && (
           <div className="space-y-3">
             {data.gastos.map((grupo, gi) => (
-              <div key={gi}>
-                <h4 className="mb-1 text-xs font-semibold text-gray-700">
-                  {grupo.grupo}
-                  <span className="ml-1 font-normal text-gray-400">({grupo.hoja})</span>
-                </h4>
+              <div key={gi} className={cn(gruposExcluidos[`gastos-${gi}`] && 'opacity-50')}>
+                <CabeceraGrupo
+                  clave={`gastos-${gi}`}
+                  nombre={grupo.grupo}
+                  hoja={grupo.hoja}
+                  monto={totalGrupoGastos(grupo)}
+                  moneda={moneda}
+                  excluido={!!gruposExcluidos[`gastos-${gi}`]}
+                  onToggle={onToggleGrupo}
+                />
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b text-left text-gray-500">

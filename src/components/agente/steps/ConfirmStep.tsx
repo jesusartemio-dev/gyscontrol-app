@@ -19,6 +19,9 @@ interface Props {
   codigoManual: string
   fechaManual: string
   destinoCodigo: string | null
+  totalImportable: number
+  totalReferencia: number | null
+  origenReferencia: 'PDF' | 'Excel' | null
 }
 
 export function ConfirmStep({
@@ -37,7 +40,17 @@ export function ConfirmStep({
   codigoManual,
   fechaManual,
   destinoCodigo,
+  totalImportable,
+  totalReferencia,
+  origenReferencia,
 }: Props) {
+  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 })
+
+  // El Excel de costeo trae hojas de otros alcances; si la suma de lo que se va a
+  // importar no cuadra con el documento de referencia, hay grupos de más o de menos.
+  const diferencia = totalReferencia !== null ? totalImportable - totalReferencia : 0
+  const descuadra = totalReferencia !== null && Math.abs(diferencia) >= 0.5
+
   const equipoCount = data.equipos.reduce((s, g) => s + g.items.length, 0)
   const servicioCount = data.servicios.reduce((s, g) => s + g.actividades.length, 0)
   const gastoCount = data.gastos.reduce((s, g) => s + g.items.length, 0)
@@ -137,16 +150,35 @@ export function ConfirmStep({
 
         {/* Totales */}
         <div className="border-t pt-3 grid grid-cols-2 gap-2 text-xs">
-          <div className="text-gray-500">Total Interno:</div>
-          <div className="font-medium">
-            {moneda} {data.resumen.totalInterno.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-          </div>
-          <div className="text-gray-500">Total Cliente:</div>
-          <div className="font-bold text-green-700">
-            {moneda} {data.resumen.totalCliente.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          {totalReferencia !== null && (
+            <>
+              <div className="text-gray-500">Según {origenReferencia}:</div>
+              <div className="font-medium">{moneda} {fmt(totalReferencia)}</div>
+            </>
+          )}
+          <div className="text-gray-500">Suma de lo que se importa:</div>
+          <div className={descuadra ? 'font-bold text-red-700' : 'font-bold text-green-700'}>
+            {moneda} {fmt(totalImportable)}
           </div>
         </div>
       </div>
+
+      {descuadra && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3">
+          <AlertCircle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
+          <div className="text-xs text-red-700">
+            <p className="font-semibold">
+              Descuadre de {moneda} {fmt(Math.abs(diferencia))} contra el {origenReferencia}
+            </p>
+            <p className="mt-0.5">
+              {diferencia > 0
+                ? 'Se van a importar ítems de más. El Excel de costeo suele traer hojas de otros alcances que no forman parte de esta propuesta.'
+                : 'Falta monto por importar. Puede haber grupos excluidos, o servicios cuyo EDT o recurso quedó sin mapear.'}{' '}
+              Vuelve al paso Preview y ajusta qué grupos entran.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Warnings */}
       {warnings.length > 0 && (
