@@ -5,7 +5,12 @@ import { Package, Wrench, Receipt, BookMarked } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ExcelExtraido } from '@/lib/agente/excelExtractor'
 import type { PropuestaExtraida } from '@/lib/agente/pdfProposalExtractor'
-import { totalGrupoEquipos, totalGrupoGastos } from '@/lib/agente/totalesImportacion'
+import {
+  totalGrupoEquipos,
+  totalGrupoGastos,
+  seccionDePartida,
+} from '@/lib/agente/totalesImportacion'
+import type { Seccion, Exclusiones, TotalesImportacion } from '@/lib/agente/totalesImportacion'
 
 // Key format: "grupoIdx-itemIdx"
 export type CatalogSelections = Record<string, boolean>
@@ -37,9 +42,16 @@ interface Props {
   pdfData: PropuestaExtraida | null
   catalogSelections: CatalogSelections
   onCatalogSelectionsChange: (selections: CatalogSelections) => void
-  gruposExcluidos: Record<string, boolean>
+  gruposExcluidos: Exclusiones
   onToggleGrupo: (clave: string) => void
   moneda?: string
+  objetivos: Record<Seccion, number> | null
+  totales: TotalesImportacion
+  partidasPdf: Array<{ descripcion: string; monto: number }>
+  asignacionPartidas: Record<number, Seccion>
+  onAsignarPartida: (indice: number, seccion: Seccion) => void
+  ajustes: Partial<Record<Seccion, number>>
+  onCuadrar: (seccion: Seccion) => void
 }
 
 type TabKey = 'equipos' | 'servicios' | 'gastos' | 'pdf'
@@ -95,8 +107,17 @@ export function PreviewStep({
   gruposExcluidos,
   onToggleGrupo,
   moneda = 'USD',
+  objetivos,
+  totales,
+  partidasPdf,
+  asignacionPartidas,
+  onAsignarPartida,
+  ajustes,
+  onCuadrar,
 }: Props) {
   const [tab, setTab] = useState<TabKey>('equipos')
+
+  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 })
 
   const equipoCount = data.equipos.reduce((s, g) => s + g.items.length, 0)
   const servicioCount = data.servicios.reduce((s, g) => s + g.actividades.length, 0)
@@ -137,20 +158,75 @@ export function PreviewStep({
 
   return (
     <div className="space-y-3">
-      {/* Resumen */}
+      {/* Objetivos del PDF — el cuadro resumen de la propuesta es la referencia */}
+      {partidasPdf.length > 0 && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-2.5">
+          <p className="mb-1.5 text-xs font-semibold text-blue-900">
+            Cuadro resumen del PDF — es el monto que se le cobró al cliente
+          </p>
+          <div className="space-y-1">
+            {partidasPdf.map((p, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs">
+                <span className="flex-1 truncate text-blue-800" title={p.descripcion}>
+                  {p.descripcion}
+                </span>
+                <select
+                  value={asignacionPartidas[i] ?? seccionDePartida(p.descripcion)}
+                  onChange={(e) => onAsignarPartida(i, e.target.value as Seccion)}
+                  className="rounded border border-blue-200 bg-white px-1 py-0.5 text-[11px]"
+                >
+                  <option value="equipos">Equipos</option>
+                  <option value="servicios">Servicios</option>
+                  <option value="gastos">Gastos</option>
+                </select>
+                <span className="w-24 text-right font-semibold text-blue-900">
+                  {moneda} {fmt(p.monto)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Resumen por sección: lo que entra vs el objetivo */}
       <div className="grid grid-cols-3 gap-2 text-center text-xs">
-        <div className="rounded-lg bg-blue-50 p-2">
-          <div className="text-lg font-bold text-blue-700">{equipoCount}</div>
-          <div className="text-blue-600">Equipos</div>
-        </div>
-        <div className="rounded-lg bg-purple-50 p-2">
-          <div className="text-lg font-bold text-purple-700">{servicioCount}</div>
-          <div className="text-purple-600">Servicios</div>
-        </div>
-        <div className="rounded-lg bg-amber-50 p-2">
-          <div className="text-lg font-bold text-amber-700">{gastoCount}</div>
-          <div className="text-amber-600">Gastos</div>
-        </div>
+        {([
+          ['equipos', 'Equipos', equipoCount, 'bg-blue-50', 'text-blue-700', 'text-blue-600'],
+          ['servicios', 'Servicios', servicioCount, 'bg-purple-50', 'text-purple-700', 'text-purple-600'],
+          ['gastos', 'Gastos', gastoCount, 'bg-amber-50', 'text-amber-700', 'text-amber-600'],
+        ] as Array<[Seccion, string, number, string, string, string]>).map(
+          ([clave, label, count, fondo, titulo, subtitulo]) => {
+          const objetivo = objetivos?.[clave] ?? null
+          const actual = totales[clave]
+          const difiere = objetivo !== null && Math.abs(actual - objetivo) >= 0.5
+          return (
+            <div key={clave} className={cn('rounded-lg p-2', fondo)}>
+              <div className={cn('text-lg font-bold', titulo)}>{count}</div>
+              <div className={subtitulo}>{label}</div>
+              <div className={cn('mt-1 font-semibold', difiere ? 'text-red-600' : 'text-green-700')}>
+                {fmt(actual)}
+              </div>
+              {objetivo !== null && (
+                <div className="text-[10px] text-gray-500">objetivo {fmt(objetivo)}</div>
+              )}
+              {difiere && (
+                <button
+                  type="button"
+                  onClick={() => onCuadrar(clave)}
+                  className="mt-1 rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-blue-600 border hover:bg-blue-50"
+                >
+                  {ajustes[clave] ? 'Recuadrar' : 'Cuadrar con PDF'}
+                </button>
+              )}
+              {ajustes[clave] !== undefined && (
+                <div className="mt-0.5 text-[10px] text-gray-500">
+                  ajuste {fmt(ajustes[clave]!)}
+                </div>
+              )}
+            </div>
+          )
+          }
+        )}
       </div>
 
       {/* Tabs */}
@@ -206,7 +282,7 @@ export function PreviewStep({
                   clave={`equipos-${gi}`}
                   nombre={grupo.grupo}
                   hoja={grupo.hoja}
-                  monto={totalGrupoEquipos(grupo)}
+                  monto={totalGrupoEquipos(grupo, gi, gruposExcluidos)}
                   moneda={moneda}
                   excluido={!!gruposExcluidos[`equipos-${gi}`]}
                   onToggle={onToggleGrupo}
@@ -214,7 +290,8 @@ export function PreviewStep({
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b text-left text-gray-500">
-                      <th className="pb-1 pr-1 w-7" title="Agregar al catálogo">
+                      <th className="pb-1 pr-1 w-6" title="Incluir en la cotización">✓</th>
+                      <th className="pb-1 pr-1 w-6" title="Agregar al catálogo">
                         <BookMarked className="h-3 w-3 text-gray-400" />
                       </th>
                       <th className="pb-1 pr-2">Descripción</th>
@@ -226,9 +303,20 @@ export function PreviewStep({
                   <tbody>
                     {grupo.items.map((item, ii) => {
                       const key = `${gi}-${ii}`
+                      const claveItem = `equipos-${gi}-${ii}`
+                      const fuera = !!gruposExcluidos[claveItem]
                       const selected = !!catalogSelections[key]
                       return (
-                        <tr key={ii} className="border-b border-gray-50">
+                        <tr key={ii} className={cn('border-b border-gray-50', fuera && 'opacity-40')}>
+                          <td className="py-1 pr-1">
+                            <input
+                              type="checkbox"
+                              checked={!fuera}
+                              onChange={() => onToggleGrupo(claveItem)}
+                              className="h-3.5 w-3.5 rounded border-gray-300 text-green-600"
+                              title={fuera ? 'No se importará' : 'Se importará'}
+                            />
+                          </td>
                           <td className="py-1 pr-1">
                             <input
                               type="checkbox"
@@ -265,14 +353,35 @@ export function PreviewStep({
                   clave={`servicios-${gi}`}
                   nombre={grupo.grupo}
                   hoja={grupo.hoja}
-                  monto={grupo.actividades.reduce((s, a) => s + a.costoCliente, 0)}
+                  monto={grupo.actividades.reduce(
+                    (s, a, ai) => (gruposExcluidos[`servicios-${gi}-${ai}`] ? s : s + a.costoCliente),
+                    0
+                  )}
                   moneda={moneda}
                   excluido={!!gruposExcluidos[`servicios-${gi}`]}
                   onToggle={onToggleGrupo}
                 />
                 {grupo.actividades.map((act, ai) => (
-                  <div key={ai} className="mb-2 rounded bg-gray-50 p-2">
-                    <p className="text-xs font-medium">{act.nombre}</p>
+                  <div
+                    key={ai}
+                    className={cn(
+                      'mb-2 rounded bg-gray-50 p-2',
+                      gruposExcluidos[`servicios-${gi}-${ai}`] && 'opacity-40'
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={!gruposExcluidos[`servicios-${gi}-${ai}`]}
+                        onChange={() => onToggleGrupo(`servicios-${gi}-${ai}`)}
+                        className="h-3.5 w-3.5 rounded border-gray-300 text-green-600"
+                        title="Incluir en la cotización"
+                      />
+                      <p className="flex-1 text-xs font-medium">{act.nombre}</p>
+                      <span className="text-[10px] font-semibold text-green-700">
+                        {fmt(act.costoCliente)}
+                      </span>
+                    </div>
                     <div className="mt-1 flex flex-wrap gap-2 text-[10px] text-gray-500">
                       {act.recursos.map((r, ri) => (
                         <span key={ri} className="rounded bg-white px-1.5 py-0.5 border">
@@ -295,7 +404,7 @@ export function PreviewStep({
                   clave={`gastos-${gi}`}
                   nombre={grupo.grupo}
                   hoja={grupo.hoja}
-                  monto={totalGrupoGastos(grupo)}
+                  monto={totalGrupoGastos(grupo, gi, gruposExcluidos)}
                   moneda={moneda}
                   excluido={!!gruposExcluidos[`gastos-${gi}`]}
                   onToggle={onToggleGrupo}
@@ -303,6 +412,7 @@ export function PreviewStep({
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b text-left text-gray-500">
+                      <th className="pb-1 pr-1 w-6" title="Incluir en la cotización">✓</th>
                       <th className="pb-1 pr-2">Nombre</th>
                       <th className="pb-1 pr-2 text-right">Cant</th>
                       <th className="pb-1 pr-2 text-right">P.Unit</th>
@@ -310,14 +420,27 @@ export function PreviewStep({
                     </tr>
                   </thead>
                   <tbody>
-                    {grupo.items.map((item, ii) => (
-                      <tr key={ii} className="border-b border-gray-50">
-                        <td className="py-1 pr-2">{item.nombre}</td>
-                        <td className="py-1 pr-2 text-right">{item.cantidad}</td>
-                        <td className="py-1 pr-2 text-right">{item.precioUnitario.toFixed(2)}</td>
-                        <td className="py-1 text-right">{item.costoCliente.toFixed(2)}</td>
-                      </tr>
-                    ))}
+                    {grupo.items.map((item, ii) => {
+                      const claveItem = `gastos-${gi}-${ii}`
+                      const fuera = !!gruposExcluidos[claveItem]
+                      return (
+                        <tr key={ii} className={cn('border-b border-gray-50', fuera && 'opacity-40')}>
+                          <td className="py-1 pr-1">
+                            <input
+                              type="checkbox"
+                              checked={!fuera}
+                              onChange={() => onToggleGrupo(claveItem)}
+                              className="h-3.5 w-3.5 rounded border-gray-300 text-green-600"
+                              title={fuera ? 'No se importará' : 'Se importará'}
+                            />
+                          </td>
+                          <td className="py-1 pr-2">{item.nombre}</td>
+                          <td className="py-1 pr-2 text-right">{item.cantidad}</td>
+                          <td className="py-1 pr-2 text-right">{item.precioUnitario.toFixed(2)}</td>
+                          <td className="py-1 text-right">{item.costoCliente.toFixed(2)}</td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

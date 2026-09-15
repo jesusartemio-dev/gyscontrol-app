@@ -23,12 +23,53 @@ export interface TotalesImportacion {
   total: number
 }
 
-export function totalGrupoEquipos(grupo: ExcelEquipoGrupo): number {
-  return grupo.items.reduce((s, i) => s + i.precioCliente * i.cantidad, 0)
+export type Seccion = 'equipos' | 'servicios' | 'gastos'
+
+/** Exclusiones por clave: "equipos-0" para un grupo, "equipos-0-3" para un ítem. */
+export type Exclusiones = Record<string, boolean>
+
+export function totalGrupoEquipos(grupo: ExcelEquipoGrupo, gi?: number, excluidos: Exclusiones = {}): number {
+  return grupo.items.reduce(
+    (s, i, ii) => (gi !== undefined && excluidos[`equipos-${gi}-${ii}`] ? s : s + i.precioCliente * i.cantidad),
+    0
+  )
 }
 
-export function totalGrupoGastos(grupo: ExcelGastoGrupo): number {
-  return grupo.items.reduce((s, i) => s + i.costoCliente, 0)
+export function totalGrupoGastos(grupo: ExcelGastoGrupo, gi?: number, excluidos: Exclusiones = {}): number {
+  return grupo.items.reduce(
+    (s, i, ii) => (gi !== undefined && excluidos[`gastos-${gi}-${ii}`] ? s : s + i.costoCliente),
+    0
+  )
+}
+
+/**
+ * Objetivo por sección leído del cuadro resumen del PDF. Las líneas comerciales
+ * ("SUMINISTRO DE EQUIPOS…", "SERVICIO…", "GASTOS…") son la referencia real:
+ * el Excel de costeo está desagregado de otra forma y no cuadra por hoja.
+ */
+export function seccionDePartida(descripcion: string): Seccion {
+  const t = descripcion.toLowerCase()
+  if (/gasto|movilizaci|vi[aá]tico|administrativ|indirecto/.test(t)) return 'gastos'
+  if (/servicio|migraci|instalaci|ingenier|programaci|mano de obra|supervisi|soporte/.test(t)) {
+    return 'servicios'
+  }
+  return 'equipos'
+}
+
+export function objetivosDesdePdf(
+  partidas: Array<{ descripcion: string; monto: number }>,
+  asignacion: Record<number, Seccion> = {}
+): Record<Seccion, number> | null {
+  if (partidas.length === 0) return null
+  const objetivos: Record<Seccion, number> = { equipos: 0, servicios: 0, gastos: 0 }
+  partidas.forEach((p, i) => {
+    objetivos[asignacion[i] ?? seccionDePartida(p.descripcion)] += p.monto
+  })
+  return {
+    equipos: redondear(objetivos.equipos),
+    servicios: redondear(objetivos.servicios),
+    gastos: redondear(objetivos.gastos),
+  }
 }
 
 /**
@@ -38,12 +79,15 @@ export function totalGrupoGastos(grupo: ExcelGastoGrupo): number {
 export function totalGrupoServicios(
   grupo: ExcelServicioGrupo,
   recursoMappings: Record<string, string>,
-  edtMappings: Record<string, string>
+  edtMappings: Record<string, string>,
+  gi?: number,
+  excluidos: Exclusiones = {}
 ): number {
   if (!edtMappings[grupo.edtSugerido || grupo.grupo]) return 0
 
-  return grupo.actividades.reduce(
-    (s, act) =>
+  return grupo.actividades.reduce((s, act, ai) => {
+    if (gi !== undefined && excluidos[`servicios-${gi}-${ai}`]) return s
+    return (
       s +
       act.recursos.reduce(
         (sr, rec) =>
@@ -51,32 +95,38 @@ export function totalGrupoServicios(
             ? sr + rec.horas * rec.costoHora * (grupo.factorSeguridad || 1)
             : sr,
         0
-      ),
-    0
-  )
+      )
+    )
+  }, 0)
 }
 
 export function calcularTotalesImportacion(
   excel: ExcelExtraido,
   recursoMappings: Record<string, string>,
   edtMappings: Record<string, string>,
-  gruposExcluidos: Record<string, boolean> = {}
+  excluidos: Exclusiones = {},
+  ajustes: Partial<Record<Seccion, number>> = {}
 ): TotalesImportacion {
-  const equipos = excel.equipos.reduce(
-    (s, g, i) => (gruposExcluidos[`equipos-${i}`] ? s : s + totalGrupoEquipos(g)),
-    0
-  )
-  const servicios = excel.servicios.reduce(
-    (s, g, i) =>
-      gruposExcluidos[`servicios-${i}`]
-        ? s
-        : s + totalGrupoServicios(g, recursoMappings, edtMappings),
-    0
-  )
-  const gastos = excel.gastos.reduce(
-    (s, g, i) => (gruposExcluidos[`gastos-${i}`] ? s : s + totalGrupoGastos(g)),
-    0
-  )
+  const equipos =
+    excel.equipos.reduce(
+      (s, g, i) => (excluidos[`equipos-${i}`] ? s : s + totalGrupoEquipos(g, i, excluidos)),
+      0
+    ) + (ajustes.equipos || 0)
+
+  const servicios =
+    excel.servicios.reduce(
+      (s, g, i) =>
+        excluidos[`servicios-${i}`]
+          ? s
+          : s + totalGrupoServicios(g, recursoMappings, edtMappings, i, excluidos),
+      0
+    ) + (ajustes.servicios || 0)
+
+  const gastos =
+    excel.gastos.reduce(
+      (s, g, i) => (excluidos[`gastos-${i}`] ? s : s + totalGrupoGastos(g, i, excluidos)),
+      0
+    ) + (ajustes.gastos || 0)
 
   return {
     equipos: redondear(equipos),

@@ -32,9 +32,11 @@ import type { PropuestaExtraida, PdfPartida } from '@/lib/agente/pdfProposalExtr
 import { RECURSO_SUMA_ALZADA, NOMBRE_RECURSO_SUMA_ALZADA } from '@/lib/agente/sumaAlzada'
 import {
   calcularTotalesImportacion,
+  objetivosDesdePdf,
   totalGrupoEquipos,
   totalGrupoGastos,
 } from '@/lib/agente/totalesImportacion'
+import type { Seccion, Exclusiones } from '@/lib/agente/totalesImportacion'
 
 // ── Types for API response ────────────────────────────────
 
@@ -302,7 +304,9 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
   // Step 2: Preview (populated after extraction)
   const [extractData, setExtractData] = useState<ExtractResponse | null>(null)
   const [catalogSelections, setCatalogSelections] = useState<CatalogSelections>({})
-  const [gruposExcluidos, setGruposExcluidos] = useState<Record<string, boolean>>({})
+  const [gruposExcluidos, setGruposExcluidos] = useState<Exclusiones>({})
+  const [asignacionPartidas, setAsignacionPartidas] = useState<Record<number, Seccion>>({})
+  const [ajustes, setAjustes] = useState<Partial<Record<Seccion, number>>>({})
 
   // Step 3: Mappings
   const [recursoMappings, setRecursoMappings] = useState<Record<string, string>>({})
@@ -349,8 +353,8 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
     [partidasPdf, extractData, clasificacion]
   )
 
-  const totalImportable = useMemo(() => {
-    if (!extractData) return 0
+  const totales = useMemo(() => {
+    if (!extractData) return { equipos: 0, servicios: 0, gastos: 0, total: 0 }
     const fuente = gruposDesdePdf
       ? { ...extractData.excel, ...gruposDesdePdf }
       : extractData.excel
@@ -362,9 +366,28 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
       fuente,
       mapeoRecursos,
       mapeoEdts,
-      gruposDesdePdf ? {} : gruposExcluidos
-    ).total
-  }, [extractData, gruposDesdePdf, recursoMappings, edtMappings, gruposExcluidos])
+      gruposDesdePdf ? {} : gruposExcluidos,
+      gruposDesdePdf ? {} : ajustes
+    )
+  }, [extractData, gruposDesdePdf, recursoMappings, edtMappings, gruposExcluidos, ajustes])
+
+  // Objetivo por sección: las líneas del cuadro resumen del PDF son la referencia,
+  // el Excel de costeo está desagregado de otra forma y no cuadra hoja por hoja.
+  const objetivosPorSeccion = useMemo(
+    () =>
+      gruposDesdePdf || !pdfFusionado
+        ? null
+        : objetivosDesdePdf(pdfFusionado.partidas, asignacionPartidas),
+    [gruposDesdePdf, pdfFusionado, asignacionPartidas]
+  )
+
+  const cuadrarSeccion = (seccion: Seccion) => {
+    if (!objetivosPorSeccion) return
+    const yaAjustado = ajustes[seccion] || 0
+    const sinAjuste = totales[seccion] - yaAjustado
+    const diferencia = Math.round((objetivosPorSeccion[seccion] - sinAjuste) * 100) / 100
+    setAjustes((prev) => ({ ...prev, [seccion]: diferencia }))
+  }
 
   // ── Handlers ──────────────────────────────────────────
 
@@ -509,24 +532,123 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
       if (!desdePdf) {
         extractData.excel.equipos.forEach((grupo, gi) => {
           if (gruposExcluidos[`equipos-${gi}`]) return
-          const nuevoIndice = equiposIncluidos.length
-          equiposIncluidos.push(grupo)
-          grupo.items.forEach((_, ii) => {
-            if (catalogSelections[`${gi}-${ii}`]) catalogItems.push(`${nuevoIndice}-${ii}`)
+          const items: ExcelEquipoGrupo['items'] = []
+          const alCatalogo: number[] = []
+          grupo.items.forEach((item, ii) => {
+            if (gruposExcluidos[`equipos-${gi}-${ii}`]) return
+            if (catalogSelections[`${gi}-${ii}`]) alCatalogo.push(items.length)
+            items.push(item)
           })
+          if (items.length === 0) return
+          const nuevoGi = equiposIncluidos.length
+          equiposIncluidos.push({ ...grupo, items })
+          alCatalogo.forEach((ii) => catalogItems.push(`${nuevoGi}-${ii}`))
         })
       }
 
-      const serviciosIncluidos = extractData.excel.servicios.filter(
-        (_, i) => !gruposExcluidos[`servicios-${i}`]
-      )
-      const gastosIncluidos = extractData.excel.gastos.filter(
-        (_, i) => !gruposExcluidos[`gastos-${i}`]
-      )
+      const serviciosIncluidos = extractData.excel.servicios
+        .map((grupo, gi) =>
+          gruposExcluidos[`servicios-${gi}`]
+            ? null
+            : {
+                ...grupo,
+                actividades: grupo.actividades.filter(
+                  (_, ai) => !gruposExcluidos[`servicios-${gi}-${ai}`]
+                ),
+              }
+        )
+        .filter((g): g is ExcelServicioGrupo => !!g && g.actividades.length > 0)
 
-      const recursosFinales = desdePdf?.usaRecursoMarcador
-        ? { ...recursoMappings, [NOMBRE_RECURSO_SUMA_ALZADA]: RECURSO_SUMA_ALZADA }
-        : recursoMappings
+      const gastosIncluidos = extractData.excel.gastos
+        .map((grupo, gi) =>
+          gruposExcluidos[`gastos-${gi}`]
+            ? null
+            : {
+                ...grupo,
+                items: grupo.items.filter((_, ii) => !gruposExcluidos[`gastos-${gi}-${ii}`]),
+              }
+        )
+        .filter((g): g is ExcelGastoGrupo => !!g && g.items.length > 0)
+
+      // Línea de cierre contra el PDF. Va como una línea visible y con margen cero,
+      // en vez de escalar precios: el precio unitario del Excel alimenta el catálogo.
+      const etiquetaAjuste = `Ajuste según propuesta${codigoManual.trim() ? ` ${codigoManual.trim()}` : ''}`
+
+      if (!desdePdf && ajustes.equipos) {
+        equiposIncluidos.push({
+          grupo: etiquetaAjuste,
+          hoja: 'PDF',
+          items: [
+            {
+              descripcion: etiquetaAjuste,
+              categoria: 'Ajuste',
+              unidad: 'Glb',
+              marca: '',
+              cantidad: 1,
+              precioLista: ajustes.equipos,
+              precioInterno: ajustes.equipos,
+              precioCliente: ajustes.equipos,
+              factorCosto: 1,
+              factorVenta: 1,
+            },
+          ],
+        })
+      }
+
+      if (!desdePdf && ajustes.gastos) {
+        gastosIncluidos.push({
+          grupo: etiquetaAjuste,
+          hoja: 'PDF',
+          items: [
+            {
+              nombre: etiquetaAjuste,
+              cantidad: 1,
+              precioUnitario: ajustes.gastos,
+              costoInterno: ajustes.gastos,
+              costoCliente: ajustes.gastos,
+            },
+          ],
+        })
+      }
+
+      if (!desdePdf && ajustes.servicios) {
+        // El ajuste necesita un EDT propio: se cuelga del mismo de los servicios ya mapeados.
+        const edtReferencia = serviciosIncluidos.find(
+          (g) => edtMappings[g.edtSugerido || g.grupo]
+        )
+        if (edtReferencia) {
+          serviciosIncluidos.push({
+            grupo: etiquetaAjuste,
+            hoja: 'PDF',
+            edtSugerido: edtReferencia.edtSugerido || edtReferencia.grupo,
+            factorSeguridad: 1,
+            margen: 1,
+            actividades: [
+              {
+                nombre: etiquetaAjuste,
+                descripcion: etiquetaAjuste,
+                recursos: [
+                  {
+                    recursoNombre: NOMBRE_RECURSO_SUMA_ALZADA,
+                    tipo: 'oficina' as const,
+                    costoHora: ajustes.servicios,
+                    horas: 1,
+                  },
+                ],
+                horasTotal: 1,
+                costoInterno: ajustes.servicios,
+                costoCliente: ajustes.servicios,
+              },
+            ],
+          })
+        }
+      }
+
+      // La línea de ajuste de servicios también se apoya en el recurso marcador.
+      const recursosFinales =
+        desdePdf?.usaRecursoMarcador || (!desdePdf && ajustes.servicios)
+          ? { ...recursoMappings, [NOMBRE_RECURSO_SUMA_ALZADA]: RECURSO_SUMA_ALZADA }
+          : recursoMappings
 
       const res = await fetch('/api/agente/importar-excel/confirmar', {
         method: 'POST',
@@ -587,7 +709,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
     extractData, recursoMappings, edtMappings, clienteId, comercialId,
     nombreCotizacion, moneda, catalogSelections, notas,
     codigoManual, fechaManual, destino,
-    gruposDesdePdf, pdfFusionado, gruposExcluidos,
+    gruposDesdePdf, pdfFusionado, gruposExcluidos, ajustes,
     onOpenChange, router,
   ])
 
@@ -721,6 +843,15 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
                     setGruposExcluidos((prev) => ({ ...prev, [clave]: !prev[clave] }))
                   }
                   moneda={moneda}
+                  objetivos={objetivosPorSeccion}
+                  totales={totales}
+                  partidasPdf={gruposDesdePdf ? [] : pdfFusionado?.partidas || []}
+                  asignacionPartidas={asignacionPartidas}
+                  onAsignarPartida={(i, seccion) =>
+                    setAsignacionPartidas((prev) => ({ ...prev, [i]: seccion }))
+                  }
+                  ajustes={ajustes}
+                  onCuadrar={cuadrarSeccion}
                 />
               )}
               {step === 2 && extractData && (
@@ -806,7 +937,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
                   codigoManual={codigoManual}
                   fechaManual={fechaManual}
                   destinoCodigo={destino?.codigo || null}
-                  totalImportable={totalImportable}
+                  totalImportable={totales.total}
                   totalReferencia={totalReferencia}
                   origenReferencia={origenReferencia}
                 />
