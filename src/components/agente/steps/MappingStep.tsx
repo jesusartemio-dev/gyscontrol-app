@@ -32,6 +32,10 @@ interface Props {
   clasificacion?: Record<string, ClasificacionPartida>
   moneda?: string
   onClasificacionChange?: (clave: string, valor: ClasificacionPartida) => void
+  /** Monto del ajuste de servicios que todavía no tiene EDT donde colgarse. */
+  ajusteServiciosSinEdt?: number | null
+  edtAjuste?: string
+  onEdtAjusteChange?: (edtId: string) => void
 }
 
 export function MappingStep({
@@ -47,9 +51,44 @@ export function MappingStep({
   clasificacion = {},
   moneda = 'USD',
   onClasificacionChange,
+  ajusteServiciosSinEdt = null,
+  edtAjuste = '',
+  onEdtAjusteChange,
 }: Props) {
   return (
     <div className="space-y-5">
+      {/* El ajuste de servicios necesita un EDT propio: sin él, el grupo no se
+          puede crear y el monto desaparecería de la cotización. */}
+      {ajusteServiciosSinEdt !== null && (
+        <div
+          className={cn(
+            'rounded-lg border p-3',
+            edtAjuste ? 'border-green-200 bg-green-50' : 'border-amber-300 bg-amber-50'
+          )}
+        >
+          <p className="text-xs font-semibold text-gray-800">
+            EDT para el ajuste de servicios ({moneda}{' '}
+            {ajusteServiciosSinEdt.toLocaleString('en-US', { minimumFractionDigits: 2 })})
+          </p>
+          <p className="mt-0.5 mb-2 text-xs text-gray-600">
+            Ninguna actividad de servicio tiene EDT asignado, y el ajuste necesita uno para
+            poder crearse. Elige a qué EDT corresponde ese monto.
+          </p>
+          <select
+            value={edtAjuste}
+            onChange={(e) => onEdtAjusteChange?.(e.target.value)}
+            className="w-full rounded-md border px-2 py-1.5 text-xs"
+          >
+            <option value="">— Elegir EDT —</option>
+            {catalogoEdts.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Clasificación de partidas — importación histórica desde PDF */}
       {partidas.length > 0 && (
         <div>

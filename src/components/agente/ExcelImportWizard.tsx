@@ -350,6 +350,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
   const [gruposExcluidos, setGruposExcluidos] = useState<Exclusiones>({})
   const [asignacionPartidas, setAsignacionPartidas] = useState<Record<number, Seccion>>({})
   const [ajustes, setAjustes] = useState<Partial<Record<Seccion, number>>>({})
+  const [edtAjuste, setEdtAjuste] = useState('')
 
   // Step 3: Mappings
   const [recursoMappings, setRecursoMappings] = useState<Record<string, string>>({})
@@ -432,6 +433,14 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
         : objetivosDesdePdf(pdfFusionado.partidas, asignacionPartidas),
     [gruposDesdePdf, pdfFusionado, asignacionPartidas]
   )
+
+  // Un grupo de servicios ya mapeado sirve de percha para el ajuste; si no hay,
+  // el EDT lo tiene que elegir el usuario o el monto se perdería al importar.
+  const grupoServicioConEdt = extractData?.excel.servicios.find(
+    (g, i) => !gruposExcluidos[`servicios-${i}`] && edtMappings[g.edtSugerido || g.grupo]
+  )
+  const ajusteServiciosSinEdt =
+    !gruposDesdePdf && ajustes.servicios && !grupoServicioConEdt ? ajustes.servicios : null
 
   const cuadrarSeccion = (seccion: Seccion) => {
     if (!objetivosPorSeccion) return
@@ -637,6 +646,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
       // Línea de cierre contra el PDF. Va como una línea visible y con margen cero,
       // en vez de escalar precios: el precio unitario del Excel alimenta el catálogo.
       const etiquetaAjuste = `Ajuste según propuesta${codigoManual.trim() ? ` ${codigoManual.trim()}` : ''}`
+      const edtsFinales: Record<string, string> = { ...edtMappings }
 
       if (!desdePdf && ajustes.equipos) {
         equiposIncluidos.push({
@@ -676,15 +686,23 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
       }
 
       if (!desdePdf && ajustes.servicios) {
-        // El ajuste necesita un EDT propio: se cuelga del mismo de los servicios ya mapeados.
+        // El ajuste necesita un EDT propio: el de los servicios ya mapeados, o el
+        // que el usuario eligió en el paso de Mapeo cuando no hay ninguno.
         const edtReferencia = serviciosIncluidos.find(
           (g) => edtMappings[g.edtSugerido || g.grupo]
         )
-        if (edtReferencia) {
+        const nombreEdtAjuste = edtReferencia
+          ? edtReferencia.edtSugerido || edtReferencia.grupo
+          : edtAjuste
+            ? etiquetaAjuste
+            : null
+
+        if (nombreEdtAjuste) {
+          if (!edtReferencia) edtsFinales[etiquetaAjuste] = edtAjuste
           serviciosIncluidos.push({
             grupo: etiquetaAjuste,
             hoja: 'PDF',
-            edtSugerido: edtReferencia.edtSugerido || edtReferencia.grupo,
+            edtSugerido: nombreEdtAjuste,
             factorSeguridad: 1,
             margen: 1,
             actividades: [
@@ -724,7 +742,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
           recursoMappings: Object.entries(recursosFinales).map(
             ([excelName, recursoId]) => ({ excelName, recursoId })
           ),
-          edtMappings: Object.entries(desdePdf ? desdePdf.edtMappings : edtMappings).map(
+          edtMappings: Object.entries(desdePdf ? desdePdf.edtMappings : edtsFinales).map(
             ([excelEdtName, edtId]) => ({ excelEdtName, edtId })
           ),
           clienteId,
@@ -773,7 +791,7 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
     extractData, recursoMappings, edtMappings, clienteId, comercialId,
     nombreCotizacion, moneda, catalogSelections, notas,
     codigoManual, fechaManual, destino,
-    gruposDesdePdf, pdfFusionado, gruposExcluidos, ajustes,
+    gruposDesdePdf, pdfFusionado, gruposExcluidos, ajustes, edtAjuste,
     onOpenChange, router,
   ])
 
@@ -785,10 +803,16 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
       case 1: return !!extractData
       case 2:
         // Una partida marcada como servicio sin EDT se descartaría en silencio al importar.
-        return !partidasPdf.some(
-          (p) =>
-            clasificacion[p.clave]?.bucket === 'servicio' && !clasificacion[p.clave]?.edtId
-        )
+        if (
+          partidasPdf.some(
+            (p) =>
+              clasificacion[p.clave]?.bucket === 'servicio' && !clasificacion[p.clave]?.edtId
+          )
+        ) {
+          return false
+        }
+        // Lo mismo con el ajuste de servicios: sin EDT no se crea el grupo y el monto se pierde.
+        return !(ajusteServiciosSinEdt !== null && !edtAjuste)
       case 3: return destino ? true : !!nombreCotizacion && !!clienteId
       case 4: return true
       default: return false
@@ -941,6 +965,9 @@ export function ExcelImportWizard({ open, onOpenChange }: Props) {
                   onClasificacionChange={(clave, valor) =>
                     setClasificacion((prev) => ({ ...prev, [clave]: valor }))
                   }
+                  ajusteServiciosSinEdt={ajusteServiciosSinEdt}
+                  edtAjuste={edtAjuste}
+                  onEdtAjusteChange={setEdtAjuste}
                 />
               )}
               {step === 3 && extractData && (
