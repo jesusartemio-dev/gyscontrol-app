@@ -166,7 +166,18 @@ function fusionarPdfs(pdfs: PropuestaExtraida[]): PropuestaExtraida | null {
     }
   }
 
-  return { ...pdfs[0], condiciones, exclusiones }
+  // Las partidas y el monto sí se acumulan: con varias propuestas cerradas en una
+  // sola OC, la referencia es la suma de todas, no la de la primera.
+  const partidas = pdfs.flatMap((p) => p.partidas)
+  const montos = pdfs.map((p) => p.montoTotal).filter((m): m is number => typeof m === 'number')
+
+  return {
+    ...pdfs[0],
+    partidas,
+    montoTotal: montos.length ? montos.reduce((s, m) => s + m, 0) : undefined,
+    condiciones,
+    exclusiones,
+  }
 }
 
 /**
