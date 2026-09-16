@@ -165,10 +165,74 @@ interface SheetGroups {
   gastos: SheetTextData[]
 }
 
+/** Rótulos de sección que aparecen dentro de la hoja, en su propia fila. */
+const PATRONES_SECCION: Array<[Exclude<SheetGroupType, 'resumen'>, RegExp]> = [
+  ['equipos', /^(materiales|equipos|suministros?|bienes)\b/i],
+  ['servicios', /^(servicios?|mano de obra)\b/i],
+  ['gastos', /^(gastos|movilizaci[oó]n)\b/i],
+]
+
+/**
+ * Secciones rotuladas dentro de la hoja. Las cotizaciones antiguas meten
+ * SERVICIOS, MATERIALES y GASTOS en una sola hoja, y clasificar solo por el
+ * nombre del archivo mandaba toda la hoja a un único extractor: lo que no
+ * coincidía con ese tipo no se le llegaba a pedir al modelo.
+ */
+function seccionesEnContenido(csv: string): SheetGroupType[] {
+  const encontradas = new Set<SheetGroupType>()
+
+  for (const linea of celdasPorFila(csv)) {
+    // Un rótulo ocupa su propia fila: sin cifras y con poco texto. Sin esto, una
+    // actividad como "Movilización y desmovilización de materiales" se confundía
+    // con el encabezado de una sección de gastos.
+    if (linea.some((c) => /^-?[\d,.]+$/.test(c) && /\d/.test(c))) continue
+
+    for (const valor of linea.slice(0, 3)) {
+      if (!valor || valor.length > 30) continue
+      for (const [tipo, patron] of PATRONES_SECCION) {
+        if (patron.test(valor)) encontradas.add(tipo)
+      }
+    }
+  }
+
+  return [...encontradas]
+}
+
+/** Divide el CSV respetando las comillas de los valores con coma. */
+function celdasPorFila(csv: string): string[][] {
+  return csv.split('\n').map((linea) => {
+    const celdas: string[] = []
+    let actual = ''
+    let entreComillas = false
+    for (const ch of linea) {
+      if (ch === '"') entreComillas = !entreComillas
+      else if (ch === ',' && !entreComillas) {
+        celdas.push(actual.trim())
+        actual = ''
+      } else actual += ch
+    }
+    celdas.push(actual.trim())
+    return celdas
+  })
+}
+
 function groupSheets(sheets: SheetTextData[]): SheetGroups {
   const groups: SheetGroups = { resumen: [], equipos: [], servicios: [], gastos: [] }
   for (const sheet of sheets) {
-    groups[classifySheet(sheet.name)].push(sheet)
+    const porNombre = classifySheet(sheet.name)
+    if (porNombre === 'resumen') {
+      groups.resumen.push(sheet)
+      continue
+    }
+
+    // Una hoja con varias secciones rotuladas se manda a cada extractor. El tipo
+    // que sugiere el nombre siempre se mantiene: una detección de más solo agrega
+    // una llamada, una de menos deja una sección sin extraer.
+    const destinos = new Set<SheetGroupType>([porNombre])
+    const porContenido = seccionesEnContenido(sheet.csv)
+    if (porContenido.length > 1) for (const t of porContenido) destinos.add(t)
+
+    for (const destino of destinos) groups[destino].push(sheet)
   }
   return groups
 }
@@ -394,6 +458,12 @@ SERVICIOS sheets (SERV. ING., SERV. CON, SERV. PRO): a matrix of activities × r
 
 GASTOS sheets (MOVIL., OPERAT., COVID): same rules as equipos — the total column decides.
 
+ONE SHEET MAY HOLD SEVERAL SECTIONS: older quotations put SERVICIOS, MATERIALES and
+GASTOS OPERATIVOS in a single sheet, each under its own banner row. Extract ONLY the
+section you are asked for and ignore the others — a materials row is not an expense.
+Their layout is simpler (descripción, cantidad, hh, costo unitario, subtotal, total):
+use the subtotal/total column of each row, and the section's total row to check yourself.
+
 - Preserve resource names exactly as they appear
 - CRITICAL: Respond ONLY with the raw JSON object. No text before or after. No markdown. No code fences. Just the JSON.`
 
@@ -411,6 +481,7 @@ Responde ÚNICAMENTE con el JSON. No agregues texto antes ni después. No uses m
 
 function buildEquipoPrompt(sheet: SheetTextData, resumenCtx: string): string {
   return `Extrae los EQUIPOS/MATERIALES de esta hoja, un "grupo" por cada bloque.
+Si la hoja trae además secciones de SERVICIOS o GASTOS, ignóralas: aquí solo van equipos y materiales.
 
 Recuerda: la columna TOTAL PRICE manda. Los ítems con QTY 0 o TOTAL PRICE 0 van con
 cantidad 0 y precios 0. No tomes números de columnas sin cabecera: son restos de la
@@ -424,7 +495,10 @@ Responde ÚNICAMENTE con el JSON. No agregues texto antes ni después. No uses m
 }
 
 function buildServicioPrompt(sheet: SheetTextData, resumenCtx: string): string {
-  return `Extrae los SERVICIOS de esta hoja: actividades con su matriz de horas×recurso.
+  return `Extrae los SERVICIOS de esta hoja: actividades con su horas×recurso.
+Si la hoja trae además secciones de MATERIALES o GASTOS, ignóralas: aquí solo van servicios.
+En las hojas antiguas cada actividad lista sus recursos (Supervisor, Técnicos…) con cantidad,
+hh y costo unitario: ahí el recurso es el nombre de la fila y las horas son cantidad × hh.
 
 Solo cuentan las actividades que tienen al menos una hora > 0. Las tarifas salen de la fila
 "COSTO POR HH". La suma de tus actividades debe dar el monto de la fila "TOTALES".
@@ -437,7 +511,8 @@ Responde ÚNICAMENTE con el JSON. No agregues texto antes ni después. No uses m
 }
 
 function buildGastoPrompt(sheet: SheetTextData, resumenCtx: string): string {
-  return `Extrae los GASTOS de esta hoja. Extrae TODOS los items.
+  return `Extrae los GASTOS de esta hoja.
+Si la hoja trae además secciones de SERVICIOS o MATERIALES, ignóralas: aquí solo van gastos.
 ${resumenCtx}
 --- HOJA: "${sheet.name}" (${sheet.rowCount} filas) ---
 ${sheet.csv}
