@@ -461,8 +461,16 @@ GASTOS sheets (MOVIL., OPERAT., COVID): same rules as equipos — the total colu
 ONE SHEET MAY HOLD SEVERAL SECTIONS: older quotations put SERVICIOS, MATERIALES and
 GASTOS OPERATIVOS in a single sheet, each under its own banner row. Extract ONLY the
 section you are asked for and ignore the others — a materials row is not an expense.
-Their layout is simpler (descripción, cantidad, hh, costo unitario, subtotal, total):
-use the subtotal/total column of each row, and the section's total row to check yourself.
+
+OLD LAYOUT (columns: Descripción, cantidad, hh, costos unitarios, Subtotal, Total):
+- The per-row amount is "Subtotal" = cantidad × costo unitario. A row belongs to the
+  quotation when cantidad > 0 and Subtotal > 0.
+- "Total" is the total of the WHOLE SECTION, written once in a merged cell: it shows up in
+  one row and is EMPTY in the others. An empty "Total" does NOT mean the row is excluded.
+  Never zero a row because its Total cell is empty, and never use that Total as a row price.
+- There is a single price column ("costos unitarios"): use it for both precioCliente and
+  precioInterno, with factorVenta = 1.
+- Check yourself: the sum of the Subtotals of a section must equal that section's Total.
 
 - Preserve resource names exactly as they appear
 - CRITICAL: Respond ONLY with the raw JSON object. No text before or after. No markdown. No code fences. Just the JSON.`

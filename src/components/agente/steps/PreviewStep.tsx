@@ -102,14 +102,16 @@ function CabeceraGrupo({
           excluido ? 'text-gray-400' : discrepa ? 'text-red-600' : 'text-green-700'
         )}
       >
-        {moneda} {monto.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+        {moneda}{' '}
+        {monto.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </span>
       {discrepa && (
         <span
           className="w-full text-right text-[10px] text-red-600"
           title="Lo que este bloque declara en su fila TOTAL del Excel"
         >
-          el Excel declara {declarado!.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          el Excel declara{' '}
+          {declarado!.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
       )}
     </div>
@@ -135,7 +137,8 @@ export function PreviewStep({
 }: Props) {
   const [tab, setTab] = useState<TabKey>('equipos')
 
-  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 })
+  const fmt = (n: number) =>
+    n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   const equipoCount = data.equipos.reduce((s, g) => s + g.items.length, 0)
   const servicioCount = data.servicios.reduce((s, g) => s + g.actividades.length, 0)
@@ -202,6 +205,12 @@ export function PreviewStep({
                 </span>
               </div>
             ))}
+            <div className="mt-1 flex items-center justify-between border-t border-blue-200 pt-1 text-xs">
+              <span className="font-semibold text-blue-900">Total según PDF</span>
+              <span className="font-bold text-blue-900">
+                {moneda} {fmt(partidasPdf.reduce((s, p) => s + p.monto, 0))}
+              </span>
+            </div>
           </div>
         </div>
       )}
