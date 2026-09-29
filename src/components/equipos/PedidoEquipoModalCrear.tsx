@@ -92,7 +92,7 @@ export default function PedidoEquipoModalCrear({
         // Initialize item selections
         const selections: Record<string, ItemSelection> = {}
         items.forEach((item: ListaEquipoItem) => {
-          const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0) - (item.cantidadEntregada || 0)
+          const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0)
           if (cantidadDisponible > 0) {
             selections[item.id] = {
               itemId: item.id,
@@ -117,7 +117,7 @@ export default function PedidoEquipoModalCrear({
   // Calculate available items
   const itemsDisponibles = useMemo(() => {
     return listaItems.filter((item) => {
-      const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0) - (item.cantidadEntregada || 0)
+      const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0)
       return cantidadDisponible > 0
     })
   }, [listaItems])

@@ -109,7 +109,7 @@ export default function PedidoDesdeListaModal({
     }
 
     lista.listaEquipoItem.forEach((item) => {
-      const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0) - (item.cantidadEntregada || 0)
+      const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0)
       if (cantidadDisponible > 0) {
         const previousSelection = itemSelections[item.id]
         selections[item.id] = {
@@ -129,7 +129,7 @@ export default function PedidoDesdeListaModal({
   const itemsDisponibles = useMemo(() => {
     if (!lista?.listaEquipoItem || !Array.isArray(lista.listaEquipoItem)) return []
     return lista.listaEquipoItem.filter((item) => {
-      const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0) - (item.cantidadEntregada || 0)
+      const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0)
       return cantidadDisponible > 0
     })
   }, [lista.listaEquipoItem])
@@ -222,7 +222,7 @@ export default function PedidoDesdeListaModal({
     setEsUrgente(false)
     const selections: Record<string, ItemSelection> = {}
     lista?.listaEquipoItem?.forEach((item) => {
-      const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0) - (item.cantidadEntregada || 0)
+      const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0)
       if (cantidadDisponible > 0) {
         selections[item.id] = {
           itemId: item.id,

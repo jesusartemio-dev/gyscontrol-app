@@ -118,7 +118,7 @@ export function AgregarDeListaModal({ open, onClose, pedidoId, proyectoId, lista
   const itemsConDisponible = useMemo(() => {
     return items.map(item => ({
       ...item,
-      cantidadDisponible: Math.max(0, item.cantidad - (item.cantidadPedida || 0) - (item.cantidadEntregada || 0)),
+      cantidadDisponible: Math.max(0, item.cantidad - (item.cantidadPedida || 0)),
     }))
   }, [items])
 
