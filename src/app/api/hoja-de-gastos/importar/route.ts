@@ -3,29 +3,9 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { generarNumeroHoja } from '@/lib/utils/generarNumeroHoja'
 
 const ROLES_ALLOWED = ['admin', 'gerente', 'administracion']
-
-async function generarNumero(): Promise<string> {
-  const now = new Date()
-  const yy = String(now.getFullYear()).slice(-2)
-  const mm = String(now.getMonth() + 1).padStart(2, '0')
-  const dd = String(now.getDate()).padStart(2, '0')
-  const prefix = `REQ-${yy}${mm}${dd}`
-
-  const ultimo = await prisma.hojaDeGastos.findFirst({
-    where: { numero: { startsWith: prefix } },
-    orderBy: { numero: 'desc' },
-  })
-
-  let correlativo = 1
-  if (ultimo) {
-    const parts = ultimo.numero.split('-')
-    correlativo = parseInt(parts[parts.length - 1]) + 1
-  }
-
-  return `${prefix}-${String(correlativo).padStart(3, '0')}`
-}
 
 interface ImportLinea {
   descripcion: string
@@ -93,7 +73,7 @@ export async function POST(req: Request) {
           continue
         }
 
-        const numero = await generarNumero()
+        const numero = await generarNumeroHoja()
 
         const lineasData = hoja.lineas.map(linea => ({
           descripcion: linea.descripcion,

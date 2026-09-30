@@ -80,6 +80,12 @@ const formatDate = (date: string | null | undefined) => {
   return new Date(year, month - 1, day).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+// formatDate es para fechas de solo día (gasto, depósito). Para timestamps
+// como createdAt hay que convertir a hora Lima: desde las 19:00 en UTC ya es
+// el día siguiente.
+const formatTimestamp = (date: string | null | undefined) =>
+  date ? new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Lima' }) : '-'
+
 // Igual que en la lista de "Mis Requerimientos": los pagos a terceros dejan
 // la cabecera sin proyecto a propósito (para no duplicar costo en los
 // reportes) — se deriva de las líneas, que sí llevan su propio proyecto.
@@ -428,7 +434,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
       const asignacion = getAsignadoA(hoja, lineas)
 
       const infoRows: string[][] = [
-        ['Estado', estadoLabels[hoja.estado] || hoja.estado, 'Creado', formatDate(hoja.createdAt)],
+        ['Estado', estadoLabels[hoja.estado] || hoja.estado, 'Creado', formatTimestamp(hoja.createdAt)],
         ['Empleado', hoja.empleado?.name || '-', 'Aprobador', hoja.aprobador?.name || '-'],
         ['Asignado a', asignacion, 'Categoría', hoja.categoriaCosto || 'gastos'],
         ['Motivo', hoja.motivo, 'Anticipo', hoja.requiereAnticipo ? 'Sí' : 'No'],
@@ -1254,7 +1260,7 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Creado:</span>
-              <span>{formatDate(hoja.createdAt)}</span>
+              <span>{formatTimestamp(hoja.createdAt)}</span>
             </div>
             {hoja.aprobador && (
               <div className="flex items-center gap-2">

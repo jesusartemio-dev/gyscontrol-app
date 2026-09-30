@@ -22,11 +22,15 @@ interface ClienteHojaDeGastos {
 export async function generarNumeroHoja(
   client: ClienteHojaDeGastos = prisma,
 ): Promise<string> {
-  const now = new Date()
-  const yy = String(now.getFullYear()).slice(-2)
-  const mm = String(now.getMonth() + 1).padStart(2, '0')
-  const dd = String(now.getDate()).padStart(2, '0')
-  const prefix = `REQ-${yy}${mm}${dd}`
+  // Fecha en hora Lima: el servidor corre en UTC y desde las 19:00 de Perú
+  // ya sería el día siguiente.
+  const [yyyy, mm, dd] = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date()).split('-')
+  const prefix = `REQ-${yyyy.slice(-2)}${mm}${dd}`
 
   const ultimo = await client.hojaDeGastos.findFirst({
     where: { numero: { startsWith: prefix } },

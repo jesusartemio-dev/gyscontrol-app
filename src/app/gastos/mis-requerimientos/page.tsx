@@ -41,10 +41,9 @@ const CATEGORIAS = [
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(amount)
 
-const formatDate = (date: string) => {
-  const [year, month, day] = date.split('T')[0].split('-').map(Number)
-  return new Date(year, month - 1, day).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
-}
+// Solo se usa con createdAt (timestamp): se muestra en hora Lima, no en UTC.
+const formatDate = (date: string) =>
+  new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Lima' })
 
 const estadoColor: Record<string, string> = {
   borrador: 'bg-gray-100 text-gray-700',
