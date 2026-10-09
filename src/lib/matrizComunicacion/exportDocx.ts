@@ -186,6 +186,8 @@ function tablaLeyenda(): Table {
     ['M', 'Mensual',  'E', 'E-mail',   'R', 'Autoriza'],
     ['E', 'Eventual', 'R', 'Reunión',  'S', 'Soporte'],
     ['',  '',         'P', 'Planilla', 'V', 'Valida'],
+    ['',  '',         'IE', 'Informe + E-mail', '', ''],
+    ['',  '',         'IR', 'Informe + Reunión', '', ''],
   ]
 
   return new Table({
@@ -204,7 +206,7 @@ function tablaLeyenda(): Table {
             dCell(fc, { w: 8, center: true, bold: true, shade: i % 2 === 1 }),
             dCell(fl, { w: 20, shade: i % 2 === 1 }),
             dCell(mc, { w: 8, center: true, bold: true, shade: i % 2 === 1 }),
-            dCell(ml, { w: 20, shade: i % 2 === 1 }),
+            dCell(ml, { w: 26, shade: i % 2 === 1 }),
             dCell(rc, { w: 8, center: true, bold: true, shade: i % 2 === 1 }),
             dCell(rl, { w: 25, shade: i % 2 === 1 }),
           ],

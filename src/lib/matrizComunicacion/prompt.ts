@@ -51,7 +51,7 @@ uno por cada EDT listado arriba, en el mismo orden.
 El campo "edtNombre" debe ser EXACTAMENTE el nombre del EDT como está escrito arriba.
 
 FRECUENCIA: D=Diario S=Semanal M=Mensual E=Eventual
-MEDIO: I=Informe M=Minuta E=Email R=Reunión P=Planilla IE=Informe+Email
+MEDIO: I=Informe M=Minuta E=Email R=Reunión P=Planilla IE=Informe+Email IR=Informe+Reunión
 RESPONSABILIDAD (combinar letras):
   D=Destinatario E=Emisor S=Soporte V=Valida
   Ejemplos: DV=Destinatario+Valida DS=Destinatario+Soporte SV=Soporte+Valida

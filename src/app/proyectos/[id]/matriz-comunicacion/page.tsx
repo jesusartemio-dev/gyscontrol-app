@@ -583,7 +583,7 @@ export default function MatrizComunicacionPage() {
       {/* Leyenda */}
       <div className="shrink-0 px-4 py-2 border-t bg-slate-50 flex gap-6 text-[10px] text-muted-foreground">
         <span><b>Frec:</b> D=Diario S=Semanal M=Mensual E=Eventual</span>
-        <span><b>Medio:</b> I=Informe M=Minuta E=Email R=Reunión P=Planilla IE=Informe+Email</span>
+        <span><b>Medio:</b> I=Informe M=Minuta E=Email R=Reunión P=Planilla IE=Informe+Email IR=Informe+Reunión</span>
         <span><b>Resp:</b> D=Dest. E=Emisor R=Autoriza S=Soporte V=Valida</span>
       </div>
 
