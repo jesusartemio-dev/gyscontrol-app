@@ -33,7 +33,7 @@ export interface ConfiguracionWizardPaso1 {
 }
 
 export interface TareaPropuesta {
-  /** null solo cuando esPropuestaIA es true — una tarea IA sin respaldo de catálogo (ver validarTareasNuevasPropuestas). */
+  /** null cuando esPropuestaIA o esManual es true — una tarea sin respaldo de catálogo (ver validarTareasNuevasPropuestas). */
   catalogoServicioId: string | null
   nombre: string
   cantidad: number
@@ -64,6 +64,12 @@ export interface TareaPropuesta {
   esPropuestaIA?: boolean
   /** Justificación de 1 línea dada por la IA al proponerla — solo presente si esPropuestaIA es true. */
   justificacion?: string
+  /**
+   * true si el usuario la creó a mano en el Paso 3 (nombre + HH libres, sin
+   * catálogo). Distinta de esPropuestaIA a propósito: no debe contarse como
+   * "sugerencia de IA aceptada" (CronogramaIASugerenciaAceptada).
+   */
+  esManual?: boolean
   /** Nombre de la unidad de medida del servicio (ej. "Metro", "Punto") — CatalogoServicio.unidadServicio.nombre, para mostrar junto al input de cantidad en el Paso 2. */
   unidadNombre?: string
   /** CatalogoServicio.notaCantidad (ej. "metros de cable") — solo para decidir si vale la pena pedirle a la IA una sugerencia de cantidad; nunca se muestra al usuario. */

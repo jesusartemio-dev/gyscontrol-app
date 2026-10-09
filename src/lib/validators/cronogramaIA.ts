@@ -16,8 +16,8 @@ export const configuracionWizardPaso1Schema = z.object({
 })
 
 export const tareaPropuestaSchema = z.object({
-  // null solo cuando esPropuestaIA es true (tarea propuesta por IA en la
-  // Etapa B de CON/PRO, sin respaldo de catálogo) — un schema que la exija
+  // null cuando esPropuestaIA es true (tarea propuesta por IA en la Etapa B
+  // de CON/PRO) o esManual es true (creada a mano en el Paso 3) — un schema que la exija
   // string rechaza el array COMPLETO de actividades apenas una sola tarea
   // así llegue en el payload (bug real: 400 en "Aplicar al Cronograma").
   catalogoServicioId: z.string().min(1).nullable(),
@@ -40,6 +40,12 @@ export const tareaPropuestaSchema = z.object({
   orden: z.number(),
   esPropuestaIA: z.boolean().optional(),
   justificacion: z.string().optional(),
+  esManual: z.boolean().optional(),
+  // Solo de presentación en el Paso 3 (input de cantidad + badge "por
+  // revisar") — sin declararlos se perdían al restaurar un borrador.
+  unidadNombre: z.string().optional(),
+  notaCantidad: z.string().nullable().optional(),
+  cantidadSugeridaPorIA: z.boolean().optional(),
 })
 
 export const actividadPropuestaSchema = z.object({

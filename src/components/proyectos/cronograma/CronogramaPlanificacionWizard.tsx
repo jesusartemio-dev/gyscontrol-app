@@ -23,17 +23,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Sparkles, AlertCircle, FileCheck2, History, Pin, PinOff, FolderInput, RotateCcw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Sparkles, AlertCircle, FileCheck2, History, Pin, PinOff, FolderInput, RotateCcw, Copy, BookOpen, PencilLine, Search, X } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import type { ActividadPropuesta, ConfiguracionWizardPaso1, EsquemaAgrupacionPropuesto } from '@/types/cronogramaIA'
+import type { ActividadPropuesta, ConfiguracionWizardPaso1, EsquemaAgrupacionPropuesto, TareaPropuesta } from '@/types/cronogramaIA'
 import type { EdtSugeridoConOrigen } from '@/lib/cronogramaIA/derivarEdtsSoporte'
 import { detectarEdtsPosibles, type EvidenciaTexto } from '@/lib/cronogramaIA/detectarEdtsPosibles'
 import { EDTS_AGRUPACION_UN_PASO, EDTS_ESQUEMA_DOS_ETAPAS, calcularEdtsPendientesIA, tieneAlMenosUnaTareaIncluida } from '@/lib/cronogramaIA/reglasActividades'
 import { agruparYOrdenarPorEstructura, type InfoOrdenEdt } from '@/lib/cronogramaIA/agruparYOrdenarPorEstructura'
-import { derivarAliasCandidato } from '@/lib/cronogramaIA/aliasActividad'
+import { derivarAliasCandidato, prefijarNombreTarea } from '@/lib/cronogramaIA/aliasActividad'
 import { ROL_RESPONSABLE_LABELS, type RolResponsable } from '@/lib/cronogramaResponsables/reglasResponsable'
 import {
   BORRADOR_LOCAL_PASO1_VERSION,
@@ -198,6 +198,10 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
   const [nombresEditables, setNombresEditables] = useState<Record<string, NombreEditableEsquema[]>>({})
   const [mostrandoEsquemas, setMostrandoEsquemas] = useState(false)
   const [confirmandoEsquemas, setConfirmandoEsquemas] = useState(false)
+  const [catalogoPorEdt, setCatalogoPorEdt] = useState<Record<string, TareaPropuesta[]>>({})
+  const [catalogoDialog, setCatalogoDialog] = useState<{ actividadIndex: number } | null>(null)
+  const [busquedaCatalogo, setBusquedaCatalogo] = useState('')
+  const [cargandoCatalogo, setCargandoCatalogo] = useState(false)
   const [previewResponsables, setPreviewResponsables] = useState<ResponsablePreviewEdt[]>([])
   const [cargandoPreviewResponsables, setCargandoPreviewResponsables] = useState(false)
 
@@ -577,6 +581,12 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
     // (generacionId/actividades/proyectoId) al momento de ejecutarse —
     // no hace falta como dependencia.
   }, [actividades, generacionId, pasoActual, open])
+
+  // El catálogo se arma con la configuración de la generación (cantidades
+  // deterministas, filtroAlcance) — otra generación puede dar otras horas.
+  useEffect(() => {
+    setCatalogoPorEdt({})
+  }, [generacionId])
 
   function solicitarCierre() {
     if (guardadoPendiente || ultimoGuardadoFallo) {
@@ -1113,7 +1123,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
     )
   }
 
-  /** Edita nombre/HH estimadas de una tarea propuesta por IA (esPropuestaIA) antes de aceptarla — nunca aplica a tareas de catálogo. */
+  /** Edita nombre/HH estimadas de una tarea sin catálogo (esPropuestaIA o esManual) — nunca aplica a tareas de catálogo. */
   function actualizarTareaPropuestaIA(actividadIndex: number, tareaIndex: number, cambios: { nombre?: string; horasEstimadas?: number }) {
     setActividades(prev =>
       prev.map((a, i) =>
@@ -1140,6 +1150,125 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
         return a
       })
     })
+  }
+
+  /**
+   * Alias de zona ("TanqueR95") que ya usan las tareas de catálogo de la
+   * Actividad — se detecta del propio nombre ("{alias} - {tarea}") en vez de
+   * recalcularlo, para que una tarea copiada/agregada quede igual que sus
+   * hermanas. Si la Actividad no tiene tareas de catálogo pero otras del
+   * mismo EDT sí usan prefijo, se deriva del nombre con la misma regla que
+   * el servidor. null = esta Actividad no prefija (ej. EDT con 1 sola).
+   */
+  function aliasDeActividad(actividadIndex: number, lista: ActividadPropuesta[] = actividades): string | null {
+    const detectar = (a: ActividadPropuesta): string | null => {
+      const nombres = a.tareas.filter(t => t.catalogoServicioId !== null).map(t => t.nombre)
+      const m = nombres[0]?.match(/^(\S+) - /)
+      return m && nombres.every(n => n.startsWith(`${m[1]} - `)) ? m[1] : null
+    }
+    const actividad = lista[actividadIndex]
+    if (!actividad) return null
+    const propio = detectar(actividad)
+    if (propio) return propio
+    if (actividad.actividadNombre === 'Sin agrupar') return null
+    const hermanasConAlias = lista.some((a, i) => i !== actividadIndex && a.edtNombre === actividad.edtNombre && detectar(a) !== null)
+    return hermanasConAlias ? derivarAliasCandidato(actividad.actividadNombre) : null
+  }
+
+  function nombreSinAlias(nombre: string, alias: string | null): string {
+    return alias && nombre.startsWith(`${alias} - `) ? nombre.slice(alias.length + 3) : nombre
+  }
+
+  /** Inserta respetando el orden real del catálogo (Armado de Andamios antes que Desmontaje); las tareas sin catálogo van al final. */
+  function insertarTarea(tareas: TareaPropuesta[], nueva: TareaPropuesta): TareaPropuesta[] {
+    if (nueva.catalogoServicioId === null) return [...tareas, nueva]
+    const pos = tareas.findIndex(t => t.catalogoServicioId === null || t.orden > nueva.orden)
+    return pos === -1 ? [...tareas, nueva] : [...tareas.slice(0, pos), nueva, ...tareas.slice(pos)]
+  }
+
+  /** Igual que moverTarea pero dejando la original — ej. "Armado de Andamios" de una zona a otra. */
+  function copiarTarea(actividadOrigenIndex: number, tareaIndex: number, actividadDestinoIndex: number) {
+    if (actividadOrigenIndex === actividadDestinoIndex) return
+    setActividades(prev => {
+      const tarea = prev[actividadOrigenIndex]?.tareas[tareaIndex]
+      if (!tarea) return prev
+      const catalogo = tarea.catalogoServicioId
+        ? catalogoPorEdt[prev[actividadOrigenIndex].edtNombre]?.find(c => c.catalogoServicioId === tarea.catalogoServicioId)
+        : undefined
+      // Nombre completo del catálogo si ya está cargado (el prefijado puede venir recortado a 45 caracteres).
+      const base = catalogo?.nombre ?? nombreSinAlias(tarea.nombre, aliasDeActividad(actividadOrigenIndex, prev))
+      const aliasDestino = aliasDeActividad(actividadDestinoIndex, prev)
+      const copia: TareaPropuesta = { ...tarea, nombre: aliasDestino ? prefijarNombreTarea(aliasDestino, base) : base }
+      return prev.map((a, i) => (i === actividadDestinoIndex ? { ...a, tareas: insertarTarea(a.tareas, copia) } : a))
+    })
+    toast({ title: 'Tarea copiada', description: `Se copió a "${actividades[actividadDestinoIndex]?.actividadNombre}".` })
+  }
+
+  async function abrirCatalogo(actividadIndex: number) {
+    const edtNombre = actividades[actividadIndex]?.edtNombre
+    if (!edtNombre || !generacionId) return
+    setCatalogoDialog({ actividadIndex })
+    setBusquedaCatalogo('')
+    if (catalogoPorEdt[edtNombre]) return
+    setCargandoCatalogo(true)
+    try {
+      const res = await fetch(
+        `/api/proyectos/${proyectoId}/cronograma/planificacion/wizard/${generacionId}/catalogo?edt=${encodeURIComponent(edtNombre)}`
+      )
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Error')
+      const { tareas } = (await res.json()) as { tareas: TareaPropuesta[] }
+      setCatalogoPorEdt(prev => ({ ...prev, [edtNombre]: tareas }))
+    } catch (e) {
+      toast({ title: 'No se pudo cargar el catálogo', description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
+      setCatalogoDialog(null)
+    } finally {
+      setCargandoCatalogo(false)
+    }
+  }
+
+  /** Agrega un servicio del catálogo; si la Actividad ya lo tenía destildado, solo lo vuelve a incluir. */
+  function agregarDesdeCatalogo(actividadIndex: number, servicio: TareaPropuesta) {
+    setActividades(prev =>
+      prev.map((a, i) => {
+        if (i !== actividadIndex) return a
+        const existente = a.tareas.findIndex(t => t.catalogoServicioId === servicio.catalogoServicioId)
+        if (existente !== -1) {
+          return { ...a, tareas: a.tareas.map((t, ti) => (ti === existente ? { ...t, incluida: true, motivoExclusion: undefined } : t)) }
+        }
+        const alias = aliasDeActividad(actividadIndex, prev)
+        const nueva: TareaPropuesta = { ...servicio, nombre: alias ? prefijarNombreTarea(alias, servicio.nombre) : servicio.nombre }
+        return { ...a, tareas: insertarTarea(a.tareas, nueva) }
+      })
+    )
+  }
+
+  /** Tarea libre (sin catálogo): nombre y HH a mano. Se distingue de las de IA con esManual. */
+  function agregarTareaManual(actividadIndex: number) {
+    setActividades(prev =>
+      prev.map((a, i) => {
+        if (i !== actividadIndex) return a
+        const nueva: TareaPropuesta = {
+          catalogoServicioId: null,
+          nombre: 'Nueva tarea',
+          cantidad: 1,
+          nivelDificultad: 1,
+          horaBase: 0,
+          horaRepetido: 0,
+          horasEstimadas: 1,
+          incluida: true,
+          orden: a.tareas.reduce((max, t) => Math.max(max, Number.isFinite(t.orden) ? t.orden : 0), 0) + 1,
+          esManual: true,
+        }
+        return { ...a, tareas: [...a.tareas, nueva] }
+      })
+    )
+  }
+
+  /** Las tareas manuales no vienen de ninguna fuente que valga la pena conservar destildada: se quitan de verdad. */
+  function quitarTareaManual(actividadIndex: number, tareaIndex: number) {
+    setActividades(prev =>
+      prev.map((a, i) => (i === actividadIndex ? { ...a, tareas: a.tareas.filter((_, ti) => ti !== tareaIndex) } : a))
+    )
   }
 
   const progreso = (pasoActual / PASOS.length) * 100
@@ -1713,10 +1842,10 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                     // propia sección más abajo — acá solo las de catálogo. El índice
                     // real (ti) se preserva para que toggleTarea/moverTarea sigan
                     // apuntando a la posición correcta en actividad.tareas.
-                    const tareasCatalogo = actividad.tareas.map((tarea, ti) => ({ tarea, ti })).filter(({ tarea }) => !tarea.esPropuestaIA)
+                    const tareasCatalogo = actividad.tareas.map((tarea, ti) => ({ tarea, ti })).filter(({ tarea }) => !tarea.esPropuestaIA && !tarea.esManual)
                     return tareasCatalogo.map(({ tarea, ti }) => (
                       <div
-                        key={tarea.catalogoServicioId}
+                        key={`${tarea.catalogoServicioId}-${ti}`}
                         className="flex items-start gap-2 text-xs p-1.5 rounded"
                       >
                         <Checkbox
@@ -1759,7 +1888,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                                 variant="ghost"
                                 size="sm"
                                 className="h-6 w-6 p-0 shrink-0"
-                                title="Mover a otra Actividad"
+                                title="Mover o copiar a otra Actividad"
                                 onClick={e => e.stopPropagation()}
                               >
                                 <FolderInput className="h-3 w-3" />
@@ -1768,8 +1897,15 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                             <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
                               <DropdownMenuLabel className="text-xs">Mover a...</DropdownMenuLabel>
                               {destinos.map(d => (
-                                <DropdownMenuItem key={d.ai} onSelect={() => moverTarea(index, ti, d.ai)}>
-                                  {d.nombre}
+                                <DropdownMenuItem key={`m-${d.ai}`} onSelect={() => moverTarea(index, ti, d.ai)}>
+                                  <FolderInput className="h-3 w-3 mr-2 shrink-0" />{d.nombre}
+                                </DropdownMenuItem>
+                              ))}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel className="text-xs">Copiar a...</DropdownMenuLabel>
+                              {destinos.map(d => (
+                                <DropdownMenuItem key={`c-${d.ai}`} onSelect={() => copiarTarea(index, ti, d.ai)}>
+                                  <Copy className="h-3 w-3 mr-2 shrink-0" />{d.nombre}
                                 </DropdownMenuItem>
                               ))}
                             </DropdownMenuContent>
@@ -1818,6 +1954,51 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                     ))}
                   </div>
                 )}
+
+                {actividad.tareas.some(t => t.esManual) && (
+                  <div className="mt-2 pt-2 border-t space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">Tareas agregadas a mano — no están en el catálogo</p>
+                    {actividad.tareas.map((tarea, ti) => ({ tarea, ti })).filter(({ tarea }) => tarea.esManual).map(({ tarea, ti }) => (
+                      <div key={`manual-${ti}`} className="flex items-center gap-1.5 text-xs p-1.5 rounded border border-dashed">
+                        <Badge variant="outline" className="text-[10px] shrink-0">Manual</Badge>
+                        <Input
+                          value={tarea.nombre}
+                          onChange={e => actualizarTareaPropuestaIA(index, ti, { nombre: e.target.value })}
+                          className="h-7 text-xs flex-1 min-w-[140px]"
+                          placeholder="Nombre de la tarea"
+                        />
+                        <Input
+                          type="number"
+                          min={0}
+                          step={0.5}
+                          value={tarea.horasEstimadas}
+                          onChange={e => actualizarTareaPropuestaIA(index, ti, { horasEstimadas: Number(e.target.value) || 0 })}
+                          className="h-7 text-xs w-20 shrink-0"
+                          title="Horas estimadas"
+                        />
+                        <span className="text-[10px] text-muted-foreground shrink-0">h</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 shrink-0 text-destructive"
+                          title="Quitar tarea"
+                          onClick={() => quitarTareaManual(index, ti)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => abrirCatalogo(index)} disabled={!generacionId}>
+                    <BookOpen className="h-3.5 w-3.5 mr-1" />Agregar del catálogo
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => agregarTareaManual(index)}>
+                    <PencilLine className="h-3.5 w-3.5 mr-1" />Tarea nueva
+                  </Button>
+                </div>
               </AccordionContent>
             </AccordionItem>
           ))}
@@ -1826,6 +2007,69 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
         {actividades.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-8">No se generó ninguna Actividad con los EDTs y filtros seleccionados.</p>
         )}
+
+        <Dialog open={catalogoDialog !== null} onOpenChange={o => { if (!o) setCatalogoDialog(null) }}>
+          <DialogContent className="max-w-lg">
+            {(() => {
+              const actividadIndex = catalogoDialog?.actividadIndex ?? -1
+              const actividad = actividades[actividadIndex]
+              if (!actividad) return null
+              const servicios = catalogoPorEdt[actividad.edtNombre] ?? []
+              const q = busquedaCatalogo.trim().toLowerCase()
+              const filtrados = q ? servicios.filter(s => s.nombre.toLowerCase().includes(q)) : servicios
+              return (
+                <>
+                  <DialogHeader>
+                    <DialogTitle className="text-base">Agregar del catálogo — {actividad.edtNombre}</DialogTitle>
+                    <DialogDescription className="text-xs">
+                      A la Actividad &quot;{actividad.actividadNombre}&quot;. Las horas se calculan igual que en la propuesta; si
+                      el servicio maneja cantidad, la ajustas después en la fila.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="relative">
+                    <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      autoFocus
+                      value={busquedaCatalogo}
+                      onChange={e => setBusquedaCatalogo(e.target.value)}
+                      placeholder="Buscar servicio (ej. andamios)"
+                      className="h-8 text-sm pl-8"
+                    />
+                  </div>
+                  <div className="max-h-[50vh] overflow-y-auto space-y-1">
+                    {cargandoCatalogo && (
+                      <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                    )}
+                    {!cargandoCatalogo && filtrados.length === 0 && (
+                      <p className="text-xs text-muted-foreground text-center py-6">
+                        {servicios.length === 0 ? 'Este EDT no tiene servicios en el catálogo.' : 'Ningún servicio coincide.'} Si no existe,
+                        usa &quot;Tarea nueva&quot;.
+                      </p>
+                    )}
+                    {!cargandoCatalogo && filtrados.map(s => {
+                      const existente = actividad.tareas.find(t => t.catalogoServicioId === s.catalogoServicioId)
+                      const yaIncluida = existente?.incluida === true
+                      return (
+                        <div key={s.catalogoServicioId} className="flex items-center gap-2 text-xs p-1.5 rounded hover:bg-muted/50">
+                          <span className="flex-1 min-w-0 truncate" title={s.nombre}>{s.nombre}</span>
+                          {s.notaCantidad && <span className="text-[10px] text-muted-foreground shrink-0">{s.unidadNombre}</span>}
+                          <span className="text-muted-foreground shrink-0">{s.horasEstimadas.toFixed(1)}h</span>
+                          {yaIncluida ? (
+                            <Badge variant="secondary" className="text-[10px] shrink-0">Ya está</Badge>
+                          ) : (
+                            <Button size="sm" variant="outline" className="h-6 px-2 text-[11px] shrink-0" onClick={() => agregarDesdeCatalogo(actividadIndex, s)}>
+                              <Plus className="h-3 w-3 mr-0.5" />{existente ? 'Volver a incluir' : 'Agregar'}
+                            </Button>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )
+            })()}
+          </DialogContent>
+        </Dialog>
       </div>
     )
   }
