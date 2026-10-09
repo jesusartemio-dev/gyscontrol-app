@@ -50,7 +50,7 @@ IMPORTANTE: El array "filas" del JSON debe tener EXACTAMENTE ${data.edts.length}
 uno por cada EDT listado arriba, en el mismo orden.
 El campo "edtNombre" debe ser EXACTAMENTE el nombre del EDT como está escrito arriba.
 
-FRECUENCIA: M=Mensual S=Semanal E=Eventual
+FRECUENCIA: D=Diario S=Semanal M=Mensual E=Eventual
 MEDIO: I=Informe M=Minuta E=Email R=Reunión P=Planilla IE=Informe+Email
 RESPONSABILIDAD (combinar letras):
   D=Destinatario E=Emisor S=Soporte V=Valida
@@ -61,14 +61,14 @@ RESPONSABILIDAD (combinar letras):
 
 CRITERIOS para asignar valores por cargo:
 - Supervisor cliente externo: DV en técnico, DS en gestión
-- Gerente de Proyectos: D en mayoría, DV en técnico
+- Gerente de Proyectos: D donde deba estar informado, DV en técnico
 - Gestor de Proyecto: E en Gestión
 - Ing. Residente/Programador: E en Ingeniería
 - Cadista: DS en Ingeniería, E en Documentación
 - Coord. Construcción: DS en Construcción, SV en campo
 - Supervisor Proyecto: E en Construcción, ES en Comisionamiento
-- Ing. Seguridad/HSEQ: E en Seguridad, D en resto
-- Coord. Comercial: E en Comercial, D en resto
+- Ing. Seguridad/HSEQ: E en Seguridad; D solo donde haya riesgo de campo
+- Coord. Comercial: E en Comercial; vacío en lo técnico
 
 REGLAS CRÍTICAS:
 1. Genera exactamente ${data.edts.length} filas — una por EDT
@@ -77,7 +77,10 @@ REGLAS CRÍTICAS:
 3. Los valores son combinaciones de letras: D, E, S, V, DV, DS,
    SV, ES — NUNCA uses la letra "R" — NO pongas "D" en todas las celdas,
    varía según cargo
-4. Ninguna celda debe quedar vacía — mínimo "D" si no hay rol claro
+4. Si la persona NO participa en esa comunicación, deja la celda vacía
+   ("valor": ""). No rellenes con "D" por defecto: "D" significa que esa
+   persona debe recibir la información. Es normal que varias celdas por
+   fila queden vacías.
 5. No incluyas texto antes ni después del JSON
 
 EJEMPLO OBLIGATORIO — así debe verse el JSON para un proyecto con
@@ -103,7 +106,7 @@ JM (Gerente), PR (Gestor), APH (Supervisor), YA (HSEQ):
       "frecuencia": "E",
       "medio": "E",
       "celdas": [
-        { "siglas": "JM",  "valor": "D"  },
+        { "siglas": "JM",  "valor": ""   },
         { "siglas": "PR",  "valor": "D"  },
         { "siglas": "APH", "valor": "D"  },
         { "siglas": "YA",  "valor": "E"  }
@@ -116,7 +119,7 @@ JM (Gerente), PR (Gestor), APH (Supervisor), YA (HSEQ):
       "medio": "IE",
       "celdas": [
         { "siglas": "JM",  "valor": "DS" },
-        { "siglas": "PR",  "valor": "D"  },
+        { "siglas": "PR",  "valor": ""   },
         { "siglas": "APH", "valor": "E"  },
         { "siglas": "YA",  "valor": "D"  }
       ]

@@ -32,7 +32,8 @@ export function aplicarReglaResponsableAFilas(
     const persona = rol ? organigramaResuelto.get(rol) ?? null : null
     const siglaResponsable = persona?.userId ? siglaPorUserId.get(persona.userId) : undefined
 
-    const celdas = f.celdas.map(c => ({ ...c, valor: c.valor.toUpperCase().replace(/R/g, '') || 'D' }))
+    // Celda vacía = la persona no participa en esa comunicación; se respeta.
+    const celdas = f.celdas.map(c => ({ ...c, valor: (c.valor ?? '').toUpperCase().replace(/R/g, '') }))
     if (siglaResponsable) {
       const celda = celdas.find(c => c.siglas === siglaResponsable)
       if (celda) {

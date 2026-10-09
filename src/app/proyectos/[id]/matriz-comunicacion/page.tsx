@@ -5,7 +5,7 @@ import { ROL_CONTACTO_CLIENTE_LABELS } from '@/lib/config/rolesContactoCliente'
 import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Loader2, MessageSquare, Plus, Trash2, Download, Sparkles, Pencil, X, Check, FileText } from 'lucide-react'
+import { Loader2, MessageSquare, Plus, Trash2, Download, Sparkles, Pencil, X, Check, FileText, ArrowUp, ArrowDown } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -72,7 +72,7 @@ interface OrgNodo {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const FRECUENCIAS = ['M', 'S', 'E']
+const FRECUENCIAS = ['D', 'S', 'M', 'E']
 const MEDIOS = ['I', 'M', 'E', 'R', 'P', 'IE', 'IR']
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -192,7 +192,7 @@ export default function MatrizComunicacionPage() {
 
   async function handleAddFila() {
     if (!matriz) return
-    const celdas: Celda[] = personal.map(p => ({ siglas: p.siglas, valor: 'D' }))
+    const celdas: Celda[] = personal.map(p => ({ siglas: p.siglas, valor: '' }))
     try {
       const res = await fetch(`/api/proyectos/${proyectoId}/matriz-comunicacion/filas`, {
         method: 'POST',
@@ -214,11 +214,33 @@ export default function MatrizComunicacionPage() {
     } catch { toast.error('Error al eliminar') }
   }
 
+  async function handleMoverFila(idx: number, delta: -1 | 1) {
+    if (!matriz) return
+    const destino = idx + delta
+    if (destino < 0 || destino >= matriz.filas.length) return
+    const previas = matriz.filas
+    const filas = [...previas]
+    ;[filas[idx], filas[destino]] = [filas[destino], filas[idx]]
+    const reordenadas = filas.map((f, i) => ({ ...f, orden: i }))
+    setMatriz(m => m ? { ...m, filas: reordenadas } : m)
+    try {
+      const res = await fetch(`/api/proyectos/${proyectoId}/matriz-comunicacion/filas/reorden`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: reordenadas.map(f => f.id) }),
+      })
+      if (!res.ok) throw new Error()
+    } catch {
+      setMatriz(m => m ? { ...m, filas: previas } : m)
+      toast.error('Error al reordenar')
+    }
+  }
+
   function startEdit(fila: MatrizFila) {
     const celdas = parseCeldas(fila.receptores)
     const map: Record<string, string> = {}
     for (const c of celdas) map[c.siglas] = c.valor
-    for (const p of personal) if (!map[p.siglas]) map[p.siglas] = 'D'
+    for (const p of personal) map[p.siglas] ??= ''
     setEditingId(fila.id)
     setEditInfo(fila.informacion)
     setEditFrq(fila.frecuencia)
@@ -231,7 +253,7 @@ export default function MatrizComunicacionPage() {
   async function saveEdit(filaId: string) {
     setSavingRow(true)
     try {
-      const celdas = personal.map(p => ({ siglas: p.siglas, valor: editCeldas[p.siglas] ?? 'D' }))
+      const celdas = personal.map(p => ({ siglas: p.siglas, valor: (editCeldas[p.siglas] ?? '').trim() }))
       const res = await fetch(`/api/proyectos/${proyectoId}/matriz-comunicacion/filas/${filaId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -436,7 +458,7 @@ export default function MatrizComunicacionPage() {
                   </>
                 )
               })()}
-              <th className="border border-slate-600 w-14 bg-[#2E4057]" rowSpan={2} />
+              <th className="border border-slate-600 w-24 bg-[#2E4057]" rowSpan={2} />
             </tr>
             {/* Row 2: siglas */}
             <tr>
@@ -499,7 +521,7 @@ export default function MatrizComunicacionPage() {
                       }`}>
                         {isEditing
                           ? <input
-                              value={editCeldas[p.siglas] ?? 'D'}
+                              value={editCeldas[p.siglas] ?? ''}
                               onChange={e => setEditCeldas(prev => ({ ...prev, [p.siglas]: e.target.value.toUpperCase() }))}
                               className="w-9 text-center text-xs font-mono border rounded py-0.5 uppercase"
                               maxLength={3}
@@ -526,6 +548,14 @@ export default function MatrizComunicacionPage() {
                       </div>
                     ) : (
                       <div className="flex gap-1 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => handleMoverFila(idx, -1)} disabled={idx === 0 || editingId !== null}
+                          title="Subir" className="p-1 rounded hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent">
+                          <ArrowUp size={11} />
+                        </button>
+                        <button onClick={() => handleMoverFila(idx, 1)} disabled={idx === matriz.filas.length - 1 || editingId !== null}
+                          title="Bajar" className="p-1 rounded hover:bg-slate-200 disabled:opacity-30 disabled:hover:bg-transparent">
+                          <ArrowDown size={11} />
+                        </button>
                         <button onClick={() => startEdit(fila)} className="p-1 rounded hover:bg-slate-200">
                           <Pencil size={11} />
                         </button>
@@ -552,7 +582,7 @@ export default function MatrizComunicacionPage() {
 
       {/* Leyenda */}
       <div className="shrink-0 px-4 py-2 border-t bg-slate-50 flex gap-6 text-[10px] text-muted-foreground">
-        <span><b>Frec:</b> M=Mensual S=Semanal E=Eventual</span>
+        <span><b>Frec:</b> D=Diario S=Semanal M=Mensual E=Eventual</span>
         <span><b>Medio:</b> I=Informe M=Minuta E=Email R=Reunión P=Planilla IE=Informe+Email</span>
         <span><b>Resp:</b> D=Dest. E=Emisor R=Autoriza S=Soporte V=Valida</span>
       </div>

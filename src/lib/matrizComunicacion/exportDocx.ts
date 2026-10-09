@@ -181,10 +181,10 @@ function tablaMatriz(personal: PersonalMatriz[], filas: FilaMatriz[]): Table {
 
 function tablaLeyenda(): Table {
   const leyendaRows = [
-    ['M', 'Mensual',  'I', 'Informe',  'D', 'Destinatario'],
+    ['D', 'Diario',   'I', 'Informe',  'D', 'Destinatario'],
     ['S', 'Semanal',  'M', 'Minuta',   'E', 'Emisor'],
-    ['E', 'Eventual', 'E', 'E-mail',   'R', 'Autoriza'],
-    ['',  '',         'R', 'Reunión',  'S', 'Soporte'],
+    ['M', 'Mensual',  'E', 'E-mail',   'R', 'Autoriza'],
+    ['E', 'Eventual', 'R', 'Reunión',  'S', 'Soporte'],
     ['',  '',         'P', 'Planilla', 'V', 'Valida'],
   ]
 
