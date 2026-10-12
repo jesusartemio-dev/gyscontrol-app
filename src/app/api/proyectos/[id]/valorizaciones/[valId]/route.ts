@@ -243,7 +243,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       if (body.estado === 'facturada' && body.crearCuentaCobrar) {
         const proyecto = await prisma.proyecto.findUnique({
           where: { id: proyectoId },
-          select: { clienteId: true },
+          select: { clienteId: true, ordenCompraCliente: true },
         })
         if (proyecto) {
           // El monto de la CxC sale del Neto a Recibir calculado en la
@@ -287,6 +287,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
               // Heredar conformidad del cliente (HES/Guía de Remisión) capturada en la valorización
               numeroHES: existing.numeroHES,
               numeroGuiaRemision: existing.numeroGuiaRemision,
+              // Una sola OC por proyecto: se hereda para que la CxC se pueda
+              // buscar por OC desde que se pre-registra la factura.
+              ordenCompraCliente: proyecto.ordenCompraCliente,
               updatedAt: new Date(),
             },
           })

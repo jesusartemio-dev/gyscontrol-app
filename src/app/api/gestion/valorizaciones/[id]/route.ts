@@ -36,6 +36,7 @@ export async function GET(
             adelantoPorcentaje: true,
             adelantoMonto: true,
             adelantoAmortizado: true,
+            ordenCompraCliente: true,
           },
         },
         adjuntos: { orderBy: { createdAt: 'asc' } },

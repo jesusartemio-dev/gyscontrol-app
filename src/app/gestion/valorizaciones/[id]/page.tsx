@@ -78,6 +78,7 @@ interface Proyecto {
   adelantoPorcentaje?: number
   adelantoMonto?: number
   adelantoAmortizado?: number
+  ordenCompraCliente?: string | null
 }
 
 interface Valorizacion {
@@ -535,6 +536,13 @@ export default function ValorizacionEditPage() {
               <Badge className={getEstadoColor(val.estado)}>{getEstadoLabel(val.estado)}</Badge>
             </div>
             <p className="text-sm text-muted-foreground">{val.proyecto?.codigo} — {val.proyecto?.nombre}</p>
+            {/* OC única por proyecto — se edita en los datos del proyecto, se hereda a la CxC al facturar */}
+            <p className="text-sm mt-0.5">
+              <span className="text-muted-foreground">OC del cliente: </span>
+              {val.proyecto?.ordenCompraCliente
+                ? <span className="font-mono font-semibold">{val.proyecto.ordenCompraCliente}</span>
+                : <span className="text-amber-600">sin registrar en el proyecto</span>}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -628,7 +636,7 @@ export default function ValorizacionEditPage() {
                 className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
                 disabled={transitioning || !tieneDocHES}
                 title={!tieneDocHES ? 'Sube el documento HES o Guía de Almacén primero' : undefined}
-                onClick={() => router.push('/administracion/facturacion')}
+                onClick={() => router.push(`/administracion/facturacion?valorizacion=${val.id}`)}
               >
                 <DollarSign className="h-4 w-4 mr-2" />
                 Ir a Facturación

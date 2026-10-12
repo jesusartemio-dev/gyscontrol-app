@@ -210,7 +210,29 @@ export default function FacturacionPage() {
   // Anular confirm dialog
   const [confirmAnular, setConfirmAnular] = useState<Valorizacion | null>(null)
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => { loadData().then(abrirValorizacionDeUrl) }, [])
+
+  // "Ir a Facturación" desde una valorización llega con ?valorizacion=<id>:
+  // se abre directamente ESA valorización en vez de la lista con los filtros
+  // guardados de la visita anterior. Se lee de window.location (no
+  // useSearchParams) para no exigir un <Suspense> en la página.
+  const abrirValorizacionDeUrl = (lista: Valorizacion[]) => {
+    const valId = new URLSearchParams(window.location.search).get('valorizacion')
+    if (!valId) return
+    // Limpia el parámetro: recargar la página no debe reabrir el diálogo.
+    window.history.replaceState(null, '', '/administracion/facturacion')
+    const val = lista.find(v => v.id === valId)
+    if (!val) {
+      toast.error('La valorización no está disponible para facturar')
+      return
+    }
+    setSearchTerm('')
+    setFilterPeriodPreset('all')
+    setFilterMoneda('all')
+    if (val.estado === 'hes_pendiente') { setTabFilter('pendientes'); openFacturar(val) }
+    else if (val.estado === 'aprobada_cliente') { setTabFilter('pendientes'); openRegistrarHES(val) }
+    else { setTabFilter('todas'); setShowDetail(val) }
+  }
 
   useEffect(() => {
     try {
@@ -220,21 +242,24 @@ export default function FacturacionPage() {
     } catch {}
   }, [searchTerm, tabFilter, filterPeriodPreset, filterPeriodDesde, filterPeriodHasta, filterMoneda])
 
-  const loadData = async () => {
+  const loadData = async (): Promise<Valorizacion[]> => {
     try {
       setLoading(true)
       const res = await fetch('/api/gestion/valorizaciones')
       if (res.ok) {
         const data = await res.json()
-        setItems(data.filter((v: Valorizacion) =>
+        const lista = data.filter((v: Valorizacion) =>
           ['aprobada_cliente', 'hes_pendiente', 'facturada', 'pagada', 'anulada'].includes(v.estado)
-        ))
+        )
+        setItems(lista)
+        return lista
       }
     } catch {
       toast.error('Error al cargar datos')
     } finally {
       setLoading(false)
     }
+    return []
   }
 
   const filtered = useMemo(() => {
@@ -862,6 +887,14 @@ export default function FacturacionPage() {
                     ? <>Se creará la Cuenta por Cobrar por el <strong>importe de la factura</strong>: {formatCurrency(datosFactura.importeTotal, facturarTarget.moneda)}.</>
                     : 'Se creará automáticamente una Cuenta por Cobrar por el monto neto.'}
                 </p>
+              </div>
+              <div className={`rounded-lg px-3 py-2 text-sm flex justify-between items-center border ${
+                facturarTarget.proyecto?.ordenCompraCliente ? 'bg-muted/40' : 'bg-amber-50 border-amber-200'
+              }`}>
+                <span className="text-muted-foreground font-medium">OC del cliente</span>
+                {facturarTarget.proyecto?.ordenCompraCliente
+                  ? <span className="font-mono">{facturarTarget.proyecto.ordenCompraCliente}</span>
+                  : <span className="text-xs text-amber-700">Sin registrar en el proyecto — la CxC quedará sin OC</span>}
               </div>
               {(facturarTarget.numeroHES || facturarTarget.numeroGuiaRemision) && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm flex justify-between items-center">

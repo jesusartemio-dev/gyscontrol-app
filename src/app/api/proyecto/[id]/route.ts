@@ -139,7 +139,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     if (data.estado === 'cerrado') {
       const proyectoActual = await prisma.proyecto.findUnique({
         where: { id },
-        select: { estado: true, clienteId: true, codigo: true, diasGarantia: true, moneda: true, tipoCambio: true },
+        select: { estado: true, clienteId: true, codigo: true, diasGarantia: true, moneda: true, tipoCambio: true, ordenCompraCliente: true },
       })
 
       if (proyectoActual && proyectoActual.estado !== 'cerrado') {
@@ -173,6 +173,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
                 proyectoId: id,
                 clienteId: proyectoActual.clienteId!,
                 descripcion: `Fondo de Garantía — ${proyectoActual.codigo}`,
+                ordenCompraCliente: proyectoActual.ordenCompraCliente,
                 monto: totalFondoGarantia,
                 saldoPendiente: totalFondoGarantia,
                 moneda: proyectoActual.moneda || 'PEN',
