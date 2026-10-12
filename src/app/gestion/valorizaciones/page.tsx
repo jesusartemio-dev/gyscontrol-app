@@ -32,6 +32,7 @@ interface Proyecto {
   descuentoComercialPct?: number
   igvPct?: number
   fondoGarantiaPct?: number
+  ordenCompraCliente?: string | null
   clienteId?: string | null
   cliente?: { id: string; codigo: string; nombre: string } | null
 }
@@ -229,7 +230,8 @@ export default function ValorizacionesPage() {
       result = result.filter(i =>
         i.codigo.toLowerCase().includes(term) ||
         i.proyecto?.nombre.toLowerCase().includes(term) ||
-        i.proyecto?.codigo.toLowerCase().includes(term)
+        i.proyecto?.codigo.toLowerCase().includes(term) ||
+        i.proyecto?.ordenCompraCliente?.toLowerCase().includes(term)
       )
     }
     if (filterPeriodPreset !== 'all') {
@@ -285,7 +287,7 @@ export default function ValorizacionesPage() {
   // ── Agrupación por proyecto ───────────────────────────────
   const proyectosData = useMemo(() => {
     type ProjGroup = {
-      proyectoId: string; codigo: string; nombre: string
+      proyectoId: string; codigo: string; nombre: string; ordenCompraCliente: string | null
       vals: Valorizacion[]; presupuesto: number; acumulado: number; totalNeto: number
       ultimaFecha: string; moneda: string
     }
@@ -297,6 +299,7 @@ export default function ValorizacionesPage() {
           proyectoId: pid,
           codigo: v.proyecto?.codigo ?? '',
           nombre: v.proyecto?.nombre ?? '',
+          ordenCompraCliente: v.proyecto?.ordenCompraCliente ?? null,
           vals: [],
           presupuesto: 0,
           acumulado: 0,
@@ -652,6 +655,7 @@ export default function ValorizacionesPage() {
                 <TableRow>
                   <TableHead>Código</TableHead>
                   <TableHead>Proyecto</TableHead>
+                  <TableHead>OC Cliente</TableHead>
                   <TableHead>Periodo</TableHead>
                   <TableHead className="text-right">Monto Val.</TableHead>
                   <TableHead className="text-right">Acumulado</TableHead>
@@ -664,7 +668,7 @@ export default function ValorizacionesPage() {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       <FileSpreadsheet className="h-8 w-8 mx-auto mb-2 opacity-40" />
                       No hay valorizaciones registradas
                     </TableCell>
@@ -676,6 +680,9 @@ export default function ValorizacionesPage() {
                       <TableCell className="text-sm">
                         <div className="font-medium">{item.proyecto?.codigo}</div>
                         <div className="text-muted-foreground text-xs truncate max-w-[200px]">{item.proyecto?.nombre}</div>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {item.proyecto?.ordenCompraCliente || <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {formatPeriod(item.periodoInicio, item.periodoFin)}
@@ -712,7 +719,7 @@ export default function ValorizacionesPage() {
               {filtered.length > 0 && (
                 <TableFooter>
                   <TableRow>
-                    <TableCell colSpan={3} className="py-2 text-sm text-muted-foreground">
+                    <TableCell colSpan={4} className="py-2 text-sm text-muted-foreground">
                       {totals.activas} valorización{totals.activas !== 1 ? 'es' : ''} activa{totals.activas !== 1 ? 's' : ''}
                       {totals.total !== totals.activas && ` · ${totals.total - totals.activas} anulada${totals.total - totals.activas !== 1 ? 's' : ''}`}
                     </TableCell>
@@ -855,7 +862,7 @@ export default function ValorizacionesPage() {
                 </div>
               ) : (
                 <div className="divide-y">
-                  {proyectosData.map(({ proyectoId, codigo, nombre, vals, presupuesto, acumulado, totalNeto, moneda }) => {
+                  {proyectosData.map(({ proyectoId, codigo, nombre, ordenCompraCliente, vals, presupuesto, acumulado, totalNeto, moneda }) => {
                     const isOpen = expandedProyectos.has(proyectoId)
                     const pct = presupuesto > 0 ? Math.min(100, acumulado / presupuesto * 100) : 0
                     const barColor = pct >= 100 ? 'bg-green-500' : pct >= 75 ? 'bg-blue-500' : pct >= 40 ? 'bg-blue-400' : 'bg-blue-300'
@@ -880,6 +887,9 @@ export default function ValorizacionesPage() {
                                   <Badge className={`${getEstadoColor(ultimoEstado)} text-[10px] py-0`}>{getEstadoLabel(ultimoEstado)}</Badge>
                                 )}
                                 <span className="text-xs text-muted-foreground truncate max-w-xs">{nombre}</span>
+                                {ordenCompraCliente && (
+                                  <span className="text-[11px] font-mono text-muted-foreground shrink-0">· OC {ordenCompraCliente}</span>
+                                )}
                               </div>
                               <div className="flex items-center gap-2">
                                 <div className="flex-1 bg-muted rounded-full h-2">

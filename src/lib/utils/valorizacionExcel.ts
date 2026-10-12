@@ -43,7 +43,7 @@ interface ProyectoRef {
 interface ValExportRow {
   codigo: string
   numero: number
-  proyecto?: { codigo: string; nombre: string } | null
+  proyecto?: { codigo: string; nombre: string; ordenCompraCliente?: string | null } | null
   periodoInicio: string
   periodoFin: string
   moneda: string
@@ -392,6 +392,7 @@ export async function exportarValAExcel(items: ValExportRow[]) {
     { header: 'N°', key: 'numero', width: 6 },
     { header: 'Proyecto', key: 'proyecto', width: 14 },
     { header: 'Nombre Proyecto', key: 'proyectoNombre', width: 25 },
+    { header: 'OC Cliente', key: 'ocCliente', width: 14 },
     { header: 'Periodo Inicio', key: 'periodoInicio', width: 14 },
     { header: 'Periodo Fin', key: 'periodoFin', width: 14 },
     { header: 'Moneda', key: 'moneda', width: 8 },
@@ -425,6 +426,7 @@ export async function exportarValAExcel(items: ValExportRow[]) {
       numero: item.numero,
       proyecto: item.proyecto?.codigo || '',
       proyectoNombre: item.proyecto?.nombre || '',
+      ocCliente: item.proyecto?.ordenCompraCliente || '',
       periodoInicio: formatDateExcel(item.periodoInicio),
       periodoFin: formatDateExcel(item.periodoFin),
       moneda: item.moneda,
@@ -452,7 +454,10 @@ export async function exportarValAExcel(items: ValExportRow[]) {
 
   // Format numbers
   const totalRows = ws.rowCount
-  const numCols = ['I', 'J', 'K', 'L', 'M', 'P', 'R', 'S', 'U', 'W', 'X']
+  // Por key (no por letra fija) para que agregar una columna no corra el formato.
+  const letra = (key: string) => ws.getColumn(key).letter
+  const numCols = ['presupuesto', 'acumAnterior', 'montoVal', 'acumActual', 'saldo', 'descMonto', 'adelMonto', 'subtotal', 'igvMonto', 'fgMonto', 'neto'].map(letra)
+  const pctCols = ['avance', 'descPct', 'adelPct', 'igvPct', 'fgPct'].map(letra)
   for (let row = 2; row <= totalRows; row++) {
     for (const col of numCols) {
       const cell = ws.getCell(`${col}${row}`)
@@ -461,7 +466,7 @@ export async function exportarValAExcel(items: ValExportRow[]) {
       }
     }
     // % columns
-    for (const col of ['N', 'O', 'Q', 'T', 'V']) {
+    for (const col of pctCols) {
       const cell = ws.getCell(`${col}${row}`)
       if (typeof cell.value === 'number') {
         cell.numFmt = '0.00'
