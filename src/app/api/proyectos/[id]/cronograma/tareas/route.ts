@@ -31,6 +31,7 @@ const createTareaSchema = z.object({
   recursoId: z.string().optional(),
   posicionamiento: z.enum(['inicio_padre', 'despues_ultima']).optional(),
   esExtra: z.boolean().optional(),
+  orden: z.number().int().min(0).optional(),
 })
 
 // ✅ Schema de validación para actualizar tarea
@@ -323,8 +324,20 @@ export async function POST(
 
     console.log('🔍 [API TAREAS] Datos finales para crear tarea:', tareaData)
 
+    // Sin orden explícito, la tarea va al final de su actividad. Antes quedaba
+    // en 0, empatada con la primera, y el árbol la mostraba en cualquier lugar.
+    let orden = validatedData.orden
+    if (orden === undefined) {
+      const ultima = await prisma.proyectoTarea.aggregate({
+        where: { proyectoActividadId: validatedData.proyectoActividadId },
+        _max: { orden: true },
+        _count: true,
+      })
+      orden = ultima._count > 0 ? (ultima._max.orden ?? 0) + 1 : 0
+    }
+
     const tarea = await prisma.proyectoTarea.create({
-      data: { ...tareaData, updatedAt: new Date() }
+      data: { ...tareaData, orden, updatedAt: new Date() }
     })
 
     console.log('✅ [API TAREAS] Tarea creada exitosamente:', tarea.id)

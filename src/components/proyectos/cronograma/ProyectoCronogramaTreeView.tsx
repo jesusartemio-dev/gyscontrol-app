@@ -710,7 +710,8 @@ export function ProyectoCronogramaTreeView({
       const fiOriginalMs = new Date(fi).getTime()
 
       // 3. Crear cada tarea manteniendo offset relativo al inicio de la actividad
-      for (const tareaNode of tareasHijas) {
+      //    y el mismo orden que tienen en la original
+      for (const [orden, tareaNode] of tareasHijas.entries()) {
         const tFi = tareaNode.data.fechaInicio
         const tFf = tareaNode.data.fechaFin
         if (!tFi || !tFf) continue
@@ -734,9 +735,28 @@ export function ProyectoCronogramaTreeView({
             recursoId: tareaNode.data.recursoId || undefined,
             responsableId: tareaNode.data.responsableId || undefined,
             esExtra: false,
+            orden,
           }),
         })
       }
+
+      // 4. Colocar la copia justo después de la original. Sin esto queda con
+      //    orden 0, empatada con la primera actividad del EDT, y el árbol la
+      //    muestra en cualquier posición.
+      const hermanos = (state.nodes.get(node.parentId!)?.children || [])
+        .map(c => c.id)
+        .filter(id => id.startsWith('actividad-'))
+      const nuevoId = `actividad-${nuevaActividad.id}`
+      hermanos.splice(hermanos.indexOf(nodeId) + 1, 0, nuevoId)
+      await Promise.all(
+        hermanos.map((id, index) =>
+          fetch(`/api/proyectos/${proyectoId}/cronograma/tree/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orden: index }),
+          })
+        )
+      )
 
       await actions.loadTree([...state.expandedNodes])
       toast.success(`Actividad "${node.nombre}" duplicada con sus tareas`)
