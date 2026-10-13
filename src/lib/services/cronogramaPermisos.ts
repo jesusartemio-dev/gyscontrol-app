@@ -8,7 +8,7 @@ import { NextResponse } from 'next/server'
  * Roles autorizados para modificar cronogramas de planificación y ejecución.
  * Los cronogramas tipo `comercial` son de solo lectura (se generan desde la cotización).
  */
-export const ROLES_CRONOGRAMA = ['admin', 'gerente', 'gestor', 'coordinador'] as const
+export const ROLES_CRONOGRAMA = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos'] as const
 
 interface ValidacionExitosa {
   ok: true
@@ -51,7 +51,7 @@ export async function validarPermisoCronograma(
     return {
       ok: false,
       response: NextResponse.json(
-        { error: 'Sin permisos para modificar cronogramas. Solo admin, gerente, gestor y coordinador pueden hacerlo.' },
+        { error: 'Sin permisos para modificar cronogramas. Solo admin, gerente, gestor, coordinador y proyectos pueden hacerlo.' },
         { status: 403 }
       ),
     }
