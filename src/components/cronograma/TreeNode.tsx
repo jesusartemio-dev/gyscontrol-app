@@ -234,7 +234,11 @@ export function TreeNode({
 
   return (
     <div
-      className={`tree-node group ${isDragging ? 'opacity-40' : ''} ${isSelected ? 'bg-blue-100 border-l-2 border-l-blue-500' : `${rowIndex != null && rowIndex % 2 === 0 ? 'bg-gray-100' : ''} hover:bg-blue-100/70`} py-0.5 cursor-pointer transition-colors`}
+      // Seleccionada o con su menú abierto: marca fuerte (fondo + barra azul a
+      // la izquierda) para que se vea qué fila se está editando. El hover es
+      // más suave para no confundirse con la selección. La barra es un
+      // box-shadow para no correr el contenido.
+      className={`tree-node group ${isDragging ? 'opacity-40' : ''} ${isSelected || dropdownOpen ? 'bg-blue-200/80 shadow-[inset_4px_0_0_0_#2563eb]' : `${rowIndex != null && rowIndex % 2 === 0 ? 'bg-gray-100' : ''} hover:bg-blue-50`} py-0.5 cursor-pointer transition-colors`}
       onClick={onSelect}
     >
       <div
@@ -502,7 +506,15 @@ export function TreeNode({
             // Pseudo-nodo: no se edita ni se borra, solo muestra sus hijos
             <span className="w-5 h-5" />
           ) : (
-          <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+          <DropdownMenu
+            open={dropdownOpen}
+            onOpenChange={(open) => {
+              setDropdownOpen(open)
+              // Abrir el menú también selecciona la fila, así queda marcada
+              // mientras se edita en el modal que se abra desde el menú.
+              if (open) onSelect()
+            }}
+          >
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-gray-400 hover:text-gray-700 transition-colors">
                 <Settings2 className="h-3.5 w-3.5" />
