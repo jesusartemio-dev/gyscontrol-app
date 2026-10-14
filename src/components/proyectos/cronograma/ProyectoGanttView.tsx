@@ -153,6 +153,9 @@ const DENSIDADES: Record<Densidad, { fila: number; margenBarra: number; texto: s
   normal: { fila: 32, margenBarra: 6, texto: 'text-[11px] leading-[13px]' },
   compacta: { fila: 22, margenBarra: 4, texto: 'text-[10px] leading-[10px]' },
 }
+
+// Fondo alternado por fila (opaco: la columna de nombres tapa las barras al pasar debajo).
+const fondoFila = (idx: number) => (idx % 2 === 1 ? 'bg-gray-50' : 'bg-white')
 // Ancho de la columna de nombres: ajustable arrastrando su borde derecho y
 // recordado por proyecto. Límites para que no tape la línea de tiempo.
 const ANCHO_NOMBRES_DEFECTO = 340
@@ -176,6 +179,8 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   const [anchoCard, setAnchoCard] = useState(0)
   const [anchoNombres, setAnchoNombres] = useState(prefsIniciales.anchoNombres ?? ANCHO_NOMBRES_DEFECTO)
   const [densidad, setDensidad] = useState<Densidad>(prefsIniciales.densidad ?? 'normal')
+  // Fila bajo el mouse (índice en visibleItems), compartida entre nombres y barras.
+  const [filaHover, setFilaHover] = useState<number | null>(null)
   const { fila: ROW_HEIGHT, margenBarra: MARGEN_BARRA, texto: claseTextoNombre } = DENSIDADES[densidad]
   // Ancho visible para la línea de tiempo (tarjeta menos la columna de nombres).
   const containerWidth = anchoCard > 0 ? Math.max(0, anchoCard - anchoNombres) : 0
@@ -711,18 +716,20 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
               style={{ width: anchoNombres }}
             >
               {asaRedimension}
-              {visibleItems.map((item) => {
+              {visibleItems.map((item, rowIdx) => {
                 const colors = TIPO_COLORS[item.tipo] || TIPO_COLORS.tarea
                 return (
                   <div
                     key={item.id}
-                    className={`flex items-center border-b border-gray-100 cursor-pointer ${
+                    className={`flex items-center border-b border-gray-200/70 cursor-pointer ${
                       item.id === seleccionId
                         ? 'bg-blue-100 shadow-[inset_4px_0_0_0_#2563eb]'
-                        : `hover:bg-blue-50 ${item.nivel === 0 ? 'bg-slate-50' : 'bg-white'}`
+                        : rowIdx === filaHover ? 'bg-blue-50' : fondoFila(rowIdx)
                     }`}
                     style={{ height: ROW_HEIGHT }}
                     onClick={() => seleccionar(item)}
+                    onMouseEnter={() => setFilaHover(rowIdx)}
+                    onMouseLeave={() => setFilaHover(null)}
                   >
                     <div
                       className="flex items-center gap-1 px-2 w-full min-w-0"
@@ -760,17 +767,28 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
             </div>
 
             {/* Timeline bars */}
-            <div className="relative flex-shrink-0" style={{ width: timeline.totalWidth, height: visibleItems.length * ROW_HEIGHT }}>
-              {/* Franja de la fila seleccionada, a lo ancho de la línea de tiempo */}
-              {(() => {
-                const idx = visibleItems.findIndex(i => i.id === seleccionId)
-                return idx >= 0 ? (
-                  <div
-                    className="absolute left-0 right-0 bg-blue-200/50 pointer-events-none"
-                    style={{ top: idx * ROW_HEIGHT, height: ROW_HEIGHT }}
-                  />
-                ) : null
-              })()}
+            <div
+              className="relative flex-shrink-0"
+              style={{ width: timeline.totalWidth, height: visibleItems.length * ROW_HEIGHT }}
+              // La fila bajo el mouse se resalta también en la columna de nombres.
+              onMouseMove={(e) => {
+                const idx = Math.floor((e.clientY - e.currentTarget.getBoundingClientRect().top) / ROW_HEIGHT)
+                setFilaHover(idx >= 0 && idx < visibleItems.length ? idx : null)
+              }}
+              onMouseLeave={() => setFilaHover(null)}
+            >
+              {/* Franjas de fila a lo ancho de la línea de tiempo: alternadas como en la
+                  columna de nombres, con línea divisoria, y resaltadas al seleccionar o
+                  pasar el mouse — para seguir con la vista de qué nombre es cada barra. */}
+              {visibleItems.map((item, idx) => (
+                <div
+                  key={`fila-${item.id}`}
+                  className={`absolute left-0 right-0 border-b border-gray-200/70 pointer-events-none ${
+                    item.id === seleccionId ? 'bg-blue-200/50' : idx === filaHover ? 'bg-blue-50' : fondoFila(idx)
+                  }`}
+                  style={{ top: idx * ROW_HEIGHT, height: ROW_HEIGHT }}
+                />
+              ))}
 
               {/* Week grid lines */}
               {timeline.weekLines.map((x, i) => (
