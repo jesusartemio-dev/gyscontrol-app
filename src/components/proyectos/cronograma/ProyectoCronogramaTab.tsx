@@ -1244,6 +1244,7 @@ export function ProyectoCronogramaTab({
             selectedId={nodoSeleccionadoId}
             onSelect={setNodoSeleccionadoId}
             editable={!esBloqueado}
+            refreshKey={refreshKey}
           />
         </TabsContent>
 

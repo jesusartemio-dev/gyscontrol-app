@@ -9,11 +9,15 @@
  *   laborables del calendario del proyecto (igual que editar la fecha de inicio).
  * - Las fechas se toman por día UTC (como la vista Jerarquía) y la duración es la
  *   misma que calcula el servidor: días laborables, contando inicio y fin.
+ * - La columna de nombres queda fija a la izquierda al desplazar la línea de tiempo.
+ * - El rango (1 mes, 3 meses…) define cuánto se ve a la vez; la línea de tiempo
+ *   siempre cubre todo el proyecto y el resto se recorre con el scroll.
+ * - Nivel, rango, zoom y filas abiertas se recuerdan por proyecto en este navegador.
  */
 
 'use client'
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -27,11 +31,15 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
-  RotateCcw
+  RotateCcw,
+  RefreshCw,
+  LocateFixed,
+  ChevronsUpDown,
+  ChevronsDownUp
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { toast as sonnerToast } from 'sonner'
-import { differenceInDays, addDays, addMonths, startOfMonth, startOfWeek, format, isToday, isSameMonth } from 'date-fns'
+import { differenceInDays, addDays, addMonths, startOfMonth, startOfWeek, format, isSameMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 interface GanttItem {
@@ -64,6 +72,40 @@ interface ProyectoGanttViewProps {
   onSelect?: (id: string) => void
   /** Permite arrastrar barras de EDTs, actividades y tareas (cronograma no comercial ni bloqueado). */
   editable?: boolean
+  /** Al cambiar, el Gantt se recarga (botón "Actualizar" general del cronograma). */
+  refreshKey?: number
+}
+
+// Preferencias del Gantt guardadas por proyecto en el navegador (no en la BD).
+interface GanttPrefs {
+  filtroNivel?: string
+  timeRangeMonths?: number
+  zoomLevel?: number
+  expandidos?: string[]
+}
+const prefsKey = (proyectoId: string) => `gantt-prefs:${proyectoId}`
+const leerPrefs = (proyectoId: string): GanttPrefs => {
+  try {
+    if (typeof window === 'undefined') return {}
+    return JSON.parse(window.localStorage.getItem(prefsKey(proyectoId)) || '{}') || {}
+  } catch {
+    return {}
+  }
+}
+const guardarPrefs = (proyectoId: string, prefs: GanttPrefs) => {
+  try {
+    window.localStorage.setItem(prefsKey(proyectoId), JSON.stringify(prefs))
+  } catch {
+    // Sin almacenamiento (modo privado, cuota): las preferencias simplemente no se recuerdan.
+  }
+}
+
+const aplanar = (list: GanttItem[], acc: GanttItem[] = []) => {
+  for (const item of list) {
+    acc.push(item)
+    if (item.hijos) aplanar(item.hijos, acc)
+  }
+  return acc
 }
 
 // Píxeles mínimos de arrastre para que cuente como mover y no como clic.
@@ -105,7 +147,8 @@ const TIPO_COLORS: Record<string, { bar: string; text: string; bg: string }> = {
 const ROW_HEIGHT = 32
 const NAME_COL_WIDTH = 280
 
-export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selectedId, onSelect, editable = false }: ProyectoGanttViewProps) {
+export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selectedId, onSelect, editable = false, refreshKey }: ProyectoGanttViewProps) {
+  const [prefsIniciales] = useState(() => leerPrefs(proyectoId))
   const [items, setItems] = useState<GanttItem[]>([])
   const itemsRef = useRef<GanttItem[]>([])
   itemsRef.current = items
@@ -114,14 +157,15 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   const [arrastre, setArrastre] = useState<{ id: string; startX: number; dx: number } | null>(null)
   const [moviendoId, setMoviendoId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [zoomLevel, setZoomLevel] = useState(1)
-  const [filtroNivel, setFiltroNivel] = useState<string>('todos')
-  const [timeRangeMonths, setTimeRangeMonths] = useState(6)
+  const [recargando, setRecargando] = useState(false)
+  const [zoomLevel, setZoomLevel] = useState(prefsIniciales.zoomLevel ?? 1)
+  const [filtroNivel, setFiltroNivel] = useState<string>(prefsIniciales.filtroNivel ?? 'todos')
+  const [timeRangeMonths, setTimeRangeMonths] = useState(prefsIniciales.timeRangeMonths ?? 3)
   const [containerWidth, setContainerWidth] = useState(0)
   const { toast } = useToast()
-  const timelineScrollRef = useRef<HTMLDivElement>(null)
   const bodyScrollRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const scrollInicialHecho = useRef(false)
 
   // Measure available timeline width
   useEffect(() => {
@@ -136,17 +180,15 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
     // nunca se medía y quedaba fijo en 8 px por día.
   }, [loading])
 
-  // Sync horizontal scroll between header and body
-  const handleBodyScroll = useCallback(() => {
-    if (bodyScrollRef.current && timelineScrollRef.current) {
-      timelineScrollRef.current.scrollLeft = bodyScrollRef.current.scrollLeft
-    }
-  }, [])
-
   // Load data from tree API (single call)
   // `silencioso`: recarga tras mover una barra, sin spinner y conservando lo expandido.
   const loadGanttData = useCallback(async (silencioso = false): Promise<GanttItem[] | undefined> => {
-    const expandidosPrevios = silencioso ? expandidosDe(itemsRef.current) : null
+    // Recarga silenciosa: conserva lo abierto ahora. Carga normal: lo que quedó
+    // guardado la última vez en este navegador (si hay).
+    const guardados = leerPrefs(proyectoId).expandidos
+    const expandidosPrevios = silencioso
+      ? expandidosDe(itemsRef.current)
+      : guardados ? new Set(guardados) : null
     try {
       if (!silencioso) setLoading(true)
 
@@ -223,6 +265,40 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   }, [proyectoId, cronogramaId])
 
   useEffect(() => { loadGanttData() }, [loadGanttData])
+
+  // Recarga solo el Gantt, sin spinner y conservando filas abiertas, zoom y scroll.
+  const recargar = useCallback(async () => {
+    setRecargando(true)
+    try {
+      await loadGanttData(true)
+    } finally {
+      setRecargando(false)
+    }
+  }, [loadGanttData])
+
+  // El "Actualizar" general del cronograma también refresca el Gantt.
+  const primerRefreshKey = useRef(true)
+  useEffect(() => {
+    if (primerRefreshKey.current) { primerRefreshKey.current = false; return }
+    recargar()
+  }, [refreshKey])
+
+  // Recordar nivel, rango, zoom y filas abiertas para este proyecto.
+  useEffect(() => {
+    if (loading || items.length === 0) return
+    guardarPrefs(proyectoId, { filtroNivel, timeRangeMonths, zoomLevel, expandidos: [...expandidosDe(items)] })
+  }, [proyectoId, filtroNivel, timeRangeMonths, zoomLevel, items, loading])
+
+  // Abrir o cerrar todos los niveles (cerrar deja visible solo el proyecto y sus fases).
+  const expandirTodo = (abrir: boolean) => {
+    const update = (list: GanttItem[]): GanttItem[] =>
+      list.map(item => ({
+        ...item,
+        expanded: abrir ? item.expandable : item.nivel === 0,
+        hijos: item.hijos ? update(item.hijos) : item.hijos,
+      }))
+    setItems(update)
+  }
 
   const seleccionar = (item: GanttItem) => {
     setSeleccionId(item.id)
@@ -329,41 +405,21 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   const timeline = useMemo(() => {
     if (visibleItems.length === 0) return null
 
-    const allDates = visibleItems.flatMap(i => [i.fechaInicio, i.fechaFin]).filter(d => !isNaN(d.getTime()))
+    // La línea de tiempo cubre siempre todo el proyecto (no solo lo visible ni
+    // solo el rango elegido), alineada a meses completos.
+    const allDates = aplanar(items).flatMap(i => [i.fechaInicio, i.fechaFin]).filter(d => !isNaN(d.getTime()))
     if (allDates.length === 0) return null
 
     const projectMinDate = new Date(Math.min(...allDates.map(d => d.getTime())))
     const projectMaxDate = new Date(Math.max(...allDates.map(d => d.getTime())))
+    const minDate = startOfMonth(projectMinDate)
+    const maxDate = startOfMonth(addMonths(projectMaxDate, 1))
 
-    let minDate: Date
-    let maxDate: Date
-
-    if (timeRangeMonths === 0) {
-      // Completo: show full project with month-aligned buffer
-      minDate = startOfMonth(projectMinDate)
-      maxDate = startOfMonth(addMonths(projectMaxDate, 2))
-    } else {
-      const projectDuration = projectMaxDate.getTime() - projectMinDate.getTime()
-      const requestedDuration = timeRangeMonths * 30 * 24 * 60 * 60 * 1000
-
-      if (requestedDuration >= projectDuration) {
-        // Requested range larger than project: center the project
-        const buffer = (requestedDuration - projectDuration) / 2
-        minDate = new Date(projectMinDate.getTime() - buffer)
-        maxDate = new Date(projectMaxDate.getTime() + buffer)
-      } else {
-        // Requested range smaller: show from project start
-        minDate = new Date(projectMinDate)
-        maxDate = new Date(projectMinDate.getTime() + requestedDuration)
-      }
-      // Add small buffer
-      minDate = addDays(minDate, -7)
-      maxDate = addDays(maxDate, 7)
-    }
-
+    // El rango define cuántos días entran en el ancho visible; "Completo" = todo el proyecto.
     const totalDays = differenceInDays(maxDate, minDate) || 1
-    const baseDayWidth = containerWidth > 0 ? containerWidth / totalDays : 8
-    const dayWidth = Math.max(3, baseDayWidth * zoomLevel)
+    const diasEnPantalla = timeRangeMonths === 0 ? totalDays : timeRangeMonths * 30.44
+    const baseDayWidth = containerWidth > 0 ? containerWidth / diasEnPantalla : 8
+    const dayWidth = Math.max(2, baseDayWidth * zoomLevel)
     const totalWidth = totalDays * dayWidth
 
     // Generate month columns
@@ -398,7 +454,40 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
     const showToday = today >= minDate && today <= maxDate
 
     return { minDate, maxDate, totalDays, dayWidth, totalWidth, months, weekLines, todayX, showToday }
-  }, [visibleItems, zoomLevel, timeRangeMonths, containerWidth])
+  }, [items, visibleItems, zoomLevel, timeRangeMonths, containerWidth])
+
+  // Desplaza la línea de tiempo para que `x` quede cerca del inicio del área visible.
+  const irAX = useCallback((x: number, suave = true) => {
+    const el = bodyScrollRef.current
+    if (!el) return
+    el.scrollTo({ left: Math.max(0, x - containerWidth / 4), behavior: suave ? 'smooth' : 'auto' })
+  }, [containerWidth])
+
+  const irAHoy = () => {
+    if (timeline?.showToday) irAX(timeline.todayX)
+    else sonnerToast.info('Hoy está fuera del rango del cronograma')
+  }
+
+  // Al abrir: ir a la fila seleccionada (si hay) o a hoy.
+  useEffect(() => {
+    if (scrollInicialHecho.current || !timeline || containerWidth <= 0) return
+    scrollInicialHecho.current = true
+    const sel = visibleItems.find(i => i.id === seleccionId)
+    if (sel) irAX(differenceInDays(sel.fechaInicio, timeline.minDate) * timeline.dayWidth, false)
+    else if (timeline.showToday) irAX(timeline.todayX, false)
+  }, [timeline, containerWidth])
+
+  // Al cambiar zoom o rango, mantener centrado el mismo día en pantalla.
+  const anchoDiaPrevio = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    const el = bodyScrollRef.current
+    const nuevo = timeline?.dayWidth
+    if (el && nuevo && anchoDiaPrevio.current && anchoDiaPrevio.current !== nuevo) {
+      const centroDia = (el.scrollLeft + containerWidth / 2) / anchoDiaPrevio.current
+      el.scrollLeft = Math.max(0, centroDia * nuevo - containerWidth / 2)
+    }
+    anchoDiaPrevio.current = nuevo ?? null
+  }, [timeline?.dayWidth])
 
   // Export CSV
   const exportToCSV = () => {
@@ -502,8 +591,25 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoomLevel(prev => Math.min(4, prev * 1.4))}>
             <ZoomIn className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoomLevel(1)}>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoomLevel(1)} title="Zoom al 100%">
             <RotateCcw className="h-3.5 w-3.5" />
+          </Button>
+
+          <div className="w-px h-4 bg-gray-200" />
+
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={irAHoy} title="Ir a hoy">
+            <LocateFixed className="h-3.5 w-3.5 mr-1" />
+            Hoy
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => expandirTodo(true)} title="Abrir todo">
+            <ChevronsUpDown className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => expandirTodo(false)} title="Cerrar todo">
+            <ChevronsDownUp className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={recargar} disabled={recargando} title="Recargar solo el Gantt">
+            <RefreshCw className={`h-3.5 w-3.5 mr-1 ${recargando ? 'animate-spin' : ''}`} />
+            Actualizar
           </Button>
 
           <div className="w-px h-4 bg-gray-200" />
@@ -515,13 +621,19 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
       </div>
 
       <CardContent className="p-0">
-        {/* Header row: name col + timeline months */}
-        <div className="flex border-b bg-white sticky top-0 z-10">
-          <div className="flex-shrink-0 border-r border-gray-200 bg-gray-50 px-2 py-1.5" style={{ width: NAME_COL_WIDTH }}>
-            <span className="text-xs font-medium text-gray-600">Elemento</span>
-          </div>
-          <div className="flex-1 overflow-hidden" ref={timelineScrollRef}>
-            <div className="flex" style={{ width: timeline.totalWidth }}>
+        {/* Encabezado y filas comparten un solo scroll horizontal; la columna de
+            nombres es sticky, así queda visible al recorrer la línea de tiempo. */}
+        <div className="overflow-x-auto" ref={bodyScrollRef}>
+          <div style={{ width: NAME_COL_WIDTH + timeline.totalWidth, minWidth: '100%' }}>
+          {/* Header row: name col + timeline months */}
+          <div className="flex border-b bg-white">
+            <div
+              className="sticky left-0 z-40 flex-shrink-0 border-r border-gray-200 bg-gray-50 px-2 py-1.5"
+              style={{ width: NAME_COL_WIDTH }}
+            >
+              <span className="text-xs font-medium text-gray-600">Elemento</span>
+            </div>
+            <div className="flex flex-shrink-0" style={{ width: timeline.totalWidth }}>
               {timeline.months.map((m, i) => (
                 <div
                   key={i}
@@ -533,17 +645,13 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
               ))}
             </div>
           </div>
-        </div>
 
-        {/* Body: rows */}
-        <div
-          className="overflow-x-auto"
-          ref={bodyScrollRef}
-          onScroll={handleBodyScroll}
-        >
-          <div className="flex" style={{ minWidth: NAME_COL_WIDTH + timeline.totalWidth }}>
-            {/* Name column */}
-            <div className="flex-shrink-0" style={{ width: NAME_COL_WIDTH }}>
+          <div className="flex">
+            {/* Name column (fija a la izquierda; fondos opacos para tapar las barras al pasar debajo) */}
+            <div
+              className="sticky left-0 z-40 flex-shrink-0 bg-white border-r border-gray-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]"
+              style={{ width: NAME_COL_WIDTH }}
+            >
               {visibleItems.map((item) => {
                 const colors = TIPO_COLORS[item.tipo] || TIPO_COLORS.tarea
                 return (
@@ -551,8 +659,8 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                     key={item.id}
                     className={`flex items-center border-b border-gray-100 cursor-pointer ${
                       item.id === seleccionId
-                        ? 'bg-blue-200/80 shadow-[inset_4px_0_0_0_#2563eb]'
-                        : `hover:bg-blue-50 ${item.nivel === 0 ? 'bg-blue-50/50' : ''}`
+                        ? 'bg-blue-100 shadow-[inset_4px_0_0_0_#2563eb]'
+                        : `hover:bg-blue-50 ${item.nivel === 0 ? 'bg-slate-50' : 'bg-white'}`
                     }`}
                     style={{ height: ROW_HEIGHT }}
                     onClick={() => seleccionar(item)}
@@ -589,7 +697,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
             </div>
 
             {/* Timeline bars */}
-            <div className="flex-1 relative" style={{ width: timeline.totalWidth }}>
+            <div className="relative flex-shrink-0" style={{ width: timeline.totalWidth, height: visibleItems.length * ROW_HEIGHT }}>
               {/* Franja de la fila seleccionada, a lo ancho de la línea de tiempo */}
               {(() => {
                 const idx = visibleItems.findIndex(i => i.id === seleccionId)
@@ -730,6 +838,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                 )
               })}
             </div>
+          </div>
           </div>
         </div>
 
