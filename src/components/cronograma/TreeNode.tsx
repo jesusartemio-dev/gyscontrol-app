@@ -6,13 +6,48 @@
 // ===================================================
 
 import React from 'react'
-import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine, ArrowRightLeft, ArrowRightToLine, Columns2, ArrowDown } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine, ArrowRightLeft, ArrowRightToLine, Columns2, ArrowDown, ArrowRight, ArrowLeft, Layers } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { TreeNode as TreeNodeType, NodeType } from './types'
 import { TreeNodeProgress } from './TreeNodeProgress'
+
+interface RelacionAnterior {
+  tipo: 'secuencia' | 'paralelo' | 'solape' | 'hueco' | 'antes'
+  dias?: number
+  anteriorNombre: string
+}
+
+/**
+ * Cómo se ubica el elemento respecto al que está justo arriba en su nivel
+ * (lo calcula la API del árbol con el calendario del proyecto). Es solo
+ * informativo: no hay dependencia guardada entre ambos.
+ */
+function RelacionAnteriorIcono({ relacion }: { relacion?: RelacionAnterior }) {
+  if (!relacion) return <span className="w-3 shrink-0" />
+  const nombre = `"${relacion.anteriorNombre}"`
+  const clase = 'h-3 w-3 shrink-0'
+  switch (relacion.tipo) {
+    case 'secuencia':
+      return <span title={`Empieza el día laborable siguiente al fin de ${nombre}`}><ArrowRight className={`${clase} text-blue-500`} /></span>
+    case 'paralelo':
+      return <span title={`Empieza el mismo día que ${nombre} (en paralelo)`}><Columns2 className={`${clase} text-emerald-600`} /></span>
+    case 'solape':
+      return <span title={`Empieza antes de que termine ${nombre} (se solapan)`}><Layers className={`${clase} text-amber-500`} /></span>
+    case 'hueco':
+      return (
+        <span className="shrink-0 text-[9px] font-medium text-gray-400" title={`${relacion.dias} día(s) laborable(s) libre(s) después de ${nombre}`}>
+          +{relacion.dias}d
+        </span>
+      )
+    case 'antes':
+      return <span title={`Empieza antes que ${nombre}, que está arriba en la lista (no están en orden de fecha)`}><ArrowLeft className={`${clase} text-rose-400`} /></span>
+    default:
+      return <span className="w-3 shrink-0" />
+  }
+}
 
 interface TreeNodeProps {
   node: TreeNodeType
@@ -369,9 +404,10 @@ export function TreeNode({
           )}
         </div>
 
-        {/* Columna 4: Fechas */}
-        <div className="text-center text-[11px] text-gray-500 truncate">
-          {formatDates()}
+        {/* Columna 4: Fechas (+ relación con el elemento de arriba) */}
+        <div className="flex items-center justify-center gap-1 text-[11px] text-gray-500 min-w-0">
+          <RelacionAnteriorIcono relacion={node.data.relacionAnterior} />
+          <span className="truncate">{formatDates()}</span>
         </div>
 
         {/* Columna 5: Duration (días hábiles desde fechas) */}

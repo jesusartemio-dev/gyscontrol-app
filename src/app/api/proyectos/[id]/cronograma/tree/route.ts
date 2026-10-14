@@ -13,6 +13,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { contarDiasLaborables } from '@/lib/utils/calendarioLaboral'
+import { clasificarRelacion } from '@/lib/services/cronogramaDesplazamiento'
 import { calcularHHRealDeTarea } from '@/lib/planTrabajo/calcularDatos'
 
 // ✅ GET /api/proyectos/[id]/cronograma/tree - Obtener árbol jerárquico del cronograma
@@ -650,6 +651,31 @@ export async function GET(
         responsablesExtrasAsignados: proyectoResponsables.extrasAssigned
       },
       children: faseNodes,
+    }
+
+    // Relación de cada EDT/actividad/tarea con el hermano de arriba (→ ∥ ⤚ +Nd),
+    // deducida de las fechas con el calendario del proyecto. Solo informativa.
+    if (calendarioLaboral) {
+      const fechasDe = (n: any) => {
+        const ini = n.data?.fechaInicio ?? n.data?.fechaInicioComercial
+        const fin = n.data?.fechaFin ?? n.data?.fechaFinComercial
+        return ini && fin ? { inicio: new Date(ini), fin: new Date(fin) } : null
+      }
+      const anotarRelaciones = (nodo: any) => {
+        const hijos: any[] = (nodo.children || []).filter((c: any) => !c.data?.isExtrasGroup)
+        for (let i = 1; i < hijos.length; i++) {
+          const prev = hijos[i - 1]
+          const cur = hijos[i]
+          if (prev.type !== cur.type || !['edt', 'actividad', 'tarea'].includes(cur.type)) continue
+          const fPrev = fechasDe(prev)
+          const fCur = fechasDe(cur)
+          if (fPrev && fCur) {
+            cur.data.relacionAnterior = clasificarRelacion(calendarioLaboral, { ...fPrev, nombre: prev.nombre }, fCur)
+          }
+        }
+        for (const hijo of nodo.children || []) anotarRelaciones(hijo)
+      }
+      anotarRelaciones(projectNode)
     }
 
     const tree = [projectNode]

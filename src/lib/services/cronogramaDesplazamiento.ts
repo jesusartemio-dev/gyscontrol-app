@@ -104,6 +104,42 @@ export function diferenciaDiasLaborables(cal: CalendarioDesplazamiento, desde: D
   return signo * cuenta
 }
 
+// ── Relación con el hermano de arriba (solo informativa) ───────────────────
+
+export type TipoRelacion = 'secuencia' | 'paralelo' | 'solape' | 'hueco' | 'antes'
+
+export interface RelacionAnterior {
+  tipo: TipoRelacion
+  /** Días laborables libres entre ambos (solo `hueco`). */
+  dias?: number
+  anteriorNombre: string
+}
+
+/**
+ * Cómo se ubica un elemento respecto al que está justo arriba en su nivel,
+ * deducido de las fechas (no se guarda ninguna dependencia):
+ * - paralelo: empiezan el mismo día.
+ * - secuencia: empieza el día laborable siguiente al fin del anterior.
+ * - solape: empieza después que el anterior pero antes de que este termine.
+ * - hueco: hay `dias` días laborables libres entre el fin del anterior y su inicio.
+ * - antes: empieza antes que el anterior (la lista no está en orden de fecha).
+ */
+export function clasificarRelacion(
+  cal: CalendarioDesplazamiento,
+  anterior: { inicio: Date; fin: Date; nombre: string },
+  actual: { inicio: Date },
+): RelacionAnterior {
+  const base = { anteriorNombre: anterior.nombre }
+  const inicio = inicioDiaUTC(actual.inicio)
+  if (mismoDiaUTC(actual.inicio, anterior.inicio)) return { tipo: 'paralelo', ...base }
+  if (inicio < inicioDiaUTC(anterior.inicio)) return { tipo: 'antes', ...base }
+  if (inicio <= inicioDiaUTC(anterior.fin)) return { tipo: 'solape', ...base }
+  if (mismoDiaUTC(actual.inicio, siguienteDiaLaborable(cal, anterior.fin))) return { tipo: 'secuencia', ...base }
+  // Laborables estrictamente entre el fin del anterior y el inicio de este.
+  const libres = Math.max(0, diferenciaDiasLaborables(cal, anterior.fin, ajustarALaborable(cal, actual.inicio)) - 1)
+  return libres === 0 ? { tipo: 'secuencia', ...base } : { tipo: 'hueco', dias: libres, ...base }
+}
+
 // ── Posicionar un nodo respecto a su padre o a un hermano ──────────────────
 
 export type ModoPosicion = 'inicio_padre' | 'despues_anterior' | 'despues_ultimo' | 'despues_de' | 'en_paralelo'
