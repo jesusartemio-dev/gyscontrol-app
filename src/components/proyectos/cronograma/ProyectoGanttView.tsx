@@ -83,6 +83,7 @@ interface GanttPrefs {
   zoomLevel?: number
   expandidos?: string[]
   anchoNombres?: number
+  densidad?: Densidad
 }
 const prefsKey = (proyectoId: string) => `gantt-prefs:${proyectoId}`
 const leerPrefs = (proyectoId: string): GanttPrefs => {
@@ -145,7 +146,13 @@ const TIPO_COLORS: Record<string, { bar: string; text: string; bg: string }> = {
   tarea: { bar: '#6b7280', text: 'text-gray-500', bg: 'bg-gray-50' },
 }
 
-const ROW_HEIGHT = 32
+// Densidad de filas: "normal" o "compacta" (más filas en pantalla). En ambas
+// el nombre cabe en 2 líneas; en compacta con letra y barra más bajas.
+type Densidad = 'normal' | 'compacta'
+const DENSIDADES: Record<Densidad, { fila: number; margenBarra: number; texto: string }> = {
+  normal: { fila: 32, margenBarra: 6, texto: 'text-[11px] leading-[13px]' },
+  compacta: { fila: 22, margenBarra: 4, texto: 'text-[10px] leading-[10px]' },
+}
 // Ancho de la columna de nombres: ajustable arrastrando su borde derecho y
 // recordado por proyecto. Límites para que no tape la línea de tiempo.
 const ANCHO_NOMBRES_DEFECTO = 340
@@ -168,6 +175,8 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   const [timeRangeMonths, setTimeRangeMonths] = useState(prefsIniciales.timeRangeMonths ?? 3)
   const [anchoCard, setAnchoCard] = useState(0)
   const [anchoNombres, setAnchoNombres] = useState(prefsIniciales.anchoNombres ?? ANCHO_NOMBRES_DEFECTO)
+  const [densidad, setDensidad] = useState<Densidad>(prefsIniciales.densidad ?? 'normal')
+  const { fila: ROW_HEIGHT, margenBarra: MARGEN_BARRA, texto: claseTextoNombre } = DENSIDADES[densidad]
   // Ancho visible para la línea de tiempo (tarjeta menos la columna de nombres).
   const containerWidth = anchoCard > 0 ? Math.max(0, anchoCard - anchoNombres) : 0
   const { toast } = useToast()
@@ -294,8 +303,8 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   // Recordar nivel, rango, zoom y filas abiertas para este proyecto.
   useEffect(() => {
     if (loading || items.length === 0) return
-    guardarPrefs(proyectoId, { filtroNivel, timeRangeMonths, zoomLevel, anchoNombres, expandidos: [...expandidosDe(items)] })
-  }, [proyectoId, filtroNivel, timeRangeMonths, zoomLevel, anchoNombres, items, loading])
+    guardarPrefs(proyectoId, { filtroNivel, timeRangeMonths, zoomLevel, anchoNombres, densidad, expandidos: [...expandidosDe(items)] })
+  }, [proyectoId, filtroNivel, timeRangeMonths, zoomLevel, anchoNombres, densidad, items, loading])
 
   // Arrastrar el borde derecho de la columna de nombres para cambiar su ancho.
   const iniciarRedimension = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -620,6 +629,16 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
             </SelectContent>
           </Select>
 
+          <Select value={densidad} onValueChange={(v) => setDensidad(v as Densidad)}>
+            <SelectTrigger className="h-7 w-28 text-xs" title="Altura de las filas">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="normal">Filas normales</SelectItem>
+              <SelectItem value="compacta">Filas compactas</SelectItem>
+            </SelectContent>
+          </Select>
+
           <div className="w-px h-4 bg-gray-200" />
 
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoomLevel(prev => Math.max(0.3, prev / 1.4))}>
@@ -726,7 +745,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                       <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
                       {/* Hasta 2 líneas; el nombre completo aparece al pasar el mouse */}
                       <span
-                        className={`min-w-0 flex-1 text-[11px] leading-[13px] line-clamp-2 break-words ${item.nivel === 0 ? 'font-semibold' : item.nivel === 1 ? 'font-medium' : ''}`}
+                        className={`min-w-0 flex-1 ${claseTextoNombre} line-clamp-2 break-words ${item.nivel === 0 ? 'font-semibold' : item.nivel === 1 ? 'font-medium' : ''}`}
                         title={item.nombre}
                       >
                         {item.nombre}
@@ -811,9 +830,9 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                             moviendoId === item.id ? 'animate-pulse' : ''
                           }`}
                           style={{
-                            top: rowIdx * ROW_HEIGHT + 6,
+                            top: rowIdx * ROW_HEIGHT + MARGEN_BARRA,
                             left: barLeft,
-                            height: ROW_HEIGHT - 12,
+                            height: ROW_HEIGHT - MARGEN_BARRA * 2,
                             transform: enArrastre ? `translateX(${arrastre.dx}px)` : undefined,
                           }}
                           onClick={() => seleccionar(item)}
