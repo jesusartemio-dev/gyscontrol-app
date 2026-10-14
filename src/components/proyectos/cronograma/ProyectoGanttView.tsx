@@ -1,6 +1,12 @@
 /**
  * ProyectoGanttView - Vista Gantt con grid temporal, línea hoy, y 5 niveles
  * Usa el endpoint /cronograma/tree para una sola llamada API
+ *
+ * - Clic en una fila o barra: la selecciona (compartida con la vista Jerarquía).
+ * - Ctrl + rueda del mouse: zoom.
+ * - Arrastrar la barra de una actividad (si `editable`): la mueve en bloque con
+ *   sus tareas. El servidor convierte el desplazamiento a días laborables del
+ *   calendario del proyecto (igual que editar la fecha de inicio a mano).
  */
 
 'use client'
@@ -22,6 +28,7 @@ import {
   RotateCcw
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { toast as sonnerToast } from 'sonner'
 import { differenceInDays, addDays, addMonths, startOfMonth, startOfWeek, format, isToday, isSameMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -40,12 +47,37 @@ interface GanttItem {
   expandable: boolean
   expanded?: boolean
   horasEstimadas?: number
+  /** Inicio guardado del propio nodo (antes del rollup de hijos). Base para mover la barra. */
+  fechaInicioNodo?: string
 }
 
 interface ProyectoGanttViewProps {
   proyectoId: string
   cronogramaId?: string
   onItemClick?: (item: GanttItem) => void
+  /** Fila seleccionada (id de nodo, p. ej. "actividad-<uuid>"), compartida con Jerarquía. */
+  selectedId?: string
+  onSelect?: (id: string) => void
+  /** Permite arrastrar barras de actividades (cronograma no comercial ni bloqueado). */
+  editable?: boolean
+}
+
+// Píxeles mínimos de arrastre para que cuente como mover y no como clic.
+const UMBRAL_ARRASTRE_PX = 4
+
+// Día UTC de una fecha + n días, como "YYYY-MM-DD" (las fechas del cronograma
+// se manejan por día UTC, igual que en el árbol).
+const diaUTCMas = (fecha: string | Date, n: number) => {
+  const d = new Date(fecha)
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + n)).toISOString().slice(0, 10)
+}
+
+const expandidosDe = (list: GanttItem[], acc = new Set<string>()) => {
+  for (const item of list) {
+    if (item.expanded) acc.add(item.id)
+    if (item.hijos) expandidosDe(item.hijos, acc)
+  }
+  return acc
 }
 
 const TIPO_COLORS: Record<string, { bar: string; text: string; bg: string }> = {
@@ -59,8 +91,14 @@ const TIPO_COLORS: Record<string, { bar: string; text: string; bg: string }> = {
 const ROW_HEIGHT = 32
 const NAME_COL_WIDTH = 280
 
-export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: ProyectoGanttViewProps) {
+export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selectedId, onSelect, editable = false }: ProyectoGanttViewProps) {
   const [items, setItems] = useState<GanttItem[]>([])
+  const itemsRef = useRef<GanttItem[]>([])
+  itemsRef.current = items
+  const [seleccionId, setSeleccionId] = useState<string | undefined>(selectedId)
+  useEffect(() => { setSeleccionId(selectedId) }, [selectedId])
+  const [arrastre, setArrastre] = useState<{ id: string; startX: number; dx: number } | null>(null)
+  const [moviendoId, setMoviendoId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [zoomLevel, setZoomLevel] = useState(1)
   const [filtroNivel, setFiltroNivel] = useState<string>('todos')
@@ -90,9 +128,11 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
   }, [])
 
   // Load data from tree API (single call)
-  const loadGanttData = useCallback(async () => {
+  // `silencioso`: recarga tras mover una barra, sin spinner y conservando lo expandido.
+  const loadGanttData = useCallback(async (silencioso = false): Promise<GanttItem[] | undefined> => {
+    const expandidosPrevios = silencioso ? expandidosDe(itemsRef.current) : null
     try {
-      setLoading(true)
+      if (!silencioso) setLoading(true)
 
       // Load project info
       const [proyectoRes, treeRes] = await Promise.all([
@@ -124,8 +164,9 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
           padreId: parentId,
           color: TIPO_COLORS[node.type]?.bar || '#6b7280',
           expandable: (node.children?.length || 0) > 0,
-          expanded: nivel <= 1,
+          expanded: expandidosPrevios ? expandidosPrevios.has(node.id) : nivel <= 1,
           horasEstimadas: data.horasEstimadas ? Number(data.horasEstimadas) : undefined,
+          fechaInicioNodo: fechaInicio || undefined,
           hijos: node.children?.map((child: any) => processNode(child, nivel + 1, node.id)) || []
         }
 
@@ -153,17 +194,92 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
         const proyectoItem = processNode(projectNode, 0)
         proyectoItem.expanded = true
         setItems([proyectoItem])
+        return [proyectoItem]
       } else {
         setItems([])
       }
     } catch (error) {
       toast({ title: 'Error cargando Gantt', description: String(error), variant: 'destructive' })
     } finally {
-      setLoading(false)
+      if (!silencioso) setLoading(false)
     }
   }, [proyectoId, cronogramaId])
 
   useEffect(() => { loadGanttData() }, [loadGanttData])
+
+  const seleccionar = (item: GanttItem) => {
+    setSeleccionId(item.id)
+    onSelect?.(item.id)
+    onItemClick?.(item)
+  }
+
+  // Ctrl + rueda = zoom. Listener nativo no pasivo: con el de React no se puede
+  // evitar el zoom del navegador. Se engancha cuando ya existe la tarjeta.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      setZoomLevel(prev => e.deltaY < 0 ? Math.min(4, prev * 1.15) : Math.max(0.3, prev / 1.15))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [loading])
+
+  // Mueve una actividad `dias` días (calendario) según donde se soltó la barra.
+  // El servidor lo convierte a días laborables y corre sus tareas en bloque.
+  const moverActividad = async (item: GanttItem, dias: number) => {
+    const base = item.fechaInicioNodo || item.fechaInicio.toISOString()
+    const nuevoInicio = diaUTCMas(base, dias)
+    const inicioAnterior = diaUTCMas(base, 0)
+    const guardar = (fecha: string) =>
+      fetch(`/api/proyectos/${proyectoId}/cronograma/tree/${item.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fechaInicioComercial: fecha }),
+      }).then(async r => {
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'No se pudo mover la actividad')
+      })
+
+    const buscar = (list: GanttItem[] | undefined): GanttItem | undefined => {
+      for (const i of list || []) {
+        if (i.id === item.id) return i
+        const enHijos = buscar(i.hijos)
+        if (enHijos) return enHijos
+      }
+    }
+
+    setMoviendoId(item.id)
+    try {
+      await guardar(nuevoInicio)
+      const recargados = await loadGanttData(true)
+      // La fecha real puede diferir de donde se soltó (fines de semana, feriados).
+      const inicioReal = buscar(recargados)?.fechaInicioNodo ?? `${nuevoInicio}T00:00:00Z`
+      const fechaTexto = new Date(inicioReal).toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'UTC' })
+      sonnerToast.success(`"${item.nombre}" ahora empieza el ${fechaTexto}`, {
+        description: 'Sus tareas se movieron en bloque según el calendario laboral.',
+        action: {
+          label: 'Deshacer',
+          onClick: async () => {
+            try {
+              await guardar(inicioAnterior)
+              await loadGanttData(true)
+              sonnerToast.success('Movimiento deshecho')
+            } catch (e) {
+              sonnerToast.error(e instanceof Error ? e.message : 'No se pudo deshacer')
+            }
+          },
+        },
+      })
+    } catch (e) {
+      sonnerToast.error(e instanceof Error ? e.message : 'No se pudo mover la actividad')
+    } finally {
+      setMoviendoId(null)
+    }
+  }
+
+  const puedeArrastrar = (item: GanttItem) => editable && item.tipo === 'actividad' && !moviendoId
 
   // Toggle expanded state
   const toggleExpanded = (itemId: string) => {
@@ -414,9 +530,13 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
                 return (
                   <div
                     key={item.id}
-                    className={`flex items-center border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${item.nivel === 0 ? 'bg-blue-50/50' : ''}`}
+                    className={`flex items-center border-b border-gray-100 cursor-pointer ${
+                      item.id === seleccionId
+                        ? 'bg-blue-200/80 shadow-[inset_4px_0_0_0_#2563eb]'
+                        : `hover:bg-blue-50 ${item.nivel === 0 ? 'bg-blue-50/50' : ''}`
+                    }`}
                     style={{ height: ROW_HEIGHT }}
-                    onClick={() => onItemClick?.(item)}
+                    onClick={() => seleccionar(item)}
                   >
                     <div
                       className="flex items-center gap-1 px-2 w-full min-w-0"
@@ -451,6 +571,17 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
 
             {/* Timeline bars */}
             <div className="flex-1 relative" style={{ width: timeline.totalWidth }}>
+              {/* Franja de la fila seleccionada, a lo ancho de la línea de tiempo */}
+              {(() => {
+                const idx = visibleItems.findIndex(i => i.id === seleccionId)
+                return idx >= 0 ? (
+                  <div
+                    className="absolute left-0 right-0 bg-blue-200/50 pointer-events-none"
+                    style={{ top: idx * ROW_HEIGHT, height: ROW_HEIGHT }}
+                  />
+                ) : null
+              })()}
+
               {/* Week grid lines */}
               {timeline.weekLines.map((x, i) => (
                 <div
@@ -491,20 +622,55 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
                 const colors = TIPO_COLORS[item.tipo] || TIPO_COLORS.tarea
                 const labelText = `${durationDays}d${item.horasEstimadas ? ` · ${item.horasEstimadas}h` : ''}`
                 const labelFitsInside = barWidth > 60
+                const arrastrable = puedeArrastrar(item)
+                const enArrastre = arrastre?.id === item.id
+                const diasArrastre = enArrastre ? Math.round(arrastre.dx / timeline.dayWidth) : 0
 
                 return (
                   <TooltipProvider key={item.id}>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div
-                          className="absolute cursor-pointer hover:opacity-80 transition-opacity group"
+                          className={`absolute group select-none touch-none ${
+                            arrastrable ? (enArrastre ? 'cursor-grabbing z-30' : 'cursor-grab') : 'cursor-pointer'
+                          } ${enArrastre ? 'opacity-90' : 'hover:opacity-80 transition-opacity'} ${
+                            moviendoId === item.id ? 'animate-pulse' : ''
+                          }`}
                           style={{
                             top: rowIdx * ROW_HEIGHT + 6,
                             left: barLeft,
                             height: ROW_HEIGHT - 12,
+                            transform: enArrastre ? `translateX(${arrastre.dx}px)` : undefined,
                           }}
-                          onClick={() => onItemClick?.(item)}
+                          onClick={() => seleccionar(item)}
+                          onPointerDown={(e) => {
+                            if (!arrastrable || e.button !== 0) return
+                            e.currentTarget.setPointerCapture(e.pointerId)
+                            setArrastre({ id: item.id, startX: e.clientX, dx: 0 })
+                          }}
+                          onPointerMove={(e) => {
+                            if (!enArrastre) return
+                            setArrastre({ ...arrastre, dx: e.clientX - arrastre.startX })
+                          }}
+                          onPointerUp={() => {
+                            if (!enArrastre) return
+                            const { dx } = arrastre
+                            setArrastre(null)
+                            if (Math.abs(dx) < UMBRAL_ARRASTRE_PX) return // fue un clic
+                            const dias = Math.round(dx / timeline.dayWidth)
+                            if (dias !== 0) moverActividad(item, dias)
+                          }}
+                          onPointerCancel={() => setArrastre(null)}
                         >
+                          {/* Fecha destino mientras se arrastra */}
+                          {enArrastre && Math.abs(arrastre.dx) >= UMBRAL_ARRASTRE_PX && (
+                            <div className="absolute -top-5 left-0 whitespace-nowrap rounded bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-white shadow">
+                              {diasArrastre === 0
+                                ? 'Sin cambio'
+                                : `Inicio: ${new Date(`${diaUTCMas(item.fechaInicioNodo || item.fechaInicio, diasArrastre)}T12:00:00Z`)
+                                    .toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'UTC' })}`}
+                            </div>
+                          )}
                           {/* Bar background */}
                           <div
                             className="absolute top-0 left-0 h-full rounded shadow-sm"
@@ -526,13 +692,17 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick }: Pro
                           </div>
                         </div>
                       </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-xs text-xs">
-                        <div className="space-y-1">
-                          <div className="font-semibold">{item.nombre}</div>
-                          <div>{format(item.fechaInicio, 'dd MMM yyyy', { locale: es })} → {format(item.fechaFin, 'dd MMM yyyy', { locale: es })}</div>
-                          <div>{durationDays} días{item.horasEstimadas ? ` · ${item.horasEstimadas}h` : ''} · {item.porcentajeAvance}%</div>
-                        </div>
-                      </TooltipContent>
+                      {/* Durante el arrastre se oculta el tooltip para que no tape el destino */}
+                      {!enArrastre && moviendoId !== item.id && (
+                        <TooltipContent side="top" className="max-w-xs text-xs">
+                          <div className="space-y-1">
+                            <div className="font-semibold">{item.nombre}</div>
+                            <div>{format(item.fechaInicio, 'dd MMM yyyy', { locale: es })} → {format(item.fechaFin, 'dd MMM yyyy', { locale: es })}</div>
+                            <div>{durationDays} días{item.horasEstimadas ? ` · ${item.horasEstimadas}h` : ''} · {item.porcentajeAvance}%</div>
+                            {arrastrable && <div className="text-muted-foreground">Arrastra la barra para mover la actividad con sus tareas</div>}
+                          </div>
+                        </TooltipContent>
+                      )}
                     </Tooltip>
                   </TooltipProvider>
                 )

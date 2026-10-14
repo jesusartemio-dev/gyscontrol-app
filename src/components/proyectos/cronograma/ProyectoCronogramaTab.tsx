@@ -109,6 +109,8 @@ export function ProyectoCronogramaTab({
   const [fechaInicio, setFechaInicio] = useState('')
   const [fechaFin, setFechaFin] = useState('')
   const [stats, setStats] = useState<CronogramaStats>({ fases: 0, edts: 0, actividades: 0, tareas: 0, tareasExtras: 0, horasExtras: 0 })
+  // Fila seleccionada, compartida entre Jerarquía y Gantt (ids tipo "actividad-<uuid>")
+  const [nodoSeleccionadoId, setNodoSeleccionadoId] = useState<string | undefined>()
 
   // Estado del calendario laboral
   const [calendarioAsignado, setCalendarioAsignado] = useState<{ id: string; nombre: string; horasPorDia: number } | null>(null)
@@ -1230,6 +1232,8 @@ export function ProyectoCronogramaTab({
             onRefresh={handleRefresh}
             fechaInicioProyecto={fechaInicio}
             selectedCronograma={selectedCronograma}
+            nodoSeleccionadoId={nodoSeleccionadoId}
+            onSeleccionarNodo={setNodoSeleccionadoId}
           />
         </TabsContent>
 
@@ -1237,12 +1241,9 @@ export function ProyectoCronogramaTab({
           <ProyectoGanttView
             proyectoId={proyectoId}
             cronogramaId={selectedCronograma?.id}
-            onItemClick={(item) => {
-              toast({
-                title: 'Elemento seleccionado',
-                description: `${item.nombre} (${item.tipo})`
-              })
-            }}
+            selectedId={nodoSeleccionadoId}
+            onSelect={setNodoSeleccionadoId}
+            editable={!esBloqueado}
           />
         </TabsContent>
 

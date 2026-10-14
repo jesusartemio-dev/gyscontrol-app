@@ -296,7 +296,9 @@ export async function PUT(
     if (nodeType !== 'tarea' && currentDates.fechaInicio && newFechaInicioRaw
         && !mismoDiaUTC(currentDates.fechaInicio, newFechaInicioRaw)) {
       const calendario = await getCalendario()
-      const deltaLaborables = diferenciaDiasLaborables(calendario, currentDates.fechaInicio, newFechaInicioRaw)
+      // Un inicio en día no laborable (p. ej. soltar la barra del Gantt en
+      // sábado) cuenta como el siguiente día laborable.
+      const deltaLaborables = diferenciaDiasLaborables(calendario, currentDates.fechaInicio, ajustarALaborable(calendario, newFechaInicioRaw))
       const newFechaFinRaw: Date | undefined = updateData.fechaFinPlan
       const finSinCambio = !newFechaFinRaw || (currentDates.fechaFin && mismoDiaUTC(currentDates.fechaFin, newFechaFinRaw))
       if (finSinCambio && currentDates.fechaFin) {

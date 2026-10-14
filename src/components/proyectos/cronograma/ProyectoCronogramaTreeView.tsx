@@ -67,6 +67,9 @@ interface ProyectoCronogramaTreeViewProps {
   fechaInicioProyecto?: string
   refreshKey?: number
   selectedCronograma?: any
+  /** Nodo seleccionado compartido con el Gantt (se conserva al cambiar de vista). */
+  nodoSeleccionadoId?: string
+  onSeleccionarNodo?: (nodeId: string) => void
 }
 
 export function ProyectoCronogramaTreeView({
@@ -74,10 +77,21 @@ export function ProyectoCronogramaTreeView({
   onRefresh,
   fechaInicioProyecto,
   refreshKey,
-  selectedCronograma
+  selectedCronograma,
+  nodoSeleccionadoId,
+  onSeleccionarNodo,
 }: ProyectoCronogramaTreeViewProps) {
   // ✅ Usar hook específico para proyectos
   const { state, actions } = useProyectoCronogramaTree(proyectoId, selectedCronograma?.id)
+
+  // Selección compartida con el Gantt: al montar se toma la que viene de
+  // afuera y cada cambio se informa hacia arriba.
+  React.useEffect(() => {
+    if (nodoSeleccionadoId && state.selectedNodeId !== nodoSeleccionadoId) actions.selectNode(nodoSeleccionadoId)
+  }, [nodoSeleccionadoId])
+  React.useEffect(() => {
+    if (state.selectedNodeId) onSeleccionarNodo?.(state.selectedNodeId)
+  }, [state.selectedNodeId])
   const [showForm, setShowForm] = useState(false)
   const [formContext, setFormContext] = useState<{
     mode: 'create' | 'edit'
