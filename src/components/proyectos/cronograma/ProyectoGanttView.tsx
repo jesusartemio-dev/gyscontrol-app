@@ -82,6 +82,7 @@ interface GanttPrefs {
   timeRangeMonths?: number
   zoomLevel?: number
   expandidos?: string[]
+  anchoNombres?: number
 }
 const prefsKey = (proyectoId: string) => `gantt-prefs:${proyectoId}`
 const leerPrefs = (proyectoId: string): GanttPrefs => {
@@ -145,7 +146,11 @@ const TIPO_COLORS: Record<string, { bar: string; text: string; bg: string }> = {
 }
 
 const ROW_HEIGHT = 32
-const NAME_COL_WIDTH = 280
+// Ancho de la columna de nombres: ajustable arrastrando su borde derecho y
+// recordado por proyecto. Límites para que no tape la línea de tiempo.
+const ANCHO_NOMBRES_DEFECTO = 340
+const ANCHO_NOMBRES_MIN = 220
+const ANCHO_NOMBRES_MAX = 640
 
 export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selectedId, onSelect, editable = false, refreshKey }: ProyectoGanttViewProps) {
   const [prefsIniciales] = useState(() => leerPrefs(proyectoId))
@@ -161,7 +166,10 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   const [zoomLevel, setZoomLevel] = useState(prefsIniciales.zoomLevel ?? 1)
   const [filtroNivel, setFiltroNivel] = useState<string>(prefsIniciales.filtroNivel ?? 'todos')
   const [timeRangeMonths, setTimeRangeMonths] = useState(prefsIniciales.timeRangeMonths ?? 3)
-  const [containerWidth, setContainerWidth] = useState(0)
+  const [anchoCard, setAnchoCard] = useState(0)
+  const [anchoNombres, setAnchoNombres] = useState(prefsIniciales.anchoNombres ?? ANCHO_NOMBRES_DEFECTO)
+  // Ancho visible para la línea de tiempo (tarjeta menos la columna de nombres).
+  const containerWidth = anchoCard > 0 ? Math.max(0, anchoCard - anchoNombres) : 0
   const { toast } = useToast()
   const bodyScrollRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -172,7 +180,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
     const el = containerRef.current
     if (!el) return
     const ro = new ResizeObserver(([entry]) => {
-      setContainerWidth(entry.contentRect.width - NAME_COL_WIDTH)
+      setAnchoCard(entry.contentRect.width)
     })
     ro.observe(el)
     return () => ro.disconnect()
@@ -286,8 +294,38 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   // Recordar nivel, rango, zoom y filas abiertas para este proyecto.
   useEffect(() => {
     if (loading || items.length === 0) return
-    guardarPrefs(proyectoId, { filtroNivel, timeRangeMonths, zoomLevel, expandidos: [...expandidosDe(items)] })
-  }, [proyectoId, filtroNivel, timeRangeMonths, zoomLevel, items, loading])
+    guardarPrefs(proyectoId, { filtroNivel, timeRangeMonths, zoomLevel, anchoNombres, expandidos: [...expandidosDe(items)] })
+  }, [proyectoId, filtroNivel, timeRangeMonths, zoomLevel, anchoNombres, items, loading])
+
+  // Arrastrar el borde derecho de la columna de nombres para cambiar su ancho.
+  const iniciarRedimension = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const inicioX = e.clientX
+    const anchoInicial = anchoNombres
+    const mover = (ev: PointerEvent) => {
+      const nuevo = anchoInicial + (ev.clientX - inicioX)
+      setAnchoNombres(Math.min(ANCHO_NOMBRES_MAX, Math.max(ANCHO_NOMBRES_MIN, nuevo)))
+    }
+    const soltar = () => {
+      window.removeEventListener('pointermove', mover)
+      window.removeEventListener('pointerup', soltar)
+      document.body.style.cursor = ''
+    }
+    document.body.style.cursor = 'col-resize'
+    window.addEventListener('pointermove', mover)
+    window.addEventListener('pointerup', soltar)
+  }
+
+  const asaRedimension = (
+    <div
+      className="absolute right-0 top-0 bottom-0 z-50 w-1.5 -mr-[3px] cursor-col-resize hover:bg-blue-400/60 active:bg-blue-500/70"
+      onPointerDown={iniciarRedimension}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={() => setAnchoNombres(ANCHO_NOMBRES_DEFECTO)}
+      title="Arrastra para cambiar el ancho (doble clic: ancho por defecto)"
+    />
+  )
 
   // Abrir o cerrar todos los niveles (cerrar deja visible solo el proyecto y sus fases).
   const expandirTodo = (abrir: boolean) => {
@@ -624,14 +662,15 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
         {/* Encabezado y filas comparten un solo scroll horizontal; la columna de
             nombres es sticky, así queda visible al recorrer la línea de tiempo. */}
         <div className="overflow-x-auto" ref={bodyScrollRef}>
-          <div style={{ width: NAME_COL_WIDTH + timeline.totalWidth, minWidth: '100%' }}>
+          <div style={{ width: anchoNombres + timeline.totalWidth, minWidth: '100%' }}>
           {/* Header row: name col + timeline months */}
           <div className="flex border-b bg-white">
             <div
               className="sticky left-0 z-40 flex-shrink-0 border-r border-gray-200 bg-gray-50 px-2 py-1.5"
-              style={{ width: NAME_COL_WIDTH }}
+              style={{ width: anchoNombres }}
             >
               <span className="text-xs font-medium text-gray-600">Elemento</span>
+              {asaRedimension}
             </div>
             <div className="flex flex-shrink-0" style={{ width: timeline.totalWidth }}>
               {timeline.months.map((m, i) => (
@@ -650,8 +689,9 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
             {/* Name column (fija a la izquierda; fondos opacos para tapar las barras al pasar debajo) */}
             <div
               className="sticky left-0 z-40 flex-shrink-0 bg-white border-r border-gray-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]"
-              style={{ width: NAME_COL_WIDTH }}
+              style={{ width: anchoNombres }}
             >
+              {asaRedimension}
               {visibleItems.map((item) => {
                 const colors = TIPO_COLORS[item.tipo] || TIPO_COLORS.tarea
                 return (
@@ -684,7 +724,11 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                       </div>
                       {/* Color dot + name */}
                       <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-                      <span className={`text-xs truncate ${item.nivel === 0 ? 'font-semibold' : item.nivel === 1 ? 'font-medium' : ''}`}>
+                      {/* Hasta 2 líneas; el nombre completo aparece al pasar el mouse */}
+                      <span
+                        className={`min-w-0 flex-1 text-[11px] leading-[13px] line-clamp-2 break-words ${item.nivel === 0 ? 'font-semibold' : item.nivel === 1 ? 'font-medium' : ''}`}
+                        title={item.nombre}
+                      >
                         {item.nombre}
                       </span>
                       <Badge variant="outline" className={`text-[9px] leading-none px-1 py-0 h-3.5 flex-shrink-0 ${colors.text} border-current/30`}>
