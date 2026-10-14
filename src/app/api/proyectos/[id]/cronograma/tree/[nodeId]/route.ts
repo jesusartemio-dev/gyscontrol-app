@@ -15,6 +15,16 @@ import { z } from 'zod'
 import { logger } from '@/lib/logger'
 import { registrarAvanceTarea, propagarRollup } from '@/lib/services/avanceTarea'
 import {
+  obtenerCalendarioProyecto,
+  diferenciaDiasLaborables,
+  desplazarDiasLaborables,
+  desplazarDescendientes,
+  siguienteDiaLaborable,
+  ajustarALaborable,
+  inicioDiaUTC,
+  mismoDiaUTC,
+} from '@/lib/services/cronogramaDesplazamiento'
+import {
   validarPermisoCronogramaPorEdt,
   validarPermisoCronogramaPorTarea,
   validarPermisoCronogramaPorFase,
@@ -52,6 +62,13 @@ const updateNodeSchema = z.object({
   // Solo aplica a tarea — actividad/EDT/fase derivan su % de sus tareas (ProgresoService)
   // y no se pueden editar directamente.
   porcentajeCompletado: z.number().min(0).max(100).optional(),
+  // Solo actividad: programarla después de otra actividad o en paralelo con
+  // ella. El servidor calcula el nuevo inicio con el calendario del proyecto y
+  // la actividad se mueve en bloque con sus tareas.
+  programarRespecto: z.object({
+    modo: z.enum(['despues_de', 'en_paralelo']),
+    actividadId: z.string().min(1),
+  }).optional(),
 })
 
 // ✅ PUT /api/proyectos/[id]/cronograma/tree/[nodeId] - Actualizar nodo específico
@@ -121,6 +138,38 @@ export async function PUT(
 
     // ✅ Obtener fechas actuales antes de actualizar (para detectar cambios reales)
     const currentDates = await fetchCurrentNodeDates(nodeType, realId)
+
+    // "Después de" / "En paralelo con" otra actividad: se traduce a un nuevo
+    // inicio y sigue por el mismo camino que editar la fecha a mano.
+    // Solo se consulta si hay que mover fechas (reordenar o renombrar no lo necesitan).
+    let calendarioCache: Awaited<ReturnType<typeof obtenerCalendarioProyecto>> | undefined
+    const getCalendario = async () => (calendarioCache ??= await obtenerCalendarioProyecto(id))
+
+    if (validatedData.programarRespecto) {
+      const calendario = await getCalendario()
+      if (nodeType !== 'actividad') {
+        return NextResponse.json({ error: 'Solo se puede programar una actividad respecto a otra' }, { status: 400 })
+      }
+      const [propia, referencia] = await Promise.all([
+        prisma.proyectoActividad.findUnique({ where: { id: realId }, select: { proyectoCronogramaId: true } }),
+        prisma.proyectoActividad.findUnique({
+          where: { id: validatedData.programarRespecto.actividadId },
+          select: { proyectoCronogramaId: true, fechaInicioPlan: true, fechaFinPlan: true },
+        }),
+      ])
+      if (!referencia || referencia.proyectoCronogramaId !== propia?.proyectoCronogramaId) {
+        return NextResponse.json({ error: 'La actividad de referencia no es de este cronograma' }, { status: 400 })
+      }
+      if (validatedData.programarRespecto.actividadId === realId) {
+        return NextResponse.json({ error: 'Elige otra actividad como referencia' }, { status: 400 })
+      }
+      const nuevoInicio = validatedData.programarRespecto.modo === 'despues_de'
+        ? siguienteDiaLaborable(calendario, referencia.fechaFinPlan)
+        : ajustarALaborable(calendario, referencia.fechaInicioPlan)
+      validatedData.fechaInicioComercial = inicioDiaUTC(nuevoInicio).toISOString()
+      // El fin lo calcula el desplazamiento en bloque, conservando la duración.
+      validatedData.fechaFinComercial = undefined
+    }
 
     // ✅ Actualizar según el tipo de nodo
     let updateData: any = {}
@@ -238,13 +287,26 @@ export async function PUT(
 
     console.log('✅ [API TREE UPDATE] Nodo actualizado exitosamente:', { nodeType, realId })
 
-    // ✅ Opción A: Cascada de fechas hacia abajo cuando cambia fechaInicio
-    const newFechaInicioRaw = nodeType === 'tarea' ? updateData.fechaInicio : updateData.fechaInicioPlan
-    if (nodeType !== 'tarea' && currentDates.fechaInicio && newFechaInicioRaw) {
-      const deltaDias = Math.round((newFechaInicioRaw.getTime() - currentDates.fechaInicio.getTime()) / 86400000)
-      if (deltaDias !== 0) {
-        await cascadarFechasHaciaAbajo(nodeType, realId, deltaDias)
+    // ✅ Mover en bloque cuando cambia el inicio de una fase/EDT/actividad: todo
+    // lo de adentro se corre los mismos días laborables (calendario del
+    // proyecto). Si no se cambió también el fin, se corre igual para conservar
+    // la duración — antes quedaba el fin viejo y la barra no coincidía con sus
+    // tareas.
+    const newFechaInicioRaw: Date | undefined = nodeType === 'tarea' ? undefined : updateData.fechaInicioPlan
+    if (nodeType !== 'tarea' && currentDates.fechaInicio && newFechaInicioRaw
+        && !mismoDiaUTC(currentDates.fechaInicio, newFechaInicioRaw)) {
+      const calendario = await getCalendario()
+      const deltaLaborables = diferenciaDiasLaborables(calendario, currentDates.fechaInicio, newFechaInicioRaw)
+      const newFechaFinRaw: Date | undefined = updateData.fechaFinPlan
+      const finSinCambio = !newFechaFinRaw || (currentDates.fechaFin && mismoDiaUTC(currentDates.fechaFin, newFechaFinRaw))
+      if (finSinCambio && currentDates.fechaFin) {
+        const finDesplazado = desplazarDiasLaborables(calendario, currentDates.fechaFin, deltaLaborables)
+        updateData.fechaFinPlan = finDesplazado
+        await actualizarFinNodo(nodeType, realId, finDesplazado)
       }
+      await desplazarDescendientes(calendario, nodeType, realId, deltaLaborables)
+      // Con los hijos ya movidos, el propio nodo toma sus fechas reales.
+      await recalcularNodoPadre(nodeType, realId)
     }
 
     // ✅ GYS-GEN-12: Solo recalcular padres si fechas/horas realmente cambiaron
@@ -628,58 +690,13 @@ async function recalcularFasePadre(faseId: string): Promise<void> {
   })
 }
 
-// ✅ Opción A: Desplazar todas las fechas de los hijos por deltaDias
-async function cascadarFechasHaciaAbajo(nodeType: string, realId: string, deltaDias: number): Promise<void> {
-  const deltaMs = deltaDias * 86400000
-
-  if (nodeType === 'fase') {
-    const edts = await prisma.proyectoEdt.findMany({
-      where: { proyectoFaseId: realId },
-      select: { id: true, fechaInicioPlan: true, fechaFinPlan: true }
-    })
-    for (const edt of edts) {
-      await prisma.proyectoEdt.update({
-        where: { id: edt.id },
-        data: {
-          fechaInicioPlan: edt.fechaInicioPlan ? new Date(edt.fechaInicioPlan.getTime() + deltaMs) : undefined,
-          fechaFinPlan:    edt.fechaFinPlan    ? new Date(edt.fechaFinPlan.getTime()    + deltaMs) : undefined,
-        }
-      })
-      await cascadarFechasHaciaAbajo('edt', edt.id, deltaDias)
-    }
-
-  } else if (nodeType === 'edt') {
-    const actividades = await prisma.proyectoActividad.findMany({
-      where: { proyectoEdtId: realId },
-      select: { id: true, fechaInicioPlan: true, fechaFinPlan: true }
-    })
-    for (const act of actividades) {
-      await prisma.proyectoActividad.update({
-        where: { id: act.id },
-        data: {
-          fechaInicioPlan: act.fechaInicioPlan ? new Date(act.fechaInicioPlan.getTime() + deltaMs) : undefined,
-          fechaFinPlan:    act.fechaFinPlan    ? new Date(act.fechaFinPlan.getTime()    + deltaMs) : undefined,
-        }
-      })
-      await cascadarFechasHaciaAbajo('actividad', act.id, deltaDias)
-    }
-
-  } else if (nodeType === 'actividad') {
-    const tareas = await prisma.proyectoTarea.findMany({
-      where: { proyectoActividadId: realId },
-      select: { id: true, fechaInicio: true, fechaFin: true }
-    })
-    for (const tarea of tareas) {
-      await prisma.proyectoTarea.update({
-        where: { id: tarea.id },
-        data: {
-          fechaInicio: tarea.fechaInicio ? new Date(tarea.fechaInicio.getTime() + deltaMs) : undefined,
-          fechaFin:    tarea.fechaFin    ? new Date(tarea.fechaFin.getTime()    + deltaMs) : undefined,
-        }
-      })
-    }
-  }
-  // Tarea: nodo hoja, nada que cascadar
+// Fin del propio nodo cuando se mueve en bloque sin que se haya editado su fin.
+// (El desplazamiento de los hijos vive en cronogramaDesplazamiento.ts.)
+async function actualizarFinNodo(nodeType: string, realId: string, fechaFinPlan: Date): Promise<void> {
+  const data = { fechaFinPlan, updatedAt: new Date() }
+  if (nodeType === 'fase') await prisma.proyectoFase.update({ where: { id: realId }, data })
+  else if (nodeType === 'edt') await prisma.proyectoEdt.update({ where: { id: realId }, data })
+  else if (nodeType === 'actividad') await prisma.proyectoActividad.update({ where: { id: realId }, data })
 }
 
 // ✅ Obtener fechas actuales del nodo antes de actualizar

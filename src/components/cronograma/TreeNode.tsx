@@ -6,7 +6,7 @@
 // ===================================================
 
 import React from 'react'
-import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine, ArrowRightLeft } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine, ArrowRightLeft, ArrowRightToLine, Columns2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -36,6 +36,7 @@ interface TreeNodeProps {
   onDuplicarActividad?: () => void
   onMoverEdt?: () => void
   onAjustarPosicion?: (posicion: 'inicio_padre' | 'despues_ultimo') => void
+  onProgramarRespecto?: (modo: 'despues_de' | 'en_paralelo') => void
   dragListeners?: Record<string, Function>
   dragAttributes?: Record<string, any>
   isDragging?: boolean
@@ -106,6 +107,7 @@ export function TreeNode({
   onDuplicarActividad,
   onMoverEdt,
   onAjustarPosicion,
+  onProgramarRespecto,
   dragListeners,
   dragAttributes,
   isDragging,
@@ -634,6 +636,26 @@ export function TreeNode({
                   >
                     <ArrowDownToLine className="h-4 w-4 mr-2" />
                     Tras último hermano
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              {/* Programar respecto a otra actividad - mueve la actividad con sus tareas */}
+              {!readOnly && node.type === 'actividad' && onProgramarRespecto && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => { setDropdownOpen(false); onProgramarRespecto('despues_de') }}
+                    className="text-gray-600"
+                  >
+                    <ArrowRightToLine className="h-4 w-4 mr-2" />
+                    Programar después de…
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => { setDropdownOpen(false); onProgramarRespecto('en_paralelo') }}
+                    className="text-gray-600"
+                  >
+                    <Columns2 className="h-4 w-4 mr-2" />
+                    En paralelo con…
                   </DropdownMenuItem>
                 </>
               )}

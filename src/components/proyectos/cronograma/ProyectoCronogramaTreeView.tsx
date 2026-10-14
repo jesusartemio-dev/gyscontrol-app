@@ -27,6 +27,7 @@ import { ImportTareasModal } from '../../cronograma/ImportTareasModal'
 import { AsignarResponsable } from './AsignarResponsable'
 import { AsignarRecurso } from './AsignarRecurso'
 import { MoverActividadEdtModal } from './MoverActividadEdtModal'
+import { ProgramarActividadModal, type ModoProgramacion } from './ProgramarActividadModal'
 import { CronogramaTreeViewProps, TreeNode as TreeNodeType, NodeType } from '../../cronograma/types'
 import type { EdtImportSelection } from '../../cronograma/ImportEdtModal'
 import { useProyectoCronogramaTree } from './hooks/useProyectoCronogramaTree'
@@ -345,6 +346,29 @@ export function ProyectoCronogramaTreeView({
   const [showImportTareasModal, setShowImportTareasModal] = useState(false)
   const [importTareasData, setImportTareasData] = useState<any[]>([])
   const [currentActividadNombre, setCurrentActividadNombre] = useState('')
+
+  // Estado para modal de programar actividad después de / en paralelo con otra
+  const [programarModal, setProgramarModal] = useState<{
+    open: boolean
+    modo: ModoProgramacion
+    nodeId: string
+  }>({ open: false, modo: 'despues_de', nodeId: '' })
+
+  const programarNode = programarModal.nodeId ? state.nodes.get(programarModal.nodeId) : undefined
+  // Candidatas: las otras actividades del mismo EDT (siempre están cargadas,
+  // porque son hermanas de la que se está programando).
+  const programarCandidatas = useMemo(() => {
+    if (!programarNode?.parentId) return []
+    const padre = state.nodes.get(programarNode.parentId)
+    return (padre?.children || [])
+      .filter(c => c.type === 'actividad' && c.id !== programarNode.id)
+      .map(c => ({
+        id: c.id.replace('actividad-', ''),
+        nombre: c.nombre,
+        fechaInicio: c.data?.fechaInicioComercial || c.data?.fechaInicioPlan,
+        fechaFin: c.data?.fechaFinComercial || c.data?.fechaFinPlan,
+      }))
+  }, [programarNode, state.nodes])
 
   // Estado para modal de mover actividad a otro EDT
   const [moverEdtModal, setMoverEdtModal] = useState<{
@@ -846,6 +870,11 @@ export function ProyectoCronogramaTreeView({
                     onDuplicate={!isReadOnly && node.type === 'tarea' ? () => handleDuplicateTarea(nodeId) : undefined}
                     onDuplicarActividad={!isReadOnly && node.type === 'actividad' ? () => handleDuplicarActividad(nodeId) : undefined}
                     onMoverEdt={!isReadOnly && node.type === 'actividad' ? () => handleAbrirMoverEdt(nodeId) : undefined}
+                    onProgramarRespecto={
+                      !isReadOnly && node.type === 'actividad'
+                        ? (modo) => setProgramarModal({ open: true, modo, nodeId })
+                        : undefined
+                    }
                     onAjustarPosicion={
                       !isReadOnly && (node.type === 'tarea' || node.type === 'actividad')
                         ? (pos) => handleAjustarPosicion(nodeId, pos)
@@ -1223,6 +1252,21 @@ export function ProyectoCronogramaTreeView({
           recursoActual={recursoModal.recursoActual}
           onAsignacionExitosa={async () => {
             setRecursoModal(prev => ({ ...prev, open: false }))
+            await actions.loadTree([...state.expandedNodes])
+            onRefresh?.()
+          }}
+        />
+
+        {/* Modal de programar actividad después de / en paralelo con otra */}
+        <ProgramarActividadModal
+          open={programarModal.open}
+          onOpenChange={(open) => setProgramarModal(prev => ({ ...prev, open }))}
+          proyectoId={proyectoId}
+          modo={programarModal.modo}
+          actividadNodeId={programarModal.nodeId}
+          actividadNombre={programarNode?.nombre || ''}
+          candidatas={programarCandidatas}
+          onSuccess={async () => {
             await actions.loadTree([...state.expandedNodes])
             onRefresh?.()
           }}
