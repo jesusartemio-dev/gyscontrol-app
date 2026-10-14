@@ -159,6 +159,11 @@ export async function POST(req: Request) {
 
     const fechaLabel = registroCampo.fechaTrabajo.toISOString().slice(0, 10)
     const numero = await generarNumeroHoja()
+    // El anticipo solicitado es lo que se pide en el día (almuerzo + pasajes),
+    // igual que en los requerimientos de materiales. Antes quedaba en 0 y había
+    // que retroceder el REQ para cargarlo a mano antes de aprobar.
+    const montoAnticipo =
+      Math.round((montoAlmuerzo + payload.pasajes.reduce((s, p) => s + Number(p.monto), 0)) * 100) / 100
 
     const hoja = await prisma.$transaction(async (tx) => {
       const creada = await tx.hojaDeGastos.create({
@@ -170,6 +175,7 @@ export async function POST(req: Request) {
           empleadoId: session.user.id,
           motivo: `Requerimiento del día — Jornada ${fechaLabel} (${registroCampo.proyecto.codigo})`,
           requiereAnticipo: true,
+          montoAnticipo,
           estado: 'enviado',
           fechaEnvio: new Date(),
           origenRegistroCampoId: registroCampo.id,
