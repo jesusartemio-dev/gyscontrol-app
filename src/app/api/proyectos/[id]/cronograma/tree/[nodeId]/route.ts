@@ -19,9 +19,8 @@ import {
   diferenciaDiasLaborables,
   desplazarDiasLaborables,
   desplazarDescendientes,
-  siguienteDiaLaborable,
+  calcularInicioPosicion,
   ajustarALaborable,
-  inicioDiaUTC,
   mismoDiaUTC,
 } from '@/lib/services/cronogramaDesplazamiento'
 import {
@@ -62,9 +61,14 @@ const updateNodeSchema = z.object({
   // Solo aplica a tarea — actividad/EDT/fase derivan su % de sus tareas (ProgresoService)
   // y no se pueden editar directamente.
   porcentajeCompletado: z.number().min(0).max(100).optional(),
-  // Solo actividad: programarla después de otra actividad o en paralelo con
-  // ella. El servidor calcula el nuevo inicio con el calendario del proyecto y
-  // la actividad se mueve en bloque con sus tareas.
+  // EDT, actividad o tarea: ubicarla respecto a su padre o a un hermano. El
+  // servidor calcula el nuevo inicio con el calendario del proyecto y el nodo
+  // se mueve en bloque con todo lo que contiene, conservando su duración.
+  posicion: z.object({
+    modo: z.enum(['inicio_padre', 'despues_anterior', 'despues_ultimo', 'despues_de', 'en_paralelo']),
+    referenciaId: z.string().optional(),
+  }).optional(),
+  // Alias anterior de `posicion` (solo actividades), se mantiene por compatibilidad.
   programarRespecto: z.object({
     modo: z.enum(['despues_de', 'en_paralelo']),
     actividadId: z.string().min(1),
@@ -139,36 +143,30 @@ export async function PUT(
     // ✅ Obtener fechas actuales antes de actualizar (para detectar cambios reales)
     const currentDates = await fetchCurrentNodeDates(nodeType, realId)
 
-    // "Después de" / "En paralelo con" otra actividad: se traduce a un nuevo
-    // inicio y sigue por el mismo camino que editar la fecha a mano.
     // Solo se consulta si hay que mover fechas (reordenar o renombrar no lo necesitan).
     let calendarioCache: Awaited<ReturnType<typeof obtenerCalendarioProyecto>> | undefined
     const getCalendario = async () => (calendarioCache ??= await obtenerCalendarioProyecto(id))
 
-    if (validatedData.programarRespecto) {
-      const calendario = await getCalendario()
-      if (nodeType !== 'actividad') {
-        return NextResponse.json({ error: 'Solo se puede programar una actividad respecto a otra' }, { status: 400 })
+    // Posicionar respecto al padre o a un hermano: se traduce a un nuevo inicio
+    // y sigue por el mismo camino que editar la fecha de inicio a mano.
+    const posicion = validatedData.posicion ?? (validatedData.programarRespecto
+      ? { modo: validatedData.programarRespecto.modo, referenciaId: validatedData.programarRespecto.actividadId }
+      : undefined)
+    if (posicion) {
+      if (posicion.referenciaId === realId) {
+        return NextResponse.json({ error: 'Elige otro elemento como referencia' }, { status: 400 })
       }
-      const [propia, referencia] = await Promise.all([
-        prisma.proyectoActividad.findUnique({ where: { id: realId }, select: { proyectoCronogramaId: true } }),
-        prisma.proyectoActividad.findUnique({
-          where: { id: validatedData.programarRespecto.actividadId },
-          select: { proyectoCronogramaId: true, fechaInicioPlan: true, fechaFinPlan: true },
-        }),
-      ])
-      if (!referencia || referencia.proyectoCronogramaId !== propia?.proyectoCronogramaId) {
-        return NextResponse.json({ error: 'La actividad de referencia no es de este cronograma' }, { status: 400 })
+      const resultado = await calcularInicioPosicion(await getCalendario(), nodeType, realId, posicion.modo, posicion.referenciaId)
+      if ('error' in resultado) {
+        return NextResponse.json({ error: resultado.error }, { status: 400 })
       }
-      if (validatedData.programarRespecto.actividadId === realId) {
-        return NextResponse.json({ error: 'Elige otra actividad como referencia' }, { status: 400 })
-      }
-      const nuevoInicio = validatedData.programarRespecto.modo === 'despues_de'
-        ? siguienteDiaLaborable(calendario, referencia.fechaFinPlan)
-        : ajustarALaborable(calendario, referencia.fechaInicioPlan)
-      validatedData.fechaInicioComercial = inicioDiaUTC(nuevoInicio).toISOString()
+      validatedData.fechaInicioComercial = resultado.inicio.toISOString()
       // El fin lo calcula el desplazamiento en bloque, conservando la duración.
       validatedData.fechaFinComercial = undefined
+      validatedData.fechaInicio = undefined
+      validatedData.fechaFin = undefined
+      validatedData.fechaInicioPlan = undefined
+      validatedData.fechaFinPlan = undefined
     }
 
     // ✅ Actualizar según el tipo de nodo
@@ -287,28 +285,36 @@ export async function PUT(
 
     console.log('✅ [API TREE UPDATE] Nodo actualizado exitosamente:', { nodeType, realId })
 
-    // ✅ Mover en bloque cuando cambia el inicio de una fase/EDT/actividad: todo
-    // lo de adentro se corre los mismos días laborables (calendario del
+    // ✅ Mover en bloque cuando cambia el inicio de una fase/EDT/actividad/tarea:
+    // todo lo de adentro se corre los mismos días laborables (calendario del
     // proyecto). Si no se cambió también el fin, se corre igual para conservar
     // la duración — antes quedaba el fin viejo y la barra no coincidía con sus
     // tareas.
-    const newFechaInicioRaw: Date | undefined = nodeType === 'tarea' ? undefined : updateData.fechaInicioPlan
-    if (nodeType !== 'tarea' && currentDates.fechaInicio && newFechaInicioRaw
+    const campoInicio = nodeType === 'tarea' ? 'fechaInicio' : 'fechaInicioPlan'
+    const campoFin = nodeType === 'tarea' ? 'fechaFin' : 'fechaFinPlan'
+    const newFechaInicioRaw: Date | undefined = updateData[campoInicio]
+    if (currentDates.fechaInicio && newFechaInicioRaw
         && !mismoDiaUTC(currentDates.fechaInicio, newFechaInicioRaw)) {
       const calendario = await getCalendario()
       // Un inicio en día no laborable (p. ej. soltar la barra del Gantt en
-      // sábado) cuenta como el siguiente día laborable.
-      const deltaLaborables = diferenciaDiasLaborables(calendario, currentDates.fechaInicio, ajustarALaborable(calendario, newFechaInicioRaw))
-      const newFechaFinRaw: Date | undefined = updateData.fechaFinPlan
+      // sábado) se lleva al siguiente día laborable.
+      const inicioLaborable = ajustarALaborable(calendario, newFechaInicioRaw)
+      const deltaLaborables = diferenciaDiasLaborables(calendario, currentDates.fechaInicio, inicioLaborable)
+      const newFechaFinRaw: Date | undefined = updateData[campoFin]
       const finSinCambio = !newFechaFinRaw || (currentDates.fechaFin && mismoDiaUTC(currentDates.fechaFin, newFechaFinRaw))
+      const fechas: { inicio?: Date; fin?: Date } = {}
+      if (!mismoDiaUTC(inicioLaborable, newFechaInicioRaw)) fechas.inicio = inicioLaborable
       if (finSinCambio && currentDates.fechaFin) {
-        const finDesplazado = desplazarDiasLaborables(calendario, currentDates.fechaFin, deltaLaborables)
-        updateData.fechaFinPlan = finDesplazado
-        await actualizarFinNodo(nodeType, realId, finDesplazado)
+        fechas.fin = desplazarDiasLaborables(calendario, currentDates.fechaFin, deltaLaborables)
+      }
+      if (fechas.inicio || fechas.fin) {
+        await actualizarFechasNodo(nodeType, realId, fechas)
+        if (fechas.inicio) updateData[campoInicio] = fechas.inicio
+        if (fechas.fin) updateData[campoFin] = fechas.fin
       }
       await desplazarDescendientes(calendario, nodeType, realId, deltaLaborables)
       // Con los hijos ya movidos, el propio nodo toma sus fechas reales.
-      await recalcularNodoPadre(nodeType, realId)
+      if (nodeType !== 'tarea') await recalcularNodoPadre(nodeType, realId)
     }
 
     // ✅ GYS-GEN-12: Solo recalcular padres si fechas/horas realmente cambiaron
@@ -692,10 +698,18 @@ async function recalcularFasePadre(faseId: string): Promise<void> {
   })
 }
 
-// Fin del propio nodo cuando se mueve en bloque sin que se haya editado su fin.
+// Fechas del propio nodo al moverlo en bloque: inicio llevado a día laborable
+// y/o fin corrido para conservar la duración.
 // (El desplazamiento de los hijos vive en cronogramaDesplazamiento.ts.)
-async function actualizarFinNodo(nodeType: string, realId: string, fechaFinPlan: Date): Promise<void> {
-  const data = { fechaFinPlan, updatedAt: new Date() }
+async function actualizarFechasNodo(nodeType: string, realId: string, fechas: { inicio?: Date; fin?: Date }): Promise<void> {
+  if (nodeType === 'tarea') {
+    await prisma.proyectoTarea.update({
+      where: { id: realId },
+      data: { fechaInicio: fechas.inicio, fechaFin: fechas.fin, updatedAt: new Date() },
+    })
+    return
+  }
+  const data = { fechaInicioPlan: fechas.inicio, fechaFinPlan: fechas.fin, updatedAt: new Date() }
   if (nodeType === 'fase') await prisma.proyectoFase.update({ where: { id: realId }, data })
   else if (nodeType === 'edt') await prisma.proyectoEdt.update({ where: { id: realId }, data })
   else if (nodeType === 'actividad') await prisma.proyectoActividad.update({ where: { id: realId }, data })

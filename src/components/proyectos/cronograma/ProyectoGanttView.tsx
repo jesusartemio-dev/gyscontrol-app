@@ -4,9 +4,11 @@
  *
  * - Clic en una fila o barra: la selecciona (compartida con la vista Jerarquía).
  * - Ctrl + rueda del mouse: zoom.
- * - Arrastrar la barra de una actividad (si `editable`): la mueve en bloque con
- *   sus tareas. El servidor convierte el desplazamiento a días laborables del
- *   calendario del proyecto (igual que editar la fecha de inicio a mano).
+ * - Arrastrar la barra de un EDT, actividad o tarea (si `editable`): la mueve en
+ *   bloque con lo que contiene. El servidor convierte el desplazamiento a días
+ *   laborables del calendario del proyecto (igual que editar la fecha de inicio).
+ * - Las fechas se toman por día UTC (como la vista Jerarquía) y la duración es la
+ *   misma que calcula el servidor: días laborables, contando inicio y fin.
  */
 
 'use client'
@@ -49,6 +51,8 @@ interface GanttItem {
   horasEstimadas?: number
   /** Inicio guardado del propio nodo (antes del rollup de hijos). Base para mover la barra. */
   fechaInicioNodo?: string
+  /** Días laborables (calendario del proyecto), los mismos que la columna DUR de Jerarquía. */
+  duracionLaborable?: number
 }
 
 interface ProyectoGanttViewProps {
@@ -58,7 +62,7 @@ interface ProyectoGanttViewProps {
   /** Fila seleccionada (id de nodo, p. ej. "actividad-<uuid>"), compartida con Jerarquía. */
   selectedId?: string
   onSelect?: (id: string) => void
-  /** Permite arrastrar barras de actividades (cronograma no comercial ni bloqueado). */
+  /** Permite arrastrar barras de EDTs, actividades y tareas (cronograma no comercial ni bloqueado). */
   editable?: boolean
 }
 
@@ -71,6 +75,16 @@ const diaUTCMas = (fecha: string | Date, n: number) => {
   const d = new Date(fecha)
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + n)).toISOString().slice(0, 10)
 }
+
+// Fecha guardada → medianoche local del mismo día UTC. Así date-fns (que
+// trabaja en hora local) ubica y muestra el mismo día que la vista Jerarquía;
+// sin esto, una fecha a las 00:00 UTC aparecía el día anterior en Perú.
+const diaLocalDesdeUTC = (v: string | Date) => {
+  const d = new Date(v)
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+}
+
+const TIPOS_ARRASTRABLES = ['edt', 'actividad', 'tarea']
 
 const expandidosDe = (list: GanttItem[], acc = new Set<string>()) => {
   for (const item of list) {
@@ -118,7 +132,9 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+    // La tarjeta con ref recién existe cuando termina de cargar; antes el ancho
+    // nunca se medía y quedaba fijo en 8 px por día.
+  }, [loading])
 
   // Sync horizontal scroll between header and body
   const handleBodyScroll = useCallback(() => {
@@ -156,8 +172,8 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
           id: node.id,
           nombre: node.nombre || 'Sin nombre',
           tipo: node.type || 'tarea',
-          fechaInicio: fechaInicio ? new Date(fechaInicio) : new Date(),
-          fechaFin: fechaFin ? new Date(fechaFin) : new Date(),
+          fechaInicio: diaLocalDesdeUTC(fechaInicio || new Date()),
+          fechaFin: diaLocalDesdeUTC(fechaFin || new Date()),
           porcentajeAvance: node.metadata?.progressPercentage || 0,
           estado: node.metadata?.status || data.estado || 'pendiente',
           nivel,
@@ -167,6 +183,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
           expanded: expandidosPrevios ? expandidosPrevios.has(node.id) : nivel <= 1,
           horasEstimadas: data.horasEstimadas ? Number(data.horasEstimadas) : undefined,
           fechaInicioNodo: fechaInicio || undefined,
+          duracionLaborable: typeof data.duracionDiasReal === 'number' ? data.duracionDiasReal : undefined,
           hijos: node.children?.map((child: any) => processNode(child, nivel + 1, node.id)) || []
         }
 
@@ -227,9 +244,9 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
     return () => el.removeEventListener('wheel', onWheel)
   }, [loading])
 
-  // Mueve una actividad `dias` días (calendario) según donde se soltó la barra.
-  // El servidor lo convierte a días laborables y corre sus tareas en bloque.
-  const moverActividad = async (item: GanttItem, dias: number) => {
+  // Mueve un EDT/actividad/tarea `dias` días (calendario) según donde se soltó
+  // la barra. El servidor lo convierte a días laborables y corre lo de adentro.
+  const moverNodo = async (item: GanttItem, dias: number) => {
     const base = item.fechaInicioNodo || item.fechaInicio.toISOString()
     const nuevoInicio = diaUTCMas(base, dias)
     const inicioAnterior = diaUTCMas(base, 0)
@@ -239,7 +256,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fechaInicioComercial: fecha }),
       }).then(async r => {
-        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'No se pudo mover la actividad')
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'No se pudo mover')
       })
 
     const buscar = (list: GanttItem[] | undefined): GanttItem | undefined => {
@@ -258,7 +275,9 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
       const inicioReal = buscar(recargados)?.fechaInicioNodo ?? `${nuevoInicio}T00:00:00Z`
       const fechaTexto = new Date(inicioReal).toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'UTC' })
       sonnerToast.success(`"${item.nombre}" ahora empieza el ${fechaTexto}`, {
-        description: 'Sus tareas se movieron en bloque según el calendario laboral.',
+        description: item.tipo === 'tarea'
+          ? 'Conserva su duración en días laborables.'
+          : 'Lo que contiene se movió en bloque según el calendario laboral.',
         action: {
           label: 'Deshacer',
           onClick: async () => {
@@ -273,13 +292,13 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
         },
       })
     } catch (e) {
-      sonnerToast.error(e instanceof Error ? e.message : 'No se pudo mover la actividad')
+      sonnerToast.error(e instanceof Error ? e.message : 'No se pudo mover')
     } finally {
       setMoviendoId(null)
     }
   }
 
-  const puedeArrastrar = (item: GanttItem) => editable && item.tipo === 'actividad' && !moviendoId
+  const puedeArrastrar = (item: GanttItem) => editable && TIPOS_ARRASTRABLES.includes(item.tipo) && !moviendoId
 
   // Toggle expanded state
   const toggleExpanded = (itemId: string) => {
@@ -616,9 +635,12 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
               {/* Bars */}
               {visibleItems.map((item, rowIdx) => {
                 const startDay = differenceInDays(item.fechaInicio, timeline.minDate)
-                const durationDays = Math.max(1, differenceInDays(item.fechaFin, item.fechaInicio))
+                // Días de calendario que ocupa la barra, contando inicio y fin (02→03 = 2 días).
+                const diasCalendario = Math.max(1, differenceInDays(item.fechaFin, item.fechaInicio) + 1)
+                // Duración mostrada: días laborables, igual que la columna DUR de Jerarquía.
+                const durationDays = item.duracionLaborable ?? diasCalendario
                 const barLeft = startDay * timeline.dayWidth
-                const barWidth = Math.max(durationDays * timeline.dayWidth, 20)
+                const barWidth = Math.max(diasCalendario * timeline.dayWidth, 20)
                 const colors = TIPO_COLORS[item.tipo] || TIPO_COLORS.tarea
                 const labelText = `${durationDays}d${item.horasEstimadas ? ` · ${item.horasEstimadas}h` : ''}`
                 const labelFitsInside = barWidth > 60
@@ -658,7 +680,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                             setArrastre(null)
                             if (Math.abs(dx) < UMBRAL_ARRASTRE_PX) return // fue un clic
                             const dias = Math.round(dx / timeline.dayWidth)
-                            if (dias !== 0) moverActividad(item, dias)
+                            if (dias !== 0) moverNodo(item, dias)
                           }}
                           onPointerCancel={() => setArrastre(null)}
                         >
@@ -698,8 +720,8 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                           <div className="space-y-1">
                             <div className="font-semibold">{item.nombre}</div>
                             <div>{format(item.fechaInicio, 'dd MMM yyyy', { locale: es })} → {format(item.fechaFin, 'dd MMM yyyy', { locale: es })}</div>
-                            <div>{durationDays} días{item.horasEstimadas ? ` · ${item.horasEstimadas}h` : ''} · {item.porcentajeAvance}%</div>
-                            {arrastrable && <div className="text-muted-foreground">Arrastra la barra para mover la actividad con sus tareas</div>}
+                            <div>{durationDays} días laborables{item.horasEstimadas ? ` · ${item.horasEstimadas}h` : ''} · {item.porcentajeAvance}%</div>
+                            {arrastrable && <div className="text-muted-foreground">Arrastra la barra para moverla{item.tipo === 'tarea' ? '' : ' con lo que contiene'}</div>}
                           </div>
                         </TooltipContent>
                       )}

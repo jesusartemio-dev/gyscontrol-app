@@ -6,7 +6,7 @@
 // ===================================================
 
 import React from 'react'
-import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine, ArrowRightLeft, ArrowRightToLine, Columns2 } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine, ArrowRightLeft, ArrowRightToLine, Columns2, ArrowDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -35,8 +35,10 @@ interface TreeNodeProps {
   onDuplicate?: () => void
   onDuplicarActividad?: () => void
   onMoverEdt?: () => void
-  onAjustarPosicion?: (posicion: 'inicio_padre' | 'despues_ultimo') => void
+  onAjustarPosicion?: (posicion: 'inicio_padre' | 'despues_anterior' | 'despues_ultimo') => void
   onProgramarRespecto?: (modo: 'despues_de' | 'en_paralelo') => void
+  /** Hay un hermano del mismo tipo justo arriba (habilita "Después del anterior"). */
+  tieneAnterior?: boolean
   dragListeners?: Record<string, Function>
   dragAttributes?: Record<string, any>
   isDragging?: boolean
@@ -108,6 +110,7 @@ export function TreeNode({
   onMoverEdt,
   onAjustarPosicion,
   onProgramarRespecto,
+  tieneAnterior,
   dragListeners,
   dragAttributes,
   isDragging,
@@ -373,7 +376,10 @@ export function TreeNode({
 
         {/* Columna 5: Duration (días hábiles desde fechas) */}
         <div className="text-right text-[11px] text-gray-500 font-mono pr-1">
-          {durationDays > 0 ? `${durationDays}d` : ''}
+          {durationDays > 0 ? `${durationDays}d` : node.data.duracionDiasReal === 0 ? (
+            // Tiene fechas pero no cae en ningún día laborable del calendario
+            <span className="text-amber-600" title="Cae solo en días no laborables del calendario del proyecto">0d</span>
+          ) : ''}
         </div>
 
         {/* Columna 6: Work (horasEstimadas) */}
@@ -631,8 +637,8 @@ export function TreeNode({
                 </DropdownMenuItem>
               )}
 
-              {/* Ajustar posición - tareas y actividades */}
-              {!readOnly && (node.type === 'tarea' || node.type === 'actividad') && onAjustarPosicion && (
+              {/* Posición en el tiempo - EDTs, actividades y tareas (se mueven con todo lo que contienen) */}
+              {!readOnly && (node.type === 'tarea' || node.type === 'actividad' || node.type === 'edt') && onAjustarPosicion && (
                 <>
                   <div className="h-px bg-gray-200 my-1" />
                   <DropdownMenuItem
@@ -641,6 +647,14 @@ export function TreeNode({
                   >
                     <ArrowUpToLine className="h-4 w-4 mr-2" />
                     Al inicio del padre
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => { setDropdownOpen(false); onAjustarPosicion('despues_anterior') }}
+                    disabled={!tieneAnterior}
+                    className="text-gray-600"
+                  >
+                    <ArrowDown className="h-4 w-4 mr-2" />
+                    Después del anterior
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => { setDropdownOpen(false); onAjustarPosicion('despues_ultimo') }}
@@ -652,8 +666,8 @@ export function TreeNode({
                 </>
               )}
 
-              {/* Programar respecto a otra actividad - mueve la actividad con sus tareas */}
-              {!readOnly && node.type === 'actividad' && onProgramarRespecto && (
+              {/* Programar respecto a un hermano elegido */}
+              {!readOnly && (node.type === 'tarea' || node.type === 'actividad' || node.type === 'edt') && onProgramarRespecto && (
                 <>
                   <DropdownMenuItem
                     onClick={() => { setDropdownOpen(false); onProgramarRespecto('despues_de') }}

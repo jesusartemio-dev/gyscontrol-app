@@ -283,48 +283,38 @@ export function ProyectoCronogramaTreeView({
   }
 
   // ── Ajustar posición (snap) ────────────────────────────────────────────────
-  const handleAjustarPosicion = async (nodeId: string, posicion: 'inicio_padre' | 'despues_ultimo') => {
+  // Hermanos del mismo tipo, en el orden en que se ven en el árbol.
+  const hermanosMismoTipo = (nodeId: string): string[] => {
     const node = state.nodes.get(nodeId)
-    if (!node) return
+    const parent = node?.parentId ? state.nodes.get(node.parentId) : null
+    return (parent?.children || []).filter(c => c.type === node?.type).map(c => c.id)
+  }
+  const anteriorDe = (nodeId: string): string | undefined => {
+    const hermanos = hermanosMismoTipo(nodeId)
+    const i = hermanos.indexOf(nodeId)
+    return i > 0 ? hermanos[i - 1] : undefined
+  }
+  const realIdDe = (nodeId: string) => nodeId.replace(/^(fase|edt|actividad|tarea)-/, '')
 
-    const isTarea = node.type === 'tarea'
-    const fi = isTarea ? node.data.fechaInicio : (node.data.fechaInicioComercial || node.data.fechaInicioPlan)
-    const ff = isTarea ? node.data.fechaFin    : (node.data.fechaFinComercial    || node.data.fechaFinPlan)
-    const duracionMs = fi && ff ? new Date(ff).getTime() - new Date(fi).getTime() : 7 * 86400000
-
-    const parent = node.parentId ? state.nodes.get(node.parentId) : null
-    const parentFi = parent?.data.fechaInicioComercial || parent?.data.fechaInicioPlan || parent?.data.fechaInicio
-
-    let newFechaInicio: Date
-
-    if (posicion === 'inicio_padre') {
-      if (!parentFi) { toast.error('El padre no tiene fecha de inicio'); return }
-      newFechaInicio = new Date(parentFi)
-    } else {
-      const siblings = (parent?.children || []).filter(c => c.id !== nodeId)
-      const maxFin = siblings.reduce((max, s) => {
-        const f = s.data.fechaFin || s.data.fechaFinComercial || s.data.fechaFinPlan
-        return f ? Math.max(max, new Date(f).getTime()) : max
-      }, 0)
-      newFechaInicio = maxFin > 0 ? new Date(maxFin + 86400000) : (parentFi ? new Date(parentFi) : new Date())
-    }
-
-    const newFechaFin = new Date(newFechaInicio.getTime() + duracionMs)
-    const fmt = (d: Date) => d.toISOString().split('T')[0]
+  // El servidor calcula la fecha con el calendario laboral del proyecto y mueve
+  // el nodo con todo lo que contiene, conservando su duración en días laborables.
+  const handleAjustarPosicion = async (nodeId: string, posicion: 'inicio_padre' | 'despues_anterior' | 'despues_ultimo') => {
+    const anterior = posicion === 'despues_anterior' ? anteriorDe(nodeId) : undefined
+    if (posicion === 'despues_anterior' && !anterior) { toast.error('No hay un elemento anterior en este nivel'); return }
 
     try {
-      await fetch(`/api/proyectos/${proyectoId}/cronograma/tree/${nodeId}`, {
+      const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/tree/${nodeId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fechaInicioComercial: fmt(newFechaInicio),
-          fechaFinComercial:    fmt(newFechaFin),
+          posicion: { modo: posicion, referenciaId: anterior ? realIdDe(anterior) : undefined },
         }),
       })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error al ajustar posición')
       await actions.loadTree([...state.expandedNodes])
       toast.success('Posición ajustada')
-    } catch {
-      toast.error('Error al ajustar posición')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al ajustar posición')
     }
   }
 
@@ -374,13 +364,14 @@ export function ProyectoCronogramaTreeView({
   const programarCandidatas = useMemo(() => {
     if (!programarNode?.parentId) return []
     const padre = state.nodes.get(programarNode.parentId)
+    // Hermanos del mismo tipo (EDTs de la fase, actividades del EDT o tareas de la actividad)
     return (padre?.children || [])
-      .filter(c => c.type === 'actividad' && c.id !== programarNode.id)
+      .filter(c => c.type === programarNode.type && c.id !== programarNode.id)
       .map(c => ({
-        id: c.id.replace('actividad-', ''),
+        id: c.id.replace(/^(edt|actividad|tarea)-/, ''),
         nombre: c.nombre,
-        fechaInicio: c.data?.fechaInicioComercial || c.data?.fechaInicioPlan,
-        fechaFin: c.data?.fechaFinComercial || c.data?.fechaFinPlan,
+        fechaInicio: c.data?.fechaInicio || c.data?.fechaInicioComercial || c.data?.fechaInicioPlan,
+        fechaFin: c.data?.fechaFin || c.data?.fechaFinComercial || c.data?.fechaFinPlan,
       }))
   }, [programarNode, state.nodes])
 
@@ -885,15 +876,16 @@ export function ProyectoCronogramaTreeView({
                     onDuplicarActividad={!isReadOnly && node.type === 'actividad' ? () => handleDuplicarActividad(nodeId) : undefined}
                     onMoverEdt={!isReadOnly && node.type === 'actividad' ? () => handleAbrirMoverEdt(nodeId) : undefined}
                     onProgramarRespecto={
-                      !isReadOnly && node.type === 'actividad'
+                      !isReadOnly && ['edt', 'actividad', 'tarea'].includes(node.type) && !node.data?.isExtrasGroup
                         ? (modo) => setProgramarModal({ open: true, modo, nodeId })
                         : undefined
                     }
                     onAjustarPosicion={
-                      !isReadOnly && (node.type === 'tarea' || node.type === 'actividad')
+                      !isReadOnly && ['edt', 'actividad', 'tarea'].includes(node.type) && !node.data?.isExtrasGroup
                         ? (pos) => handleAjustarPosicion(nodeId, pos)
                         : undefined
                     }
+                    tieneAnterior={!!anteriorDe(nodeId)}
                     onImport={isReadOnly ? undefined : () => handleImportItems(nodeId)}
                     onSelect={() => actions.selectNode(nodeId)}
                     isSelected={isSelected}
@@ -1279,6 +1271,7 @@ export function ProyectoCronogramaTreeView({
           modo={programarModal.modo}
           actividadNodeId={programarModal.nodeId}
           actividadNombre={programarNode?.nombre || ''}
+          tipoNodo={programarNode?.type}
           candidatas={programarCandidatas}
           onSuccess={async () => {
             await actions.loadTree([...state.expandedNodes])

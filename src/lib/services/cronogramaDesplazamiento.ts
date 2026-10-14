@@ -104,6 +104,108 @@ export function diferenciaDiasLaborables(cal: CalendarioDesplazamiento, desde: D
   return signo * cuenta
 }
 
+// ── Posicionar un nodo respecto a su padre o a un hermano ──────────────────
+
+export type ModoPosicion = 'inicio_padre' | 'despues_anterior' | 'despues_ultimo' | 'despues_de' | 'en_paralelo'
+
+interface Hermano { id: string; inicio: Date; fin: Date }
+
+/** Inicio del padre y hermanos (mismo tipo, mismo padre) de un EDT, actividad o tarea. */
+async function padreYHermanos(nodeType: string, realId: string): Promise<{ inicioPadre: Date | null; hermanos: Hermano[] } | null> {
+  if (nodeType === 'edt') {
+    const edt = await prisma.proyectoEdt.findUnique({
+      where: { id: realId },
+      select: { proyectoFaseId: true, proyectoCronogramaId: true, proyectoFase: { select: { fechaInicioPlan: true } } },
+    })
+    if (!edt) return null
+    const hermanos = await prisma.proyectoEdt.findMany({
+      where: { proyectoCronogramaId: edt.proyectoCronogramaId, proyectoFaseId: edt.proyectoFaseId, id: { not: realId } },
+      select: { id: true, fechaInicioPlan: true, fechaFinPlan: true },
+    })
+    return {
+      inicioPadre: edt.proyectoFase?.fechaInicioPlan ?? null,
+      hermanos: hermanos
+        .filter(h => h.fechaInicioPlan && h.fechaFinPlan)
+        .map(h => ({ id: h.id, inicio: h.fechaInicioPlan!, fin: h.fechaFinPlan! })),
+    }
+  }
+  if (nodeType === 'actividad') {
+    const act = await prisma.proyectoActividad.findUnique({
+      where: { id: realId },
+      select: { proyectoEdtId: true, proyectoEdt: { select: { fechaInicioPlan: true } } },
+    })
+    if (!act) return null
+    const hermanos = await prisma.proyectoActividad.findMany({
+      where: { proyectoEdtId: act.proyectoEdtId, id: { not: realId } },
+      select: { id: true, fechaInicioPlan: true, fechaFinPlan: true },
+    })
+    return {
+      inicioPadre: act.proyectoEdt.fechaInicioPlan ?? null,
+      hermanos: hermanos.map(h => ({ id: h.id, inicio: h.fechaInicioPlan, fin: h.fechaFinPlan })),
+    }
+  }
+  if (nodeType === 'tarea') {
+    const tarea = await prisma.proyectoTarea.findUnique({
+      where: { id: realId },
+      select: {
+        proyectoActividadId: true,
+        proyectoEdtId: true,
+        proyectoActividad: { select: { fechaInicioPlan: true } },
+        proyectoEdt: { select: { fechaInicioPlan: true } },
+      },
+    })
+    if (!tarea) return null
+    // Tarea dentro de una actividad: sus hermanas son las de esa actividad.
+    // Tarea suelta en el EDT: las otras tareas sueltas del EDT.
+    const hermanos = await prisma.proyectoTarea.findMany({
+      where: tarea.proyectoActividadId
+        ? { proyectoActividadId: tarea.proyectoActividadId, id: { not: realId } }
+        : { proyectoEdtId: tarea.proyectoEdtId, proyectoActividadId: null, id: { not: realId } },
+      select: { id: true, fechaInicio: true, fechaFin: true },
+    })
+    return {
+      inicioPadre: (tarea.proyectoActividad?.fechaInicioPlan ?? tarea.proyectoEdt.fechaInicioPlan) ?? null,
+      hermanos: hermanos.map(h => ({ id: h.id, inicio: h.fechaInicio, fin: h.fechaFin })),
+    }
+  }
+  return null
+}
+
+/**
+ * Nuevo inicio (medianoche UTC de un día laborable) para un EDT, actividad o
+ * tarea según el modo:
+ * - inicio_padre: primer día laborable del padre.
+ * - despues_anterior / despues_de: día laborable siguiente al fin del hermano `referenciaId`.
+ * - despues_ultimo: día laborable siguiente al fin del hermano que termina más tarde.
+ * - en_paralelo: mismo inicio que el hermano `referenciaId`.
+ * Devuelve `{ error }` si no se puede calcular.
+ */
+export async function calcularInicioPosicion(
+  cal: CalendarioDesplazamiento,
+  nodeType: string,
+  realId: string,
+  modo: ModoPosicion,
+  referenciaId?: string,
+): Promise<{ inicio: Date } | { error: string }> {
+  const datos = await padreYHermanos(nodeType, realId)
+  if (!datos) return { error: 'Solo se puede posicionar un EDT, una actividad o una tarea' }
+
+  let base: Date
+  if (modo === 'inicio_padre') {
+    if (!datos.inicioPadre) return { error: 'El padre no tiene fecha de inicio' }
+    base = ajustarALaborable(cal, datos.inicioPadre)
+  } else if (modo === 'despues_ultimo') {
+    if (datos.hermanos.length === 0) return { error: 'No hay otros elementos en el mismo nivel' }
+    const ultimoFin = datos.hermanos.reduce((max, h) => (h.fin > max ? h.fin : max), datos.hermanos[0].fin)
+    base = siguienteDiaLaborable(cal, ultimoFin)
+  } else {
+    const ref = datos.hermanos.find(h => h.id === referenciaId)
+    if (!ref) return { error: 'El elemento de referencia no está en el mismo nivel' }
+    base = modo === 'en_paralelo' ? ajustarALaborable(cal, ref.inicio) : siguienteDiaLaborable(cal, ref.fin)
+  }
+  return { inicio: inicioDiaUTC(base) }
+}
+
 /**
  * Desplaza en bloque todos los descendientes de un nodo `n` días laborables.
  * El nodo en sí no se toca: lo actualiza quien llama.

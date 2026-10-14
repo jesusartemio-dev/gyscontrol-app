@@ -1,9 +1,9 @@
 'use client'
 
 /**
- * ProgramarActividadModal - Programa una actividad después de otra o en
- * paralelo con ella. La actividad se mueve en bloque con sus tareas; el nuevo
- * inicio lo calcula el servidor con el calendario laboral del proyecto.
+ * ProgramarActividadModal - Programa un EDT, actividad o tarea después de un
+ * hermano o en paralelo con él. Se mueve en bloque con todo lo que contiene; el
+ * nuevo inicio lo calcula el servidor con el calendario laboral del proyecto.
  */
 
 import React, { useState, useEffect } from 'react'
@@ -30,8 +30,15 @@ interface ProgramarActividadModalProps {
   modo: ModoProgramacion
   actividadNodeId: string
   actividadNombre: string
+  /** Tipo del nodo que se programa, para los textos. */
+  tipoNodo?: string
   candidatas: ActividadCandidata[]
   onSuccess: () => void
+}
+
+const CONTENIDO: Record<string, string> = {
+  edt: 'Sus actividades y tareas se mueven en bloque. ',
+  actividad: 'Sus tareas se mueven en bloque. ',
 }
 
 // Las fechas del cronograma se muestran por día UTC, igual que en el árbol.
@@ -45,6 +52,7 @@ export function ProgramarActividadModal({
   modo,
   actividadNodeId,
   actividadNombre,
+  tipoNodo = 'actividad',
   candidatas,
   onSuccess,
 }: ProgramarActividadModalProps) {
@@ -65,16 +73,16 @@ export function ProgramarActividadModal({
       const response = await fetch(`/api/proyectos/${proyectoId}/cronograma/tree/${actividadNodeId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ programarRespecto: { modo, actividadId: referenciaId } }),
+        body: JSON.stringify({ posicion: { modo, referenciaId } }),
       })
       const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || 'No se pudo programar la actividad')
+      if (!response.ok) throw new Error(data.error || 'No se pudo programar')
 
-      toast.success(esDespues ? 'Actividad programada después de la seleccionada' : 'Actividad programada en paralelo')
+      toast.success(esDespues ? 'Programado después del elemento seleccionado' : 'Programado en paralelo')
       onSuccess()
       onOpenChange(false)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'No se pudo programar la actividad')
+      toast.error(error instanceof Error ? error.message : 'No se pudo programar')
     } finally {
       setSubmitting(false)
     }
@@ -98,11 +106,11 @@ export function ProgramarActividadModal({
           <div className="space-y-2">
             <Label>{esDespues ? 'Empieza después de' : 'Empieza junto con'}</Label>
             {candidatas.length === 0 ? (
-              <p className="text-sm text-gray-500 py-2">No hay otras actividades en este EDT.</p>
+              <p className="text-sm text-gray-500 py-2">No hay otros elementos en este mismo nivel.</p>
             ) : (
               <Select value={referenciaId} onValueChange={setReferenciaId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar actividad..." />
+                  <SelectValue placeholder="Seleccionar..." />
                 </SelectTrigger>
                 <SelectContent>
                   {candidatas.map(c => (
@@ -119,9 +127,9 @@ export function ProgramarActividadModal({
             <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-amber-800">
               {esDespues
-                ? 'La actividad empezará el siguiente día laborable al fin de la seleccionada.'
-                : 'La actividad empezará el mismo día que la seleccionada.'}
-              {' '}Todas sus tareas se mueven en bloque, conservando su duración, según el calendario laboral del proyecto.
+                ? 'Empezará el siguiente día laborable al fin del elemento seleccionado.'
+                : 'Empezará el mismo día que el elemento seleccionado.'}
+              {' '}{CONTENIDO[tipoNodo] ?? ''}Conserva su duración en días laborables del calendario del proyecto.
             </p>
           </div>
 
