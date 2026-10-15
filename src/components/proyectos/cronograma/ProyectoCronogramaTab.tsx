@@ -59,6 +59,7 @@ import { ProyectoGanttView } from './ProyectoGanttView'
 // CronogramaGanttViewPro deshabilitado - funcionalidad consolidada en Gantt
 import { ProyectoDependencyManager } from './ProyectoDependencyManager'
 import { exportCronogramaToExcel, type RecursoExport } from '@/lib/utils/msProjectExcelExport'
+import { generarMspdiProyecto } from '@/lib/utils/msProjectMspdiExport'
 import ImportExcelCronogramaModal from './ImportExcelCronogramaModal'
 import { CronogramaVarianza } from './CronogramaVarianza'
 import { CronogramaTableView } from './CronogramaTableView'
@@ -469,6 +470,48 @@ export function ProyectoCronogramaTab({
         description: error instanceof Error ? error.message : 'No se pudo eliminar.',
         variant: 'destructive'
       })
+    }
+  }
+
+  // Exportación fiel a MS Project (XML/MSPDI): lleva el calendario del proyecto,
+  // tareas en modo manual con sus fechas exactas, duración, trabajo (HH) como
+  // asignación, dependencias con tipo y desfase, hitos y fecha límite, y el ID
+  // de GYS de cada elemento (Text1) para poder reimportar actualizando.
+  const handleExportXml = async () => {
+    try {
+      setIsLoading(true)
+      const cronogramaId = selectedCronograma?.id
+      const [treeRes, depsRes, calRes] = await Promise.all([
+        fetch(`/api/proyectos/${proyectoId}/cronograma/tree${cronogramaId ? `?cronogramaId=${cronogramaId}` : ''}`),
+        fetch(`/api/proyectos/${proyectoId}/cronograma/dependencias`),
+        fetch(`/api/proyectos/${proyectoId}/cronograma/calendario`),
+      ])
+      if (!treeRes.ok || !calRes.ok) throw new Error('No se pudieron obtener los datos del cronograma')
+      const raiz = (await treeRes.json())?.data?.tree?.[0]
+      if (!raiz) {
+        toast({ title: 'Sin datos', description: 'No hay elementos para exportar.', variant: 'destructive' })
+        return
+      }
+      const dependencias = depsRes.ok ? (await depsRes.json()).data || [] : []
+      const calendario = await calRes.json()
+      const xml = generarMspdiProyecto({ proyectoNombre, arbol: raiz, dependencias, calendario })
+
+      const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      const nombreSeguro = (proyectoNombre || 'cronograma').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80)
+      link.download = `${nombreSeguro} - ${selectedCronograma?.nombre || 'cronograma'}.xml`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      toast({
+        title: 'Exportado para MS Project',
+        description: 'Ábrelo en MS Project con Archivo → Abrir. Incluye calendario, dependencias, hitos y el ID de GYS.',
+      })
+    } catch (error) {
+      toast({ title: 'Error en exportación', description: error instanceof Error ? error.message : 'No se pudo exportar.', variant: 'destructive' })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -958,6 +1001,14 @@ export function ProyectoCronogramaTab({
               }} disabled={isLoading}>
                 <Download className="h-4 w-4 mr-2" />
                 Exportar Excel (MS Project)
+              </DropdownMenuItem>
+
+              <DropdownMenuItem onSelect={() => {
+                setDropdownOpen(false)
+                setTimeout(() => handleExportXml(), 100)
+              }} disabled={isLoading}>
+                <Download className="h-4 w-4 mr-2" />
+                Exportar a MS Project (XML)
               </DropdownMenuItem>
 
               {!esComercial && hasCronograma && (

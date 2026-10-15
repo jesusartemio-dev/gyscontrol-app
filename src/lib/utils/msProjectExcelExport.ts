@@ -25,6 +25,10 @@ interface TreeNode {
     fechaLimite?: string | null
     /** Días laborables calculados por la API del árbol. */
     duracionDiasReal?: number
+    /** Horas laborables entre inicio y fin (columna DUR), calculadas por la API del árbol. */
+    duracionHoras?: number
+    /** Horas-hombre (trabajo total) de la tarea, calculadas por la API del árbol. */
+    horasHombre?: number
   }
   children?: TreeNode[]
 }
@@ -33,6 +37,12 @@ interface Dependencia {
   tareaOrigenId: string
   tareaDependienteId: string
   tipo: string
+  lagMinutos?: number
+}
+
+// Tipo de vínculo en la columna Predecessors de MS Project (en inglés, como el resto del archivo)
+const TIPO_PREDECESORA: Record<string, string> = {
+  finish_to_start: 'FS', start_to_start: 'SS', finish_to_finish: 'FF', start_to_finish: 'SF',
 }
 
 export interface RecursoExport {
@@ -46,8 +56,10 @@ interface TareaRecursoRow {
   taskName: string
   nodeId: string
   recursoNombre: string
-  horasEstimadas: number
-  personasEstimadas: number
+  /** Trabajo total (HH) de la tarea. */
+  trabajo: number
+  /** Duración en horas laborables (para las unidades = trabajo / duración). */
+  duracionHoras: number
 }
 
 interface FlatRow {
@@ -63,6 +75,10 @@ interface FlatRow {
   nodeId: string // internal UUID for dependency mapping
   /** Hito (Milestone de MS Project): duración 0 y rombo en el Gantt. */
   milestone: boolean
+  /** Resumen (fase/EDT/actividad con hijos): MS Project calcula sus fechas. */
+  summary: boolean
+  /** ID de GYS (p. ej. "tarea-<uuid>") para reconocer la tarea al reimportar. */
+  gysId: string
   /** Fecha comprometida del hito (Deadline de MS Project). */
   deadline: Date | null
 }
@@ -93,27 +109,27 @@ function flattenTree(node: TreeNode, horasPorDia: number): FlatRow[] {
     // MS Project convierte en hito cualquier tarea de duración 0, así que una
     // tarea sin horas que no es hito se exporta con sus días laborables.
     const esHito = !hasChildren && data.esHito === true
+    // Duración = horas laborables entre inicio y fin (la columna DUR de GYS), en
+    // horas para no depender de las horas por día que tenga MS Project. Los
+    // resúmenes van sin duración: MS Project la calcula de sus hijos.
     let duration = ''
     if (esHito) {
       duration = '0 days'
-    } else if (horas > 0) {
-      const days = horas / horasPorDia
-      if (days === Math.floor(days)) {
-        duration = `${days} days`
-      } else {
-        duration = `${days.toFixed(2)} days`
-      }
     } else if (!hasChildren) {
-      const dias = Number(data.duracionDiasReal) || 1
-      duration = `${dias} ${dias === 1 ? 'day' : 'days'}`
+      const durHoras = Number(data.duracionHoras)
+      if (Number.isFinite(durHoras) && durHoras > 0) {
+        duration = `${Math.round(durHoras * 100) / 100} hrs`
+      } else {
+        const dias = Number(data.duracionDiasReal) || 1
+        duration = `${dias} ${dias === 1 ? 'day' : 'days'}`
+      }
     }
 
-    // Work: person-hours
+    // Work = horas-hombre (HH), las mismas de la columna HH de GYS.
     let work = ''
-    if (!hasChildren && horas > 0) {
-      const personas = data.personasEstimadas || 1
-      const totalWork = horas * personas
-      work = `${totalWork} hrs`
+    if (!hasChildren && !esHito) {
+      const hh = data.horasHombre !== undefined ? Number(data.horasHombre) : horas * (data.personasEstimadas || 1)
+      work = `${Math.round((hh || 0) * 100) / 100} hrs`
     }
 
     // Strip prefix from ID (e.g. "tarea-xxx" -> "xxx")
@@ -132,6 +148,8 @@ function flattenTree(node: TreeNode, horasPorDia: number): FlatRow[] {
       nodeId,
       milestone: esHito,
       deadline: esHito && data.fechaLimite ? new Date(data.fechaLimite) : null,
+      summary: !!hasChildren,
+      gysId: n.id,
     })
 
     if (n.children) {
@@ -151,7 +169,8 @@ function flattenTree(node: TreeNode, horasPorDia: number): FlatRow[] {
  */
 function resolvePredecessors(
   rows: FlatRow[],
-  dependencias: Dependencia[]
+  dependencias: Dependencia[],
+  horasPorDia: number
 ): void {
   // Build map: tarea UUID -> row ID
   const uuidToRowId = new Map<string, number>()
@@ -159,14 +178,20 @@ function resolvePredecessors(
     uuidToRowId.set(row.nodeId, row.id)
   }
 
-  // Build map: tarea UUID -> list of predecessor row IDs
-  const predecessorMap = new Map<string, number[]>()
+  // Build map: tarea UUID -> predecesoras con tipo y desfase ("4", "5SS", "7FS+2 hrs")
+  const predecessorMap = new Map<string, string[]>()
+  const minDia = Math.round(horasPorDia * 60)
   for (const dep of dependencias) {
     const origenRowId = uuidToRowId.get(dep.tareaOrigenId)
     if (origenRowId === undefined) continue
+    const tipo = TIPO_PREDECESORA[dep.tipo] ?? 'FS'
+    const lag = dep.lagMinutos ?? 0
+    const lagTxt = lag === 0 ? '' : `${lag > 0 ? '+' : '-'}${
+      Math.abs(lag) % minDia === 0 ? `${Math.abs(lag) / minDia} days` : `${Math.round((Math.abs(lag) / 60) * 100) / 100} hrs`}`
+    const texto = tipo === 'FS' && !lagTxt ? String(origenRowId) : `${origenRowId}${tipo}${lagTxt}`
 
     const existing = predecessorMap.get(dep.tareaDependienteId) || []
-    existing.push(origenRowId)
+    existing.push(texto)
     predecessorMap.set(dep.tareaDependienteId, existing)
   }
 
@@ -179,19 +204,17 @@ function resolvePredecessors(
   }
 }
 
-// Las fechas guardan la hora de obra en los campos UTC (sin zona horaria, como
-// MS Project): se escriben tal cual, en UTC. Con la zona del navegador una
-// fecha de las 08:00 salía 03:00, y una de las 00:00 salía el día anterior.
-function formatExcelDate(date: Date): string {
-  return date.toLocaleDateString('en-US', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-    timeZone: 'UTC',
-  })
+// Las fechas se escriben como fecha real de Excel (no como texto): MS Project
+// las lee igual sea cual sea el idioma, y no aparece el "at" que agregan los
+// navegadores al formatear ("October 28, 2026 at 08:00 AM").
+// Las fechas guardan la hora de obra en los campos UTC (sin zona, como MS
+// Project). El número de serie de Excel se calcula directo de esos componentes:
+// si se le pasa un Date a la librería, convierte con la zona del navegador y su
+// desfase histórico de 1899 (en Lima corría las horas 1 minuto: 08:00 → 07:59).
+const EPOCH_EXCEL_MS = Date.UTC(1899, 11, 30)
+function formatExcelDate(date: Date): XLSX.CellObject {
+  const serial = (date.getTime() - EPOCH_EXCEL_MS) / 86400000
+  return { t: 'n', v: Math.round(serial * 1440) / 1440, z: 'yyyy-mm-dd hh:mm' }
 }
 
 /**
@@ -216,8 +239,10 @@ function collectTareaRecursos(tree: TreeNode[]): TareaRecursoRow[] {
         taskName: n.nombre || '',
         nodeId,
         recursoNombre: data.recursoNombre,
-        horasEstimadas: Number(data.horasEstimadas || 0),
-        personasEstimadas: data.personasEstimadas || 1,
+        trabajo: data.horasHombre !== undefined
+          ? Number(data.horasHombre) || 0
+          : Number(data.horasEstimadas || 0) * (data.personasEstimadas || 1),
+        duracionHoras: Number(data.duracionHoras) || 0,
       })
     }
 
@@ -260,13 +285,14 @@ function buildResourceSheet(recursos: RecursoExport[]): XLSX.WorkSheet {
 function buildAssignmentSheet(tareaRecursos: TareaRecursoRow[]): XLSX.WorkSheet {
   const header = ['Task Name', 'Resource Name', '% Work Complete', 'Work', 'Units']
   const dataRows = tareaRecursos.map(t => {
-    const totalWork = t.horasEstimadas * t.personasEstimadas
+    // Unidades = trabajo / duración (5 h en 5 días de 9.5 h = 11%), como las calcula MS Project.
+    const unidades = t.duracionHoras > 0 ? Math.round((t.trabajo / t.duracionHoras) * 100) : 100
     return [
       t.taskName,
       t.recursoNombre,
       '0%',
-      totalWork > 0 ? `${totalWork} hrs` : '0 hrs',
-      `${t.personasEstimadas * 100}%`,
+      `${Math.round(t.trabajo * 100) / 100} hrs`,
+      `${unidades}%`,
     ]
   })
 
@@ -304,7 +330,7 @@ export function exportCronogramaToExcel(
   })
 
   // Resolve predecessors
-  resolvePredecessors(allRows, dependencias)
+  resolvePredecessors(allRows, dependencias, horasPorDia)
 
   // Build Task_Table sheet
   const header = [
@@ -321,12 +347,15 @@ export function exportCronogramaToExcel(
     'Notes',
     'Milestone',
     'Deadline',
+    'Text1',
   ]
 
   const dataRows = allRows.map((row) => [
     row.id,
     'Yes',
-    'Auto Scheduled',
+    // Manual: MS Project respeta las fechas exactas (no las reprograma por las
+    // dependencias); los resúmenes se calculan de sus hijos.
+    row.summary ? 'Auto Scheduled' : 'Manually Scheduled',
     row.name,
     row.duration,
     row.work,
@@ -337,6 +366,7 @@ export function exportCronogramaToExcel(
     row.notes,
     row.milestone ? 'Yes' : 'No',
     row.deadline ? formatExcelDate(row.deadline) : 'NA',
+    row.gysId,
   ])
 
   const ws = XLSX.utils.aoa_to_sheet([header, ...dataRows])
@@ -356,6 +386,7 @@ export function exportCronogramaToExcel(
     { wch: 40 },  // Notes
     { wch: 10 },  // Milestone
     { wch: 30 },  // Deadline
+    { wch: 46 },  // Text1 (ID de GYS)
   ]
 
   const wb = XLSX.utils.book_new()
