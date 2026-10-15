@@ -61,6 +61,7 @@ import { ProyectoDependencyManager } from './ProyectoDependencyManager'
 import { exportCronogramaToExcel, type RecursoExport } from '@/lib/utils/msProjectExcelExport'
 import { generarMspdiProyecto } from '@/lib/utils/msProjectMspdiExport'
 import ImportExcelCronogramaModal from './ImportExcelCronogramaModal'
+import { SincronizarMsProjectModal } from './SincronizarMsProjectModal'
 import { CronogramaVarianza } from './CronogramaVarianza'
 import { CronogramaTableView } from './CronogramaTableView'
 import { AsignarRecursoPorEdt } from './AsignarRecursoPorEdt'
@@ -100,6 +101,7 @@ export function ProyectoCronogramaTab({
   const [showGenerarCronogramaModal, setShowGenerarCronogramaModal] = useState(false)
   const [showGenerarIAModal, setShowGenerarIAModal] = useState(false)
   const [showImportExcelModal, setShowImportExcelModal] = useState(false)
+  const [showSincronizarModal, setShowSincronizarModal] = useState(false)
   const [showAsignarRecursoModal, setShowAsignarRecursoModal] = useState(false)
   const [showAutoasignarResponsablesModal, setShowAutoasignarResponsablesModal] = useState(false)
 
@@ -965,6 +967,15 @@ export function ProyectoCronogramaTab({
                     <Upload className="h-4 w-4 mr-2" />
                     Importar desde Excel (MS Project)
                   </DropdownMenuItem>
+                  {hasCronograma && (
+                    <DropdownMenuItem onSelect={() => {
+                      setDropdownOpen(false)
+                      setTimeout(() => setShowSincronizarModal(true), 100)
+                    }} disabled={esBloqueado}>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Actualizar desde MS Project (XML o Excel)
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                 </>
               )}
@@ -1216,6 +1227,16 @@ export function ProyectoCronogramaTab({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Actualizar desde MS Project: reconoce cada elemento por su GYS ID y solo cambia lo que cambió */}
+      <SincronizarMsProjectModal
+        open={showSincronizarModal}
+        onOpenChange={setShowSincronizarModal}
+        proyectoId={proyectoId}
+        cronogramaId={selectedCronograma?.id}
+        cronogramaNombre={selectedCronograma?.nombre}
+        onSuccess={handleRefresh}
+      />
 
       {/* Modal de importar Excel */}
       <ImportExcelCronogramaModal
