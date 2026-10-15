@@ -3836,6 +3836,12 @@ model ProyectoTarea {
   /// Justificación de 1 línea dada por la IA al proponerla — solo presente
   /// cuando esPropuestaIA es true.
   justificacionIA             String?
+  /// Hito (como Milestone de MS Project): duración 0, sin horas, se muestra
+  /// como ◆ en su fecha (fechaInicio = fechaFin). Reemplaza a ProyectoHito.
+  esHito                      Boolean                              @default(false)
+  /// Fecha comprometida (Deadline de MS Project). Queda fija aunque el hito se
+  /// mueva; si el hito la pasa, se avisa. Hito con fechaLimite = contractual.
+  fechaLimite                 DateTime?
   createdAt                   DateTime                             @default(now())
   updatedAt                   DateTime
   registroHoras               RegistroHoras[]

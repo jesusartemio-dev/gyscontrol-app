@@ -343,6 +343,8 @@ export async function POST(
                     "estado",
                     "recursoId",
                     "responsableId",
+                    "esHito",
+                    "fechaLimite",
                     "createdAt",
                     "updatedAt"
                   ) VALUES (
@@ -361,6 +363,8 @@ export async function POST(
                     ${tareaOrigen.estado}::"EstadoTarea",
                     ${tareaOrigen.recursoId},
                     ${tareaOrigen.responsableId},
+                    ${tareaOrigen.esHito ?? false},
+                    ${tareaOrigen.fechaLimite ?? null},
                     NOW(),
                     NOW()
                   )

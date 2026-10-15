@@ -94,6 +94,10 @@ export interface FilaTarea {
   justificacionIA?: string | null
   /** Cantidad real usada para calcular horasEstimadas (ej. 45 metros de cable) — trazabilidad, null si el servicio no maneja cantidad variable. */
   cantidad?: number | null
+  /** Hito ◆ (Milestone): un solo día, sin horas. Los agrega el wizard (inicio/fin de proyecto). */
+  esHito?: boolean
+  /** Fecha comprometida del hito (Deadline de MS Project). */
+  fechaLimite?: Date | null
 }
 
 export interface EstructuraReal {

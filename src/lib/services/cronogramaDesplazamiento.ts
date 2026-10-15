@@ -127,10 +127,14 @@ export interface RelacionAnterior {
 export function clasificarRelacion(
   cal: CalendarioDesplazamiento,
   anterior: { inicio: Date; fin: Date; nombre: string },
-  actual: { inicio: Date },
+  actual: { inicio: Date; esHito?: boolean },
 ): RelacionAnterior {
   const base = { anteriorNombre: anterior.nombre }
   const inicio = inicioDiaUTC(actual.inicio)
+  // Un hito que cae el día en que termina el anterior va "después" de él (como en MS Project).
+  if (actual.esHito && mismoDiaUTC(actual.inicio, anterior.fin) && !mismoDiaUTC(anterior.inicio, anterior.fin)) {
+    return { tipo: 'secuencia', ...base }
+  }
   if (mismoDiaUTC(actual.inicio, anterior.inicio)) return { tipo: 'paralelo', ...base }
   if (inicio < inicioDiaUTC(anterior.inicio)) return { tipo: 'antes', ...base }
   if (inicio <= inicioDiaUTC(anterior.fin)) return { tipo: 'solape', ...base }
@@ -147,7 +151,7 @@ export type ModoPosicion = 'inicio_padre' | 'despues_anterior' | 'despues_ultimo
 interface Hermano { id: string; inicio: Date; fin: Date }
 
 /** Inicio del padre y hermanos (mismo tipo, mismo padre) de un EDT, actividad o tarea. */
-async function padreYHermanos(nodeType: string, realId: string): Promise<{ inicioPadre: Date | null; hermanos: Hermano[] } | null> {
+async function padreYHermanos(nodeType: string, realId: string): Promise<{ inicioPadre: Date | null; hermanos: Hermano[]; esHito?: boolean } | null> {
   if (nodeType === 'edt') {
     const edt = await prisma.proyectoEdt.findUnique({
       where: { id: realId },
@@ -186,6 +190,7 @@ async function padreYHermanos(nodeType: string, realId: string): Promise<{ inici
       select: {
         proyectoActividadId: true,
         proyectoEdtId: true,
+        esHito: true,
         proyectoActividad: { select: { fechaInicioPlan: true } },
         proyectoEdt: { select: { fechaInicioPlan: true } },
       },
@@ -202,6 +207,7 @@ async function padreYHermanos(nodeType: string, realId: string): Promise<{ inici
     return {
       inicioPadre: (tarea.proyectoActividad?.fechaInicioPlan ?? tarea.proyectoEdt.fechaInicioPlan) ?? null,
       hermanos: hermanos.map(h => ({ id: h.id, inicio: h.fechaInicio, fin: h.fechaFin })),
+      esHito: tarea.esHito,
     }
   }
   return null
@@ -226,6 +232,10 @@ export async function calcularInicioPosicion(
   const datos = await padreYHermanos(nodeType, realId)
   if (!datos) return { error: 'Solo se puede posicionar un EDT, una actividad o una tarea' }
 
+  // Un hito "después de" algo cae el mismo día en que ese algo termina (como
+  // en MS Project); una tarea normal, el día laborable siguiente.
+  const despuesDe = (fin: Date) => (datos.esHito ? ajustarALaborable(cal, fin) : siguienteDiaLaborable(cal, fin))
+
   let base: Date
   if (modo === 'inicio_padre') {
     if (!datos.inicioPadre) return { error: 'El padre no tiene fecha de inicio' }
@@ -233,11 +243,11 @@ export async function calcularInicioPosicion(
   } else if (modo === 'despues_ultimo') {
     if (datos.hermanos.length === 0) return { error: 'No hay otros elementos en el mismo nivel' }
     const ultimoFin = datos.hermanos.reduce((max, h) => (h.fin > max ? h.fin : max), datos.hermanos[0].fin)
-    base = siguienteDiaLaborable(cal, ultimoFin)
+    base = despuesDe(ultimoFin)
   } else {
     const ref = datos.hermanos.find(h => h.id === referenciaId)
     if (!ref) return { error: 'El elemento de referencia no está en el mismo nivel' }
-    base = modo === 'en_paralelo' ? ajustarALaborable(cal, ref.inicio) : siguienteDiaLaborable(cal, ref.fin)
+    base = modo === 'en_paralelo' ? ajustarALaborable(cal, ref.inicio) : despuesDe(ref.fin)
   }
   return { inicio: inicioDiaUTC(base) }
 }

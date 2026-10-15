@@ -352,9 +352,14 @@ export async function POST(
             const tareaStart = tareaData.row.start
               ? new Date(tareaData.row.start)
               : actStart
-            const tareaFinish = tareaData.row.finish
-              ? new Date(tareaData.row.finish)
-              : actFinish
+            // Duración "0 días" en MS Project = hito: un solo día, sin horas.
+            const esHito = tareaDur.isMilestone
+            const tareaFinish = esHito
+              ? tareaStart
+              : tareaData.row.finish
+                ? new Date(tareaData.row.finish)
+                : actFinish
+            if (esHito) horasEstimadas = 0
 
             await prisma.proyectoTarea.create({
               data: {
@@ -373,6 +378,7 @@ export async function POST(
                 estado: 'pendiente',
                 prioridad: 'media',
                 porcentajeCompletado: 0,
+                esHito,
                 creadoPorId: session.user?.id || null,
                 updatedAt: new Date(),
               },

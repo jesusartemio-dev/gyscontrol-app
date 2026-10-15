@@ -13,7 +13,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { contarDiasLaborables } from '@/lib/utils/calendarioLaboral'
-import { clasificarRelacion } from '@/lib/services/cronogramaDesplazamiento'
+import { clasificarRelacion, diferenciaDiasLaborables, inicioDiaUTC } from '@/lib/services/cronogramaDesplazamiento'
 import { calcularHHRealDeTarea } from '@/lib/planTrabajo/calcularDatos'
 
 // ✅ GET /api/proyectos/[id]/cronograma/tree - Obtener árbol jerárquico del cronograma
@@ -65,6 +65,17 @@ export async function GET(
     const duracionDiasReal = (fechaInicio: Date | string | null, fechaFin: Date | string | null): number => {
       if (!fechaInicio || !fechaFin || !calendarioLaboral) return 0
       return contarDiasLaborables(new Date(fechaInicio), new Date(fechaFin), calendarioLaboral)
+    }
+
+    // Hito (Milestone de MS Project): duración 0. Con fecha límite, cuántos días
+    // laborables la pasa (0 si va a tiempo) — el árbol y el Gantt lo marcan en rojo.
+    const datosHito = (tarea: { esHito: boolean; fechaLimite: Date | null; fechaFin: Date }) => {
+      if (!tarea.esHito) return { esHito: false }
+      const diasPasadoLimite =
+        tarea.fechaLimite && calendarioLaboral && inicioDiaUTC(tarea.fechaFin) > inicioDiaUTC(tarea.fechaLimite)
+          ? diferenciaDiasLaborables(calendarioLaboral, tarea.fechaLimite, tarea.fechaFin)
+          : 0
+      return { esHito: true, fechaLimite: tarea.fechaLimite, diasPasadoLimite, duracionDiasReal: 0 }
     }
 
     // ✅ HH real = horasEstimadas × personas del recurso (nunca personasEstimadas,
@@ -422,7 +433,8 @@ export async function GET(
                       justificacionIA: tarea.justificacionIA || null,
                       creadoPorId: tarea.creadoPorId,
                       creadoPorNombre: (tarea as any).creadoPor?.name || null,
-                      duracionDiasReal: duracionDiasReal(tarea.fechaInicio, tarea.fechaFin)
+                      duracionDiasReal: duracionDiasReal(tarea.fechaInicio, tarea.fechaFin),
+                      ...datosHito(tarea),
                     },
                     metadata: {
                       hasChildren: false,
@@ -670,7 +682,11 @@ export async function GET(
           const fPrev = fechasDe(prev)
           const fCur = fechasDe(cur)
           if (fPrev && fCur) {
-            cur.data.relacionAnterior = clasificarRelacion(calendarioLaboral, { ...fPrev, nombre: prev.nombre }, fCur)
+            cur.data.relacionAnterior = clasificarRelacion(
+              calendarioLaboral,
+              { ...fPrev, nombre: prev.nombre },
+              { ...fCur, esHito: cur.data?.esHito === true },
+            )
           }
         }
         for (const hijo of nodo.children || []) anotarRelaciones(hijo)

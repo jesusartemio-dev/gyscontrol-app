@@ -296,6 +296,26 @@ export function ProyectoCronogramaTreeView({
   }
   const realIdDe = (nodeId: string) => nodeId.replace(/^(fase|edt|actividad|tarea)-/, '')
 
+  // Marcar o quitar hito ◆ (Milestone de MS Project): el servidor lo deja en un
+  // solo día y sin horas.
+  const handleToggleHito = async (nodeId: string) => {
+    const node = state.nodes.get(nodeId)
+    if (!node || node.type !== 'tarea') return
+    const marcar = !node.data?.esHito
+    try {
+      const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/tree/${nodeId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ esHito: marcar }),
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'No se pudo actualizar')
+      await actions.loadTree([...state.expandedNodes])
+      toast.success(marcar ? `"${node.nombre}" ahora es un hito` : `"${node.nombre}" ya no es un hito`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo actualizar')
+    }
+  }
+
   // El servidor calcula la fecha con el calendario laboral del proyecto y mueve
   // el nodo con todo lo que contiene, conservando su duración en días laborables.
   const handleAjustarPosicion = async (nodeId: string, posicion: 'inicio_padre' | 'despues_anterior' | 'despues_ultimo') => {
@@ -886,6 +906,7 @@ export function ProyectoCronogramaTreeView({
                         : undefined
                     }
                     tieneAnterior={!!anteriorDe(nodeId)}
+                    onToggleHito={!isReadOnly && node.type === 'tarea' && !node.data?.esExtra ? () => handleToggleHito(nodeId) : undefined}
                     onImport={isReadOnly ? undefined : () => handleImportItems(nodeId)}
                     onSelect={() => actions.selectNode(nodeId)}
                     isSelected={isSelected}
@@ -1160,6 +1181,7 @@ export function ProyectoCronogramaTreeView({
             }}
             nodes={state.nodes}
             proyectoId={proyectoId}
+            permiteHitos
           />
         )}
 

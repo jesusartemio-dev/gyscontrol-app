@@ -336,6 +336,8 @@ export function useProyectoCronogramaTree(proyectoId: string, cronogramaId?: str
             posicionamiento: data.posicionamiento || 'despues_ultima',
             recursoId: data.recursoId || undefined,
             responsableId: data.responsableId || undefined,
+            esHito: data.esHito === true,
+            fechaLimite: data.esHito && data.fechaLimite ? data.fechaLimite : null,
           }
           break
 

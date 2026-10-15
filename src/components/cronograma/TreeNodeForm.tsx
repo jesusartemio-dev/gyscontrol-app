@@ -30,6 +30,8 @@ interface TreeNodeFormProps {
   onCancel: () => void
   nodes?: Map<string, TreeNode>
   proyectoId?: string
+  /** Muestra "Es hito" y "Fecha límite" en tareas (solo cronograma de proyecto). */
+  permiteHitos?: boolean
 }
 
 const NODE_TYPE_LABELS: Record<string, string> = {
@@ -65,7 +67,8 @@ export function TreeNodeForm({
   onSubmit,
   onCancel,
   nodes = new Map(),
-  proyectoId
+  proyectoId,
+  permiteHitos = false
 }: TreeNodeFormProps) {
   // Función para obtener el estado por defecto según el tipo de nodo
   const getDefaultStatus = (nodeType?: NodeType): 'pendiente' | 'en_progreso' | 'completada' | 'pausada' | 'cancelada' | 'planificado' => {
@@ -89,7 +92,10 @@ export function TreeNodeForm({
     orden: '',
     prioridad: 'media' as const,
     estado: getDefaultStatus(nodeType),
-    posicionamiento: 'despues_ultima' as PositioningMode
+    posicionamiento: 'despues_ultima' as PositioningMode,
+    // Solo tareas: hito ◆ (un solo día, sin horas) y su fecha comprometida
+    esHito: false,
+    fechaLimite: ''
   })
 
   // Tarea: personal del proyecto (para el select de responsable) + info de creadoPor
@@ -450,7 +456,9 @@ export function TreeNodeForm({
                   node.metadata.status === 'paused' ? 'pausada' :
                   node.metadata.status === 'cancelled' ? 'cancelada' :
                   node.data.estado || getDefaultStatus(node.type),
-          posicionamiento: node.data.posicionamiento || 'despues_ultima'
+          posicionamiento: node.data.posicionamiento || 'despues_ultima',
+          esHito: node.data.esHito === true,
+          fechaLimite: node.data.fechaLimite ? toLocalDateString(node.data.fechaLimite) : ''
         })
 
         // Cargar info del recurso si existe
@@ -547,6 +555,20 @@ export function TreeNodeForm({
       ...(mode === 'create' && {
         posicionamiento: formData.posicionamiento
       })
+    }
+
+    // Hito: un solo día (fin = inicio) y sin horas; la fecha límite solo aplica a hitos.
+    const esTareaForm = nodeType === 'tarea' || (mode === 'edit' && nodeId && nodes.get(nodeId)?.type === 'tarea')
+    if (esTareaForm && permiteHitos) {
+      submitData.esHito = formData.esHito
+      submitData.fechaLimite = formData.esHito && formData.fechaLimite ? formData.fechaLimite : null
+      if (formData.esHito) {
+        submitData.fechaFinComercial = formData.fechaInicioComercial
+        submitData.horasEstimadas = 0
+      }
+    } else {
+      delete submitData.esHito
+      delete submitData.fechaLimite
     }
 
     console.log('🔍 [FORM SUBMIT] submitData:', submitData)
@@ -649,8 +671,49 @@ export function TreeNodeForm({
                 />
               </div>
 
+              {/* ── TAREA: ¿es hito? (Milestone de MS Project: duración 0, sin horas) ── */}
+              {isTarea && permiteHitos && (
+                <label className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-amber-600"
+                    checked={formData.esHito}
+                    onChange={(e) => setFormData(prev => ({ ...prev, esHito: e.target.checked }))}
+                  />
+                  <span className="font-medium text-amber-800">◆ Es hito</span>
+                  <span className="text-xs text-amber-700/80">Un solo día y sin horas, como un hito de MS Project</span>
+                </label>
+              )}
+
+              {/* ── HITO: una fecha + fecha límite opcional (la fecha comprometida) ── */}
+              {isTarea && formData.esHito && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="fechaHito">Fecha del hito</Label>
+                    <Input
+                      id="fechaHito"
+                      type="date"
+                      value={formData.fechaInicioComercial}
+                      onChange={(e) => setFormData(prev => ({ ...prev, fechaInicioComercial: e.target.value, fechaFinComercial: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="fechaLimite">Fecha límite (opcional)</Label>
+                    <Input
+                      id="fechaLimite"
+                      type="date"
+                      value={formData.fechaLimite}
+                      onChange={(e) => setFormData(prev => ({ ...prev, fechaLimite: e.target.value }))}
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Fecha comprometida (contrato). Si la tiene, el hito es contractual y se avisa si el plan la pasa.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* ── TAREA: Fechas + Horas en una fila ── */}
-              {isTarea && (
+              {isTarea && !formData.esHito && (
                 <div className="grid grid-cols-[1fr_1fr_auto] gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="fechaInicio">F. Inicio</Label>

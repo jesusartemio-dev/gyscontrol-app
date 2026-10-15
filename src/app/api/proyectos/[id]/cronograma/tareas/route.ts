@@ -32,6 +32,9 @@ const createTareaSchema = z.object({
   posicionamiento: z.enum(['inicio_padre', 'despues_ultima']).optional(),
   esExtra: z.boolean().optional(),
   orden: z.number().int().min(0).optional(),
+  // Hito (Milestone de MS Project): un solo día, sin horas. fechaLimite = fecha comprometida.
+  esHito: z.boolean().optional(),
+  fechaLimite: z.string().nullable().optional(),
 })
 
 // ✅ Schema de validación para actualizar tarea
@@ -300,7 +303,8 @@ export async function POST(
 
     console.log('✅ [API TAREAS] Cronograma verificado:', cronogramaExists.id)
 
-    // ✅ Crear la tarea
+    // ✅ Crear la tarea. Un hito ocupa un solo día (fin = inicio) y no lleva horas.
+    const esHito = validatedData.esHito ?? false
     const tareaData = {
       id: crypto.randomUUID(),
       proyectoEdtId: actividad.proyectoEdtId,
@@ -309,8 +313,10 @@ export async function POST(
       nombre: validatedData.nombre,
       descripcion: validatedData.descripcion,
       fechaInicio: fechaInicio ?? new Date(),
-      fechaFin: fechaFin ?? new Date(),
-      horasEstimadas: validatedData.horasEstimadas,
+      fechaFin: esHito ? (fechaInicio ?? new Date()) : (fechaFin ?? new Date()),
+      horasEstimadas: esHito ? 0 : validatedData.horasEstimadas,
+      esHito,
+      fechaLimite: esHito && validatedData.fechaLimite ? new Date(validatedData.fechaLimite) : null,
       personasEstimadas: validatedData.personasEstimadas || 1,
       prioridad: validatedData.prioridad as 'baja' | 'media' | 'alta' | 'critica',
       dependenciaId: validatedData.dependenciaId,

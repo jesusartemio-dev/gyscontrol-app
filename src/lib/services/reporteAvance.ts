@@ -177,6 +177,68 @@ function parseComentariosHitos(json: Prisma.JsonValue | null): Map<string, strin
   return map
 }
 
+/**
+ * Hitos del reporte a partir de las tareas-hito del cronograma (como en MS Project):
+ * - Plan: la fecha límite (comprometida) o, si no tiene, la fecha en la Línea Base.
+ * - Pronóstico: la fecha en el cronograma de ejecución (o en la Línea Base si aún no hay).
+ * - Real: la fecha de fin cuando el hito está completado.
+ * - Contractual si tiene fecha límite; si no, intermedio.
+ * El hito de ejecución se empareja con el de la Línea Base por nombre.
+ * Devuelve [] si el proyecto no tiene tareas-hito (se usan entonces los ProyectoHito).
+ */
+async function hitosDesdeTareas(proyectoId: string): Promise<Omit<HitoReporte, 'comentario'>[]> {
+  const cronogramas = await prisma.proyectoCronograma.findMany({
+    where: { proyectoId, tipo: { in: ['planificacion', 'ejecucion'] } },
+    select: { id: true, tipo: true, esBaseline: true },
+  })
+  const base =
+    cronogramas.find((c) => c.tipo === 'planificacion' && c.esBaseline) ??
+    cronogramas.find((c) => c.tipo === 'planificacion')
+  const ejec = cronogramas.find((c) => c.tipo === 'ejecucion')
+  const ids = [base?.id, ejec?.id].filter((x): x is string => !!x)
+  if (ids.length === 0) return []
+
+  const tareas = await prisma.proyectoTarea.findMany({
+    where: { proyectoCronogramaId: { in: ids }, esHito: true },
+    select: {
+      id: true, nombre: true, proyectoCronogramaId: true, fechaFin: true, fechaFinReal: true,
+      fechaLimite: true, estado: true, porcentajeCompletado: true,
+    },
+  })
+  const clave = (n: string) => n.trim().toLowerCase()
+  const enBase = tareas.filter((t) => t.proyectoCronogramaId === base?.id)
+  const enEjec = new Map(tareas.filter((t) => t.proyectoCronogramaId === ejec?.id).map((t) => [clave(t.nombre), t]))
+  const completado = (t: (typeof tareas)[number]) => t.estado === 'completada' || t.porcentajeCompletado >= 100
+
+  const filas: Omit<HitoReporte, 'comentario' | 'orden'>[] = enBase.map((b) => {
+    const vigente = enEjec.get(clave(b.nombre)) ?? b
+    enEjec.delete(clave(b.nombre))
+    const limite = vigente.fechaLimite ?? b.fechaLimite
+    return {
+      id: b.id,
+      tipo: (limite ? 'contractual' : 'intermedio') as HitoReporte['tipo'],
+      nombre: b.nombre,
+      fechaPlan: limite ?? b.fechaFin,
+      fechaPronostico: vigente.fechaFin,
+      fechaReal: completado(vigente) ? vigente.fechaFinReal ?? vigente.fechaFin : null,
+    }
+  })
+  // Hitos agregados solo en ejecución (no estaban en la Línea Base).
+  for (const e of enEjec.values()) {
+    filas.push({
+      id: e.id,
+      tipo: e.fechaLimite ? 'contractual' : 'intermedio',
+      nombre: e.nombre,
+      fechaPlan: e.fechaLimite,
+      fechaPronostico: e.fechaFin,
+      fechaReal: completado(e) ? e.fechaFinReal ?? e.fechaFin : null,
+    })
+  }
+  return filas
+    .sort((a, b) => (a.fechaPlan ?? a.fechaPronostico ?? new Date(0)).getTime() - (b.fechaPlan ?? b.fechaPronostico ?? new Date(0)).getTime())
+    .map((f, i) => ({ ...f, orden: i }))
+}
+
 /** Deriva impedimentos desde los bloqueos (Json) de las jornadas de la semana. */
 function impedimentosDesdeBloqueos(
   jornadas: Awaited<ReturnType<typeof obtenerJornadasDeSemana>>,
@@ -257,18 +319,22 @@ export async function obtenerReporteAvanceAgregado(
     porcentajeAvance: f.porcentajeAvance,
   }))
 
-  // ── Hitos del proyecto, aplicando comentariosHitos override ──
+  // ── Hitos: de las tareas-hito del cronograma; si el proyecto aún no tiene,
+  // de la tabla anterior ProyectoHito. Se aplica el override comentariosHitos. ──
   const comentariosOverride = parseComentariosHitos(reporte.comentariosHitos)
-  const hitos: HitoReporte[] = reporte.proyecto.hitos.map((h) => ({
-    id: h.id,
-    tipo: h.tipo,
-    nombre: h.nombre,
-    orden: h.orden,
-    fechaPlan: h.fechaPlan,
-    fechaPronostico: h.fechaPronostico,
-    fechaReal: h.fechaReal,
-    comentario: comentariosOverride.get(h.id) ?? h.comentario,
-  }))
+  const hitosTareas = await hitosDesdeTareas(proyectoId)
+  const hitos: HitoReporte[] = hitosTareas.length > 0
+    ? hitosTareas.map((h) => ({ ...h, comentario: comentariosOverride.get(h.id) ?? null }))
+    : reporte.proyecto.hitos.map((h) => ({
+        id: h.id,
+        tipo: h.tipo,
+        nombre: h.nombre,
+        orden: h.orden,
+        fechaPlan: h.fechaPlan,
+        fechaPronostico: h.fechaPronostico,
+        fechaReal: h.fechaReal,
+        comentario: comentariosOverride.get(h.id) ?? h.comentario,
+      }))
 
   // ── Variaciones guardadas ──
   const variaciones = parseVariaciones(reporte.variaciones)

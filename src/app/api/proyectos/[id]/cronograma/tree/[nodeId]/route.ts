@@ -61,6 +61,9 @@ const updateNodeSchema = z.object({
   // Solo aplica a tarea — actividad/EDT/fase derivan su % de sus tareas (ProgresoService)
   // y no se pueden editar directamente.
   porcentajeCompletado: z.number().min(0).max(100).optional(),
+  // Solo tarea: hito (Milestone de MS Project) y su fecha comprometida (Deadline).
+  esHito: z.boolean().optional(),
+  fechaLimite: z.string().nullable().optional(),
   // EDT, actividad o tarea: ubicarla respecto a su padre o a un hermano. El
   // servidor calcula el nuevo inicio con el calendario del proyecto y el nodo
   // se mueve en bloque con todo lo que contiene, conservando su duración.
@@ -171,6 +174,8 @@ export async function PUT(
 
     // ✅ Actualizar según el tipo de nodo
     let updateData: any = {}
+    // Solo tareas: si queda como hito (se calcula en el case 'tarea').
+    let esHitoFinal = false
 
     switch (nodeType) {
       case 'fase':
@@ -233,6 +238,24 @@ export async function PUT(
           personasEstimadas: validatedData.personasEstimadas,
           recursoId: validatedData.recursoId,
           responsableId: validatedData.responsableId,
+        }
+
+        // Hito: un solo día (fin = inicio) y sin horas. Al dejar de ser hito
+        // pierde la fecha límite (solo aplica a hitos).
+        const tareaActual = await prisma.proyectoTarea.findUnique({
+          where: { id: realId },
+          select: { esHito: true, fechaInicio: true },
+        })
+        esHitoFinal = validatedData.esHito ?? tareaActual?.esHito ?? false
+        if (validatedData.esHito !== undefined) updateData.esHito = validatedData.esHito
+        if (esHitoFinal) {
+          updateData.horasEstimadas = 0
+          updateData.fechaFin = updateData.fechaInicio ?? tareaActual?.fechaInicio
+          if (validatedData.fechaLimite !== undefined) {
+            updateData.fechaLimite = validatedData.fechaLimite ? new Date(validatedData.fechaLimite) : null
+          }
+        } else if (validatedData.esHito === false) {
+          updateData.fechaLimite = null
         }
         console.log('🔍 [API TREE UPDATE] Tarea updateData:', updateData)
         console.log('🔍 [API TREE UPDATE] validatedData:', validatedData)
@@ -304,7 +327,10 @@ export async function PUT(
       const finSinCambio = !newFechaFinRaw || (currentDates.fechaFin && mismoDiaUTC(currentDates.fechaFin, newFechaFinRaw))
       const fechas: { inicio?: Date; fin?: Date } = {}
       if (!mismoDiaUTC(inicioLaborable, newFechaInicioRaw)) fechas.inicio = inicioLaborable
-      if (finSinCambio && currentDates.fechaFin) {
+      if (esHitoFinal) {
+        // Un hito ocupa un solo día: su fin es su inicio (ya en día laborable).
+        if (!newFechaFinRaw || !mismoDiaUTC(newFechaFinRaw, inicioLaborable)) fechas.fin = inicioLaborable
+      } else if (finSinCambio && currentDates.fechaFin) {
         fechas.fin = desplazarDiasLaborables(calendario, currentDates.fechaFin, deltaLaborables)
       }
       if (fechas.inicio || fechas.fin) {

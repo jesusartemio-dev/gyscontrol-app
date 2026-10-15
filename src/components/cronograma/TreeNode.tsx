@@ -6,7 +6,7 @@
 // ===================================================
 
 import React from 'react'
-import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine, ArrowRightLeft, ArrowRightToLine, Columns2, ArrowDown, ArrowRight, ArrowLeft, Layers } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine, ArrowRightLeft, ArrowRightToLine, Columns2, ArrowDown, ArrowRight, ArrowLeft, Layers, Diamond } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -74,6 +74,8 @@ interface TreeNodeProps {
   onProgramarRespecto?: (modo: 'despues_de' | 'en_paralelo') => void
   /** Hay un hermano del mismo tipo justo arriba (habilita "Después del anterior"). */
   tieneAnterior?: boolean
+  /** Solo tareas: marcar o quitar como hito ◆. */
+  onToggleHito?: () => void
   dragListeners?: Record<string, Function>
   dragAttributes?: Record<string, any>
   isDragging?: boolean
@@ -146,6 +148,7 @@ export function TreeNode({
   onAjustarPosicion,
   onProgramarRespecto,
   tieneAnterior,
+  onToggleHito,
   dragListeners,
   dragAttributes,
   isDragging,
@@ -266,9 +269,20 @@ export function TreeNode({
         return `${day} ${month}`
       } catch { return '' }
     }
+    if (node.type === 'tarea' && node.data?.esHito && fechaInicio) return fmt(fechaInicio)
     if (fechaInicio && fechaFin) return `${fmt(fechaInicio)}–${fmt(fechaFin)}`
     return ''
   }
+
+  // Fecha corta "30 nov" (día UTC, igual que las fechas de la fila).
+  const fmtCorta = (d: string | Date) => {
+    const date = new Date(d)
+    if (isNaN(date.getTime())) return ''
+    const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+    return `${String(date.getUTCDate()).padStart(2, '0')} ${months[date.getUTCMonth()]}`
+  }
+  const esHitoTarea = node.type === 'tarea' && node.data?.esHito === true
+  const diasPasadoLimite = Number(node.data?.diasPasadoLimite) || 0
 
   return (
     <div
@@ -348,10 +362,29 @@ export function TreeNode({
             <span className="text-[10px] text-gray-400 shrink-0">({node.metadata.totalChildren})</span>
           )}
 
-          {/* Indicador de hito */}
+          {/* Indicador de hito (◆) y su fecha límite: dorado si es contractual, rojo si la pasa */}
           {node.data?.esHito && (
-            <Badge variant="outline" className="text-[10px] leading-none px-1 py-0 h-4 bg-green-50 text-green-700 border-green-200 shrink-0">
-              Hito
+            <Badge
+              variant="outline"
+              className={`text-[10px] leading-none px-1 py-0 h-4 shrink-0 ${
+                node.data?.fechaLimite ? 'bg-amber-50 text-amber-700 border-amber-300' : 'bg-gray-50 text-gray-600 border-gray-300'
+              }`}
+              title={node.data?.fechaLimite ? 'Hito contractual (tiene fecha límite)' : 'Hito'}
+            >
+              ◆ Hito
+            </Badge>
+          )}
+          {esHitoTarea && node.data?.fechaLimite && (
+            <Badge
+              variant="outline"
+              className={`text-[10px] leading-none px-1 py-0 h-4 shrink-0 ${
+                diasPasadoLimite > 0 ? 'bg-red-50 text-red-700 border-red-300' : 'bg-white text-gray-600 border-gray-300'
+              }`}
+              title={diasPasadoLimite > 0
+                ? `Pasa la fecha límite por ${diasPasadoLimite} día(s) laborable(s)`
+                : 'Fecha límite (comprometida)'}
+            >
+              Límite {fmtCorta(node.data.fechaLimite)}{diasPasadoLimite > 0 ? ` · +${diasPasadoLimite}d` : ''}
             </Badge>
           )}
 
@@ -412,7 +445,7 @@ export function TreeNode({
 
         {/* Columna 5: Duration (días hábiles desde fechas) */}
         <div className="text-right text-[11px] text-gray-500 font-mono pr-1">
-          {durationDays > 0 ? `${durationDays}d` : node.data.duracionDiasReal === 0 ? (
+          {esHitoTarea ? '0d' : durationDays > 0 ? `${durationDays}d` : node.data.duracionDiasReal === 0 ? (
             // Tiene fechas pero no cae en ningún día laborable del calendario
             <span className="text-amber-600" title="Cae solo en días no laborables del calendario del proyecto">0d</span>
           ) : ''}
@@ -670,6 +703,17 @@ export function TreeNode({
                 >
                   <ArrowRightLeft className="h-4 w-4 mr-2" />
                   Mover a otro EDT
+                </DropdownMenuItem>
+              )}
+
+              {/* Marcar o quitar hito (Milestone de MS Project): un solo día, sin horas */}
+              {!readOnly && node.type === 'tarea' && onToggleHito && (
+                <DropdownMenuItem
+                  onClick={() => { setDropdownOpen(false); onToggleHito() }}
+                  className="text-amber-700"
+                >
+                  <Diamond className="h-4 w-4 mr-2" />
+                  {node.data?.esHito ? 'Quitar hito' : 'Marcar como hito'}
                 </DropdownMenuItem>
               )}
 

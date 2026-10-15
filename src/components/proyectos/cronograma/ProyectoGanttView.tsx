@@ -61,6 +61,12 @@ interface GanttItem {
   fechaInicioNodo?: string
   /** Días laborables (calendario del proyecto), los mismos que la columna DUR de Jerarquía. */
   duracionLaborable?: number
+  /** Hito ◆ (Milestone de MS Project): se dibuja como rombo en su fecha. */
+  esHito?: boolean
+  /** Fecha comprometida del hito (Deadline); se marca en su fila. */
+  fechaLimite?: Date
+  /** Días laborables que el hito pasa su fecha límite (0 = a tiempo). */
+  diasPasadoLimite?: number
 }
 
 interface ProyectoGanttViewProps {
@@ -248,6 +254,9 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
           horasEstimadas: data.horasEstimadas ? Number(data.horasEstimadas) : undefined,
           fechaInicioNodo: fechaInicio || undefined,
           duracionLaborable: typeof data.duracionDiasReal === 'number' ? data.duracionDiasReal : undefined,
+          esHito: data.esHito === true,
+          fechaLimite: data.esHito && data.fechaLimite ? diaLocalDesdeUTC(data.fechaLimite) : undefined,
+          diasPasadoLimite: Number(data.diasPasadoLimite) || 0,
           hijos: node.children?.map((child: any) => processNode(child, nivel + 1, node.id)) || []
         }
 
@@ -821,6 +830,23 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                 </div>
               )}
 
+              {/* Fecha límite de los hitos (Deadline de MS Project): ▼ en su día, rojo si el hito la pasa */}
+              {visibleItems.map((item, idx) => {
+                if (!item.esHito || !item.fechaLimite) return null
+                const x = differenceInDays(item.fechaLimite, timeline.minDate) * timeline.dayWidth + timeline.dayWidth / 2
+                const tarde = (item.diasPasadoLimite ?? 0) > 0
+                return (
+                  <div
+                    key={`limite-${item.id}`}
+                    className="absolute pointer-events-none z-10"
+                    style={{ left: x - 5, top: idx * ROW_HEIGHT, height: ROW_HEIGHT, width: 10 }}
+                  >
+                    <div className={`mx-auto h-full w-px ${tarde ? 'bg-red-500' : 'bg-amber-500'}`} />
+                    <div className={`absolute left-0 top-0 text-[9px] leading-none ${tarde ? 'text-red-600' : 'text-amber-600'}`}>▼</div>
+                  </div>
+                )
+              })}
+
               {/* Bars */}
               {visibleItems.map((item, rowIdx) => {
                 const startDay = differenceInDays(item.fechaInicio, timeline.minDate)
@@ -828,10 +854,16 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                 const diasCalendario = Math.max(1, differenceInDays(item.fechaFin, item.fechaInicio) + 1)
                 // Duración mostrada: días laborables, igual que la columna DUR de Jerarquía.
                 const durationDays = item.duracionLaborable ?? diasCalendario
-                const barLeft = startDay * timeline.dayWidth
-                const barWidth = Math.max(diasCalendario * timeline.dayWidth, 20)
+                const ladoRombo = ROW_HEIGHT - MARGEN_BARRA * 2
+                const barLeft = item.esHito
+                  ? startDay * timeline.dayWidth + timeline.dayWidth / 2 - ladoRombo / 2
+                  : startDay * timeline.dayWidth
+                const barWidth = item.esHito ? ladoRombo : Math.max(diasCalendario * timeline.dayWidth, 20)
+                const colorHito = item.diasPasadoLimite ? '#dc2626' : item.fechaLimite ? '#d97706' : '#4b5563'
                 const colors = TIPO_COLORS[item.tipo] || TIPO_COLORS.tarea
-                const labelText = `${durationDays}d${item.horasEstimadas ? ` · ${item.horasEstimadas}h` : ''}`
+                const labelText = item.esHito
+                  ? format(item.fechaInicio, 'dd MMM', { locale: es })
+                  : `${durationDays}d${item.horasEstimadas ? ` · ${item.horasEstimadas}h` : ''}`
                 const labelFitsInside = barWidth > 60
                 const arrastrable = puedeArrastrar(item)
                 const enArrastre = arrastre?.id === item.id
@@ -882,25 +914,46 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                                     .toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'UTC' })}`}
                             </div>
                           )}
-                          {/* Bar background */}
-                          <div
-                            className="absolute top-0 left-0 h-full rounded shadow-sm"
-                            style={{ width: barWidth, backgroundColor: item.color + '40', border: `1px solid ${item.color}80` }}
-                          />
-                          {/* Progress fill */}
-                          <div
-                            className="absolute left-0 top-0 h-full rounded-l"
-                            style={{ width: `${(item.porcentajeAvance / 100) * barWidth}px`, backgroundColor: item.color + 'A0' }}
-                          />
-                          {/* Label - inside bar if fits, outside to the right if not */}
-                          <div
-                            className="absolute top-0 h-full flex items-center whitespace-nowrap"
-                            style={{ left: labelFitsInside ? 0 : barWidth + 4, paddingLeft: labelFitsInside ? 6 : 0 }}
-                          >
-                            <span className="text-[10px] font-medium" style={{ color: item.color }}>
-                              {labelText}
-                            </span>
-                          </div>
+                          {item.esHito ? (
+                            <>
+                              {/* Hito ◆: rombo en su fecha (relleno si está completado) */}
+                              <div
+                                className="absolute left-0 top-0 h-full w-full rotate-45 scale-[0.72] rounded-[2px] shadow-sm"
+                                style={{
+                                  backgroundColor: item.porcentajeAvance >= 100 ? colorHito : colorHito + '33',
+                                  border: `2px solid ${colorHito}`,
+                                }}
+                              />
+                              <div className="absolute top-0 h-full flex items-center whitespace-nowrap" style={{ left: barWidth + 4 }}>
+                                <span className="text-[10px] font-semibold" style={{ color: colorHito }}>
+                                  {labelText}
+                                  {item.diasPasadoLimite ? ` · +${item.diasPasadoLimite}d sobre el límite` : ''}
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              {/* Bar background */}
+                              <div
+                                className="absolute top-0 left-0 h-full rounded shadow-sm"
+                                style={{ width: barWidth, backgroundColor: item.color + '40', border: `1px solid ${item.color}80` }}
+                              />
+                              {/* Progress fill */}
+                              <div
+                                className="absolute left-0 top-0 h-full rounded-l"
+                                style={{ width: `${(item.porcentajeAvance / 100) * barWidth}px`, backgroundColor: item.color + 'A0' }}
+                              />
+                              {/* Label - inside bar if fits, outside to the right if not */}
+                              <div
+                                className="absolute top-0 h-full flex items-center whitespace-nowrap"
+                                style={{ left: labelFitsInside ? 0 : barWidth + 4, paddingLeft: labelFitsInside ? 6 : 0 }}
+                              >
+                                <span className="text-[10px] font-medium" style={{ color: item.color }}>
+                                  {labelText}
+                                </span>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </TooltipTrigger>
                       {/* Durante el arrastre se oculta el tooltip para que no tape el destino */}
@@ -908,8 +961,22 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                         <TooltipContent side="top" className="max-w-xs text-xs">
                           <div className="space-y-1">
                             <div className="font-semibold">{item.nombre}</div>
-                            <div>{format(item.fechaInicio, 'dd MMM yyyy', { locale: es })} → {format(item.fechaFin, 'dd MMM yyyy', { locale: es })}</div>
-                            <div>{durationDays} días laborables{item.horasEstimadas ? ` · ${item.horasEstimadas}h` : ''} · {item.porcentajeAvance}%</div>
+                            {item.esHito ? (
+                              <>
+                                <div>◆ Hito · {format(item.fechaInicio, 'dd MMM yyyy', { locale: es })}</div>
+                                {item.fechaLimite && (
+                                  <div className={item.diasPasadoLimite ? 'text-red-300 font-medium' : ''}>
+                                    Fecha límite: {format(item.fechaLimite, 'dd MMM yyyy', { locale: es })}
+                                    {item.diasPasadoLimite ? ` · la pasa por ${item.diasPasadoLimite} día(s) laborable(s)` : ' · a tiempo'}
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <div>{format(item.fechaInicio, 'dd MMM yyyy', { locale: es })} → {format(item.fechaFin, 'dd MMM yyyy', { locale: es })}</div>
+                                <div>{durationDays} días laborables{item.horasEstimadas ? ` · ${item.horasEstimadas}h` : ''} · {item.porcentajeAvance}%</div>
+                              </>
+                            )}
                             {arrastrable && <div className="text-muted-foreground">Arrastra la barra para moverla{item.tipo === 'tarea' ? '' : ' con lo que contiene'}</div>}
                           </div>
                         </TooltipContent>
@@ -932,6 +999,15 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                 <span className="capitalize">{tipo}</span>
               </div>
             ))}
+            <div className="w-px h-3 bg-gray-200" />
+            <div className="flex items-center gap-1">
+              <span className="text-gray-600">◆</span>
+              <span>Hito</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-amber-600">▼</span>
+              <span>Fecha límite</span>
+            </div>
             <div className="w-px h-3 bg-gray-200" />
             <div className="flex items-center gap-1">
               <div className="w-2.5 h-2.5 rounded bg-red-500" />

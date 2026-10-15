@@ -20,6 +20,11 @@ interface TreeNode {
     recursoTipo?: string | null
     isExtrasGroup?: boolean
     esExtra?: boolean
+    /** Hito ◆ (Milestone) y su fecha comprometida (Deadline). */
+    esHito?: boolean
+    fechaLimite?: string | null
+    /** Días laborables calculados por la API del árbol. */
+    duracionDiasReal?: number
   }
   children?: TreeNode[]
 }
@@ -56,6 +61,10 @@ interface FlatRow {
   notes: string
   work: string
   nodeId: string // internal UUID for dependency mapping
+  /** Hito (Milestone de MS Project): duración 0 y rombo en el Gantt. */
+  milestone: boolean
+  /** Fecha comprometida del hito (Deadline de MS Project). */
+  deadline: Date | null
 }
 
 /**
@@ -80,9 +89,14 @@ function flattenTree(node: TreeNode, horasPorDia: number): FlatRow[] {
     // Outline level: proyecto=1, fase=2, edt=3, actividad=4, tarea=5
     const outlineLevel = n.level + 1
 
-    // Duration: convert hours back to days string
+    // Duration: convert hours back to days string. "0 days" es solo para hitos:
+    // MS Project convierte en hito cualquier tarea de duración 0, así que una
+    // tarea sin horas que no es hito se exporta con sus días laborables.
+    const esHito = !hasChildren && data.esHito === true
     let duration = ''
-    if (horas > 0) {
+    if (esHito) {
+      duration = '0 days'
+    } else if (horas > 0) {
       const days = horas / horasPorDia
       if (days === Math.floor(days)) {
         duration = `${days} days`
@@ -90,7 +104,8 @@ function flattenTree(node: TreeNode, horasPorDia: number): FlatRow[] {
         duration = `${days.toFixed(2)} days`
       }
     } else if (!hasChildren) {
-      duration = '0 days'
+      const dias = Number(data.duracionDiasReal) || 1
+      duration = `${dias} ${dias === 1 ? 'day' : 'days'}`
     }
 
     // Work: person-hours
@@ -115,6 +130,8 @@ function flattenTree(node: TreeNode, horasPorDia: number): FlatRow[] {
       notes: data.descripcion || '',
       work,
       nodeId,
+      milestone: esHito,
+      deadline: esHito && data.fechaLimite ? new Date(data.fechaLimite) : null,
     })
 
     if (n.children) {
@@ -298,6 +315,8 @@ export function exportCronogramaToExcel(
     'Predecessors',
     'Outline Level',
     'Notes',
+    'Milestone',
+    'Deadline',
   ]
 
   const dataRows = allRows.map((row) => [
@@ -312,6 +331,8 @@ export function exportCronogramaToExcel(
     row.predecessors,
     row.outlineLevel,
     row.notes,
+    row.milestone ? 'Yes' : 'No',
+    row.deadline ? formatExcelDate(row.deadline) : 'NA',
   ])
 
   const ws = XLSX.utils.aoa_to_sheet([header, ...dataRows])
@@ -329,6 +350,8 @@ export function exportCronogramaToExcel(
     { wch: 14 },  // Predecessors
     { wch: 14 },  // Outline Level
     { wch: 40 },  // Notes
+    { wch: 10 },  // Milestone
+    { wch: 30 },  // Deadline
   ]
 
   const wb = XLSX.utils.book_new()

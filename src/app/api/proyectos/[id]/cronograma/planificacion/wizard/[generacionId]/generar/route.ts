@@ -47,6 +47,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       proyecto: {
         select: {
           fechaInicio: true,
+          fechaFin: true,
           cotizacion: {
             select: {
               calendarioLaboral: { include: { diaCalendario: true, excepcionCalendario: true } },
@@ -179,37 +180,40 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     }))
   const { sugerencias: dependenciasSugeridas, advertencias: advertenciasDependencias } = sugerirDependencias(tareasParaDependencias)
 
-  const primeraFase = estructura.fases[0]
-  const ultimaFase = estructura.fases[estructura.fases.length - 1]
-  const hitos = [
-    {
+  // Hitos de inicio y fin como tareas-hito ◆ (Milestone de MS Project), dentro
+  // de la primera y la última tarea del cronograma. Su fecha límite (contractual)
+  // son las fechas de inicio/fin del proyecto. Reemplazan a los ProyectoHito que
+  // se creaban antes (y que se duplicaban cada vez que se corría el wizard).
+  const hitos: typeof estructura.tareas = []
+  if (estructura.tareas.length > 0) {
+    const porInicio = [...estructura.tareas].sort((a, b) => a.fechaInicio.getTime() - b.fechaInicio.getTime())
+    const porFin = [...estructura.tareas].sort((a, b) => b.fechaFin.getTime() - a.fechaFin.getTime())
+    const primera = porInicio[0]
+    const ultima = porFin[0]
+    const maxOrdenEnActividad = (actividadId: string) =>
+      Math.max(0, ...estructura.tareas.filter(t => t.proyectoActividadId === actividadId).map(t => t.orden))
+    const hito = (base: (typeof estructura.tareas)[number], nombre: string, fecha: Date, orden: number, fechaLimite: Date | null) => ({
       id: randomUUID(),
-      proyectoId: cronograma.proyectoId,
-      tipo: 'contractual' as const,
-      nombre: 'Inicio de Proyecto',
-      orden: 0,
-      fechaPlan: primeraFase.fechaInicioPlan,
-      proyectoFaseId: primeraFase.id,
-    },
-    {
-      id: randomUUID(),
-      proyectoId: cronograma.proyectoId,
-      tipo: 'intermedio' as const,
-      nombre: 'Aprobación de Línea Base',
-      orden: 1,
-      fechaPlan: new Date(),
-      proyectoFaseId: null,
-    },
-    {
-      id: randomUUID(),
-      proyectoId: cronograma.proyectoId,
-      tipo: 'contractual' as const,
-      nombre: 'Fin de Proyecto',
-      orden: 2,
-      fechaPlan: ultimaFase.fechaFinPlan,
-      proyectoFaseId: ultimaFase.id,
-    },
-  ]
+      proyectoEdtId: base.proyectoEdtId,
+      proyectoActividadId: base.proyectoActividadId,
+      proyectoCronogramaId: base.proyectoCronogramaId,
+      nombre,
+      orden,
+      fechaInicio: fecha,
+      fechaFin: fecha,
+      horasEstimadas: 0,
+      updatedAt: new Date(),
+      catalogoServicioId: null,
+      recursoId: null,
+      responsableId: null,
+      esHito: true,
+      fechaLimite,
+    })
+    hitos.push(
+      hito(primera, 'Inicio de Proyecto', primera.fechaInicio, -1, cronograma.proyecto.fechaInicio ?? null),
+      hito(ultima, 'Fin de Proyecto', ultima.fechaFin, maxOrdenEnActividad(ultima.proyectoActividadId) + 1, cronograma.proyecto.fechaFin ?? null),
+    )
+  }
 
   const filasAsignacionResponsables = construirFilasAsignacionAuditoria(
     cronograma.proyectoId,
@@ -222,7 +226,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       prisma.proyectoFase.createMany({ data: estructura.fases }),
       prisma.proyectoEdt.createMany({ data: estructura.edts }),
       prisma.proyectoActividad.createMany({ data: estructura.actividades }),
-      prisma.proyectoTarea.createMany({ data: estructura.tareas }),
+      prisma.proyectoTarea.createMany({ data: [...estructura.tareas, ...hitos] }),
       ...(dependenciasSugeridas.length > 0
         ? [
             prisma.proyectoDependenciasTarea.createMany({
@@ -230,7 +234,6 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
             }),
           ]
         : []),
-      prisma.proyectoHito.createMany({ data: hitos }),
       ...(filasAsignacionResponsables.length > 0
         ? [prisma.proyectoTareaResponsableAsignacion.createMany({ data: filasAsignacionResponsables })]
         : []),

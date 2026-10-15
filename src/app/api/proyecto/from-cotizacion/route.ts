@@ -802,6 +802,8 @@ export async function POST(request: NextRequest) {
                       estado: EstadoTarea.pendiente,
                       porcentajeCompletado: 0,
                       orden: 0,
+                      // Los hitos de la cotización siguen siendo hitos en el proyecto
+                      esHito: tareaComercial.esHito ?? false,
                       createdAt: new Date(),
                       updatedAt: new Date()
                     }
