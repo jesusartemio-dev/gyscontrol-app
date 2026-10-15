@@ -165,7 +165,14 @@ export async function calcularPlanSincronizacion(cronogramaId: string, filas: Fi
       const fin = f.esHito ? ini : f.fin ? new Date(f.fin) : null
       if (ini && !mismoInstante(ini, t.fechaInicio)) campos.push({ campo: 'Inicio', antes: fechaTxt(t.fechaInicio), despues: fechaTxt(ini) })
       if (fin && !mismoInstante(fin, t.fechaFin)) campos.push({ campo: 'Fin', antes: fechaTxt(t.fechaFin), despues: fechaTxt(fin) })
-      if (f.esHito !== t.esHito) campos.push({ campo: 'Hito', antes: t.esHito, despues: f.esHito })
+      if (f.esHito !== t.esHito) {
+        campos.push({ campo: 'Hito', antes: t.esHito, despues: f.esHito })
+        // Una tarea con duración que llega como hito pierde su duración: avisar
+        // (pasaba con XML viejos, que MS Project abría con trabajo 0 como hitos).
+        if (f.esHito && t.fechaFin.getTime() > t.fechaInicio.getTime()) {
+          plan.advertencias.push(`"${t.nombre}" pasaría a hito y perdería su duración. Si no la marcaste como hito en MS Project, no apliques: vuelve a exportar el XML desde GYS y edita esa copia.`)
+        }
+      }
       const limiteActual = t.fechaLimite ? t.fechaLimite.toISOString().slice(0, 10) : null
       const limiteNuevo = f.esHito ? f.fechaLimite : null
       if ((limiteNuevo ?? null) !== limiteActual) campos.push({ campo: 'Fecha límite', antes: limiteActual, despues: limiteNuevo })

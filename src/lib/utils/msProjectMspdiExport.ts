@@ -226,13 +226,20 @@ export function generarMspdiProyecto(opts: {
       </PredecessorLink>`
     }).join('\n')
 
+    // Duración real y restante según el avance. Sin RemainingDuration, MS Project
+    // deja en 0 la duración de las tareas sin asignación (trabajo 0) y las
+    // convierte en hitos al abrir el archivo.
+    const avance = Math.min(100, Math.max(0, Math.round(Number(d.progreso ?? d.porcentajeAvance ?? 0)) || 0))
+    const horasReales = (horasDur * avance) / 100
     const fechas = ini && fin
       ? `      <Start>${fechaMsp(ini)}</Start>
       <Finish>${fechaMsp(fin)}</Finish>${f.esResumen ? '' : `
       <Duration>${duracionMsp(horasDur)}</Duration>
       <ManualStart>${fechaMsp(ini)}</ManualStart>
       <ManualFinish>${fechaMsp(fin)}</ManualFinish>
-      <ManualDuration>${duracionMsp(horasDur)}</ManualDuration>`}`
+      <ManualDuration>${duracionMsp(horasDur)}</ManualDuration>
+      <ActualDuration>${duracionMsp(horasReales)}</ActualDuration>
+      <RemainingDuration>${duracionMsp(horasDur - horasReales)}</RemainingDuration>`}`
       : ''
     const limite = esHito && d.fechaLimite
       ? `\n      <Deadline>${new Date(d.fechaLimite).toISOString().slice(0, 10)}T${horaMsp(jornadaFin)}</Deadline>`
@@ -254,7 +261,7 @@ ${fechas}
       <Milestone>${esHito ? 1 : 0}</Milestone>
       <Summary>${f.esResumen ? 1 : 0}</Summary>
       <Manual>${f.esResumen ? 0 : 1}</Manual>
-      <PercentComplete>${Math.round(Number(d.progreso ?? f.nodo.data?.porcentajeAvance ?? 0)) || 0}</PercentComplete>${limite}${d.descripcion ? `
+      <PercentComplete>${avance}</PercentComplete>${limite}${d.descripcion ? `
       <Notes>${esc(String(d.descripcion))}</Notes>` : ''}
 ${preds}
       <ExtendedAttribute>
