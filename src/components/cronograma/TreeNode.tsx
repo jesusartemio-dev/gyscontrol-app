@@ -450,7 +450,11 @@ export function TreeNode({
 
         {/* Columna 5: Duración por horas laborables, como MS Project ("4h", "1.5d", "0d") */}
         <div className="text-right text-[11px] text-gray-500 font-mono pr-1">
-          {esHitoTarea ? '0d' : node.data.duracionTexto && node.data.duracionHoras > 0 ? node.data.duracionTexto : durationDays > 0 ? `${durationDays}d` : node.data.duracionDiasReal === 0 ? (
+          {esHitoTarea ? '0d' : node.data.duracionTexto && node.data.duracionHoras > 0 ? node.data.duracionTexto : node.type === 'tarea' && node.data.duracionTexto ? (
+            // Inicio = Fin y no es hito: la duración real es 0 (antes se mostraba
+            // "1d" contando días de calendario, y el formulario decía 0d).
+            <span className="text-amber-600" title="Inicio y Fin son el mismo instante: duración 0. Si dura un día, pon el Fin al final de la jornada; si es un hito, márcalo como hito.">0d</span>
+          ) : durationDays > 0 ? `${durationDays}d` : node.data.duracionDiasReal === 0 ? (
             // Tiene fechas pero no cae en ningún día laborable del calendario
             <span className="text-amber-600" title="Cae solo en días no laborables del calendario del proyecto">0d</span>
           ) : ''}
