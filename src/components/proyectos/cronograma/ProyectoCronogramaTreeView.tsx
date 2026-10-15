@@ -24,6 +24,7 @@ import { TreeHeader } from '../../cronograma/TreeHeader'
 import { TreeNodeForm } from '../../cronograma/TreeNodeForm'
 import { PredecesorasEditor } from '../../cronograma/PredecesorasEditor'
 import { MoverEdtFaseModal } from './MoverEdtFaseModal'
+import { GenerarDependenciasModal } from './GenerarDependenciasModal'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ImportModal } from '../../cronograma/ImportModal'
 import { ImportEdtModal } from '../../cronograma/ImportEdtModal'
@@ -836,6 +837,9 @@ export function ProyectoCronogramaTreeView({
     }
   }
 
+  // "Generar dependencias desde fechas" de una fase, EDT o actividad.
+  const [generarDeps, setGenerarDeps] = useState<{ nodeId: string; nombre: string } | null>(null)
+
   // EDT a otra fase del mismo cronograma (con sus actividades y tareas).
   const [moverFase, setMoverFase] = useState<{ edtId: string; edtNombre: string; faseActualNombre: string } | null>(null)
   const handleAbrirMoverFase = (nodeId: string) => {
@@ -927,6 +931,9 @@ export function ProyectoCronogramaTreeView({
                     onDuplicarActividad={!isReadOnly && node.type === 'actividad' ? () => handleDuplicarActividad(nodeId) : undefined}
                     onMoverEdt={!isReadOnly && node.type === 'actividad' ? () => handleAbrirMoverEdt(nodeId) : undefined}
                     onMoverFase={!isReadOnly && node.type === 'edt' ? () => handleAbrirMoverFase(nodeId) : undefined}
+                    onGenerarDependencias={!isReadOnly && ['fase', 'edt', 'actividad'].includes(node.type) && !node.data?.isExtrasGroup
+                      ? () => setGenerarDeps({ nodeId, nombre: node.nombre })
+                      : undefined}
                     onProgramarRespecto={
                       !isReadOnly && ['edt', 'actividad', 'tarea'].includes(node.type) && !node.data?.isExtrasGroup
                         ? (modo) => setProgramarModal({ open: true, modo, nodeId })
@@ -1198,6 +1205,21 @@ export function ProyectoCronogramaTreeView({
             </>
           )}
         </div>
+
+        {generarDeps && (
+          <GenerarDependenciasModal
+            open={!!generarDeps}
+            onOpenChange={(abierto) => { if (!abierto) setGenerarDeps(null) }}
+            proyectoId={proyectoId}
+            nodeId={generarDeps.nodeId}
+            nodeNombre={generarDeps.nombre}
+            horasPorDia={Number(state.nodes.get(state.rootNodes[0])?.data?.horasPorDia) || 8}
+            onSuccess={async () => {
+              await actions.loadTree([...state.expandedNodes])
+              onRefresh?.()
+            }}
+          />
+        )}
 
         {moverFase && (
           <MoverEdtFaseModal

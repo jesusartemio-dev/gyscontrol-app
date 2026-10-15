@@ -95,6 +95,8 @@ interface TreeNodeProps {
   onMoverEdt?: () => void
   /** Solo EDTs: mover a otra fase con todo lo que contiene. */
   onMoverFase?: () => void
+  /** Fase, EDT o actividad: deducir dependencias de sus tareas a partir de las fechas. */
+  onGenerarDependencias?: () => void
   onAjustarPosicion?: (posicion: 'inicio_padre' | 'despues_anterior' | 'despues_ultimo') => void
   onProgramarRespecto?: (modo: 'despues_de' | 'en_paralelo') => void
   /** Hay un hermano del mismo tipo justo arriba (habilita "Después del anterior"). */
@@ -173,6 +175,7 @@ export function TreeNode({
   onDuplicarActividad,
   onMoverEdt,
   onMoverFase,
+  onGenerarDependencias,
   onAjustarPosicion,
   onProgramarRespecto,
   tieneAnterior,
@@ -751,6 +754,14 @@ export function TreeNode({
                 >
                   <ArrowRightLeft className="h-4 w-4 mr-2" />
                   Mover a otro EDT
+                </DropdownMenuItem>
+              )}
+
+              {/* Dependencias de las tareas de adentro, deducidas de las fechas actuales */}
+              {!readOnly && ['fase', 'edt', 'actividad'].includes(node.type) && onGenerarDependencias && (
+                <DropdownMenuItem onClick={() => { setDropdownOpen(false); onGenerarDependencias() }}>
+                  <Link2 className="h-4 w-4 mr-2" />
+                  Generar dependencias desde fechas
                 </DropdownMenuItem>
               )}
 
