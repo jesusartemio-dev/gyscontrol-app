@@ -250,7 +250,9 @@ export async function PUT(
           orden: validatedData.orden,
           fechaInicio: inicioRecibido,
           fechaFin: finRecibido,
-          horasEstimadas: validatedData.horasEstimadas || validatedData.horasPlan,
+          // `??` y no `||`: 0 horas es un valor válido (tarea de duración con trabajo 0,
+          // p. ej. una revisión del cliente); con `||` el 0 se ignoraba.
+          horasEstimadas: validatedData.horasEstimadas ?? validatedData.horasPlan,
           prioridad: validatedData.prioridad,
           personasEstimadas: validatedData.personasEstimadas,
           recursoId: validatedData.recursoId,
