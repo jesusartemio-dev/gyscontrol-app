@@ -637,6 +637,20 @@ export async function GET(
       ? Math.round(faseNodes.reduce((s: number, f: any) => s + (f.metadata?.progressPercentage || 0) * (Number(f.data?.horasEstimadas) || 0), 0) / totalHorasFases)
       : (faseNodes.length > 0 ? Math.round(faseNodes.reduce((s: number, f: any) => s + (f.metadata?.progressPercentage || 0), 0) / faseNodes.length) : 0)
 
+    // Fechas del nodo proyecto = las de su cronograma (mín. inicio / máx. fin de
+    // las fases), como la tarea resumen del proyecto en MS Project y como el
+    // Gantt. Las fechas del registro del proyecto (contractuales) solo si aún no
+    // hay fases con fechas.
+    const fechasFases = faseNodes
+      .map((f: any) => ({
+        inicio: f.data?.fechaInicio ?? f.data?.fechaInicioComercial ?? f.data?.fechaInicioPlan,
+        fin: f.data?.fechaFin ?? f.data?.fechaFinComercial ?? f.data?.fechaFinPlan,
+      }))
+      .filter((f: { inicio?: Date | string; fin?: Date | string }) => f.inicio && f.fin)
+      .map((f: { inicio: Date | string; fin: Date | string }) => ({ inicio: new Date(f.inicio).getTime(), fin: new Date(f.fin).getTime() }))
+    const proyectoInicio = fechasFases.length ? new Date(Math.min(...fechasFases.map((f: { inicio: number }) => f.inicio))) : proyecto.fechaInicio
+    const proyectoFin = fechasFases.length ? new Date(Math.max(...fechasFases.map((f: { fin: number }) => f.fin))) : proyecto.fechaFin
+
     const projectNode = {
       id: `proyecto-${id}`,
       type: 'proyecto',
@@ -644,11 +658,11 @@ export async function GET(
       level: 0,
       expanded: true, // Siempre expandido por defecto
       data: {
-        fechaInicioComercial: proyecto.fechaInicio,
-        fechaFinComercial: proyecto.fechaFin,
+        fechaInicioComercial: proyectoInicio,
+        fechaFinComercial: proyectoFin,
         horasEstimadas: round1(proyectoHorasTotales),
         horasHombre: round1(proyectoHorasHombre),
-        duracionDiasReal: duracionDiasReal(proyecto.fechaInicio, proyecto.fechaFin)
+        duracionDiasReal: duracionDiasReal(proyectoInicio, proyectoFin)
       },
       metadata: {
         hasChildren: faseNodes.length > 0,
