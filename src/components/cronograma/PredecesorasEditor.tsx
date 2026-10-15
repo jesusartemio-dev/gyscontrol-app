@@ -50,15 +50,37 @@ interface Props {
 
 const realId = (nodeId: string) => nodeId.replace(/^tarea-/, '')
 
-/** Fase › EDT › Actividad de una tarea, subiendo por parentId. */
-function rutaDe(nodes: Map<string, TreeNode>, nodo: TreeNode): string {
+interface Candidata {
+  nodeId: string
+  nombre: string
+  ruta: string
+  fase?: { id: string; nombre: string }
+  edt?: { id: string; nombre: string }
+  actividad: string
+  /** Fecha de la tarea para ubicarla ("12 oct–14 oct"). */
+  fechas: string
+}
+
+const fmtDia = (v?: string | Date) => {
+  if (!v) return ''
+  const d = new Date(v)
+  return isNaN(d.getTime()) ? '' : d.toLocaleDateString('es-PE', { day: '2-digit', month: 'short', timeZone: 'UTC' })
+}
+
+/** Fase, EDT y Actividad de una tarea, subiendo por parentId. */
+function ubicacionDe(nodes: Map<string, TreeNode>, nodo: TreeNode): Omit<Candidata, 'nodeId' | 'nombre' | 'fechas'> {
+  const r: Omit<Candidata, 'nodeId' | 'nombre' | 'fechas'> = { ruta: '', actividad: 'Sin actividad' }
   const partes: string[] = []
   let p = nodo.parentId ? nodes.get(nodo.parentId) : undefined
   while (p && p.type !== 'proyecto') {
     partes.unshift(p.nombre)
+    if (p.type === 'fase') r.fase = { id: p.id, nombre: p.nombre }
+    else if (p.type === 'edt') r.edt = { id: p.id, nombre: p.nombre }
+    else if (p.type === 'actividad') r.actividad = p.nombre
     p = p.parentId ? nodes.get(p.parentId) : undefined
   }
-  return partes.join(' › ')
+  r.ruta = partes.join(' › ')
+  return r
 }
 
 function formatearDesfase(min: number, hpd: number): string {
@@ -88,18 +110,49 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
   const [ocupado, setOcupado] = useState(false)
   const base = `/api/proyectos/${proyectoId}/cronograma/dependencias`
 
-  // Tareas candidatas: todas las del cronograma menos esta y las que ya son predecesoras.
+  // Tareas candidatas, en el orden del cronograma: todas menos esta y las que ya son predecesoras.
   const candidatas = useMemo(() => {
     const ya = new Set(lista.map((d) => d.tareaId))
-    const r: { nodeId: string; nombre: string; ruta: string }[] = []
+    const r: Candidata[] = []
     nodes.forEach((n) => {
       if (n.type !== 'tarea' || n.id === tareaNodeId || ya.has(realId(n.id)) || n.data?.esExtra) return
-      r.push({ nodeId: n.id, nombre: n.nombre, ruta: rutaDe(nodes, n) })
+      const ini = n.data?.fechaInicio ?? n.data?.fechaInicioComercial
+      const fin = n.data?.fechaFin ?? n.data?.fechaFinComercial
+      const fechas = n.data?.esHito ? `◆ ${fmtDia(ini)}` : `${fmtDia(ini)}–${fmtDia(fin)}`
+      r.push({ nodeId: n.id, nombre: n.nombre, fechas, ...ubicacionDe(nodes, n) })
     })
     return r
   }, [nodes, tareaNodeId, lista])
 
-  const agregar = async (cand: { nodeId: string; nombre: string; ruta: string }) => {
+  // Filtro en cascada Fase → EDT; la lista se agrupa por Actividad.
+  const [filtroFase, setFiltroFase] = useState('todas')
+  const [filtroEdt, setFiltroEdt] = useState('todos')
+  const fases = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const c of candidatas) if (c.fase) m.set(c.fase.id, c.fase.nombre)
+    return [...m]
+  }, [candidatas])
+  const edts = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const c of candidatas) if (c.edt && (filtroFase === 'todas' || c.fase?.id === filtroFase)) m.set(c.edt.id, c.edt.nombre)
+    return [...m]
+  }, [candidatas, filtroFase])
+  const grupos = useMemo(() => {
+    const g = new Map<string, Candidata[]>()
+    for (const c of candidatas) {
+      if (filtroFase !== 'todas' && c.fase?.id !== filtroFase) continue
+      if (filtroEdt !== 'todos' && c.edt?.id !== filtroEdt) continue
+      // Encabezado: Actividad, con EDT (y Fase) cuando no están filtrados.
+      const titulo = [filtroFase === 'todas' ? c.fase?.nombre : null, filtroEdt === 'todos' ? c.edt?.nombre : null, c.actividad]
+        .filter(Boolean).join(' › ')
+      const l = g.get(titulo) ?? []
+      l.push(c)
+      g.set(titulo, l)
+    }
+    return [...g]
+  }, [candidatas, filtroFase, filtroEdt])
+
+  const agregar = async (cand: Candidata) => {
     const lag = parsearDesfase(nuevoDesfase, horasPorDia)
     if (lag === null) { toast.error('Desfase no válido. Ejemplos: +2d, -4h, 1.5d'); return }
     setOcupado(true)
@@ -217,19 +270,42 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
               <Plus className="mr-1 h-3.5 w-3.5" /> Agregar predecesora…
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[30rem] p-0" align="end">
+          <PopoverContent className="w-[34rem] p-0" align="end">
+            {/* Filtro Fase → EDT (select nativo: uno de Radix cerraría el popover al abrirse) */}
+            <div className="flex gap-2 border-b p-2">
+              <select
+                value={filtroFase}
+                onChange={(e) => { setFiltroFase(e.target.value); setFiltroEdt('todos') }}
+                className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-xs"
+                aria-label="Fase"
+              >
+                <option value="todas">Todas las fases</option>
+                {fases.map(([id, nombre]) => <option key={id} value={id}>{nombre}</option>)}
+              </select>
+              <select
+                value={filtroEdt}
+                onChange={(e) => setFiltroEdt(e.target.value)}
+                className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-xs"
+                aria-label="EDT"
+              >
+                <option value="todos">Todos los EDT</option>
+                {edts.map(([id, nombre]) => <option key={id} value={id}>{nombre}</option>)}
+              </select>
+            </div>
             <Command filter={(valor, busqueda) => (valor.toLowerCase().includes(busqueda.toLowerCase()) ? 1 : 0)}>
-              <CommandInput placeholder="Buscar tarea (nombre, fase, EDT o actividad)…" className="text-xs" />
-              <CommandList className="max-h-72">
+              <CommandInput placeholder="Buscar tarea o actividad…" className="text-xs" />
+              <CommandList className="max-h-80">
                 <CommandEmpty>No hay tareas que coincidan.</CommandEmpty>
-                <CommandGroup>
-                  {candidatas.map((c) => (
-                    <CommandItem key={c.nodeId} value={`${c.nombre} ${c.ruta} ${c.nodeId}`} onSelect={() => agregar(c)} className="flex-col items-start gap-0">
-                      <span className="text-xs">{c.nombre}</span>
-                      <span className="text-[10px] text-muted-foreground">{c.ruta}</span>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
+                {grupos.map(([titulo, tareas]) => (
+                  <CommandGroup key={titulo} heading={titulo}>
+                    {tareas.map((c) => (
+                      <CommandItem key={c.nodeId} value={`${c.nombre} ${c.ruta} ${c.nodeId}`} onSelect={() => agregar(c)} className="flex items-center justify-between gap-2 pl-4">
+                        <span className="min-w-0 truncate text-xs">{c.nombre}</span>
+                        <span className="shrink-0 text-[10px] text-muted-foreground">{c.fechas}</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                ))}
               </CommandList>
             </Command>
           </PopoverContent>

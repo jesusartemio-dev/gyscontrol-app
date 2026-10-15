@@ -3,6 +3,7 @@
 // manual: una dependencia no mueve fechas sola. Aquí se calcula dónde DEBERÍA
 // ir la sucesora, para avisar cuando no se cumple y para "Ajustar sucesora".
 
+import { prisma } from '@/lib/prisma'
 import {
   type CalendarioHoras,
   desplazarHorasLaborables,
@@ -128,4 +129,37 @@ export function parsearDesfase(texto: string, horasPorDia: number): number | nul
   const n = Number(m[2]) * (m[1] === '-' ? -1 : 1)
   const enHoras = m[3] && m[3].startsWith('h')
   return Math.round((enHoras ? n : n * horasPorDia) * 60)
+}
+
+/**
+ * Guarda la dependencia origen → dependiente (sin desfase), como "Vincular
+ * tareas" de MS Project. Si ya existe con otro tipo, la cambia. No la crea si
+ * cerraría un ciclo o si son de cronogramas distintos.
+ */
+export async function vincularTareas(
+  origenId: string,
+  dependienteId: string,
+  tipo: TipoDependencia,
+): Promise<{ estado: 'creada' | 'actualizada' | 'existente' | 'ciclo' | 'omitida'; nombreOrigen?: string }> {
+  const [origen, dependiente] = await Promise.all([
+    prisma.proyectoTarea.findUnique({ where: { id: origenId }, select: { nombre: true, proyectoCronogramaId: true } }),
+    prisma.proyectoTarea.findUnique({ where: { id: dependienteId }, select: { proyectoCronogramaId: true } }),
+  ])
+  if (!origen || !dependiente || origen.proyectoCronogramaId !== dependiente.proyectoCronogramaId) return { estado: 'omitida' }
+
+  const existente = await prisma.proyectoDependenciasTarea.findFirst({ where: { tareaOrigenId: origenId, tareaDependienteId: dependienteId } })
+  if (existente) {
+    if (existente.tipo === tipo && existente.lagMinutos === 0) return { estado: 'existente', nombreOrigen: origen.nombre }
+    await prisma.proyectoDependenciasTarea.update({ where: { id: existente.id }, data: { tipo, lagMinutos: 0 } })
+    return { estado: 'actualizada', nombreOrigen: origen.nombre }
+  }
+  const deps = await prisma.proyectoDependenciasTarea.findMany({
+    where: { tareaOrigen: { proyectoCronogramaId: origen.proyectoCronogramaId } },
+    select: { tareaOrigenId: true, tareaDependienteId: true },
+  })
+  if (creaCiclo(deps, origenId, dependienteId)) return { estado: 'ciclo', nombreOrigen: origen.nombre }
+  await prisma.proyectoDependenciasTarea.create({
+    data: { id: crypto.randomUUID(), tareaOrigenId: origenId, tareaDependienteId: dependienteId, tipo, lagMinutos: 0 },
+  })
+  return { estado: 'creada', nombreOrigen: origen.nombre }
 }

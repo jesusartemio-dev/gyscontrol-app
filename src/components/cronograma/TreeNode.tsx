@@ -99,6 +99,8 @@ interface TreeNodeProps {
   tieneAnterior?: boolean
   /** Solo tareas: marcar o quitar como hito ◆. */
   onToggleHito?: () => void
+  /** Solo tareas: abrir sus predecesoras (de cualquier actividad o fase). */
+  onPredecesoras?: () => void
   dragListeners?: Record<string, Function>
   dragAttributes?: Record<string, any>
   isDragging?: boolean
@@ -172,6 +174,7 @@ export function TreeNode({
   onProgramarRespecto,
   tieneAnterior,
   onToggleHito,
+  onPredecesoras,
   dragListeners,
   dragAttributes,
   isDragging,
@@ -756,6 +759,14 @@ export function TreeNode({
                 >
                   <Diamond className="h-4 w-4 mr-2" />
                   {node.data?.esHito ? 'Quitar hito' : 'Marcar como hito'}
+                </DropdownMenuItem>
+              )}
+
+              {/* Predecesoras: dependencias con tareas de cualquier actividad, EDT o fase */}
+              {node.type === 'tarea' && onPredecesoras && (
+                <DropdownMenuItem onClick={() => { setDropdownOpen(false); onPredecesoras() }}>
+                  <Link2 className="h-4 w-4 mr-2" />
+                  Predecesoras…{node.data?.predecesoras?.length ? ` (${node.data.predecesoras.length})` : ''}
                 </DropdownMenuItem>
               )}
 

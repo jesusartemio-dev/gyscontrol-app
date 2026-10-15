@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ArrowRightToLine, Columns2, Loader2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { textoDependenciaCreada } from '@/components/cronograma/dependenciasTexto'
 
 export type ModoProgramacion = 'despues_de' | 'en_paralelo'
 
@@ -78,7 +79,9 @@ export function ProgramarActividadModal({
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || 'No se pudo programar')
 
-      toast.success(esDespues ? 'Programado después del elemento seleccionado' : 'Programado en paralelo')
+      toast.success(esDespues ? 'Programado después del elemento seleccionado' : 'Programado en paralelo', {
+        description: textoDependenciaCreada(data.dependencia),
+      })
       onSuccess()
       onOpenChange(false)
     } catch (error) {

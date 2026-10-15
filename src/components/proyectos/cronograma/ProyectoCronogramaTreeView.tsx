@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
+import { textoDependenciaCreada } from '@/components/cronograma/dependenciasTexto'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { RefreshCw, TreePine, Plus, Download, List, Filter, Zap, Trash2, Clock, Calculator, Lock } from 'lucide-react'
@@ -21,6 +22,8 @@ import { Badge } from '@/components/ui/badge'
 import { TreeNode } from '../../cronograma/TreeNode'
 import { TreeHeader } from '../../cronograma/TreeHeader'
 import { TreeNodeForm } from '../../cronograma/TreeNodeForm'
+import { PredecesorasEditor } from '../../cronograma/PredecesorasEditor'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ImportModal } from '../../cronograma/ImportModal'
 import { ImportEdtModal } from '../../cronograma/ImportEdtModal'
 import { ImportTareasModal } from '../../cronograma/ImportTareasModal'
@@ -93,6 +96,8 @@ export function ProyectoCronogramaTreeView({
     if (state.selectedNodeId) onSeleccionarNodo?.(state.selectedNodeId)
   }, [state.selectedNodeId])
   const [showForm, setShowForm] = useState(false)
+  // Tarea cuyas predecesoras se editan desde el menú de la fila.
+  const [predecesorasDe, setPredecesorasDe] = useState<string | null>(null)
   const [formContext, setFormContext] = useState<{
     mode: 'create' | 'edit'
     nodeType?: NodeType
@@ -330,9 +335,10 @@ export function ProyectoCronogramaTreeView({
           posicion: { modo: posicion, referenciaId: anterior ? realIdDe(anterior) : undefined },
         }),
       })
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Error al ajustar posición')
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Error al ajustar posición')
       await actions.loadTree([...state.expandedNodes])
-      toast.success('Posición ajustada')
+      toast.success('Posición ajustada', { description: textoDependenciaCreada(data.dependencia) })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al ajustar posición')
     }
@@ -724,7 +730,7 @@ export function ProyectoCronogramaTreeView({
       await fetch(`/api/proyectos/${proyectoId}/cronograma/tree/tarea-${copia.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ posicion: { modo: 'despues_de', referenciaId: node.id.replace('tarea-', '') } }),
+        body: JSON.stringify({ posicion: { modo: 'despues_de', referenciaId: node.id.replace('tarea-', ''), vincular: false } }),
       })
       await actions.loadTree([...state.expandedNodes])
       toast.success(`Tarea "${node.nombre}" duplicada`)
@@ -922,6 +928,7 @@ export function ProyectoCronogramaTreeView({
                     }
                     tieneAnterior={!!anteriorDe(nodeId)}
                     onToggleHito={!isReadOnly && node.type === 'tarea' && !node.data?.esExtra ? () => handleToggleHito(nodeId) : undefined}
+                    onPredecesoras={!isReadOnly && node.type === 'tarea' && !node.data?.esExtra ? () => setPredecesorasDe(nodeId) : undefined}
                     onImport={isReadOnly ? undefined : () => handleImportItems(nodeId)}
                     onSelect={() => actions.selectNode(nodeId)}
                     isSelected={isSelected}
@@ -1180,6 +1187,34 @@ export function ProyectoCronogramaTreeView({
             </>
           )}
         </div>
+
+        {/* Predecesoras desde el menú de la fila (se guardan al instante; al cerrar se recarga) */}
+        <Dialog
+          open={!!predecesorasDe}
+          onOpenChange={(abierto) => {
+            if (abierto) return
+            setPredecesorasDe(null)
+            recargarSiCambiaronDependencias()
+          }}
+        >
+          <DialogContent className="sm:max-w-[620px] max-h-[92vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-base">
+                Predecesoras de “{predecesorasDe ? state.nodes.get(predecesorasDe)?.nombre : ''}”
+              </DialogTitle>
+            </DialogHeader>
+            {predecesorasDe && (
+              <PredecesorasEditor
+                proyectoId={proyectoId}
+                tareaNodeId={predecesorasDe}
+                nodes={state.nodes}
+                horasPorDia={Number(state.nodes.get(state.rootNodes[0])?.data?.horasPorDia) || 8}
+                onCambio={() => { dependenciasCambiadasRef.current = true }}
+                onFechasAjustadas={() => { dependenciasCambiadasRef.current = true }}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Formulario modal */}
         {showForm && formContext && (

@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { logger } from '@/lib/logger'
 import { registrarAvanceTarea, propagarRollup } from '@/lib/services/avanceTarea'
+import { vincularTareas } from '@/lib/services/cronogramaDependencias'
 import {
   obtenerCalendarioProyecto,
   desplazarDescendientes,
@@ -72,6 +73,9 @@ const updateNodeSchema = z.object({
   posicion: z.object({
     modo: z.enum(['inicio_padre', 'despues_anterior', 'despues_ultimo', 'despues_de', 'en_paralelo']),
     referenciaId: z.string().optional(),
+    // Entre tareas también guarda la dependencia (false al duplicar: la copia
+    // solo se ubica después de la original, no depende de ella).
+    vincular: z.boolean().optional().default(true),
   }).optional(),
   // Alias anterior de `posicion` (solo actividades), se mantiene por compatibilidad.
   programarRespecto: z.object({
@@ -151,6 +155,7 @@ export async function PUT(
     // Solo se consulta si hay que mover fechas (reordenar o renombrar no lo necesitan).
     let calendarioCache: Awaited<ReturnType<typeof obtenerCalendarioProyecto>> | undefined
     const getCalendario = async () => (calendarioCache ??= await obtenerCalendarioProyecto(id))
+    let vinculo: { origenId: string; tipo: 'finish_to_start' | 'start_to_start' } | undefined
 
     // Posicionar respecto al padre o a un hermano: se traduce a un nuevo inicio
     // y sigue por el mismo camino que editar la fecha de inicio a mano.
@@ -166,6 +171,14 @@ export async function PUT(
         return NextResponse.json({ error: resultado.error }, { status: 400 })
       }
       validatedData.fechaInicioComercial = resultado.inicio.toISOString()
+      // Entre tareas, como "Vincular tareas" de MS Project: además de mover,
+      // queda guardada la dependencia (Fin-Comienzo, o Comienzo-Comienzo en paralelo).
+      if (nodeType === 'tarea' && resultado.referenciaId && ('vincular' in posicion ? posicion.vincular !== false : true)) {
+        vinculo = {
+          origenId: resultado.referenciaId,
+          tipo: posicion.modo === 'en_paralelo' ? 'start_to_start' : 'finish_to_start',
+        }
+      }
       // El fin lo calcula el desplazamiento en bloque, conservando la duración.
       validatedData.fechaFinComercial = undefined
       validatedData.fechaInicio = undefined
@@ -361,6 +374,9 @@ export async function PUT(
       if (nodeType !== 'tarea') await recalcularNodoPadre(nodeType, realId)
     }
 
+    let dependencia: Awaited<ReturnType<typeof vincularTareas>> | undefined
+    if (vinculo) dependencia = await vincularTareas(vinculo.origenId, realId, vinculo.tipo)
+
     // ✅ GYS-GEN-12: Solo recalcular padres si fechas/horas realmente cambiaron
     const datesChanged = didDatesChange(nodeType, updateData, currentDates)
     if (datesChanged) {
@@ -373,7 +389,8 @@ export async function PUT(
 
     return NextResponse.json({
       success: true,
-      data: { id: realId, type: nodeType, ...updateData }
+      data: { id: realId, type: nodeType, ...updateData },
+      ...(dependencia && { dependencia }),
     })
 
   } catch (error) {

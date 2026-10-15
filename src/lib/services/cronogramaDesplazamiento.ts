@@ -252,7 +252,7 @@ export async function calcularInicioPosicion(
   realId: string,
   modo: ModoPosicion,
   referenciaId?: string,
-): Promise<{ inicio: Date } | { error: string }> {
+): Promise<{ inicio: Date; referenciaId?: string } | { error: string }> {
   const datos = await padreYHermanos(nodeType, realId)
   if (!datos) return { error: 'Solo se puede posicionar un EDT, una actividad o una tarea' }
 
@@ -264,14 +264,16 @@ export async function calcularInicioPosicion(
     inicio = siguienteMomentoLaborable(cal, datos.inicioPadre)
   } else if (modo === 'despues_ultimo') {
     if (datos.hermanos.length === 0) return { error: 'No hay otros elementos en el mismo nivel' }
-    const ultimoFin = datos.hermanos.reduce((max, h) => (h.fin > max ? h.fin : max), datos.hermanos[0].fin)
-    inicio = despuesDe(ultimoFin)
+    const ultimo = datos.hermanos.reduce((max, h) => (h.fin > max.fin ? h : max), datos.hermanos[0])
+    inicio = despuesDe(ultimo.fin)
+    referenciaId = ultimo.id
   } else {
     const ref = datos.hermanos.find(h => h.id === referenciaId)
     if (!ref) return { error: 'El elemento de referencia no está en el mismo nivel' }
     inicio = modo === 'en_paralelo' ? siguienteMomentoLaborable(cal, ref.inicio) : despuesDe(ref.fin)
   }
-  return { inicio }
+  // referenciaId: el elemento respecto al cual quedó (para crear la dependencia).
+  return { inicio, referenciaId: modo === 'inicio_padre' ? undefined : referenciaId }
 }
 
 /** Horas laborables (con signo) para mover un nodo de `desde` a `hasta`. */
