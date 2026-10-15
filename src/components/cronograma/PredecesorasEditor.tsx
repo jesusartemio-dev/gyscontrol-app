@@ -165,8 +165,8 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
       const j = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(j.error || 'No se pudo agregar')
       setLista((l) => [...l, { id: j.data.id, tareaId: realId(cand.nodeId), nombre: cand.nombre, ruta: cand.ruta, tipo: nuevoTipo, lagMinutos: lag }])
-      setAbierto(false)
-      setNuevoDesfase('')
+      // La lista queda abierta para agregar varias seguidas; la agregada sale de la lista.
+      toast.success(`Predecesora agregada: ${cand.nombre}`)
       onCambio()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo agregar')
@@ -308,6 +308,12 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
                 ))}
               </CommandList>
             </Command>
+            <div className="flex items-center justify-between border-t px-3 py-1.5 text-[11px] text-muted-foreground">
+              <span>Puedes elegir varias seguidas ({lista.length} agregada{lista.length === 1 ? '' : 's'})</span>
+              <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={() => setAbierto(false)}>
+                Listo
+              </Button>
+            </div>
           </PopoverContent>
         </Popover>
       </div>
