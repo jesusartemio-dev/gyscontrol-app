@@ -108,8 +108,7 @@ function calendarioXml(cal: CalendarioExport): string {
       </Exception>`
   }).join('\n')
 
-  return `  <Calendars>
-    <Calendar>
+  return `    <Calendar>
       <UID>1</UID>
       <Name>${esc(cal.nombre || 'Calendario GYS')}</Name>
       <IsBaseCalendar>1</IsBaseCalendar>
@@ -121,9 +120,20 @@ ${weekDays}
       <Exceptions>
 ${excepciones}
       </Exceptions>` : ''}
-    </Calendar>
-  </Calendars>`
+    </Calendar>`
 }
+
+// Calendario propio de cada recurso, basado en el del proyecto (así lo escribe
+// MS Project). Si el recurso apunta directo al calendario base, MS Project lo
+// convierte en calendario de ese recurso y deja el proyecto con "Standard"
+// (8 h, hasta las 17:00): las duraciones salían recortadas (1.84d en vez de 2d).
+const calendarioRecursoXml = (uid: number, nombre: string) => `    <Calendar>
+      <UID>${uid}</UID>
+      <Name>${esc(nombre)}</Name>
+      <IsBaseCalendar>0</IsBaseCalendar>
+      <IsBaselineCalendar>0</IsBaselineCalendar>
+      <BaseCalendarUID>1</BaseCalendarUID>
+    </Calendar>`
 
 interface FilaTarea {
   uid: number
@@ -240,6 +250,7 @@ ${fechas}
       <DurationFormat>${horasDur > 0 && horasDur < hpd ? 5 : 7}</DurationFormat>
       <Work>${duracionMsp(f.esResumen ? 0 : hh)}</Work>
       <EffortDriven>0</EffortDriven>
+      <Estimated>0</Estimated>
       <Milestone>${esHito ? 1 : 0}</Milestone>
       <Summary>${f.esResumen ? 1 : 0}</Summary>
       <Manual>${f.esResumen ? 0 : 1}</Manual>
@@ -260,7 +271,7 @@ ${preds}
       <Type>1</Type>
       <IsNull>0</IsNull>
       <MaxUnits>${r.maxUnidades.toFixed(2)}</MaxUnits>
-      <CalendarUID>1</CalendarUID>
+      <CalendarUID>${r.uid + 1}</CalendarUID>
     </Resource>`).join('\n')
 
   const asignacionesXml = asignaciones.map((a) => `    <Assignment>
@@ -288,9 +299,9 @@ ${preds}
   <MinutesPerDay>${minDia}</MinutesPerDay>
   <MinutesPerWeek>${minDia * diasSemana}</MinutesPerWeek>
   <DaysPerMonth>20</DaysPerMonth>
+  <DefaultTaskType>1</DefaultTaskType>
   <DurationFormat>7</DurationFormat>
   <WorkFormat>2</WorkFormat>
-  <DefaultTaskType>1</DefaultTaskType>
   <NewTasksEffortDriven>0</NewTasksEffortDriven>
   <NewTasksEstimated>0</NewTasksEstimated>
   <ExtendedAttributes>
@@ -300,7 +311,9 @@ ${preds}
       <Alias>GYS ID</Alias>
     </ExtendedAttribute>
   </ExtendedAttributes>
-${calendarioXml(calendario)}
+  <Calendars>
+${[calendarioXml(calendario), ...[...recursos.values()].map((r) => calendarioRecursoXml(r.uid + 1, r.nombre))].join('\n')}
+  </Calendars>
   <Tasks>
 ${tareasXml}
   </Tasks>
