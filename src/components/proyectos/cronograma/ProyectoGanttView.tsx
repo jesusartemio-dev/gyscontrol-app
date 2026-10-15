@@ -35,7 +35,8 @@ import {
   RefreshCw,
   LocateFixed,
   ChevronsUpDown,
-  ChevronsDownUp
+  ChevronsDownUp,
+  Link2
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { toast as sonnerToast } from 'sonner'
@@ -69,6 +70,8 @@ interface GanttItem {
   fechaLimite?: Date
   /** Días laborables que el hito pasa su fecha límite (0 = a tiempo). */
   diasPasadoLimite?: number
+  /** Predecesoras guardadas (solo tareas); horasIncumplidas > 0 = no se cumple. */
+  predecesoras?: { tareaId: string; nombre: string; tipo: string; tipoTexto?: string; horasIncumplidas?: number }[]
 }
 
 interface ProyectoGanttViewProps {
@@ -92,6 +95,7 @@ interface GanttPrefs {
   expandidos?: string[]
   anchoNombres?: number
   densidad?: Densidad
+  mostrarDependencias?: boolean
 }
 const prefsKey = (proyectoId: string) => `gantt-prefs:${proyectoId}`
 const leerPrefs = (proyectoId: string): GanttPrefs => {
@@ -202,6 +206,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   const [anchoCard, setAnchoCard] = useState(0)
   const [anchoNombres, setAnchoNombres] = useState(prefsIniciales.anchoNombres ?? ANCHO_NOMBRES_DEFECTO)
   const [densidad, setDensidad] = useState<Densidad>(prefsIniciales.densidad ?? 'normal')
+  const [mostrarDependencias, setMostrarDependencias] = useState(prefsIniciales.mostrarDependencias ?? true)
   // Fila bajo el mouse (índice en visibleItems), compartida entre nombres y barras.
   const [filaHover, setFilaHover] = useState<number | null>(null)
   const { fila: ROW_HEIGHT, margenBarra: MARGEN_BARRA, texto: claseTextoNombre } = DENSIDADES[densidad]
@@ -275,6 +280,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
           esHito: data.esHito === true,
           fechaLimite: data.esHito && data.fechaLimite ? diaLocalDesdeUTC(data.fechaLimite) : undefined,
           diasPasadoLimite: Number(data.diasPasadoLimite) || 0,
+          predecesoras: Array.isArray(data.predecesoras) ? data.predecesoras : undefined,
           hijos: node.children?.map((child: any) => processNode(child, nivel + 1, node.id)) || []
         }
 
@@ -337,8 +343,8 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   // Recordar nivel, rango, zoom y filas abiertas para este proyecto.
   useEffect(() => {
     if (loading || items.length === 0) return
-    guardarPrefs(proyectoId, { filtroNivel, timeRangeMonths, zoomLevel, anchoNombres, densidad, expandidos: [...expandidosDe(items)] })
-  }, [proyectoId, filtroNivel, timeRangeMonths, zoomLevel, anchoNombres, densidad, items, loading])
+    guardarPrefs(proyectoId, { filtroNivel, timeRangeMonths, zoomLevel, anchoNombres, densidad, mostrarDependencias, expandidos: [...expandidosDe(items)] })
+  }, [proyectoId, filtroNivel, timeRangeMonths, zoomLevel, anchoNombres, densidad, mostrarDependencias, items, loading])
 
   // Arrastrar el borde derecho de la columna de nombres para cambiar su ancho.
   const iniciarRedimension = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -674,6 +680,17 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
             </SelectContent>
           </Select>
 
+          <Button
+            variant={mostrarDependencias ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => setMostrarDependencias(v => !v)}
+            title="Mostrar u ocultar las flechas de dependencias (en rojo las que no se cumplen)"
+          >
+            <Link2 className="h-3.5 w-3.5 mr-1" />
+            Dependencias
+          </Button>
+
           <div className="w-px h-4 bg-gray-200" />
 
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoomLevel(prev => Math.max(0.3, prev / 1.4))}>
@@ -868,6 +885,72 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                 )
               })}
 
+              {/* Flechas de dependencias (como MS Project): de la predecesora a la
+                  sucesora según el tipo. Rojas si no se cumplen. Solo entre filas visibles. */}
+              {mostrarDependencias && (() => {
+                const filaDe = new Map(visibleItems.map((it, i) => [it.id, i]))
+                const x = (d: Date) => {
+                  const dia = differenceInCalendarDays(d, timeline.minDate)
+                  const min = d.getHours() * 60 + d.getMinutes()
+                  const frac = Math.min(1, Math.max(0, (min - jornada.ini) / Math.max(1, jornada.fin - jornada.ini)))
+                  return (dia + frac) * timeline.dayWidth
+                }
+                const yMedio = (fila: number) => fila * ROW_HEIGHT + ROW_HEIGHT / 2
+                const flechas: { key: string; d: string; roja: boolean; titulo: string }[] = []
+                visibleItems.forEach((suc, filaSuc) => {
+                  for (const dep of suc.predecesoras ?? []) {
+                    const filaPred = filaDe.get(`tarea-${dep.tareaId}`)
+                    if (filaPred === undefined) continue
+                    const pred = visibleItems[filaPred]
+                    const desdeFin = dep.tipo === 'finish_to_start' || dep.tipo === 'finish_to_finish'
+                    const haciaFin = dep.tipo === 'finish_to_finish' || dep.tipo === 'start_to_finish'
+                    const x1 = x(desdeFin ? pred.fechaFin : pred.fechaInicio)
+                    const x2 = x(haciaFin ? suc.fechaFin : suc.fechaInicio)
+                    const y1 = yMedio(filaPred)
+                    const y2 = yMedio(filaSuc)
+                    const salida = desdeFin ? x1 + 6 : x1 - 6
+                    // Llega por la izquierda al inicio y por la derecha al fin de la sucesora.
+                    const llegada = haciaFin ? x2 + 6 : x2 - 6
+                    const yCruce = filaSuc > filaPred ? filaSuc * ROW_HEIGHT : (filaSuc + 1) * ROW_HEIGHT
+                    const directo = haciaFin ? salida >= llegada - 0.5 : salida <= llegada + 0.5
+                    const d = directo
+                      ? `M ${x1} ${y1} H ${salida} V ${y2} H ${x2}`
+                      : `M ${x1} ${y1} H ${salida} V ${yCruce} H ${llegada} V ${y2} H ${x2}`
+                    const roja = (dep.horasIncumplidas ?? 0) > 0
+                    flechas.push({ key: `${dep.tareaId}-${suc.id}`, d, roja, titulo: `${pred.nombre} → ${suc.nombre} (${dep.tipoTexto ?? 'FC'})${roja ? ' · no se cumple' : ''}` })
+                  }
+                })
+                if (flechas.length === 0) return null
+                return (
+                  <svg
+                    className="absolute left-0 top-0 pointer-events-none z-[5]"
+                    width={timeline.totalWidth}
+                    height={visibleItems.length * ROW_HEIGHT}
+                  >
+                    <defs>
+                      <marker id="gantt-flecha" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M0,0 L6,3 L0,6 z" fill="#6b7280" />
+                      </marker>
+                      <marker id="gantt-flecha-roja" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M0,0 L6,3 L0,6 z" fill="#dc2626" />
+                      </marker>
+                    </defs>
+                    {flechas.map(f => (
+                      <path
+                        key={f.key}
+                        d={f.d}
+                        fill="none"
+                        stroke={f.roja ? '#dc2626' : '#6b7280'}
+                        strokeWidth={f.roja ? 1.5 : 1}
+                        markerEnd={`url(#${f.roja ? 'gantt-flecha-roja' : 'gantt-flecha'})`}
+                      >
+                        <title>{f.titulo}</title>
+                      </path>
+                    ))}
+                  </svg>
+                )
+              })()}
+
               {/* Bars */}
               {visibleItems.map((item, rowIdx) => {
                 // Posición por hora: el día ocupa su celda y dentro de ella la jornada
@@ -1002,6 +1085,11 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                                 <div>Duración {item.duracionTexto ?? `${durationDays}d`}{item.horasEstimadas ? ` · ${item.horasEstimadas}h` : ''} · {item.porcentajeAvance}%</div>
                               </>
                             )}
+                            {item.predecesoras?.map(dep => (
+                              <div key={dep.tareaId} className={dep.horasIncumplidas ? 'text-red-300 font-medium' : 'text-muted-foreground'}>
+                                ← {dep.nombre} ({dep.tipoTexto ?? 'FC'}){dep.horasIncumplidas ? ' · no se cumple' : ''}
+                              </div>
+                            ))}
                             {arrastrable && <div className="text-muted-foreground">Arrastra la barra para moverla{item.tipo === 'tarea' ? '' : ' con lo que contiene'}</div>}
                           </div>
                         </TooltipContent>

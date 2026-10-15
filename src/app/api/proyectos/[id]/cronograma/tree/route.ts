@@ -15,6 +15,7 @@ import { logger } from '@/lib/logger'
 import { contarDiasLaborables } from '@/lib/utils/calendarioLaboral'
 import { clasificarRelacion, diferenciaDiasLaborables, inicioDiaUTC } from '@/lib/services/cronogramaDesplazamiento'
 import { type CalendarioHoras, formatearDuracion, horasLaborablesEntre, horasPorDiaCalendario } from '@/lib/services/cronogramaHoras'
+import { horasIncumplidas, formatearDesfase, ABREVIATURA_DEPENDENCIA, type TipoDependencia } from '@/lib/services/cronogramaDependencias'
 import { calcularHHRealDeTarea } from '@/lib/planTrabajo/calcularDatos'
 
 // ✅ GET /api/proyectos/[id]/cronograma/tree - Obtener árbol jerárquico del cronograma
@@ -713,6 +714,42 @@ export async function GET(
         for (const hijo of nodo.children || []) anotarRelaciones(hijo)
       }
       anotarRelaciones(projectNode)
+
+      // Dependencias (predecesoras/sucesoras) de cada tarea, con la ruta
+      // Fase › EDT › Actividad de la otra tarea y si la dependencia no se cumple
+      // (la sucesora va antes de lo que exige: modo manual, solo se avisa).
+      const tareasPorId = new Map<string, { nodo: any; ruta: string }>()
+      const indexar = (nodo: any, ruta: string[]) => {
+        if (nodo.type === 'tarea') {
+          tareasPorId.set(String(nodo.id).replace(/^tarea-/, ''), { nodo, ruta: ruta.join(' › ') })
+        }
+        const sigRuta = ['fase', 'edt', 'actividad'].includes(nodo.type) ? [...ruta, nodo.nombre] : ruta
+        for (const hijo of nodo.children || []) indexar(hijo, sigRuta)
+      }
+      indexar(projectNode, [])
+      if (tareasPorId.size > 0) {
+        const deps = await prisma.proyectoDependenciasTarea.findMany({
+          where: { tareaDependienteId: { in: [...tareasPorId.keys()] } },
+          select: { id: true, tipo: true, lagMinutos: true, tareaOrigenId: true, tareaDependienteId: true },
+        })
+        for (const dep of deps) {
+          const pred = tareasPorId.get(dep.tareaOrigenId)
+          const suc = tareasPorId.get(dep.tareaDependienteId)
+          if (!pred || !suc) continue
+          const fp = fechasDe(pred.nodo)
+          const fs = fechasDe(suc.nodo)
+          const incumple = fp && fs ? horasIncumplidas(cal, dep, fp, fs) : 0
+          const base = {
+            id: dep.id, tipo: dep.tipo, lagMinutos: dep.lagMinutos,
+            // "FC+2d", como la columna Predecesoras de MS Project (en español)
+            tipoTexto: `${ABREVIATURA_DEPENDENCIA[dep.tipo as TipoDependencia] ?? 'FC'}${formatearDesfase(dep.lagMinutos, hpd)}`,
+            horasIncumplidas: Math.round(incumple * 100) / 100,
+          }
+          ;(suc.nodo.data.predecesoras ??= []).push({ ...base, tareaId: dep.tareaOrigenId, nombre: pred.nodo.nombre, ruta: pred.ruta })
+          ;(pred.nodo.data.sucesoras ??= []).push({ ...base, tareaId: dep.tareaDependienteId, nombre: suc.nodo.nombre, ruta: suc.ruta })
+          if (incumple > 0) suc.nodo.data.dependenciaIncumplida = true
+        }
+      }
     }
 
     const tree = [projectNode]

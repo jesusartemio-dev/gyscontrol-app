@@ -425,6 +425,16 @@ export function ProyectoCronogramaTreeView({
     setShowForm(true)
   }
 
+  // Las predecesoras se guardan al instante desde el formulario; al cerrarlo se
+  // recarga el árbol para ver los cambios (íconos, avisos, fechas ajustadas).
+  const dependenciasCambiadasRef = useRef(false)
+  const recargarSiCambiaronDependencias = async () => {
+    if (!dependenciasCambiadasRef.current) return
+    dependenciasCambiadasRef.current = false
+    await actions.loadTree([...state.expandedNodes])
+    onRefresh?.()
+  }
+
   const handleFormSubmit = async (data: any) => {
     try {
       console.log('📝 [FORM SUBMIT] Iniciando submit del formulario')
@@ -441,7 +451,8 @@ export function ProyectoCronogramaTreeView({
       console.log('📝 [FORM SUBMIT] Operación completada, cerrando formulario')
       setShowForm(false)
       setFormContext(null)
-      onRefresh?.()
+      if (dependenciasCambiadasRef.current) await recargarSiCambiaronDependencias()
+      else onRefresh?.()
     } catch (error) {
       console.error('❌ [FORM SUBMIT] Error guardando nodo:', error)
     }
@@ -1182,10 +1193,12 @@ export function ProyectoCronogramaTreeView({
             onCancel={() => {
               setShowForm(false)
               setFormContext(null)
+              recargarSiCambiaronDependencias()
             }}
             nodes={state.nodes}
             proyectoId={proyectoId}
             permiteHitos
+            onDependenciasCambiadas={() => { dependenciasCambiadasRef.current = true }}
           />
         )}
 

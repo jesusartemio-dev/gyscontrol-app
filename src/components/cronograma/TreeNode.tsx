@@ -6,7 +6,7 @@
 // ===================================================
 
 import React from 'react'
-import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine, ArrowRightLeft, ArrowRightToLine, Columns2, ArrowDown, ArrowRight, ArrowLeft, Layers, Diamond } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine, ArrowRightLeft, ArrowRightToLine, Columns2, ArrowDown, ArrowRight, ArrowLeft, Layers, Diamond, Link2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -52,6 +52,24 @@ function RelacionAnteriorIcono({ relacion }: { relacion?: RelacionAnterior }) {
     default:
       return <span className="w-3 shrink-0" />
   }
+}
+
+interface DependenciaNodo {
+  nombre: string
+  ruta?: string
+  tipoTexto?: string
+  horasIncumplidas?: number
+}
+
+/** Texto del tooltip: predecesoras (←) y sucesoras (→) con su ubicación. */
+function textoDependencias(data: { predecesoras?: DependenciaNodo[]; sucesoras?: DependenciaNodo[] }): string {
+  const linea = (flecha: string, d: DependenciaNodo) =>
+    `${flecha} ${d.nombre} (${d.tipoTexto ?? 'FC'})${d.ruta ? ` · ${d.ruta}` : ''}${
+      d.horasIncumplidas ? '  ⚠ no se cumple' : ''}`
+  const partes: string[] = []
+  if (data.predecesoras?.length) partes.push('Predecesoras:', ...data.predecesoras.map((d) => linea('←', d)))
+  if (data.sucesoras?.length) partes.push(`${partes.length ? '\n' : ''}Sucesoras:`, ...data.sucesoras.map((d) => linea('→', d)))
+  return partes.join('\n') + '\n\nSe editan en Editar tarea › Predecesoras.'
 }
 
 interface TreeNodeProps {
@@ -392,6 +410,21 @@ export function TreeNode({
               Límite {fmtCorta(node.data.fechaLimite)}{diasPasadoLimite > 0 ? ` · +${diasPasadoLimite}d` : ''}
             </Badge>
           )}
+
+          {/* Dependencias guardadas (como la columna Predecesoras de MS Project).
+              Rojo si alguna no se cumple: la tarea va antes de lo que exige. */}
+          {node.type === 'tarea' && (node.data?.predecesoras?.length || node.data?.sucesoras?.length) ? (
+            <span
+              className={`inline-flex items-center gap-0.5 text-[10px] leading-none px-1 h-4 rounded border shrink-0 cursor-default ${
+                node.data.dependenciaIncumplida ? 'bg-red-50 text-red-700 border-red-300' : 'bg-white text-gray-500 border-gray-300'
+              }`}
+              title={textoDependencias(node.data)}
+            >
+              <Link2 className="h-2.5 w-2.5" />
+              {node.data?.predecesoras?.length ?? 0}
+              {node.data?.sucesoras?.length ? <span className="text-gray-400">/{node.data.sucesoras.length}</span> : null}
+            </span>
+          ) : null}
 
           {/* Badge "Extra" para tareas fuera del cronograma planificado */}
           {node.type === 'tarea' && node.data?.esExtra && (

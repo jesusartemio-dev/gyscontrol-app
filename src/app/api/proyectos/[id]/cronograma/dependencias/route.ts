@@ -15,12 +15,15 @@ import { z } from 'zod'
 import { isCronogramaBloqueado, cronogramaBloqueadoResponse } from '@/lib/utils/cronogramaLockCheck'
 import { logger } from '@/lib/logger'
 import { validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
+import { creaCiclo } from '@/lib/services/cronogramaDependencias'
 
 // ✅ Schema de validación para crear dependencia
 const createDependenciaSchema = z.object({
   tareaOrigenId: z.string().min(1, 'El ID de la tarea origen es requerido'),
   tareaDependienteId: z.string().min(1, 'El ID de la tarea dependiente es requerido'),
   tipo: z.enum(['finish_to_start', 'start_to_start', 'finish_to_finish', 'start_to_finish']).default('finish_to_start'),
+  // Desfase en minutos laborables (negativo = adelanto), como el Lag de MS Project
+  lagMinutos: z.number().int().optional().default(0),
 })
 
 // ✅ GET /api/proyectos/[id]/cronograma/dependencias - Obtener dependencias del proyecto
@@ -172,6 +175,26 @@ export async function POST(
       )
     }
 
+    // Ambas del mismo cronograma (línea base y ejecución no se mezclan)
+    if (tareaOrigenData.proyectoCronogramaId !== tareaDependienteData.proyectoCronogramaId) {
+      return NextResponse.json(
+        { error: 'Las dos tareas deben ser del mismo cronograma' },
+        { status: 400 }
+      )
+    }
+
+    // Sin ciclos: A → B → … → A
+    const depsCronograma = await prisma.proyectoDependenciasTarea.findMany({
+      where: { tareaOrigen: { proyectoCronogramaId: tareaOrigenData.proyectoCronogramaId } },
+      select: { tareaOrigenId: true, tareaDependienteId: true }
+    })
+    if (creaCiclo(depsCronograma, validatedData.tareaOrigenId, validatedData.tareaDependienteId)) {
+      return NextResponse.json(
+        { error: 'Esa dependencia forma un ciclo: la predecesora ya depende (directa o indirectamente) de esta tarea' },
+        { status: 400 }
+      )
+    }
+
     // ✅ Verificar que no existe ya esta dependencia
     const existingDependencia = await prisma.proyectoDependenciasTarea.findFirst({
       where: {
@@ -193,7 +216,8 @@ export async function POST(
         id: crypto.randomUUID(),
         tareaOrigenId: validatedData.tareaOrigenId,
         tareaDependienteId: validatedData.tareaDependienteId,
-        tipo: validatedData.tipo
+        tipo: validatedData.tipo,
+        lagMinutos: validatedData.lagMinutos
       },
       include: {
         tareaOrigen: {

@@ -18,6 +18,7 @@ import { AlertTriangle, CheckCircle, XCircle, Users, Clock, Lock, Tag } from 'lu
 import { TreeNode, NodeType, PositioningMode, PositioningConfig } from './types'
 import { obtenerCalendarioLaboral } from '@/lib/utils/calendarioLaboral'
 import RecursoSelect from '@/components/catalogo/RecursoSelect'
+import { PredecesorasEditor } from './PredecesorasEditor'
 import type { Recurso } from '@/types'
 
 interface TreeNodeFormProps {
@@ -32,6 +33,8 @@ interface TreeNodeFormProps {
   proyectoId?: string
   /** Muestra "Es hito" y "Fecha límite" en tareas (solo cronograma de proyecto). */
   permiteHitos?: boolean
+  /** Se agregó, cambió o quitó una predecesora (se guardan al instante). */
+  onDependenciasCambiadas?: () => void
 }
 
 const NODE_TYPE_LABELS: Record<string, string> = {
@@ -68,7 +71,8 @@ export function TreeNodeForm({
   onCancel,
   nodes = new Map(),
   proyectoId,
-  permiteHitos = false
+  permiteHitos = false,
+  onDependenciasCambiadas
 }: TreeNodeFormProps) {
   // Función para obtener el estado por defecto según el tipo de nodo
   const getDefaultStatus = (nodeType?: NodeType): 'pendiente' | 'en_progreso' | 'completada' | 'pausada' | 'cancelada' | 'planificado' => {
@@ -704,7 +708,7 @@ export function TreeNodeForm({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent className="sm:max-w-[620px]">
+      <DialogContent className="sm:max-w-[620px] max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{getDialogTitle()}</DialogTitle>
           {getParentInfo() && (
@@ -879,6 +883,22 @@ export function TreeNodeForm({
                     </p>
                   </div>
                 </div>
+              )}
+
+              {/* ── TAREA (proyecto): predecesoras de cualquier actividad o fase ── */}
+              {isTarea && porHoras && mode === 'edit' && nodeId && proyectoId && (
+                <PredecesorasEditor
+                  proyectoId={proyectoId}
+                  tareaNodeId={nodeId}
+                  nodes={nodes}
+                  horasPorDia={horasPorDia}
+                  onCambio={() => onDependenciasCambiadas?.()}
+                  onFechasAjustadas={(inicio, fin) => {
+                    ultimoEditado.current = 'fin'
+                    setFormData(prev => ({ ...prev, fechaInicioComercial: inicio, fechaFinComercial: fin }))
+                    recalcularDuracion(inicio, fin)
+                  }}
+                />
               )}
 
               {/* ── TAREA: Fechas + Horas en una fila ── */}
