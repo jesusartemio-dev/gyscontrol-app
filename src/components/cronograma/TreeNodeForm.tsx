@@ -5,7 +5,7 @@
 // ✅ Sistema "inicio_padre" vs "despues_ultima", validaciones
 // ===================================================
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -110,6 +110,12 @@ export function TreeNodeForm({
   const aFechaHora = (valor: string, extremo: 'inicio' | 'fin') => {
     if (!valor) return ''
     if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) return `${valor}T${extremo === 'inicio' ? jornada.inicio : jornada.fin}`
+    // Ya es "YYYY-MM-DDTHH:MM" sin zona (hora de obra, lo que usa el input): se
+    // deja tal cual. Pasarlo por new Date() lo leía como hora local del navegador
+    // y en Perú le sumaba 5 h cada vez que se mostraba.
+    const sinZona = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(:\d{2}(\.\d+)?)?$/.exec(valor)
+    if (sinZona) return sinZona[1]
+    // ISO con zona (lo que manda el servidor, "…Z"): su hora UTC es la hora de obra.
     const d = new Date(valor)
     return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 16)
   }
@@ -121,6 +127,9 @@ export function TreeNodeForm({
     return m[2] && m[2].toLowerCase().startsWith('h') ? n : n * horasPorDia
   }
   const [calculandoFechas, setCalculandoFechas] = useState(false)
+  // Último campo de fecha que tocó el usuario: decide si al guardar manda el Fin
+  // (lo editó a mano) o se recalcula desde Inicio + Duración.
+  const ultimoEditado = useRef<'inicio' | 'duracion' | 'fin' | null>(null)
   const calcularFechas = async (body: { inicio: string; horas?: number; fin?: string }) => {
     if (!proyectoId || !body.inicio) return null
     try {
@@ -608,8 +617,24 @@ export function TreeNodeForm({
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Tarea por horas: si lo último que se tocó fue Inicio o Duración, el Fin se
+    // recalcula aquí con el calendario antes de guardar (como MS Project: Fin =
+    // Inicio + Duración). Evita guardar un Fin viejo si se hace clic en
+    // "Actualizar" mientras el cálculo del onBlur aún no volvía.
+    let finCalculado: string | undefined
+    const tareaPorHoras = porHoras && !formData.esHito &&
+      (nodeType === 'tarea' || (mode === 'edit' && nodeId && nodes.get(nodeId)?.type === 'tarea'))
+    if (tareaPorHoras && ultimoEditado.current !== 'fin') {
+      const horas = parseDuracion(formData.duracionTexto)
+      const ini = aFechaHora(formData.fechaInicioComercial, 'inicio')
+      if (horas !== null && ini) {
+        const r = await calcularFechas({ inicio: ini, horas })
+        if (r) finCalculado = r.fin
+      }
+    }
 
     // Para fases, mapear fechas a fechaInicioPlan/fechaFinPlan; para otros nodos mantener fechaInicioComercial/fechaFinComercial
     let submitData: any = {
@@ -638,6 +663,8 @@ export function TreeNodeForm({
       delete submitData.esHito
       delete submitData.fechaLimite
     }
+
+    if (finCalculado) submitData.fechaFinComercial = finCalculado
 
     console.log('🔍 [FORM SUBMIT] submitData:', submitData)
 
@@ -792,6 +819,7 @@ export function TreeNodeForm({
                         value={aFechaHora(formData.fechaInicioComercial, 'inicio')}
                         onChange={(e) => {
                           const v = e.target.value
+                          ultimoEditado.current = 'inicio'
                           setFormData(prev => ({ ...prev, fechaInicioComercial: v }))
                           if (v) recalcularFin(v, formData.duracionTexto || '1d')
                         }}
@@ -803,7 +831,7 @@ export function TreeNodeForm({
                         id="duracion"
                         value={formData.duracionTexto}
                         placeholder="1d · 4h"
-                        onChange={(e) => setFormData(prev => ({ ...prev, duracionTexto: e.target.value }))}
+                        onChange={(e) => { ultimoEditado.current = 'duracion'; setFormData(prev => ({ ...prev, duracionTexto: e.target.value })) }}
                         onBlur={() => {
                           const ini = aFechaHora(formData.fechaInicioComercial, 'inicio')
                           if (ini && parseDuracion(formData.duracionTexto) !== null) recalcularFin(ini, formData.duracionTexto)
@@ -821,6 +849,7 @@ export function TreeNodeForm({
                         value={aFechaHora(formData.fechaFinComercial, 'fin')}
                         onChange={(e) => {
                           const v = e.target.value
+                          ultimoEditado.current = 'fin'
                           setFormData(prev => ({ ...prev, fechaFinComercial: v }))
                           const ini = aFechaHora(formData.fechaInicioComercial, 'inicio')
                           if (v && ini) recalcularDuracion(ini, v)
