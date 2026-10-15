@@ -16,13 +16,15 @@ import { logger } from '@/lib/logger'
 import { registrarAvanceTarea, propagarRollup } from '@/lib/services/avanceTarea'
 import {
   obtenerCalendarioProyecto,
-  diferenciaDiasLaborables,
-  desplazarDiasLaborables,
   desplazarDescendientes,
   calcularInicioPosicion,
-  ajustarALaborable,
-  mismoDiaUTC,
+  deltaHorasEntre,
 } from '@/lib/services/cronogramaDesplazamiento'
+import {
+  desplazarHorasLaborables,
+  fechaDeFormulario,
+  siguienteMomentoLaborable,
+} from '@/lib/services/cronogramaHoras'
 import {
   validarPermisoCronogramaPorEdt,
   validarPermisoCronogramaPorTarea,
@@ -172,6 +174,21 @@ export async function PUT(
       validatedData.fechaFinPlan = undefined
     }
 
+    // Fechas recibidas → hora de obra. "YYYY-MM-DD" (solo día, p. ej. el
+    // formulario) va al inicio/fin de la jornada de ese día; si es el mismo día
+    // que ya tenía, se conserva la hora guardada (no se pierde un 13:00 por
+    // reenviar el mismo día). Con hora, se respeta tal cual.
+    const leerFecha = async (valor: string | undefined, extremo: 'inicio' | 'fin', actual: Date | null | undefined) => {
+      if (!valor) return undefined
+      const soloDia = /^\d{4}-\d{2}-\d{2}$/.test(valor.trim())
+      if (soloDia && actual && actual.toISOString().slice(0, 10) === valor.trim()) return actual
+      return fechaDeFormulario(await getCalendario(), valor, extremo)
+    }
+    const inicioRecibido = await leerFecha(
+      validatedData.fechaInicioComercial ?? validatedData.fechaInicio ?? validatedData.fechaInicioPlan, 'inicio', currentDates.fechaInicio)
+    const finRecibido = await leerFecha(
+      validatedData.fechaFinComercial ?? validatedData.fechaFin ?? validatedData.fechaFinPlan, 'fin', currentDates.fechaFin)
+
     // ✅ Actualizar según el tipo de nodo
     let updateData: any = {}
     // Solo tareas: si queda como hito (se calcula en el case 'tarea').
@@ -183,8 +200,8 @@ export async function PUT(
           nombre: validatedData.nombre,
           descripcion: validatedData.descripcion,
           orden: validatedData.orden,
-          fechaInicioPlan: validatedData.fechaInicioPlan ? new Date(validatedData.fechaInicioPlan) : undefined,
-          fechaFinPlan: validatedData.fechaFinPlan ? new Date(validatedData.fechaFinPlan) : undefined,
+          fechaInicioPlan: inicioRecibido,
+          fechaFinPlan: finRecibido,
         }
         await prisma.proyectoFase.update({
           where: { id: realId },
@@ -197,8 +214,8 @@ export async function PUT(
           nombre: validatedData.nombre,
           descripcion: validatedData.descripcion,
           orden: validatedData.orden,
-          fechaInicioPlan: validatedData.fechaInicioComercial ? new Date(validatedData.fechaInicioComercial) : undefined,
-          fechaFinPlan: validatedData.fechaFinComercial ? new Date(validatedData.fechaFinComercial) : undefined,
+          fechaInicioPlan: inicioRecibido,
+          fechaFinPlan: finRecibido,
           horasPlan: validatedData.horasEstimadas,
           prioridad: validatedData.prioridad,
           estado: validatedData.estado,
@@ -214,8 +231,8 @@ export async function PUT(
           nombre: validatedData.nombre,
           descripcion: validatedData.descripcion,
           orden: validatedData.orden,
-          fechaInicioPlan: validatedData.fechaInicioComercial ? new Date(validatedData.fechaInicioComercial) : undefined,
-          fechaFinPlan: validatedData.fechaFinComercial ? new Date(validatedData.fechaFinComercial) : undefined,
+          fechaInicioPlan: inicioRecibido,
+          fechaFinPlan: finRecibido,
           horasPlan: validatedData.horasEstimadas,
           prioridad: validatedData.prioridad,
           estado: validatedData.estado,
@@ -231,8 +248,8 @@ export async function PUT(
           nombre: validatedData.nombre,
           descripcion: validatedData.descripcion,
           orden: validatedData.orden,
-          fechaInicio: validatedData.fechaInicioComercial ? new Date(validatedData.fechaInicioComercial) : (validatedData.fechaInicio ? new Date(validatedData.fechaInicio) : undefined),
-          fechaFin: validatedData.fechaFinComercial ? new Date(validatedData.fechaFinComercial) : (validatedData.fechaFin ? new Date(validatedData.fechaFin) : undefined),
+          fechaInicio: inicioRecibido,
+          fechaFin: finRecibido,
           horasEstimadas: validatedData.horasEstimadas || validatedData.horasPlan,
           prioridad: validatedData.prioridad,
           personasEstimadas: validatedData.personasEstimadas,
@@ -309,36 +326,35 @@ export async function PUT(
     console.log('✅ [API TREE UPDATE] Nodo actualizado exitosamente:', { nodeType, realId })
 
     // ✅ Mover en bloque cuando cambia el inicio de una fase/EDT/actividad/tarea:
-    // todo lo de adentro se corre los mismos días laborables (calendario del
-    // proyecto). Si no se cambió también el fin, se corre igual para conservar
-    // la duración — antes quedaba el fin viejo y la barra no coincidía con sus
-    // tareas.
+    // todo lo de adentro se corre las mismas horas laborables (calendario del
+    // proyecto), conservando cada duración. Si no se cambió también el fin, se
+    // corre igual para conservar la duración del propio nodo (como MS Project).
     const campoInicio = nodeType === 'tarea' ? 'fechaInicio' : 'fechaInicioPlan'
     const campoFin = nodeType === 'tarea' ? 'fechaFin' : 'fechaFinPlan'
     const newFechaInicioRaw: Date | undefined = updateData[campoInicio]
     if (currentDates.fechaInicio && newFechaInicioRaw
-        && !mismoDiaUTC(currentDates.fechaInicio, newFechaInicioRaw)) {
+        && newFechaInicioRaw.getTime() !== currentDates.fechaInicio.getTime()) {
       const calendario = await getCalendario()
-      // Un inicio en día no laborable (p. ej. soltar la barra del Gantt en
-      // sábado) se lleva al siguiente día laborable.
-      const inicioLaborable = ajustarALaborable(calendario, newFechaInicioRaw)
-      const deltaLaborables = diferenciaDiasLaborables(calendario, currentDates.fechaInicio, inicioLaborable)
+      // Un inicio fuera de jornada (p. ej. soltar la barra del Gantt en sábado)
+      // pasa al siguiente momento laborable. Un hito es un instante y se respeta.
+      const inicioLaborable = esHitoFinal ? newFechaInicioRaw : siguienteMomentoLaborable(calendario, newFechaInicioRaw)
+      const deltaHoras = deltaHorasEntre(calendario, currentDates.fechaInicio, inicioLaborable)
       const newFechaFinRaw: Date | undefined = updateData[campoFin]
-      const finSinCambio = !newFechaFinRaw || (currentDates.fechaFin && mismoDiaUTC(currentDates.fechaFin, newFechaFinRaw))
+      const finSinCambio = !newFechaFinRaw || (currentDates.fechaFin && newFechaFinRaw.getTime() === currentDates.fechaFin.getTime())
       const fechas: { inicio?: Date; fin?: Date } = {}
-      if (!mismoDiaUTC(inicioLaborable, newFechaInicioRaw)) fechas.inicio = inicioLaborable
+      if (inicioLaborable.getTime() !== newFechaInicioRaw.getTime()) fechas.inicio = inicioLaborable
       if (esHitoFinal) {
-        // Un hito ocupa un solo día: su fin es su inicio (ya en día laborable).
-        if (!newFechaFinRaw || !mismoDiaUTC(newFechaFinRaw, inicioLaborable)) fechas.fin = inicioLaborable
+        // Un hito es un instante: su fin es su inicio.
+        if (!newFechaFinRaw || newFechaFinRaw.getTime() !== inicioLaborable.getTime()) fechas.fin = inicioLaborable
       } else if (finSinCambio && currentDates.fechaFin) {
-        fechas.fin = desplazarDiasLaborables(calendario, currentDates.fechaFin, deltaLaborables)
+        fechas.fin = desplazarHorasLaborables(calendario, currentDates.fechaFin, deltaHoras, 'fin')
       }
       if (fechas.inicio || fechas.fin) {
         await actualizarFechasNodo(nodeType, realId, fechas)
         if (fechas.inicio) updateData[campoInicio] = fechas.inicio
         if (fechas.fin) updateData[campoFin] = fechas.fin
       }
-      await desplazarDescendientes(calendario, nodeType, realId, deltaLaborables)
+      await desplazarDescendientes(calendario, nodeType, realId, deltaHoras)
       // Con los hijos ya movidos, el propio nodo toma sus fechas reales.
       if (nodeType !== 'tarea') await recalcularNodoPadre(nodeType, realId)
     }

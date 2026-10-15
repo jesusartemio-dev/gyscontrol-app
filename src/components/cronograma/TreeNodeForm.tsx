@@ -95,8 +95,74 @@ export function TreeNodeForm({
     posicionamiento: 'despues_ultima' as PositioningMode,
     // Solo tareas: hito ◆ (un solo día, sin horas) y su fecha comprometida
     esHito: false,
-    fechaLimite: ''
+    fechaLimite: '',
+    // Solo tareas del cronograma de proyecto: duración como MS Project ("1d", "4h", "1.5d")
+    duracionTexto: ''
   })
+
+  // ── Duración por horas (cronograma de proyecto) ──────────────────────────
+  // Las fechas de tarea van con hora de obra ("YYYY-MM-DDTHH:MM", sin zona) y
+  // el fin se calcula en el servidor con el calendario (jornada, feriados, paradas).
+  const porHoras = permiteHitos
+  const nodoProyecto = Array.from(nodes.values()).find((n: any) => n.type === 'proyecto') as any
+  const horasPorDia: number = Number(nodoProyecto?.data?.horasPorDia) || 8
+  const jornada: { inicio: string; fin: string } = nodoProyecto?.data?.jornada || { inicio: '08:00', fin: '18:30' }
+  const aFechaHora = (valor: string, extremo: 'inicio' | 'fin') => {
+    if (!valor) return ''
+    if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) return `${valor}T${extremo === 'inicio' ? jornada.inicio : jornada.fin}`
+    const d = new Date(valor)
+    return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 16)
+  }
+  // "4h", "1.5d", "2" (días) → horas laborables; null si no se entiende.
+  const parseDuracion = (texto: string): number | null => {
+    const m = /^\s*(\d+(?:[.,]\d+)?)\s*(h|hr|hrs|hora|horas|d|dia|dias|día|días)?\s*$/i.exec(texto || '')
+    if (!m) return null
+    const n = Number(m[1].replace(',', '.'))
+    return m[2] && m[2].toLowerCase().startsWith('h') ? n : n * horasPorDia
+  }
+  const [calculandoFechas, setCalculandoFechas] = useState(false)
+  const calcularFechas = async (body: { inicio: string; horas?: number; fin?: string }) => {
+    if (!proyectoId || !body.inicio) return null
+    try {
+      setCalculandoFechas(true)
+      const r = await fetch(`/api/proyectos/${proyectoId}/cronograma/calcular-fechas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      return r.ok ? await r.json() as { inicio: string; fin: string; horas: number; texto: string } : null
+    } finally {
+      setCalculandoFechas(false)
+    }
+  }
+  // Cambió el inicio o la duración → se recalcula el fin.
+  const recalcularFin = async (inicio: string, duracionTexto: string) => {
+    const horas = parseDuracion(duracionTexto)
+    if (horas === null) return
+    const r = await calcularFechas({ inicio, horas })
+    if (r) setFormData(prev => ({ ...prev, fechaFinComercial: r.fin, duracionTexto: r.texto }))
+  }
+  // Cambió el fin → se recalcula la duración.
+  const recalcularDuracion = async (inicio: string, fin: string) => {
+    const r = await calcularFechas({ inicio, fin })
+    if (r) setFormData(prev => ({ ...prev, duracionTexto: r.texto }))
+  }
+  const duracionHoras = parseDuracion(formData.duracionTexto)
+  const trabajoHoras = Number(formData.horasEstimadas) || 0
+  const unidades = duracionHoras && duracionHoras > 0 ? Math.round((trabajoHoras / duracionHoras) * 100) : null
+
+  useEffect(() => {
+    if (!porHoras || mode !== 'create' || nodeType !== 'tarea' || formData.esHito) return
+    const ini = formData.fechaInicioComercial
+    const fin = formData.fechaFinComercial
+    const iniEsDia = /^\d{4}-\d{2}-\d{2}$/.test(ini)
+    const finEsDia = /^\d{4}-\d{2}-\d{2}$/.test(fin)
+    if (!iniEsDia && !finEsDia) return
+    const iniH = aFechaHora(ini, 'inicio')
+    const finH = aFechaHora(fin, 'fin')
+    setFormData(prev => ({ ...prev, fechaInicioComercial: iniH, fechaFinComercial: finH }))
+    if (iniH && finH) recalcularDuracion(iniH, finH)
+  }, [porHoras, mode, nodeType, formData.fechaInicioComercial, formData.fechaFinComercial, formData.esHito])
 
   // Tarea: personal del proyecto (para el select de responsable) + info de creadoPor
   const [personalProyecto, setPersonalProyecto] = useState<{ id: string; name: string }[]>([])
@@ -432,11 +498,12 @@ export function TreeNodeForm({
           const day = String(date.getUTCDate()).padStart(2, '0')
           return `${year}-${month}-${day}`
         }
+        const tareaPorHoras = porHoras && node.type === 'tarea'
         if (fechaInicio) {
-          fechaInicio = toLocalDateString(fechaInicio)
+          fechaInicio = tareaPorHoras ? aFechaHora(fechaInicio, 'inicio') : toLocalDateString(fechaInicio)
         }
         if (fechaFin) {
-          fechaFin = toLocalDateString(fechaFin)
+          fechaFin = tareaPorHoras ? aFechaHora(fechaFin, 'fin') : toLocalDateString(fechaFin)
         }
 
         setFormData({
@@ -458,7 +525,8 @@ export function TreeNodeForm({
                   node.data.estado || getDefaultStatus(node.type),
           posicionamiento: node.data.posicionamiento || 'despues_ultima',
           esHito: node.data.esHito === true,
-          fechaLimite: node.data.fechaLimite ? toLocalDateString(node.data.fechaLimite) : ''
+          fechaLimite: node.data.fechaLimite ? toLocalDateString(node.data.fechaLimite) : '',
+          duracionTexto: node.data.duracionTexto || ''
         })
 
         // Cargar info del recurso si existe
@@ -692,8 +760,8 @@ export function TreeNodeForm({
                     <Label htmlFor="fechaHito">Fecha del hito</Label>
                     <Input
                       id="fechaHito"
-                      type="date"
-                      value={formData.fechaInicioComercial}
+                      type={porHoras ? 'datetime-local' : 'date'}
+                      value={porHoras ? aFechaHora(formData.fechaInicioComercial, 'inicio') : formData.fechaInicioComercial}
                       onChange={(e) => setFormData(prev => ({ ...prev, fechaInicioComercial: e.target.value, fechaFinComercial: e.target.value }))}
                     />
                   </div>
@@ -712,8 +780,78 @@ export function TreeNodeForm({
                 </div>
               )}
 
+              {/* ── TAREA (proyecto): como MS Project — Inicio + Duración → Fin; Trabajo y Unidades ── */}
+              {isTarea && !formData.esHito && porHoras && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-[1fr_7rem_1fr] gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="fechaInicio">Inicio</Label>
+                      <Input
+                        id="fechaInicio"
+                        type="datetime-local"
+                        value={aFechaHora(formData.fechaInicioComercial, 'inicio')}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          setFormData(prev => ({ ...prev, fechaInicioComercial: v }))
+                          if (v) recalcularFin(v, formData.duracionTexto || '1d')
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="duracion" title="Como en MS Project: 1d, 1.5d, 4h">Duración</Label>
+                      <Input
+                        id="duracion"
+                        value={formData.duracionTexto}
+                        placeholder="1d · 4h"
+                        onChange={(e) => setFormData(prev => ({ ...prev, duracionTexto: e.target.value }))}
+                        onBlur={() => {
+                          const ini = aFechaHora(formData.fechaInicioComercial, 'inicio')
+                          if (ini && parseDuracion(formData.duracionTexto) !== null) recalcularFin(ini, formData.duracionTexto)
+                        }}
+                        className={formData.duracionTexto && parseDuracion(formData.duracionTexto) === null ? 'border-red-400' : ''}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="fechaFin" className="flex items-center gap-1">
+                        Fin {calculandoFechas && <span className="text-[10px] text-muted-foreground">calculando…</span>}
+                      </Label>
+                      <Input
+                        id="fechaFin"
+                        type="datetime-local"
+                        value={aFechaHora(formData.fechaFinComercial, 'fin')}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          setFormData(prev => ({ ...prev, fechaFinComercial: v }))
+                          const ini = aFechaHora(formData.fechaInicioComercial, 'inicio')
+                          if (v && ini) recalcularDuracion(ini, v)
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-[7rem_1fr] gap-3 items-end">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="horasEstimadas" title="Horas de esfuerzo por persona (Work)">Trabajo (h)</Label>
+                      <Input
+                        id="horasEstimadas"
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={formData.horasEstimadas}
+                        onChange={(e) => setFormData(prev => ({ ...prev, horasEstimadas: e.target.value }))}
+                        placeholder="0"
+                      />
+                    </div>
+                    <p className={`text-xs pb-2 ${unidades !== null && unidades > 100 ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                      {unidades === null
+                        ? 'La duración sale de Inicio y Fin según el calendario del proyecto.'
+                        : `Unidades: ${unidades}% de la jornada${unidades > 100 ? ' — sobreasignada (más trabajo que tiempo disponible)' : ''}`}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* ── TAREA: Fechas + Horas en una fila ── */}
-              {isTarea && !formData.esHito && (
+              {isTarea && !formData.esHito && !porHoras && (
                 <div className="grid grid-cols-[1fr_1fr_auto] gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="fechaInicio">F. Inicio</Label>

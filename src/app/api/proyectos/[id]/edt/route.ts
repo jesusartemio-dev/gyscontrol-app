@@ -1,4 +1,6 @@
 import { tieneRol } from '@/lib/auth/roles'
+import { obtenerCalendarioProyecto } from '@/lib/services/cronogramaDesplazamiento'
+import { fechaDeFormulario } from '@/lib/services/cronogramaHoras'
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -190,6 +192,8 @@ export async function POST(
       );
     }
 
+    // Fechas en hora de obra: "YYYY-MM-DD" va al inicio/fin de la jornada.
+    const calendario = data.fechaInicio || data.fechaFin ? await obtenerCalendarioProyecto(id) : null
     // 🏗️ Crear EDT
     const nuevoEdt = await prisma.proyectoEdt.create({
       data: {
@@ -198,8 +202,8 @@ export async function POST(
         proyectoCronogramaId: data.proyectoCronogramaId,
         nombre: data.nombre,
         edtId: data.edtId, // DB field is still edtId
-        fechaInicioPlan: data.fechaInicio ? new Date(data.fechaInicio) : undefined,
-        fechaFinPlan: data.fechaFin ? new Date(data.fechaFin) : undefined,
+        fechaInicioPlan: data.fechaInicio && calendario ? fechaDeFormulario(calendario, String(data.fechaInicio), 'inicio') : undefined,
+        fechaFinPlan: data.fechaFin && calendario ? fechaDeFormulario(calendario, String(data.fechaFin), 'fin') : undefined,
         horasPlan: data.horasEstimadas,
         responsableId: data.responsableId,
         descripcion: data.descripcion,

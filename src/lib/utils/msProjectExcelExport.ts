@@ -179,6 +179,9 @@ function resolvePredecessors(
   }
 }
 
+// Las fechas guardan la hora de obra en los campos UTC (sin zona horaria, como
+// MS Project): se escriben tal cual, en UTC. Con la zona del navegador una
+// fecha de las 08:00 salía 03:00, y una de las 00:00 salía el día anterior.
 function formatExcelDate(date: Date): string {
   return date.toLocaleDateString('en-US', {
     day: 'numeric',
@@ -187,6 +190,7 @@ function formatExcelDate(date: Date): string {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,
+    timeZone: 'UTC',
   })
 }
 

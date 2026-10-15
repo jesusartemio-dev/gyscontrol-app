@@ -16,6 +16,8 @@ import { TreeNodeProgress } from './TreeNodeProgress'
 
 interface RelacionAnterior {
   tipo: 'secuencia' | 'paralelo' | 'solape' | 'hueco' | 'antes'
+  /** Tiempo laborable libre (solo hueco): horas, y días si es ≥ 1 jornada. */
+  horas?: number
   dias?: number
   anteriorNombre: string
 }
@@ -31,17 +33,20 @@ function RelacionAnteriorIcono({ relacion }: { relacion?: RelacionAnterior }) {
   const clase = 'h-3 w-3 shrink-0'
   switch (relacion.tipo) {
     case 'secuencia':
-      return <span title={`Empieza el día laborable siguiente al fin de ${nombre}`}><ArrowRight className={`${clase} text-blue-500`} /></span>
+      return <span title={`Empieza en cuanto termina ${nombre}`}><ArrowRight className={`${clase} text-blue-500`} /></span>
     case 'paralelo':
-      return <span title={`Empieza el mismo día que ${nombre} (en paralelo)`}><Columns2 className={`${clase} text-emerald-600`} /></span>
+      return <span title={`Empieza junto con ${nombre} (en paralelo)`}><Columns2 className={`${clase} text-emerald-600`} /></span>
     case 'solape':
       return <span title={`Empieza antes de que termine ${nombre} (se solapan)`}><Layers className={`${clase} text-amber-500`} /></span>
-    case 'hueco':
+    case 'hueco': {
+      const texto = relacion.dias ? `${relacion.dias}d` : `${relacion.horas ?? 0}h`
+      const detalle = relacion.dias ? `${relacion.dias} día(s) laborable(s)` : `${relacion.horas ?? 0} hora(s) laborable(s)`
       return (
-        <span className="shrink-0 text-[9px] font-medium text-gray-400" title={`${relacion.dias} día(s) laborable(s) libre(s) después de ${nombre}`}>
-          +{relacion.dias}d
+        <span className="shrink-0 text-[9px] font-medium text-gray-400" title={`${detalle} libre(s) después de ${nombre}`}>
+          +{texto}
         </span>
       )
+    }
     case 'antes':
       return <span title={`Empieza antes que ${nombre}, que está arriba en la lista (no están en orden de fecha)`}><ArrowLeft className={`${clase} text-rose-400`} /></span>
     default:
@@ -443,9 +448,9 @@ export function TreeNode({
           <span className="truncate">{formatDates()}</span>
         </div>
 
-        {/* Columna 5: Duration (días hábiles desde fechas) */}
+        {/* Columna 5: Duración por horas laborables, como MS Project ("4h", "1.5d", "0d") */}
         <div className="text-right text-[11px] text-gray-500 font-mono pr-1">
-          {esHitoTarea ? '0d' : durationDays > 0 ? `${durationDays}d` : node.data.duracionDiasReal === 0 ? (
+          {esHitoTarea ? '0d' : node.data.duracionTexto && node.data.duracionHoras > 0 ? node.data.duracionTexto : durationDays > 0 ? `${durationDays}d` : node.data.duracionDiasReal === 0 ? (
             // Tiene fechas pero no cae en ningún día laborable del calendario
             <span className="text-amber-600" title="Cae solo en días no laborables del calendario del proyecto">0d</span>
           ) : ''}

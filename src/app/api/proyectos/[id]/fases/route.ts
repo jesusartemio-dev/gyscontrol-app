@@ -8,6 +8,8 @@
 // ===================================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { obtenerCalendarioProyecto } from '@/lib/services/cronogramaDesplazamiento'
+import { fechaDeFormulario } from '@/lib/services/cronogramaHoras'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -165,6 +167,8 @@ export async function POST(
     const nuevoOrden = (maxOrden._max?.orden || 0) + 1
 
     // ✅ Crear la fase
+    // Fechas en hora de obra: "YYYY-MM-DD" va al inicio/fin de la jornada.
+    const calendario = validatedData.fechaInicioPlan || validatedData.fechaFinPlan ? await obtenerCalendarioProyecto(id) : null
     const fase = await prisma.proyectoFase.create({
       data: {
         id: crypto.randomUUID(),
@@ -175,8 +179,8 @@ export async function POST(
         orden: validatedData.orden || nuevoOrden,
         estado: 'planificado',
         porcentajeAvance: 0,
-        fechaInicioPlan: validatedData.fechaInicioPlan ? new Date(validatedData.fechaInicioPlan) : null,
-        fechaFinPlan: validatedData.fechaFinPlan ? new Date(validatedData.fechaFinPlan) : null,
+        fechaInicioPlan: validatedData.fechaInicioPlan && calendario ? fechaDeFormulario(calendario, validatedData.fechaInicioPlan, 'inicio') : null,
+        fechaFinPlan: validatedData.fechaFinPlan && calendario ? fechaDeFormulario(calendario, validatedData.fechaFinPlan, 'fin') : null,
         updatedAt: new Date()
       },
       include: {

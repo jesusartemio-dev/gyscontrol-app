@@ -1,11 +1,19 @@
-// Desplazamiento de nodos del cronograma en días laborables, según el
-// calendario del proyecto.
+// Desplazamiento y posición de nodos del cronograma según el calendario del
+// proyecto, por horas laborables (como MS Project).
 //
-// Las fechas del cronograma se guardan con hora (08:00Z, 18:30Z, 00:00Z…) y la
-// UI muestra el día UTC, así que aquí todo se razona por día UTC y la hora de
-// cada fecha se conserva al moverla.
+// Convención de fechas: "hora de obra" — la hora tal cual en obra guardada en
+// los campos UTC (ver cronogramaHoras.ts). Por eso todo se razona con getUTC*.
 
 import { prisma } from '@/lib/prisma'
+import {
+  type CalendarioHoras,
+  desplazarHorasLaborables,
+  diferenciaHorasLaborables,
+  extremoDeInstante,
+  horasLaborablesEntre,
+  horasPorDiaCalendario,
+  siguienteMomentoLaborable,
+} from './cronogramaHoras'
 
 const DIA_MS = 86400000
 const DIAS_SEMANA = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado']
@@ -18,14 +26,20 @@ export interface CalendarioDesplazamiento {
   excepcionCalendario: { fecha: Date; tipo: string }[]
 }
 
-const CALENDARIO_LUN_VIE: CalendarioDesplazamiento = {
+// Sin calendario configurado: lunes a viernes, 08:00–12:00 y 13:00–17:00.
+const CALENDARIO_LUN_VIE: CalendarioHoras = {
   diasLaborables: ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'],
   diaCalendario: [],
   excepcionCalendario: [],
+  horasPorDia: 8,
+  horaInicioManana: '08:00',
+  horaFinManana: '12:00',
+  horaInicioTarde: '13:00',
+  horaFinTarde: '17:00',
 }
 
 /** Calendario del proyecto; si no tiene, el primer calendario activo (igual que el árbol). */
-export async function obtenerCalendarioProyecto(proyectoId: string): Promise<CalendarioDesplazamiento> {
+export async function obtenerCalendarioProyecto(proyectoId: string): Promise<CalendarioHoras> {
   const include = { diaCalendario: true, excepcionCalendario: true }
   const config = await prisma.configuracionCalendario.findFirst({
     where: { entidadTipo: 'proyecto', entidadId: proyectoId },
@@ -34,7 +48,7 @@ export async function obtenerCalendarioProyecto(proyectoId: string): Promise<Cal
   const calendario =
     config?.calendarioLaboral ??
     (await prisma.calendarioLaboral.findFirst({ where: { activo: true }, include }))
-  return calendario ?? CALENDARIO_LUN_VIE
+  return (calendario as CalendarioHoras | null) ?? CALENDARIO_LUN_VIE
 }
 
 const claveDia = (d: Date) => d.toISOString().slice(0, 10)
@@ -110,7 +124,8 @@ export type TipoRelacion = 'secuencia' | 'paralelo' | 'solape' | 'hueco' | 'ante
 
 export interface RelacionAnterior {
   tipo: TipoRelacion
-  /** Días laborables libres entre ambos (solo `hueco`). */
+  /** Tiempo laborable libre entre ambos (solo `hueco`): en horas, y en días si es ≥ 1 jornada. */
+  horas?: number
   dias?: number
   anteriorNombre: string
 }
@@ -118,30 +133,38 @@ export interface RelacionAnterior {
 /**
  * Cómo se ubica un elemento respecto al que está justo arriba en su nivel,
  * deducido de las fechas (no se guarda ninguna dependencia):
- * - paralelo: empiezan el mismo día.
- * - secuencia: empieza el día laborable siguiente al fin del anterior.
+ * - secuencia: empieza en cuanto termina el anterior (el siguiente momento laborable).
+ * - paralelo: empiezan en el mismo momento.
  * - solape: empieza después que el anterior pero antes de que este termine.
- * - hueco: hay `dias` días laborables libres entre el fin del anterior y su inicio.
+ * - hueco: queda tiempo laborable libre entre el fin del anterior y su inicio.
  * - antes: empieza antes que el anterior (la lista no está en orden de fecha).
  */
 export function clasificarRelacion(
-  cal: CalendarioDesplazamiento,
+  cal: CalendarioHoras,
   anterior: { inicio: Date; fin: Date; nombre: string },
   actual: { inicio: Date; esHito?: boolean },
 ): RelacionAnterior {
   const base = { anteriorNombre: anterior.nombre }
-  const inicio = inicioDiaUTC(actual.inicio)
-  // Un hito que cae el día en que termina el anterior va "después" de él (como en MS Project).
-  if (actual.esHito && mismoDiaUTC(actual.inicio, anterior.fin) && !mismoDiaUTC(anterior.inicio, anterior.fin)) {
+  const ini = actual.inicio.getTime()
+  // Un hito va "después de" lo que termina en su mismo instante (como en MS Project).
+  if (actual.esHito && ini === anterior.fin.getTime() && anterior.fin.getTime() !== anterior.inicio.getTime()) {
     return { tipo: 'secuencia', ...base }
   }
-  if (mismoDiaUTC(actual.inicio, anterior.inicio)) return { tipo: 'paralelo', ...base }
-  if (inicio < inicioDiaUTC(anterior.inicio)) return { tipo: 'antes', ...base }
-  if (inicio <= inicioDiaUTC(anterior.fin)) return { tipo: 'solape', ...base }
-  if (mismoDiaUTC(actual.inicio, siguienteDiaLaborable(cal, anterior.fin))) return { tipo: 'secuencia', ...base }
-  // Laborables estrictamente entre el fin del anterior y el inicio de este.
-  const libres = Math.max(0, diferenciaDiasLaborables(cal, anterior.fin, ajustarALaborable(cal, actual.inicio)) - 1)
-  return libres === 0 ? { tipo: 'secuencia', ...base } : { tipo: 'hueco', dias: libres, ...base }
+  if (ini === siguienteMomentoLaborable(cal, anterior.fin).getTime() && ini >= anterior.fin.getTime()) {
+    return { tipo: 'secuencia', ...base }
+  }
+  if (ini === anterior.inicio.getTime()) return { tipo: 'paralelo', ...base }
+  if (ini < anterior.inicio.getTime()) return { tipo: 'antes', ...base }
+  if (ini < anterior.fin.getTime()) return { tipo: 'solape', ...base }
+  const libres = horasLaborablesEntre(cal, anterior.fin, actual.inicio)
+  if (libres === 0) return { tipo: 'secuencia', ...base }
+  const hpd = horasPorDiaCalendario(cal)
+  return {
+    tipo: 'hueco',
+    horas: Math.round(libres * 10) / 10,
+    dias: libres >= hpd ? Math.round((libres / hpd) * 10) / 10 : undefined,
+    ...base,
+  }
 }
 
 // ── Posicionar un nodo respecto a su padre o a un hermano ──────────────────
@@ -214,16 +237,17 @@ async function padreYHermanos(nodeType: string, realId: string): Promise<{ inici
 }
 
 /**
- * Nuevo inicio (medianoche UTC de un día laborable) para un EDT, actividad o
- * tarea según el modo:
- * - inicio_padre: primer día laborable del padre.
- * - despues_anterior / despues_de: día laborable siguiente al fin del hermano `referenciaId`.
- * - despues_ultimo: día laborable siguiente al fin del hermano que termina más tarde.
+ * Nuevo inicio para un EDT, actividad o tarea según el modo (por horas, como
+ * Fin-Comienzo en MS Project):
+ * - inicio_padre: primer momento laborable del padre.
+ * - despues_anterior / despues_de: en cuanto termina el hermano `referenciaId`
+ *   (el mismo día si queda jornada). Un hito, en el mismo instante en que termina.
+ * - despues_ultimo: igual, tras el hermano que termina más tarde.
  * - en_paralelo: mismo inicio que el hermano `referenciaId`.
  * Devuelve `{ error }` si no se puede calcular.
  */
 export async function calcularInicioPosicion(
-  cal: CalendarioDesplazamiento,
+  cal: CalendarioHoras,
   nodeType: string,
   realId: string,
   modo: ModoPosicion,
@@ -232,38 +256,44 @@ export async function calcularInicioPosicion(
   const datos = await padreYHermanos(nodeType, realId)
   if (!datos) return { error: 'Solo se puede posicionar un EDT, una actividad o una tarea' }
 
-  // Un hito "después de" algo cae el mismo día en que ese algo termina (como
-  // en MS Project); una tarea normal, el día laborable siguiente.
-  const despuesDe = (fin: Date) => (datos.esHito ? ajustarALaborable(cal, fin) : siguienteDiaLaborable(cal, fin))
+  const despuesDe = (fin: Date) => (datos.esHito ? fin : siguienteMomentoLaborable(cal, fin))
 
-  let base: Date
+  let inicio: Date
   if (modo === 'inicio_padre') {
     if (!datos.inicioPadre) return { error: 'El padre no tiene fecha de inicio' }
-    base = ajustarALaborable(cal, datos.inicioPadre)
+    inicio = siguienteMomentoLaborable(cal, datos.inicioPadre)
   } else if (modo === 'despues_ultimo') {
     if (datos.hermanos.length === 0) return { error: 'No hay otros elementos en el mismo nivel' }
     const ultimoFin = datos.hermanos.reduce((max, h) => (h.fin > max ? h.fin : max), datos.hermanos[0].fin)
-    base = despuesDe(ultimoFin)
+    inicio = despuesDe(ultimoFin)
   } else {
     const ref = datos.hermanos.find(h => h.id === referenciaId)
     if (!ref) return { error: 'El elemento de referencia no está en el mismo nivel' }
-    base = modo === 'en_paralelo' ? ajustarALaborable(cal, ref.inicio) : despuesDe(ref.fin)
+    inicio = modo === 'en_paralelo' ? siguienteMomentoLaborable(cal, ref.inicio) : despuesDe(ref.fin)
   }
-  return { inicio: inicioDiaUTC(base) }
+  return { inicio }
+}
+
+/** Horas laborables (con signo) para mover un nodo de `desde` a `hasta`. */
+export function deltaHorasEntre(cal: CalendarioHoras, desde: Date, hasta: Date): number {
+  return diferenciaHorasLaborables(cal, desde, hasta)
 }
 
 /**
- * Desplaza en bloque todos los descendientes de un nodo `n` días laborables.
+ * Desplaza en bloque todos los descendientes de un nodo `deltaHoras` laborables
+ * (con signo). Cada inicio y cada fin se mueven como tales (ver
+ * desplazarHorasLaborables), así cada elemento conserva su duración.
  * El nodo en sí no se toca: lo actualiza quien llama.
  */
 export async function desplazarDescendientes(
-  cal: CalendarioDesplazamiento,
+  cal: CalendarioHoras,
   nodeType: string,
   realId: string,
-  n: number,
+  deltaHoras: number,
 ): Promise<void> {
-  if (n === 0) return
-  const mover = (f: Date | null) => (f ? desplazarDiasLaborables(cal, f, n) : undefined)
+  if (deltaHoras === 0) return
+  const moverIni = (f: Date | null) => (f ? desplazarHorasLaborables(cal, f, deltaHoras, 'inicio') : undefined)
+  const moverFin = (f: Date | null) => (f ? desplazarHorasLaborables(cal, f, deltaHoras, 'fin') : undefined)
 
   if (nodeType === 'fase') {
     const edts = await prisma.proyectoEdt.findMany({
@@ -273,9 +303,9 @@ export async function desplazarDescendientes(
     for (const edt of edts) {
       await prisma.proyectoEdt.update({
         where: { id: edt.id },
-        data: { fechaInicioPlan: mover(edt.fechaInicioPlan), fechaFinPlan: mover(edt.fechaFinPlan), updatedAt: new Date() },
+        data: { fechaInicioPlan: moverIni(edt.fechaInicioPlan), fechaFinPlan: moverFin(edt.fechaFinPlan), updatedAt: new Date() },
       })
-      await desplazarDescendientes(cal, 'edt', edt.id, n)
+      await desplazarDescendientes(cal, 'edt', edt.id, deltaHoras)
     }
   } else if (nodeType === 'edt') {
     const actividades = await prisma.proyectoActividad.findMany({
@@ -285,19 +315,25 @@ export async function desplazarDescendientes(
     for (const act of actividades) {
       await prisma.proyectoActividad.update({
         where: { id: act.id },
-        data: { fechaInicioPlan: mover(act.fechaInicioPlan), fechaFinPlan: mover(act.fechaFinPlan), updatedAt: new Date() },
+        data: { fechaInicioPlan: moverIni(act.fechaInicioPlan), fechaFinPlan: moverFin(act.fechaFinPlan), updatedAt: new Date() },
       })
-      await desplazarDescendientes(cal, 'actividad', act.id, n)
+      await desplazarDescendientes(cal, 'actividad', act.id, deltaHoras)
     }
   } else if (nodeType === 'actividad') {
     const tareas = await prisma.proyectoTarea.findMany({
       where: { proyectoActividadId: realId },
-      select: { id: true, fechaInicio: true, fechaFin: true },
+      select: { id: true, fechaInicio: true, fechaFin: true, esHito: true },
     })
     for (const tarea of tareas) {
+      // Un hito es un instante: inicio y fin se mueven juntos, según dónde cae.
+      if (tarea.esHito) {
+        const t = desplazarHorasLaborables(cal, tarea.fechaInicio, deltaHoras, extremoDeInstante(cal, tarea.fechaInicio))
+        await prisma.proyectoTarea.update({ where: { id: tarea.id }, data: { fechaInicio: t, fechaFin: t, updatedAt: new Date() } })
+        continue
+      }
       await prisma.proyectoTarea.update({
         where: { id: tarea.id },
-        data: { fechaInicio: mover(tarea.fechaInicio), fechaFin: mover(tarea.fechaFin), updatedAt: new Date() },
+        data: { fechaInicio: moverIni(tarea.fechaInicio), fechaFin: moverFin(tarea.fechaFin), updatedAt: new Date() },
       })
     }
   }

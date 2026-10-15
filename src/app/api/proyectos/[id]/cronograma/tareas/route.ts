@@ -15,6 +15,8 @@ import { z } from 'zod'
 import { recalcularPadresPostOperacion } from '@/lib/utils/cronogramaRollup'
 import { logger } from '@/lib/logger'
 import { validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
+import { obtenerCalendarioProyecto } from '@/lib/services/cronogramaDesplazamiento'
+import { fechaDeFormulario, horasPorDiaCalendario, siguienteMomentoLaborable, sumarHorasLaborables } from '@/lib/services/cronogramaHoras'
 
 // ✅ Schema de validación para crear tarea
 const createTareaSchema = z.object({
@@ -189,10 +191,11 @@ export async function POST(
     let fechaInicio: Date | null = null
     let fechaFin: Date | null = null
 
+    const calendario = await obtenerCalendarioProyecto(id)
     if (validatedData.fechaInicio && validatedData.fechaFin) {
-      // Si se especificaron fechas manualmente, usarlas
-      fechaInicio = new Date(validatedData.fechaInicio)
-      fechaFin = new Date(validatedData.fechaFin)
+      // Fechas indicadas: "YYYY-MM-DD" va al inicio/fin de la jornada; con hora se respeta (hora de obra).
+      fechaInicio = fechaDeFormulario(calendario, validatedData.fechaInicio, 'inicio')
+      fechaFin = fechaDeFormulario(calendario, validatedData.fechaFin, 'fin')
       console.log('🔍 [API TAREAS] Usando fechas manuales:', {
         fechaInicio: fechaInicio.toISOString(),
         fechaFin: fechaFin.toISOString()
@@ -218,13 +221,13 @@ export async function POST(
         })
 
         if (ultimaTarea?.fechaFin) {
-          // Calcular fecha de inicio como el día siguiente a la última tarea
-          fechaInicio = new Date(ultimaTarea.fechaFin)
-          fechaInicio.setDate(fechaInicio.getDate() + 1)
-
-          // Fecha fin por defecto: 3 días después (tareas son más cortas)
-          fechaFin = new Date(fechaInicio)
-          fechaFin.setDate(fechaFin.getDate() + 3)
+          // Empieza en cuanto termina la última tarea (Fin-Comienzo, por horas) y
+          // dura sus horas estimadas; sin horas, una jornada.
+          fechaInicio = siguienteMomentoLaborable(calendario, ultimaTarea.fechaFin)
+          const horas = validatedData.horasEstimadas && validatedData.horasEstimadas > 0
+            ? validatedData.horasEstimadas
+            : horasPorDiaCalendario(calendario)
+          fechaFin = sumarHorasLaborables(calendario, fechaInicio, horas)
 
           console.log('🔍 [API TAREAS] Fechas calculadas después del último hermano:', {
             fechaInicio: fechaInicio.toISOString(),

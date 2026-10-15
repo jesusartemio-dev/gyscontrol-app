@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { contarDiasLaborables } from '@/lib/utils/calendarioLaboral'
 import { clasificarRelacion, diferenciaDiasLaborables, inicioDiaUTC } from '@/lib/services/cronogramaDesplazamiento'
+import { type CalendarioHoras, formatearDuracion, horasLaborablesEntre, horasPorDiaCalendario } from '@/lib/services/cronogramaHoras'
 import { calcularHHRealDeTarea } from '@/lib/planTrabajo/calcularDatos'
 
 // ✅ GET /api/proyectos/[id]/cronograma/tree - Obtener árbol jerárquico del cronograma
@@ -668,11 +669,31 @@ export async function GET(
     // Relación de cada EDT/actividad/tarea con el hermano de arriba (→ ∥ ⤚ +Nd),
     // deducida de las fechas con el calendario del proyecto. Solo informativa.
     if (calendarioLaboral) {
+      const cal = calendarioLaboral as unknown as CalendarioHoras
+      const hpd = horasPorDiaCalendario(cal)
       const fechasDe = (n: any) => {
         const ini = n.data?.fechaInicio ?? n.data?.fechaInicioComercial
         const fin = n.data?.fechaFin ?? n.data?.fechaFinComercial
         return ini && fin ? { inicio: new Date(ini), fin: new Date(fin) } : null
       }
+      // Duración por horas laborables (como MS Project): "4h", "1.5d", "0d" (hito).
+      const anotarDuracion = (nodo: any) => {
+        const f = fechasDe(nodo)
+        if (nodo.data && f && !nodo.data.isExtrasGroup) {
+          const horas = nodo.data.esHito ? 0 : horasLaborablesEntre(cal, f.inicio, f.fin)
+          nodo.data.duracionHoras = Math.round(horas * 100) / 100
+          nodo.data.duracionTexto = formatearDuracion(horas, hpd)
+        }
+        for (const hijo of nodo.children || []) anotarDuracion(hijo)
+      }
+      anotarDuracion(projectNode)
+      // Para mostrar duraciones y ubicar las horas en el Gantt (jornada del calendario).
+      ;(projectNode.data as Record<string, unknown>).horasPorDia = hpd
+      ;(projectNode.data as Record<string, unknown>).jornada = {
+        inicio: cal.horaInicioManana ?? '08:00',
+        fin: cal.horaFinTarde ?? '17:00',
+      }
+
       const anotarRelaciones = (nodo: any) => {
         const hijos: any[] = (nodo.children || []).filter((c: any) => !c.data?.isExtrasGroup)
         for (let i = 1; i < hijos.length; i++) {
@@ -683,7 +704,7 @@ export async function GET(
           const fCur = fechasDe(cur)
           if (fPrev && fCur) {
             cur.data.relacionAnterior = clasificarRelacion(
-              calendarioLaboral,
+              cal,
               { ...fPrev, nombre: prev.nombre },
               { ...fCur, esHito: cur.data?.esHito === true },
             )

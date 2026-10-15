@@ -175,7 +175,24 @@ function resolveMonthName(name: string): number | undefined {
 }
 
 // Parsear fecha de MS Project: "29 December 2025 08:00 a.m.", "30 diciembre 2025 08:00", "30-dic-2025"
+//
+// MS Project no maneja zonas horarias: "8:00 AM" es la hora en obra. El
+// cronograma guarda esa hora tal cual en los campos UTC ("hora de obra"), así
+// que aquí se construye en UTC. Antes se armaba en la hora local del navegador
+// (Perú) y un 08:00 quedaba guardado como 13:00 UTC.
 export function parseMSProjectDate(dateStr: string | number | null | undefined): Date | null {
+  const local = parseMSProjectDateLocal(dateStr)
+  if (!local) return null
+  // Un ISO con zona explícita (…Z, …-05:00) ya es un instante: se respeta.
+  if (typeof dateStr === 'string' && /(Z|[+-]\d{2}:\d{2})$/i.test(dateStr.trim())) return local
+  return new Date(Date.UTC(
+    local.getFullYear(), local.getMonth(), local.getDate(),
+    local.getHours(), local.getMinutes(), local.getSeconds(),
+  ))
+}
+
+// Interpreta la fecha en la hora local del entorno (como lo hace Date con estos formatos).
+function parseMSProjectDateLocal(dateStr: string | number | null | undefined): Date | null {
   if (!dateStr) return null
 
   // Si XLSX ya lo convirtió a número serial de Excel

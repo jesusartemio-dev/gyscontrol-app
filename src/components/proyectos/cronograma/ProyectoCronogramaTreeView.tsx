@@ -686,30 +686,35 @@ export function ProyectoCronogramaTreeView({
     const proyectoActividadId = node.parentId?.replace('actividad-', '')
     if (!proyectoActividadId) return
 
-    const fechaFinOriginal = new Date(node.data.fechaFin)
-    const fechaInicioNueva = new Date(fechaFinOriginal)
-    fechaInicioNueva.setDate(fechaInicioNueva.getDate() + 1)
-    const fechaFinNueva = new Date(fechaInicioNueva)
-    fechaFinNueva.setDate(fechaFinNueva.getDate() + 1)
-
     try {
+      // La copia nace con las mismas fechas y horas que la original y luego el
+      // servidor la ubica "después de" ella por horas laborables (como
+      // Fin-Comienzo en MS Project), conservando su duración.
       const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/tareas`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nombre: node.nombre,
           proyectoActividadId,
-          fechaInicio: fechaInicioNueva.toISOString(),
-          fechaFin: fechaFinNueva.toISOString(),
+          fechaInicio: new Date(node.data.fechaInicio).toISOString(),
+          fechaFin: new Date(node.data.fechaFin).toISOString(),
           horasEstimadas: Number(node.data.horasEstimadas) || 0,
           personasEstimadas: node.data.personasEstimadas || 1,
           prioridad: node.data.prioridad || 'media',
           recursoId: node.data.recursoId || undefined,
           responsableId: node.data.responsableId || undefined,
           esExtra: false,
+          esHito: node.data.esHito === true,
+          fechaLimite: node.data.esHito && node.data.fechaLimite ? node.data.fechaLimite : null,
         }),
       })
       if (!res.ok) throw new Error('Error al duplicar')
+      const { data: copia } = await res.json()
+      await fetch(`/api/proyectos/${proyectoId}/cronograma/tree/tarea-${copia.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ posicion: { modo: 'despues_de', referenciaId: node.id.replace('tarea-', '') } }),
+      })
       await actions.loadTree([...state.expandedNodes])
       toast.success(`Tarea "${node.nombre}" duplicada`)
     } catch {
@@ -728,11 +733,9 @@ export function ProyectoCronogramaTreeView({
     const fi = node.data.fechaInicioComercial || node.data.fechaInicioPlan
     const ff = node.data.fechaFinComercial    || node.data.fechaFinPlan
     if (!fi || !ff) { toast.error('La actividad no tiene fechas definidas'); return }
-
-    const duracionMs = new Date(ff).getTime() - new Date(fi).getTime()
-    const nuevaFechaInicio = new Date(new Date(ff).getTime() + 86400000) // día siguiente al fin
-    const nuevaFechaFin    = new Date(nuevaFechaInicio.getTime() + duracionMs)
-    const fmt = (d: Date) => d.toISOString().split('T')[0]
+    // La copia nace con las mismas fechas y horas (actividad y tareas) y al final
+    // el servidor la mueve en bloque "después de" la original por horas laborables.
+    const iso = (v: string | Date) => new Date(v).toISOString()
 
     try {
       // 1. Crear nueva actividad
@@ -742,8 +745,8 @@ export function ProyectoCronogramaTreeView({
         body: JSON.stringify({
           nombre: node.nombre,
           proyectoEdtId,
-          fechaInicioPlan: fmt(nuevaFechaInicio),
-          fechaFinPlan: fmt(nuevaFechaFin),
+          fechaInicioPlan: iso(fi),
+          fechaFinPlan: iso(ff),
           horasPlan: Number(node.data.horasPlan) || 0,
           prioridad: node.data.prioridad || 'media',
         }),
@@ -756,19 +759,11 @@ export function ProyectoCronogramaTreeView({
       const tareasHijas = (node.children || []).filter(
         c => c.type === 'tarea' && !c.data?.esExtra && !c.data?.isExtrasGroup
       )
-      const fiOriginalMs = new Date(fi).getTime()
-
-      // 3. Crear cada tarea manteniendo offset relativo al inicio de la actividad
-      //    y el mismo orden que tienen en la original
+      // 3. Crear cada tarea con sus mismas fechas y horas, y el mismo orden
       for (const [orden, tareaNode] of tareasHijas.entries()) {
         const tFi = tareaNode.data.fechaInicio
         const tFf = tareaNode.data.fechaFin
         if (!tFi || !tFf) continue
-
-        const offsetInicio = new Date(tFi).getTime() - fiOriginalMs
-        const durTarea     = new Date(tFf).getTime() - new Date(tFi).getTime()
-        const tareaInicio  = new Date(nuevaFechaInicio.getTime() + offsetInicio)
-        const tareaFin     = new Date(tareaInicio.getTime() + durTarea)
 
         await fetch(`/api/proyectos/${proyectoId}/cronograma/tareas`, {
           method: 'POST',
@@ -776,14 +771,16 @@ export function ProyectoCronogramaTreeView({
           body: JSON.stringify({
             nombre: tareaNode.nombre,
             proyectoActividadId: nuevaActividad.id,
-            fechaInicio: fmt(tareaInicio),
-            fechaFin: fmt(tareaFin),
+            fechaInicio: iso(tFi),
+            fechaFin: iso(tFf),
             horasEstimadas: Number(tareaNode.data.horasEstimadas) || 0,
             personasEstimadas: tareaNode.data.personasEstimadas || 1,
             prioridad: tareaNode.data.prioridad || 'media',
             recursoId: tareaNode.data.recursoId || undefined,
             responsableId: tareaNode.data.responsableId || undefined,
             esExtra: false,
+            esHito: tareaNode.data.esHito === true,
+            fechaLimite: tareaNode.data.esHito && tareaNode.data.fechaLimite ? tareaNode.data.fechaLimite : null,
             orden,
           }),
         })
@@ -806,6 +803,13 @@ export function ProyectoCronogramaTreeView({
           })
         )
       )
+
+      // 5. Ubicarla en el tiempo justo después de la original (mueve sus tareas en bloque)
+      await fetch(`/api/proyectos/${proyectoId}/cronograma/tree/${nuevoId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ posicion: { modo: 'despues_de', referenciaId: actividadId } }),
+      })
 
       await actions.loadTree([...state.expandedNodes])
       toast.success(`Actividad "${node.nombre}" duplicada con sus tareas`)

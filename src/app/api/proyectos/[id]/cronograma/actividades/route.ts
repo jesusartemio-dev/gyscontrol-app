@@ -8,6 +8,8 @@
 // ===================================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { obtenerCalendarioProyecto } from '@/lib/services/cronogramaDesplazamiento'
+import { fechaDeFormulario } from '@/lib/services/cronogramaHoras'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -229,9 +231,10 @@ export async function POST(
     let fechaFinPlan: Date | null = null
 
     if (validatedData.fechaInicioPlan && validatedData.fechaFinPlan) {
-      // Si se especificaron fechas manualmente, usarlas
-      fechaInicioPlan = new Date(validatedData.fechaInicioPlan)
-      fechaFinPlan = new Date(validatedData.fechaFinPlan)
+      // Fechas indicadas: "YYYY-MM-DD" va al inicio/fin de la jornada; con hora se respeta (hora de obra).
+      const calendario = await obtenerCalendarioProyecto(id)
+      fechaInicioPlan = fechaDeFormulario(calendario, validatedData.fechaInicioPlan, 'inicio')
+      fechaFinPlan = fechaDeFormulario(calendario, validatedData.fechaFinPlan, 'fin')
       console.log('🔍 [API ACTIVIDADES] Usando fechas manuales:', {
         fechaInicioPlan: fechaInicioPlan.toISOString(),
         fechaFinPlan: fechaFinPlan.toISOString()

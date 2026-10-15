@@ -39,7 +39,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { toast as sonnerToast } from 'sonner'
-import { differenceInDays, addDays, addMonths, startOfMonth, startOfWeek, format, isSameMonth } from 'date-fns'
+import { differenceInDays, differenceInCalendarDays, addDays, addMonths, startOfMonth, startOfWeek, format, isSameMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 interface GanttItem {
@@ -61,6 +61,8 @@ interface GanttItem {
   fechaInicioNodo?: string
   /** Días laborables (calendario del proyecto), los mismos que la columna DUR de Jerarquía. */
   duracionLaborable?: number
+  /** Duración por horas laborables como la columna DUR ("4h", "1.5d"). */
+  duracionTexto?: string
   /** Hito ◆ (Milestone de MS Project): se dibuja como rombo en su fecha. */
   esHito?: boolean
   /** Fecha comprometida del hito (Deadline); se marca en su fila. */
@@ -134,6 +136,18 @@ const diaLocalDesdeUTC = (v: string | Date) => {
   return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
 }
 
+// Igual, pero conservando la hora de obra (las fechas guardan la hora tal cual
+// en obra en los campos UTC). Se usa para ubicar las barras por hora.
+const horaLocalDesdeUTC = (v: string | Date) => {
+  const d = new Date(v)
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes())
+}
+
+const aMinutos = (hhmm: string | undefined, porDefecto: number) => {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm ?? '')
+  return m ? Number(m[1]) * 60 + Number(m[2]) : porDefecto
+}
+
 const TIPOS_ARRASTRABLES = ['edt', 'actividad', 'tarea']
 
 const expandidosDe = (list: GanttItem[], acc = new Set<string>()) => {
@@ -177,6 +191,9 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   useEffect(() => { setSeleccionId(selectedId) }, [selectedId])
   const [arrastre, setArrastre] = useState<{ id: string; startX: number; dx: number } | null>(null)
   const [moviendoId, setMoviendoId] = useState<string | null>(null)
+  // Jornada del calendario (minutos desde 00:00): las horas de cada día se
+  // reparten en el ancho de su celda — un día completo la llena, 4 h algo menos de la mitad.
+  const [jornada, setJornada] = useState({ ini: 8 * 60, fin: 18 * 60 + 30 })
   const [loading, setLoading] = useState(true)
   const [recargando, setRecargando] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(prefsIniciales.zoomLevel ?? 1)
@@ -242,8 +259,8 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
           id: node.id,
           nombre: node.nombre || 'Sin nombre',
           tipo: node.type || 'tarea',
-          fechaInicio: diaLocalDesdeUTC(fechaInicio || new Date()),
-          fechaFin: diaLocalDesdeUTC(fechaFin || new Date()),
+          fechaInicio: horaLocalDesdeUTC(fechaInicio || new Date()),
+          fechaFin: horaLocalDesdeUTC(fechaFin || new Date()),
           porcentajeAvance: node.metadata?.progressPercentage || 0,
           estado: node.metadata?.status || data.estado || 'pendiente',
           nivel,
@@ -254,6 +271,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
           horasEstimadas: data.horasEstimadas ? Number(data.horasEstimadas) : undefined,
           fechaInicioNodo: fechaInicio || undefined,
           duracionLaborable: typeof data.duracionDiasReal === 'number' ? data.duracionDiasReal : undefined,
+          duracionTexto: typeof data.duracionTexto === 'string' ? data.duracionTexto : undefined,
           esHito: data.esHito === true,
           fechaLimite: data.esHito && data.fechaLimite ? diaLocalDesdeUTC(data.fechaLimite) : undefined,
           diasPasadoLimite: Number(data.diasPasadoLimite) || 0,
@@ -280,6 +298,8 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
       // Tree API returns [projectNode] with children (fases)
       // Process the project node directly at level 0
       const projectNode = treeArray[0]
+      const j = projectNode?.data?.jornada
+      if (j) setJornada({ ini: aMinutos(j.inicio, 8 * 60), fin: aMinutos(j.fin, 18 * 60 + 30) })
       if (projectNode) {
         const proyectoItem = processNode(projectNode, 0)
         proyectoItem.expanded = true
@@ -384,9 +404,10 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   // Mueve un EDT/actividad/tarea `dias` días (calendario) según donde se soltó
   // la barra. El servidor lo convierte a días laborables y corre lo de adentro.
   const moverNodo = async (item: GanttItem, dias: number) => {
-    const base = item.fechaInicioNodo || item.fechaInicio.toISOString()
-    const nuevoInicio = diaUTCMas(base, dias)
-    const inicioAnterior = diaUTCMas(base, 0)
+    // Se conserva la hora de inicio: el servidor solo la corre si cae fuera de jornada.
+    const base = new Date(item.fechaInicioNodo || item.fechaInicio.toISOString())
+    const nuevoInicio = new Date(base.getTime() + dias * 86400000).toISOString()
+    const inicioAnterior = base.toISOString()
     const guardar = (fecha: string) =>
       fetch(`/api/proyectos/${proyectoId}/cronograma/tree/${item.id}`, {
         method: 'PUT',
@@ -409,11 +430,11 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
       await guardar(nuevoInicio)
       const recargados = await loadGanttData(true)
       // La fecha real puede diferir de donde se soltó (fines de semana, feriados).
-      const inicioReal = buscar(recargados)?.fechaInicioNodo ?? `${nuevoInicio}T00:00:00Z`
+      const inicioReal = buscar(recargados)?.fechaInicioNodo ?? nuevoInicio
       const fechaTexto = new Date(inicioReal).toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'UTC' })
       sonnerToast.success(`"${item.nombre}" ahora empieza el ${fechaTexto}`, {
         description: item.tipo === 'tarea'
-          ? 'Conserva su duración en días laborables.'
+          ? 'Conserva su duración en horas laborables.'
           : 'Lo que contiene se movió en bloque según el calendario laboral.',
         action: {
           label: 'Deshacer',
@@ -833,7 +854,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
               {/* Fecha límite de los hitos (Deadline de MS Project): ▼ en su día, rojo si el hito la pasa */}
               {visibleItems.map((item, idx) => {
                 if (!item.esHito || !item.fechaLimite) return null
-                const x = differenceInDays(item.fechaLimite, timeline.minDate) * timeline.dayWidth + timeline.dayWidth / 2
+                const x = (differenceInCalendarDays(item.fechaLimite, timeline.minDate) + 1) * timeline.dayWidth
                 const tarde = (item.diasPasadoLimite ?? 0) > 0
                 return (
                   <div
@@ -849,21 +870,25 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
 
               {/* Bars */}
               {visibleItems.map((item, rowIdx) => {
-                const startDay = differenceInDays(item.fechaInicio, timeline.minDate)
-                // Días de calendario que ocupa la barra, contando inicio y fin (02→03 = 2 días).
-                const diasCalendario = Math.max(1, differenceInDays(item.fechaFin, item.fechaInicio) + 1)
-                // Duración mostrada: días laborables, igual que la columna DUR de Jerarquía.
+                // Posición por hora: el día ocupa su celda y dentro de ella la jornada
+                // (08:00 → borde izquierdo, 18:30 → borde derecho).
+                const posX = (d: Date) => {
+                  const dia = differenceInCalendarDays(d, timeline.minDate)
+                  const min = d.getHours() * 60 + d.getMinutes()
+                  const frac = Math.min(1, Math.max(0, (min - jornada.ini) / Math.max(1, jornada.fin - jornada.ini)))
+                  return (dia + frac) * timeline.dayWidth
+                }
+                const diasCalendario = Math.max(1, differenceInCalendarDays(item.fechaFin, item.fechaInicio) + 1)
+                // Duración mostrada: la misma de la columna DUR de Jerarquía (por horas).
                 const durationDays = item.duracionLaborable ?? diasCalendario
                 const ladoRombo = ROW_HEIGHT - MARGEN_BARRA * 2
-                const barLeft = item.esHito
-                  ? startDay * timeline.dayWidth + timeline.dayWidth / 2 - ladoRombo / 2
-                  : startDay * timeline.dayWidth
-                const barWidth = item.esHito ? ladoRombo : Math.max(diasCalendario * timeline.dayWidth, 20)
+                const barLeft = item.esHito ? posX(item.fechaInicio) - ladoRombo / 2 : posX(item.fechaInicio)
+                const barWidth = item.esHito ? ladoRombo : Math.max(posX(item.fechaFin) - posX(item.fechaInicio), 6)
                 const colorHito = item.diasPasadoLimite ? '#dc2626' : item.fechaLimite ? '#d97706' : '#4b5563'
                 const colors = TIPO_COLORS[item.tipo] || TIPO_COLORS.tarea
                 const labelText = item.esHito
                   ? format(item.fechaInicio, 'dd MMM', { locale: es })
-                  : `${durationDays}d${item.horasEstimadas ? ` · ${item.horasEstimadas}h` : ''}`
+                  : `${item.duracionTexto ?? `${durationDays}d`}${item.horasEstimadas ? ` · ${item.horasEstimadas}h` : ''}`
                 const labelFitsInside = barWidth > 60
                 const arrastrable = puedeArrastrar(item)
                 const enArrastre = arrastre?.id === item.id
@@ -963,7 +988,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                             <div className="font-semibold">{item.nombre}</div>
                             {item.esHito ? (
                               <>
-                                <div>◆ Hito · {format(item.fechaInicio, 'dd MMM yyyy', { locale: es })}</div>
+                                <div>◆ Hito · {format(item.fechaInicio, 'dd MMM yyyy HH:mm', { locale: es })}</div>
                                 {item.fechaLimite && (
                                   <div className={item.diasPasadoLimite ? 'text-red-300 font-medium' : ''}>
                                     Fecha límite: {format(item.fechaLimite, 'dd MMM yyyy', { locale: es })}
@@ -973,8 +998,8 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                               </>
                             ) : (
                               <>
-                                <div>{format(item.fechaInicio, 'dd MMM yyyy', { locale: es })} → {format(item.fechaFin, 'dd MMM yyyy', { locale: es })}</div>
-                                <div>{durationDays} días laborables{item.horasEstimadas ? ` · ${item.horasEstimadas}h` : ''} · {item.porcentajeAvance}%</div>
+                                <div>{format(item.fechaInicio, 'dd MMM yyyy HH:mm', { locale: es })} → {format(item.fechaFin, 'dd MMM yyyy HH:mm', { locale: es })}</div>
+                                <div>Duración {item.duracionTexto ?? `${durationDays}d`}{item.horasEstimadas ? ` · ${item.horasEstimadas}h` : ''} · {item.porcentajeAvance}%</div>
                               </>
                             )}
                             {arrastrable && <div className="text-muted-foreground">Arrastra la barra para moverla{item.tipo === 'tarea' ? '' : ' con lo que contiene'}</div>}
