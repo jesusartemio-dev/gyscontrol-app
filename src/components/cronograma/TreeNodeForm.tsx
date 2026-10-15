@@ -704,7 +704,7 @@ export function TreeNodeForm({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[620px]">
         <DialogHeader>
           <DialogTitle>{getDialogTitle()}</DialogTitle>
           {getParentInfo() && (
@@ -810,12 +810,13 @@ export function TreeNodeForm({
               {/* ── TAREA (proyecto): como MS Project — Inicio + Duración → Fin; Trabajo y Unidades ── */}
               {isTarea && !formData.esHito && porHoras && (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-[1fr_7rem_1fr] gap-3">
+                  <div className="grid grid-cols-[minmax(0,1fr)_5.5rem_minmax(0,1fr)] gap-3">
                     <div className="space-y-1.5">
                       <Label htmlFor="fechaInicio">Inicio</Label>
                       <Input
                         id="fechaInicio"
                         type="datetime-local"
+                        className="min-w-0 px-2"
                         value={aFechaHora(formData.fechaInicioComercial, 'inicio')}
                         onChange={(e) => {
                           const v = e.target.value
@@ -846,6 +847,7 @@ export function TreeNodeForm({
                       <Input
                         id="fechaFin"
                         type="datetime-local"
+                        className="min-w-0 px-2"
                         value={aFechaHora(formData.fechaFinComercial, 'fin')}
                         onChange={(e) => {
                           const v = e.target.value
