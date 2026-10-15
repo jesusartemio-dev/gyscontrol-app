@@ -23,6 +23,7 @@ import { TreeNode } from '../../cronograma/TreeNode'
 import { TreeHeader } from '../../cronograma/TreeHeader'
 import { TreeNodeForm } from '../../cronograma/TreeNodeForm'
 import { PredecesorasEditor } from '../../cronograma/PredecesorasEditor'
+import { MoverEdtFaseModal } from './MoverEdtFaseModal'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ImportModal } from '../../cronograma/ImportModal'
 import { ImportEdtModal } from '../../cronograma/ImportEdtModal'
@@ -835,6 +836,15 @@ export function ProyectoCronogramaTreeView({
     }
   }
 
+  // EDT a otra fase del mismo cronograma (con sus actividades y tareas).
+  const [moverFase, setMoverFase] = useState<{ edtId: string; edtNombre: string; faseActualNombre: string } | null>(null)
+  const handleAbrirMoverFase = (nodeId: string) => {
+    const node = state.nodes.get(nodeId)
+    if (!node || node.type !== 'edt') return
+    const fase = node.parentId ? state.nodes.get(node.parentId) : null
+    setMoverFase({ edtId: nodeId.replace('edt-', ''), edtNombre: node.nombre, faseActualNombre: fase?.nombre || 'Sin fase' })
+  }
+
   const handleAbrirMoverEdt = (nodeId: string) => {
     const node = state.nodes.get(nodeId)
     if (!node || node.type !== 'actividad') return
@@ -916,6 +926,7 @@ export function ProyectoCronogramaTreeView({
                     onDuplicate={!isReadOnly && node.type === 'tarea' ? () => handleDuplicateTarea(nodeId) : undefined}
                     onDuplicarActividad={!isReadOnly && node.type === 'actividad' ? () => handleDuplicarActividad(nodeId) : undefined}
                     onMoverEdt={!isReadOnly && node.type === 'actividad' ? () => handleAbrirMoverEdt(nodeId) : undefined}
+                    onMoverFase={!isReadOnly && node.type === 'edt' ? () => handleAbrirMoverFase(nodeId) : undefined}
                     onProgramarRespecto={
                       !isReadOnly && ['edt', 'actividad', 'tarea'].includes(node.type) && !node.data?.isExtrasGroup
                         ? (modo) => setProgramarModal({ open: true, modo, nodeId })
@@ -1187,6 +1198,21 @@ export function ProyectoCronogramaTreeView({
             </>
           )}
         </div>
+
+        {moverFase && (
+          <MoverEdtFaseModal
+            open={!!moverFase}
+            onOpenChange={(abierto) => { if (!abierto) setMoverFase(null) }}
+            proyectoId={proyectoId}
+            edtId={moverFase.edtId}
+            edtNombre={moverFase.edtNombre}
+            faseActualNombre={moverFase.faseActualNombre}
+            onSuccess={async () => {
+              await actions.loadTree([...state.expandedNodes])
+              onRefresh?.()
+            }}
+          />
+        )}
 
         {/* Predecesoras desde el menú de la fila (se guardan al instante; al cerrar se recarga) */}
         <Dialog

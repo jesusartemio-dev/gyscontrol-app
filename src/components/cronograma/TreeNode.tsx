@@ -93,6 +93,8 @@ interface TreeNodeProps {
   onDuplicate?: () => void
   onDuplicarActividad?: () => void
   onMoverEdt?: () => void
+  /** Solo EDTs: mover a otra fase con todo lo que contiene. */
+  onMoverFase?: () => void
   onAjustarPosicion?: (posicion: 'inicio_padre' | 'despues_anterior' | 'despues_ultimo') => void
   onProgramarRespecto?: (modo: 'despues_de' | 'en_paralelo') => void
   /** Hay un hermano del mismo tipo justo arriba (habilita "Después del anterior"). */
@@ -170,6 +172,7 @@ export function TreeNode({
   onDuplicate,
   onDuplicarActividad,
   onMoverEdt,
+  onMoverFase,
   onAjustarPosicion,
   onProgramarRespecto,
   tieneAnterior,
@@ -748,6 +751,17 @@ export function TreeNode({
                 >
                   <ArrowRightLeft className="h-4 w-4 mr-2" />
                   Mover a otro EDT
+                </DropdownMenuItem>
+              )}
+
+              {/* Mover a otra fase - solo EDTs */}
+              {!readOnly && node.type === 'edt' && onMoverFase && (
+                <DropdownMenuItem
+                  onClick={() => { setDropdownOpen(false); onMoverFase() }}
+                  className="text-blue-600"
+                >
+                  <ArrowRightLeft className="h-4 w-4 mr-2" />
+                  Mover a otra fase
                 </DropdownMenuItem>
               )}
 
