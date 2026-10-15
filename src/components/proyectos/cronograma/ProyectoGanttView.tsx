@@ -923,7 +923,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                 if (flechas.length === 0) return null
                 return (
                   <svg
-                    className="absolute left-0 top-0 pointer-events-none z-[5]"
+                    className="absolute left-0 top-0 pointer-events-none"
                     width={timeline.totalWidth}
                     height={visibleItems.length * ROW_HEIGHT}
                   >
@@ -991,6 +991,8 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                             top: rowIdx * ROW_HEIGHT + MARGEN_BARRA,
                             left: barLeft,
                             height: ROW_HEIGHT - MARGEN_BARRA * 2,
+                            // El hito necesita su caja cuadrada: sin ancho el rombo girado se ve como "/".
+                            width: item.esHito ? barWidth : undefined,
                             transform: enArrastre ? `translateX(${arrastre.dx}px)` : undefined,
                           }}
                           onClick={() => seleccionar(item)}
