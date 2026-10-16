@@ -118,11 +118,12 @@ export interface EstructuraReal {
 const FASE_PARALELA_CONTINUA = 'PLANIFICACION'
 
 /** Código corto del EDT (catálogo), dentro de FASE_PARALELA_CONTINUA, cuyo
- * fin gatilla el inicio de la fase siguiente — ej. Ingeniería no arranca sin
- * que Seguridad (inducciones/permisos) esté lista, no cuando termina TODA
- * Planificación (que sigue corriendo en paralelo). Si el EDT no está
- * incluido en esta generación, se cae al fin real de la fase. */
-const EDT_GATILLO_SIGUIENTE_FASE: Record<string, string> = { PLANIFICACION: 'SEG' }
+ * fin gatilla el inicio de la fase siguiente: Ingeniería arranca al terminar
+ * GES (plan del proyecto aprobado), no cuando termina TODA Planificación.
+ * Seguridad (SEG) corre en paralelo y no frena a Ingeniería (antes estaba
+ * como gatillo por error). Si el EDT no está incluido en esta generación, se
+ * cae al fin real de la fase. */
+const EDT_GATILLO_SIGUIENTE_FASE: Record<string, string> = { PLANIFICACION: 'GES' }
 
 /**
  * Fases que corren en paralelo con la cadena principal (Planificación →

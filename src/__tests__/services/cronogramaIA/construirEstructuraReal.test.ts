@@ -270,7 +270,7 @@ describe('construirEstructuraReal', () => {
   })
 })
 
-describe('construirEstructuraReal — PLANIFICACION en paralelo + Ingeniería gatillada por Seguridad', () => {
+describe('construirEstructuraReal — PLANIFICACION en paralelo + Ingeniería gatillada por GES', () => {
   const fechaInicioProyecto = new Date('2026-08-03T00:00:00') // lunes
 
   it('GES, PRO y SEG (las 3 EDTs de PLANIFICACION) arrancan el MISMO día — nunca encadenadas entre sí', () => {
@@ -322,11 +322,11 @@ describe('construirEstructuraReal — PLANIFICACION en paralelo + Ingeniería ga
     expect(fasePlanificacion.fechaFinPlan.getTime()).toBe(ges.fechaFinPlan.getTime())
   })
 
-  it('INGENIERIA arranca justo después de SEG específicamente, NO después del fin de toda PLANIFICACION (que termina más tarde por GES/PRO)', () => {
+  it('INGENIERIA arranca justo después de GES específicamente, NO después del fin de toda PLANIFICACION (que termina más tarde por SEG/PRO)', () => {
     const actividades: ActividadPropuesta[] = [
-      { edtNombre: 'GES', actividadNombre: 'Inicio', tareas: [tarea('t1', 'Kickoff', 40)], origen: 'determinista' }, // 5 días
+      { edtNombre: 'GES', actividadNombre: 'Inicio', tareas: [tarea('t1', 'Kickoff', 8)], origen: 'determinista' }, // 1 día — el más corto
       { edtNombre: 'PRO', actividadNombre: 'Compras', tareas: [tarea('t2', 'RFQ', 24)], origen: 'determinista' }, // 3 días
-      { edtNombre: 'SEG', actividadNombre: 'Inducciones', tareas: [tarea('t3', 'Inducción', 8)], origen: 'determinista' }, // 1 día — el más corto
+      { edtNombre: 'SEG', actividadNombre: 'Inducciones', tareas: [tarea('t3', 'Inducción', 40)], origen: 'determinista' }, // 5 días
       { edtNombre: 'ING', actividadNombre: 'Diseño', tareas: [tarea('t4', 'Diseño', 8)], origen: 'determinista' },
     ]
     const r = construirEstructuraReal({
@@ -343,9 +343,9 @@ describe('construirEstructuraReal — PLANIFICACION en paralelo + Ingeniería ga
     const seg = r.edts.find(e => e.nombre === 'Seguridad')!
     const ing = r.edts.find(e => e.nombre === 'Ingenieria de Detalle')!
 
-    // Arranca después de SEG (el gatillo), no después de GES (que termina más tarde).
-    expect(ing.fechaInicioPlan.getTime()).toBeGreaterThan(seg.fechaFinPlan.getTime())
-    expect(ing.fechaInicioPlan.getTime()).toBeLessThan(ges.fechaFinPlan.getTime())
+    // Arranca después de GES (el gatillo), no después de SEG (que corre en paralelo y termina más tarde).
+    expect(ing.fechaInicioPlan.getTime()).toBeGreaterThan(ges.fechaFinPlan.getTime())
+    expect(ing.fechaInicioPlan.getTime()).toBeLessThan(seg.fechaFinPlan.getTime())
   })
 
   it('REGRESIÓN: fases sin gatillo configurado (ej. EJECUCION) siguen estrictamente secuenciales — Construccion arranca después de Comisionamiento del mismo EDT/orden real', () => {
@@ -369,9 +369,9 @@ describe('construirEstructuraReal — PLANIFICACION en paralelo + Ingeniería ga
     expect(cmm.fechaInicioPlan.getTime()).toBeGreaterThanOrEqual(con.fechaFinPlan.getTime())
   })
 
-  it('fallback: si SEG no está incluido en la generación, la fase siguiente igual arranca (cae al fin real de PLANIFICACION, sin reventar)', () => {
+  it('fallback: si GES no está incluido en la generación, la fase siguiente igual arranca (cae al fin real de PLANIFICACION, sin reventar)', () => {
     const actividades: ActividadPropuesta[] = [
-      { edtNombre: 'GES', actividadNombre: 'Inicio', tareas: [tarea('t1', 'Kickoff', 8)], origen: 'determinista' },
+      { edtNombre: 'SEG', actividadNombre: 'Inducciones', tareas: [tarea('t1', 'Inducción', 8)], origen: 'determinista' },
       { edtNombre: 'ING', actividadNombre: 'Diseño', tareas: [tarea('t2', 'Diseño', 8)], origen: 'determinista' },
     ]
     const r = construirEstructuraReal({
@@ -384,9 +384,9 @@ describe('construirEstructuraReal — PLANIFICACION en paralelo + Ingeniería ga
       recursoPorServicio: new Map(),
     })
 
-    const ges = r.edts.find(e => e.nombre === 'Gestion del Proyecto')!
+    const seg = r.edts.find(e => e.nombre === 'Seguridad')!
     const ing = r.edts.find(e => e.nombre === 'Ingenieria de Detalle')!
-    expect(ing.fechaInicioPlan.getTime()).toBeGreaterThanOrEqual(ges.fechaFinPlan.getTime())
+    expect(ing.fechaInicioPlan.getTime()).toBeGreaterThanOrEqual(seg.fechaFinPlan.getTime())
   })
 })
 
@@ -447,9 +447,10 @@ describe('construirEstructuraReal — GESTION Y CONTROL transversal y PROCURA en
     expect(con.fechaInicioPlan.getTime()).toBeLessThan(pro.fechaFinPlan.getTime())
   })
 
-  it('INGENIERIA sigue arrancando tras SEG y CIERRE tras Ejecución (la cadena principal no cambia)', () => {
+  it('INGENIERIA arranca tras GES (no espera a SEG) y CIERRE tras Ejecución', () => {
     const r = construir()
-    expect(edt(r, 'Ingenieria').fechaInicioPlan.getTime()).toBeGreaterThan(edt(r, 'Seguridad').fechaFinPlan.getTime())
+    expect(edt(r, 'Ingenieria').fechaInicioPlan.getTime()).toBeGreaterThan(edt(r, 'Planificación del Proyecto').fechaFinPlan.getTime())
+    expect(edt(r, 'Ingenieria').fechaInicioPlan.getTime()).toBeLessThan(edt(r, 'Seguridad').fechaFinPlan.getTime())
     expect(edt(r, 'Cierre').fechaInicioPlan.getTime()).toBeGreaterThan(fase(r, 'EJECUCION').fechaFinPlan.getTime())
   })
 })
