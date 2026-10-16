@@ -541,7 +541,50 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
     const todayX = differenceInDays(today, minDate) * dayWidth
     const showToday = today >= minDate && today <= maxDate
 
-    return { minDate, maxDate, totalDays, dayWidth, totalWidth, months, weekLines, todayX, showToday }
+    // Segundo nivel de la escala (como MS Project): días si hay espacio, si no
+    // semanas, y si tampoco, solo meses. Más fines de semana sombreados.
+    const escala: 'dias' | 'semanas' | 'meses' = dayWidth >= 18 ? 'dias' : dayWidth >= 3.5 ? 'semanas' : 'meses'
+    const LETRA_DIA = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
+    const celdas: { x: number; width: number; label: string; actual: boolean; finDeSemana: boolean }[] = []
+    if (escala === 'dias') {
+      for (let i = 0; i < totalDays; i++) {
+        const dia = addDays(minDate, i)
+        const dow = dia.getDay()
+        celdas.push({
+          x: i * dayWidth,
+          width: dayWidth,
+          label: dayWidth >= 28 ? `${LETRA_DIA[dow]} ${format(dia, 'd')}` : format(dia, 'd'),
+          actual: differenceInCalendarDays(dia, today) === 0,
+          finDeSemana: dow === 0 || dow === 6,
+        })
+      }
+    } else if (escala === 'semanas') {
+      for (let ini = startOfWeek(minDate, { weekStartsOn: 1 }); ini < maxDate; ini = addDays(ini, 7)) {
+        const desde = Math.max(0, differenceInDays(ini, minDate))
+        const hasta = Math.min(totalDays, differenceInDays(addDays(ini, 7), minDate))
+        const width = (hasta - desde) * dayWidth
+        if (width <= 0) continue
+        celdas.push({
+          x: desde * dayWidth,
+          width,
+          // Fecha del lunes de la semana, como MS Project; solo el número si no cabe.
+          label: width >= 44 ? format(ini, 'dd MMM', { locale: es }) : width >= 16 ? format(ini, 'dd') : '',
+          actual: today >= ini && today < addDays(ini, 7),
+          finDeSemana: false,
+        })
+      }
+    }
+    // Columnas de sábado y domingo (fondo gris en el área de barras), si se distinguen.
+    const finesDeSemana: { x: number; width: number }[] = []
+    if (dayWidth >= 3.5) {
+      for (let i = 0; i < totalDays; i++) {
+        const dow = addDays(minDate, i).getDay()
+        if (dow === 6) finesDeSemana.push({ x: i * dayWidth, width: Math.min(2, totalDays - i) * dayWidth })
+        else if (dow === 0 && i === 0) finesDeSemana.push({ x: 0, width: dayWidth })
+      }
+    }
+
+    return { minDate, maxDate, totalDays, dayWidth, totalWidth, months, weekLines, todayX, showToday, escala, celdas, finesDeSemana }
   }, [items, visibleItems, zoomLevel, timeRangeMonths, containerWidth])
 
   // Desplaza la línea de tiempo para que `x` quede cerca del inicio del área visible.
@@ -743,16 +786,36 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
               <span className="text-xs font-medium text-gray-600">Elemento</span>
               {asaRedimension}
             </div>
-            <div className="flex flex-shrink-0" style={{ width: timeline.totalWidth }}>
-              {timeline.months.map((m, i) => (
-                <div
-                  key={i}
-                  className={`flex-shrink-0 border-r border-gray-200 px-1.5 py-1.5 text-center ${isSameMonth(m.date, new Date()) ? 'bg-blue-50' : 'bg-gray-50'}`}
-                  style={{ width: m.width }}
-                >
-                  <span className="text-[10px] font-medium text-gray-600 uppercase">{m.label}</span>
+            <div className="flex-shrink-0" style={{ width: timeline.totalWidth }}>
+              {/* Nivel superior: meses */}
+              <div className="flex">
+                {timeline.months.map((m, i) => (
+                  <div
+                    key={i}
+                    className={`flex-shrink-0 border-r border-gray-200 px-1.5 py-1 text-center ${isSameMonth(m.date, new Date()) ? 'bg-blue-50' : 'bg-gray-50'}`}
+                    style={{ width: m.width }}
+                  >
+                    <span className="text-[10px] font-medium text-gray-600 uppercase">{m.label}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Nivel inferior: días o semanas según el espacio (como MS Project) */}
+              {timeline.escala !== 'meses' && (
+                <div className="relative h-5 border-t border-gray-200 bg-white">
+                  {timeline.celdas.map((c, i) => (
+                    <div
+                      key={i}
+                      className={`absolute top-0 h-full overflow-hidden border-r border-gray-200 text-center leading-5 ${
+                        c.actual ? 'bg-blue-100 font-semibold text-blue-700' : c.finDeSemana ? 'bg-gray-100 text-gray-400' : 'text-gray-500'
+                      }`}
+                      style={{ left: c.x, width: c.width }}
+                      title={timeline.escala === 'semanas' ? `Semana del ${c.label}` : undefined}
+                    >
+                      <span className="whitespace-nowrap text-[9px]">{c.label}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
@@ -834,6 +897,15 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                     item.id === seleccionId ? 'bg-blue-200/50' : idx === filaHover ? 'bg-blue-50' : fondoFila(idx)
                   }`}
                   style={{ top: idx * ROW_HEIGHT, height: ROW_HEIGHT }}
+                />
+              ))}
+
+              {/* Sábados y domingos sombreados (días no laborables), como MS Project */}
+              {timeline.finesDeSemana.map((w, i) => (
+                <div
+                  key={`fds-${i}`}
+                  className="absolute top-0 bottom-0 bg-gray-100/60 pointer-events-none"
+                  style={{ left: w.x, width: w.width }}
                 />
               ))}
 
