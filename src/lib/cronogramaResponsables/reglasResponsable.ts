@@ -33,6 +33,7 @@ const REGLA_ROL_POR_EDT: Record<string, RolResponsable> = {
   GES: 'gestor',
   CTL: 'gestor',
   PRO: 'gestor',
+  SER: 'gestor',
   CIE: 'gestor',
   ING: 'residente',
   PLA: 'residente',

@@ -120,6 +120,8 @@ export interface EstructuraReal {
  * bloque previo que "se cierra"). Ver EDT_GATILLO_SIGUIENTE_FASE para qué SÍ
  * gatilla el avance a la siguiente fase. */
 const FASE_PARALELA_CONTINUA = 'PLANIFICACION'
+/** Fases cuyas EDTs arrancan juntas (en paralelo) en vez de encadenarse: Planificación (GES/SEG) y Procura (PRO/SER). */
+const FASES_EDTS_EN_PARALELO = new Set([FASE_PARALELA_CONTINUA, 'PROCURA'])
 
 /** Código corto del EDT (catálogo), dentro de FASE_PARALELA_CONTINUA, cuyo
  * fin gatilla el inicio de la fase siguiente: Ingeniería arranca al terminar
@@ -222,7 +224,7 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
     const fechaInicioFase = inicioPropio ? avanzarSiguienteInicio(inicioPropio, calendarioLaboral) : cursorFase
     // Fase paralela (PLANIFICACION): todas sus EDTs arrancan el mismo día
     // (fechaInicioFase), nunca encadenadas entre sí — ver FASE_PARALELA_CONTINUA.
-    const esFaseParalela = faseInfo.faseNombre === FASE_PARALELA_CONTINUA
+    const esFaseParalela = FASES_EDTS_EN_PARALELO.has(claveFase(faseInfo.faseNombre))
     // Fallback si la Fase no tuviera EDTs (no debería ocurrir en la práctica) —
     // se sobreescribe abajo con el fin REAL del último EDT (secuencial) o el
     // MÁXIMO entre EDTs (paralela). En paralela el fallback NO puede basarse

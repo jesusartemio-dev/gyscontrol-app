@@ -10,6 +10,7 @@ import { sugerirYAplicarCantidades } from '@/lib/cronogramaIA/generarSugerencias
 import { EDTS_ESQUEMA_DOS_ETAPAS } from '@/lib/cronogramaIA/reglasActividades'
 import { resolverAliasParaNombres } from '@/lib/cronogramaIA/aliasActividad'
 import { FAMILIA_SOPORTES_FABRICADOS, NOMBRE_FAMILIA_OFICIAL_PRO } from '@/lib/cronogramaIA/vocabularioFamiliasPro'
+import { EDT_SERVICIOS_ALQUILERES, separarServiciosYAlquileres } from '@/lib/cronogramaIA/separarServiciosAlquileres'
 import { normalizarNombreTarea } from '@/lib/cronogramaIA/matchTareaCatalogo'
 import type { ActividadPropuesta, CatalogoServicioParaWizard, ConfiguracionWizardPaso1, EsquemaElegido, NombreConAlias } from '@/types/cronogramaIA'
 import type { ContextoCotizacionParaPrompt, EquipoRealParaPrompt } from '@/lib/cronogramaIA/prompts'
@@ -218,7 +219,45 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     resultado.actividades = sugerenciaCantidad.actividades
     resultado.advertencias.push(...sugerenciaCantidad.advertencias)
 
-    const actividadesPrevias = ((generacion.propuestaActividades as unknown as ActividadPropuesta[]) ?? []).filter(a => a.edtNombre !== body.edtNombre)
+    // PRO = materiales; las familias de alquiler y subcontrato pasan al EDT SER
+    // "Servicios y Alquileres" con sus propios pasos (ver separarServiciosAlquileres.ts).
+    if (body.edtNombre === 'PRO') {
+      const ser = await prisma.edt.findUnique({
+        where: { nombre: EDT_SERVICIOS_ALQUILERES },
+        include: { catalogoServicio: { include: { unidadServicio: true, recurso: true }, orderBy: { orden: 'asc' } } },
+      })
+      if (ser) {
+        const serviciosSer: CatalogoServicioParaWizard[] = ser.catalogoServicio.map(s => ({
+          id: s.id,
+          nombre: s.nombre,
+          descripcion: s.descripcion,
+          edtNombre: ser.nombre,
+          actividadTag: s.actividadTag,
+          filtroAlcance: s.filtroAlcance,
+          notaCantidad: s.notaCantidad,
+          horaBase: s.horaBase,
+          horaRepetido: s.horaRepetido,
+          cantidad: s.cantidad,
+          nivelDificultad: s.nivelDificultad,
+          orden: s.orden,
+          unidadNombre: s.unidadServicio.nombre,
+          recursoNombre: s.recurso.nombre,
+        }))
+        const aliasPorNombre = new Map(body.nombresActividades.filter(n => n.alias).map(n => [n.nombre, n.alias!]))
+        resultado.actividades = separarServiciosYAlquileres(resultado.actividades, serviciosSer, {
+          brownfield: config.brownfield,
+          ingenieriaDetalle: config.ingenieriaDetalle,
+          nPets: config.nPets,
+          tableros: config.tableros,
+          plcs: config.plcs,
+          hmiCantidad: config.hmiCantidad,
+        }, aliasPorNombre)
+      }
+    }
+
+    // Al re-agrupar PRO también se reemplaza lo que había pasado a SER.
+    const edtsReemplazados = new Set<string>(body.edtNombre === 'PRO' ? ['PRO', EDT_SERVICIOS_ALQUILERES] : [body.edtNombre])
+    const actividadesPrevias = ((generacion.propuestaActividades as unknown as ActividadPropuesta[]) ?? []).filter(a => !edtsReemplazados.has(a.edtNombre))
     const propuestaActividades = [...actividadesPrevias, ...resultado.actividades]
 
     // Aviso temprano (antes de aplicar) — "Soportes Fabricados" depende de
