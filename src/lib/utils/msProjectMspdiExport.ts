@@ -237,18 +237,26 @@ export function generarMspdiProyecto(opts: {
       <Duration>${duracionMsp(horasDur)}</Duration>
       <ManualStart>${fechaMsp(ini)}</ManualStart>
       <ManualFinish>${fechaMsp(fin)}</ManualFinish>
-      <ManualDuration>${duracionMsp(horasDur)}</ManualDuration>
+      <ManualDuration>${duracionMsp(horasDur)}</ManualDuration>`}`
+      : ''
+    // Van después de PercentComplete (orden del esquema MSPDI).
+    const duracionesAvance = ini && fin && !f.esResumen
+      ? `
       <ActualDuration>${duracionMsp(horasReales)}</ActualDuration>
-      <RemainingDuration>${duracionMsp(horasDur - horasReales)}</RemainingDuration>`}`
+      <RemainingDuration>${duracionMsp(horasDur - horasReales)}</RemainingDuration>`
       : ''
     const limite = esHito && d.fechaLimite
       ? `\n      <Deadline>${new Date(d.fechaLimite).toISOString().slice(0, 10)}T${horaMsp(jornadaFin)}</Deadline>`
       : ''
 
+    // Elementos en el orden del esquema oficial (mspdi_pj12.xsd): versiones de MS
+    // Project más estrictas ignoran lo que llega fuera de orden — p. ej. Manual
+    // tarde deja las tareas en automático, desde el inicio del proyecto.
     return `    <Task>
       <UID>${f.uid}</UID>
       <ID>${f.uid}</ID>
       <Name>${esc(f.nodo.nombre || '')}</Name>
+      <Manual>${f.esResumen ? 0 : 1}</Manual>
       <Type>1</Type>
       <IsNull>0</IsNull>
       <OutlineNumber>${f.outlineNumber}</OutlineNumber>
@@ -260,8 +268,7 @@ ${fechas}
       <Estimated>0</Estimated>
       <Milestone>${esHito ? 1 : 0}</Milestone>
       <Summary>${f.esResumen ? 1 : 0}</Summary>
-      <Manual>${f.esResumen ? 0 : 1}</Manual>
-      <PercentComplete>${avance}</PercentComplete>${limite}${d.descripcion ? `
+      <PercentComplete>${avance}</PercentComplete>${duracionesAvance}${limite}${d.descripcion ? `
       <Notes>${esc(String(d.descripcion))}</Notes>` : ''}
 ${preds}
       <ExtendedAttribute>
