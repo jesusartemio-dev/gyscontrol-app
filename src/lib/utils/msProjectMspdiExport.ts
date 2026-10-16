@@ -284,18 +284,21 @@ ${preds}
       <Name>${esc(r.nombre)}</Name>
       <Type>1</Type>
       <IsNull>0</IsNull>
-      <MaxUnits>${r.maxUnidades.toFixed(2)}</MaxUnits>
+      <MaxUnits>${Math.max(1, Math.ceil(r.maxUnidades))}</MaxUnits>
       <CalendarUID>${r.uid + 1}</CalendarUID>
     </Resource>`).join('\n')
 
+  // Sin números con decimales: en una PC con coma decimal (español), MS Project
+  // leía "0.2632" como 0 % y recalculaba las duraciones en 0. Las unidades las
+  // calcula MS Project con el trabajo y la duración (tarea de duración fija).
+  // Orden del esquema: Finish, Start, …, Work.
   const asignacionesXml = asignaciones.map((a) => `    <Assignment>
       <UID>${a.uid}</UID>
       <TaskUID>${a.tareaUid}</TaskUID>
       <ResourceUID>${a.recursoUid}</ResourceUID>
-      <Units>${a.unidades.toFixed(4)}</Units>
-      <Work>${duracionMsp(a.trabajo)}</Work>
-      <Start>${a.inicio}</Start>
       <Finish>${a.fin}</Finish>
+      <Start>${a.inicio}</Start>
+      <Work>${duracionMsp(a.trabajo)}</Work>
     </Assignment>`).join('\n')
 
   const minDia = Math.round(hpd * 60)
