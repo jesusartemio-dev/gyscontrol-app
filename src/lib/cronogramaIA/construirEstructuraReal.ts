@@ -402,7 +402,7 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
 }
 
 /** Calendario del generador → calendario por horas (con valores por defecto si faltan). */
-function calendarioHoras(cal: unknown): CalendarioHoras {
+export function calendarioHoras(cal: unknown): CalendarioHoras {
   const c = (cal ?? {}) as Partial<CalendarioHoras>
   return {
     ...c,
@@ -439,7 +439,7 @@ function diasDeCiclo(tipo: 'semanal' | 'mensual', desde: Date, hasta: Date): Dat
  * demás actividades (una sola vez) encadenan sus tareas desde el inicio de la
  * ventana. Recalcula fechas de actividades, EDTs y la fase.
  */
-function programarGestionYControl(o: {
+export function programarGestionYControl(o: {
   cal: CalendarioHoras
   faseGC: FilaFase
   finVentana: Date

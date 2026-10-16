@@ -41,7 +41,8 @@ async function main() {
   const recursos = new Map((await prisma.recurso.findMany({ where: { nombre: { in: ['Gestor', 'SSOMA'] } } })).map(r => [r.nombre, r.id]))
   // Anteriores: los de CTL y la habilitación de SEG, que todavía no están marcados.
   const anteriores = await prisma.catalogoServicio.findMany({
-    where: { nombre: { in: ANTERIORES }, edt: { nombre: { in: ['CTL', 'SEG'] } }, NOT: { actividadTag: { has: 'Obsoleto' } } },
+    // Nunca los nuevos (uno se llama igual que un anterior): esos llevan la etiqueta de su actividad.
+    where: { nombre: { in: ANTERIORES }, edt: { nombre: { in: ['CTL', 'SEG'] } }, NOT: [{ actividadTag: { has: 'Obsoleto' } }, { actividadTag: { hasSome: [...new Set(NUEVOS.map(n => n.tag))] } }] },
     select: { id: true, nombre: true, descripcion: true, actividadTag: true, categoriaId: true, edt: { select: { nombre: true } } },
   })
   const idsAnteriores = new Set(anteriores.map(a => a.id))
