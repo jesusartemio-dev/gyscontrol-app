@@ -178,7 +178,13 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       edtNombre: estructura.edtIdACodigo.get(t.proyectoEdtId) ?? '',
       actividadNombre: actividadIdANombre.get(t.proyectoActividadId) ?? '',
     }))
-  const { sugerencias: dependenciasSugeridas, advertencias: advertenciasDependencias } = sugerirDependencias(tareasParaDependencias)
+  const { sugerencias: sugerenciasReglas, advertencias: advertenciasDependencias } = sugerirDependencias(tareasParaDependencias)
+  // + las de cada ciclo de Gestión y Control (Elaboración → Envío → …), sin repetir pares.
+  const paresReglas = new Set(sugerenciasReglas.map(d => `${d.tareaOrigenId}>${d.tareaDependienteId}`))
+  const dependenciasSugeridas = [
+    ...sugerenciasReglas,
+    ...estructura.dependenciasCiclos.filter(d => !paresReglas.has(`${d.tareaOrigenId}>${d.tareaDependienteId}`)),
+  ]
 
   // Hitos de inicio y fin como tareas-hito ◆ (Milestone de MS Project), dentro
   // de la primera y la última tarea del cronograma. Su fecha límite (contractual)

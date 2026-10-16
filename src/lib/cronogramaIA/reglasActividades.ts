@@ -113,6 +113,11 @@ export function evaluarAlcance(
   return { incluida: true }
 }
 
+/** Servicio reemplazado en el catálogo: no se propone al generar cronogramas. */
+export function esServicioObsoleto(servicio: Pick<CatalogoServicioParaWizard, 'actividadTag'>): boolean {
+  return (servicio.actividadTag ?? []).some(t => /^obsoleto$/i.test(t))
+}
+
 export function construirTareaPropuesta(
   servicio: CatalogoServicioParaWizard,
   config: Pick<ConfiguracionWizardPaso1, 'brownfield' | 'ingenieriaDetalle'> & ConfiguracionCantidadDeterminista
@@ -219,11 +224,31 @@ function generarCIE(servicios: CatalogoServicioParaWizard[], config: Configuraci
   return agruparPorTag(servicios, 'CIE', { Tecnico: 'Cierre Técnico', Gestion: 'Cierre de Gestión' }, config)
 }
 
-/** CTL: una sola actividad con las tareas recurrentes de control (reuniones, reportes, valorizaciones). */
+/**
+ * Actividades de la fase GESTION Y CONTROL. Las recurrentes se repiten
+ * numeradas (01, 02…) al construir la estructura — ver
+ * RECURRENCIA_ACTIVIDAD y construirEstructuraReal.
+ */
+export const ACTIVIDAD_REPORTE_AVANCE = 'Reporte Avance Semanal'
+export const ACTIVIDAD_VALORIZACIONES = 'Valorizaciones'
+export const ACTIVIDAD_HABILITACION = 'Habilitación de Personal'
+export const ACTIVIDAD_REPORTE_SEGURIDAD = 'Reporte Semanal de Seguridad'
+
+/** Semanal: un ciclo cada viernes. Mensual: un ciclo cada día 20 (valorizaciones). */
+export const RECURRENCIA_ACTIVIDAD: Record<string, 'semanal' | 'mensual'> = {
+  [ACTIVIDAD_REPORTE_AVANCE]: 'semanal',
+  [ACTIVIDAD_REPORTE_SEGURIDAD]: 'semanal',
+  [ACTIVIDAD_VALORIZACIONES]: 'mensual',
+}
+
+/** CTL (Control): reportes semanales de avance y valorizaciones mensuales. */
 function generarCTL(servicios: CatalogoServicioParaWizard[], config: ConfiguracionWizardPaso1): ActividadPropuesta[] {
-  const tareas = servicios.map(s => construirTareaPropuesta(s, config))
-  if (!tieneAlMenosUnaTareaIncluida(tareas)) return []
-  return [{ edtNombre: 'CTL', actividadNombre: 'Control y Seguimiento', tareas, origen: 'determinista' }]
+  return agruparPorTag(servicios, 'CTL', { ReporteAvance: ACTIVIDAD_REPORTE_AVANCE, Valorizaciones: ACTIVIDAD_VALORIZACIONES }, config)
+}
+
+/** SSO (Gestión de Seguridad): habilitación de personal y reportes semanales de seguridad. */
+function generarSSO(servicios: CatalogoServicioParaWizard[], config: ConfiguracionWizardPaso1): ActividadPropuesta[] {
+  return agruparPorTag(servicios, 'SSO', { Habilitacion: ACTIVIDAD_HABILITACION, ReporteSeguridad: ACTIVIDAD_REPORTE_SEGURIDAD }, config)
 }
 
 function generarSEG(servicios: CatalogoServicioParaWizard[], config: ConfiguracionWizardPaso1): ActividadPropuesta[] {
@@ -367,10 +392,13 @@ export function generarActividadesDeterministas(
   const subalcanceDisciplina = evaluarSubalcanceDisciplinas(edts.map(e => e.nombre), config.alcanceLibre, textoTdr)
   const subalcanceProtocolosIng = evaluarSubalcanceProtocolosIng(config.alcanceLibre, textoTdr)
 
-  for (const edt of edts) {
-    if ((EDTS_AGRUPACION_IA as readonly string[]).includes(edt.nombre)) {
+  for (const edtOriginal of edts) {
+    if ((EDTS_AGRUPACION_IA as readonly string[]).includes(edtOriginal.nombre)) {
       continue
     }
+    // Servicios reemplazados (etiqueta [Obsoleto]): siguen en el catálogo por
+    // las cotizaciones pasadas, pero el generador ya no los usa.
+    const edt = { ...edtOriginal, servicios: edtOriginal.servicios.filter(s => !esServicioObsoleto(s)) }
     switch (edt.nombre) {
       case 'GES':
         actividades.push(...generarGES(edt.servicios, config))
@@ -386,6 +414,9 @@ export function generarActividadesDeterministas(
         break
       case 'CTL':
         actividades.push(...generarCTL(edt.servicios, config))
+        break
+      case 'SSO':
+        actividades.push(...generarSSO(edt.servicios, config))
         break
       case 'CMM':
         actividades.push(...generarCMM(edt.servicios, config, subalcanceCMM))

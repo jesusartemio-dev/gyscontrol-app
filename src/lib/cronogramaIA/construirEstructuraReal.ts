@@ -1,7 +1,9 @@
 import { randomUUID } from 'crypto'
 import { ajustarFechaADiaLaborable, calcularFechaFinConCalendario } from '@/lib/utils/calendarioLaboral'
 import { agruparYOrdenarPorEstructura, type GrupoEdtOrdenado, type InfoOrdenEdt } from './agruparYOrdenarPorEstructura'
-import type { ActividadPropuesta } from '@/types/cronogramaIA'
+import type { ActividadPropuesta, TareaPropuesta } from '@/types/cronogramaIA'
+import { type CalendarioHoras, siguienteMomentoLaborable, sumarHorasLaborables } from '@/lib/services/cronogramaHoras'
+import { RECURRENCIA_ACTIVIDAD } from './reglasActividades'
 
 // Re-exportado por compatibilidad — la implementación real vive en
 // agruparYOrdenarPorEstructura.ts (sin esta ruta, un import desde acá
@@ -108,6 +110,8 @@ export interface EstructuraReal {
   advertencias: string[]
   /** proyectoEdtId -> código corto del catálogo (ej. "CON") — uso interno (reglas de dependencias), no se persiste. */
   edtIdACodigo: Map<string, string>
+  /** Fin-Comienzo entre las tareas de cada ciclo de GESTION Y CONTROL (Elaboración → Envío → …). */
+  dependenciasCiclos: { tareaOrigenId: string; tareaDependienteId: string; tipo: 'finish_to_start' }[]
 }
 
 /** Fase cuyas EDTs corren en PARALELO entre sí (todas arrancan el mismo día
@@ -200,6 +204,8 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
   // Fines ya calculados, para las fases con inicio propio (ver FASE_GESTION_CONTROL).
   const finPorEdtCodigo = new Map<string, Date>()
   const finPorFase = new Map<string, Date>()
+  // Propuesta original de cada tarea (horas por vez para los ciclos de Gestión y Control).
+  const propuestaPorTareaId = new Map<string, TareaPropuesta>()
 
   for (const faseInfo of fasesAgrupadas) {
     const horasFase = faseInfo.grupos.reduce((acc, g) => acc + g.actividades.reduce((a2, act) => a2 + act.tareas.reduce((a3, t) => a3 + t.horasEstimadas, 0), 0), 0)
@@ -292,6 +298,7 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
         for (const tarea of actividad.tareas) {
           const horasTareaRedondeadas = duracionDiasDesdeHoras(tarea.horasEstimadas, horasPorDia) * horasPorDia
           const tareaId = randomUUID()
+          propuestaPorTareaId.set(tareaId, tarea)
           const fechaInicioTarea = calcularFechaFinConCalendario(fechaInicioActividad, horasAcumActividad, calendarioLaboral)
           horasAcumActividad += horasTareaRedondeadas
           const fechaFinTarea = calcularFechaFinConCalendario(fechaInicioActividad, horasAcumActividad, calendarioLaboral)
@@ -373,19 +380,133 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
     }
   }
 
-  // Gestión y Control es transversal: sus tareas (reuniones y reportes
-  // semanales, valorizaciones) son de esfuerzo nivelado, corren desde su
-  // inicio hasta el fin de Ejecución con las mismas horas de trabajo.
-  const finEjecucion = finPorFase.get(FASE_EJECUCION)
+  // Gestión y Control es transversal: va del fin de GES al fin de Ejecución.
+  // Sus actividades recurrentes se repiten numeradas en esa ventana (reportes
+  // cada viernes, valorizaciones cada día 20) y las de una sola vez
+  // (habilitación de personal) van al inicio.
+  const dependenciasCiclos: EstructuraReal['dependenciasCiclos'] = []
   const faseGC = fases.find(f => claveFase(f.nombre) === FASE_GESTION_CONTROL)
-  if (faseGC && finEjecucion && finEjecucion.getTime() > faseGC.fechaFinPlan.getTime()) {
-    const edtsGC = new Set(edts.filter(e => e.proyectoFaseId === faseGC.id).map(e => e.id))
-    const actsGC = new Set(actividadesFilas.filter(a => edtsGC.has(a.proyectoEdtId)).map(a => a.id))
-    for (const t of tareas) if (actsGC.has(t.proyectoActividadId)) { t.fechaInicio = faseGC.fechaInicioPlan; t.fechaFin = finEjecucion }
-    for (const a of actividadesFilas) if (actsGC.has(a.id)) { a.fechaInicioPlan = faseGC.fechaInicioPlan; a.fechaFinPlan = finEjecucion }
-    for (const e of edts) if (edtsGC.has(e.id)) { e.fechaInicioPlan = faseGC.fechaInicioPlan; e.fechaFinPlan = finEjecucion }
-    faseGC.fechaFinPlan = finEjecucion
+  if (faseGC) {
+    const otrasFases = fases.filter(f => f.id !== faseGC.id)
+    const finVentana = finPorFase.get(FASE_EJECUCION)
+      ?? (otrasFases.length ? new Date(Math.max(...otrasFases.map(f => f.fechaFinPlan.getTime()))) : faseGC.fechaFinPlan)
+    const nuevas = programarGestionYControl({
+      cal: calendarioHoras(calendarioLaboral),
+      faseGC, finVentana, edts, actividades: actividadesFilas, tareas, propuestaPorTareaId,
+    })
+    tareas.splice(0, tareas.length, ...nuevas.tareas)
+    dependenciasCiclos.push(...nuevas.dependencias)
   }
 
-  return { fases, edts, actividades: actividadesFilas, tareas, advertencias, edtIdACodigo }
+  return { fases, edts, actividades: actividadesFilas, tareas, advertencias, edtIdACodigo, dependenciasCiclos }
+}
+
+/** Calendario del generador → calendario por horas (con valores por defecto si faltan). */
+function calendarioHoras(cal: unknown): CalendarioHoras {
+  const c = (cal ?? {}) as Partial<CalendarioHoras>
+  return {
+    ...c,
+    diasLaborables: c.diasLaborables ?? ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'],
+    diaCalendario: c.diaCalendario ?? [],
+    excepcionCalendario: c.excepcionCalendario ?? [],
+  } as CalendarioHoras
+}
+
+const DIA_MS = 86400000
+const inicioDiaUTC = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+
+/** Días de cada ciclo dentro de la ventana: viernes (semanal) o día 20 (mensual). Al menos uno. */
+function diasDeCiclo(tipo: 'semanal' | 'mensual', desde: Date, hasta: Date): Date[] {
+  const ini = inicioDiaUTC(desde).getTime()
+  const fin = hasta.getTime()
+  const dias: Date[] = []
+  if (tipo === 'semanal') {
+    for (let t = ini; t <= fin; t += DIA_MS) if (new Date(t).getUTCDay() === 5) dias.push(new Date(t))
+  } else {
+    const d0 = new Date(ini)
+    for (let y = d0.getUTCFullYear(), m = d0.getUTCMonth(); Date.UTC(y, m, 1) <= fin; m === 11 ? (y++, m = 0) : m++) {
+      const t = Date.UTC(y, m, 20)
+      if (t >= ini && t <= fin) dias.push(new Date(t))
+    }
+  }
+  return dias.length ? dias : [new Date(ini)]
+}
+
+/**
+ * Programa la fase GESTION Y CONTROL. Cada actividad recurrente (ver
+ * RECURRENCIA_ACTIVIDAD) se repite por ciclo con sus tareas en cadena el mismo
+ * día, numeradas "01", "02"… (1.ª vez horaBase, siguientes horaRepetido). Las
+ * demás actividades (una sola vez) encadenan sus tareas desde el inicio de la
+ * ventana. Recalcula fechas de actividades, EDTs y la fase.
+ */
+function programarGestionYControl(o: {
+  cal: CalendarioHoras
+  faseGC: FilaFase
+  finVentana: Date
+  edts: FilaEdt[]
+  actividades: FilaActividad[]
+  tareas: FilaTarea[]
+  propuestaPorTareaId: Map<string, TareaPropuesta>
+}): { tareas: FilaTarea[]; dependencias: EstructuraReal['dependenciasCiclos'] } {
+  const { cal, faseGC, finVentana } = o
+  const edtsGC = o.edts.filter(e => e.proyectoFaseId === faseGC.id)
+  const idsEdt = new Set(edtsGC.map(e => e.id))
+  const actsGC = o.actividades.filter(a => idsEdt.has(a.proyectoEdtId))
+  const idsAct = new Set(actsGC.map(a => a.id))
+  const resto = o.tareas.filter(t => !idsAct.has(t.proyectoActividadId))
+  const nuevas: FilaTarea[] = []
+  const dependencias: EstructuraReal['dependenciasCiclos'] = []
+  const inicioVentana = siguienteMomentoLaborable(cal, inicioDiaUTC(faseGC.fechaInicioPlan))
+
+  /** Encadena tareas desde `desde`: cada una empieza cuando termina la anterior. */
+  const encadenar = (base: FilaTarea[], desde: Date, horasDe: (t: FilaTarea) => number, sufijo: string) => {
+    let cursor = siguienteMomentoLaborable(cal, desde)
+    let anterior: FilaTarea | null = null
+    for (const t of base) {
+      const horas = Math.max(0, horasDe(t))
+      const fin = sumarHorasLaborables(cal, cursor, horas)
+      const fila: FilaTarea = { ...t, id: sufijo ? randomUUID() : t.id, nombre: sufijo ? `${t.nombre} ${sufijo}` : t.nombre, fechaInicio: cursor, fechaFin: fin, horasEstimadas: horas }
+      nuevas.push(fila)
+      if (anterior) dependencias.push({ tareaOrigenId: anterior.id, tareaDependienteId: fila.id, tipo: 'finish_to_start' })
+      anterior = fila
+      cursor = siguienteMomentoLaborable(cal, fin)
+    }
+  }
+
+  for (const act of actsGC) {
+    const base = o.tareas.filter(t => t.proyectoActividadId === act.id).sort((a, b) => a.orden - b.orden)
+    if (!base.length) continue
+    const recurrencia = RECURRENCIA_ACTIVIDAD[act.nombre]
+    const desdeIdx = nuevas.length
+    if (recurrencia) {
+      diasDeCiclo(recurrencia, inicioVentana, finVentana).forEach((dia, k) => {
+        const nn = String(k + 1).padStart(2, '0')
+        encadenar(base, dia, t => {
+          const p = o.propuestaPorTareaId.get(t.id)
+          if (!p) return t.horasEstimadas
+          return k === 0 ? p.horaBase : (p.horaRepetido || p.horaBase)
+        }, nn)
+      })
+    } else {
+      encadenar(base, inicioVentana, t => t.horasEstimadas, '')
+    }
+    const delAct = nuevas.slice(desdeIdx)
+    delAct.forEach((t, i) => { t.orden = i })
+    act.fechaInicioPlan = new Date(Math.min(...delAct.map(t => t.fechaInicio.getTime())))
+    act.fechaFinPlan = new Date(Math.max(...delAct.map(t => t.fechaFin.getTime())))
+    act.horasPlan = delAct.reduce((s, t) => s + t.horasEstimadas, 0)
+  }
+
+  for (const e of edtsGC) {
+    const acts = actsGC.filter(a => a.proyectoEdtId === e.id)
+    if (!acts.length) continue
+    e.fechaInicioPlan = new Date(Math.min(...acts.map(a => a.fechaInicioPlan.getTime())))
+    e.fechaFinPlan = new Date(Math.max(...acts.map(a => a.fechaFinPlan.getTime())))
+    e.horasPlan = acts.reduce((s, a) => s + a.horasPlan, 0)
+  }
+  if (edtsGC.length) {
+    faseGC.fechaInicioPlan = new Date(Math.min(...edtsGC.map(e => e.fechaInicioPlan.getTime())))
+    faseGC.fechaFinPlan = new Date(Math.max(...edtsGC.map(e => e.fechaFinPlan.getTime())))
+  }
+  return { tareas: [...resto, ...nuevas], dependencias }
 }

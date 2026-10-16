@@ -396,7 +396,8 @@ describe('construirEstructuraReal — GESTION Y CONTROL transversal y PROCURA en
   const CATALOGO = new Map<string, EdtCatalogoInfo>([
     ['GES', { id: 'edt-ges', nombre: 'GES', descripcionEdt: 'Planificación del Proyecto', faseNombre: 'PLANIFICACION', faseOrden: 0, edtOrden: 0 }],
     ['SEG', { id: 'edt-seg', nombre: 'SEG', descripcionEdt: 'Seguridad', faseNombre: 'PLANIFICACION', faseOrden: 0, edtOrden: 1 }],
-    ['CTL', { id: 'edt-ctl', nombre: 'CTL', descripcionEdt: 'Control y Seguimiento', faseNombre: 'GESTION Y CONTROL', faseOrden: 1, edtOrden: 0 }],
+    ['CTL', { id: 'edt-ctl', nombre: 'CTL', descripcionEdt: 'Control', faseNombre: 'GESTION Y CONTROL', faseOrden: 1, edtOrden: 0 }],
+    ['SSO', { id: 'edt-sso', nombre: 'SSO', descripcionEdt: 'Gestión de Seguridad', faseNombre: 'GESTION Y CONTROL', faseOrden: 1, edtOrden: 1 }],
     ['ING', { id: 'edt-ing', nombre: 'ING', descripcionEdt: 'Ingenieria', faseNombre: 'INGENIERIA', faseOrden: 2, edtOrden: 0 }],
     ['PRO', { id: 'edt-pro', nombre: 'PRO', descripcionEdt: 'Procura', faseNombre: 'PROCURA', faseOrden: 3, edtOrden: 0 }],
     ['CON', { id: 'edt-con', nombre: 'CON', descripcionEdt: 'Construccion', faseNombre: 'EJECUCION', faseOrden: 4, edtOrden: 0 }],
@@ -406,10 +407,12 @@ describe('construirEstructuraReal — GESTION Y CONTROL transversal y PROCURA en
     actividades: [
       { edtNombre: 'GES', actividadNombre: 'Inicio', tareas: [tarea('t1', 'Kickoff', 24)], origen: 'determinista' }, // 3 días
       { edtNombre: 'SEG', actividadNombre: 'Documentos de Seguridad', tareas: [tarea('t2', 'IPERC', 40)], origen: 'determinista' }, // 5 días
-      { edtNombre: 'CTL', actividadNombre: 'Control y Seguimiento', tareas: [tarea('t3', 'Reporte Semanal', 8), tarea('t4', 'Valorizaciones', 8, 1)], origen: 'determinista' },
+      { edtNombre: 'CTL', actividadNombre: 'Reporte Avance Semanal', tareas: [tarea('r1', 'Elaboración de Reporte Semanal', 2), tarea('r2', 'Envío de Reporte Semanal', 0.5, 1)], origen: 'determinista' },
+      { edtNombre: 'CTL', actividadNombre: 'Valorizaciones', tareas: [tarea('v1', 'Elaboración de Valorización', 4), tarea('v2', 'Envío de Valorización', 0.5, 1), tarea('v3', 'Aprobación de Valorización', 0.5, 2), tarea('v4', 'Recepción de Conformidad HES', 0.5, 3)], origen: 'determinista' },
+      { edtNombre: 'SSO', actividadNombre: 'Habilitación de Personal', tareas: [tarea('h1', 'Solicitud de Validación de OC', 1), tarea('h2', 'Solicitud Ingreso Personal SPOT', 1, 1), tarea('h3', 'Habilitación de Personal Sistema Rainbow', 1, 2)], origen: 'determinista' },
       { edtNombre: 'ING', actividadNombre: 'Diseño', tareas: [tarea('t5', 'Diseño', 40)], origen: 'determinista' },
       { edtNombre: 'PRO', actividadNombre: 'Cables', tareas: [tarea('t6', 'Compra', 80)], origen: 'determinista' }, // 10 días
-      { edtNombre: 'CON', actividadNombre: 'Obra', tareas: [tarea('t7', 'Montaje', 40)], origen: 'determinista' },
+      { edtNombre: 'CON', actividadNombre: 'Obra', tareas: [tarea('t7', 'Montaje', 120)], origen: 'determinista' }, // 15 días: la ventana incluye un día 20
       { edtNombre: 'CIE', actividadNombre: 'Cierre', tareas: [tarea('t8', 'Acta', 8)], origen: 'determinista' },
     ],
     edtsCatalogo: CATALOGO,
@@ -422,18 +425,51 @@ describe('construirEstructuraReal — GESTION Y CONTROL transversal y PROCURA en
   const edt = (r: ReturnType<typeof construir>, nombre: string) => r.edts.find(e => e.nombre === nombre)!
   const fase = (r: ReturnType<typeof construir>, nombre: string) => r.fases.find(f => f.nombre === nombre)!
 
-  it('CTL arranca después de GES (no del fin de toda Planificación) y se estira hasta el fin de Ejecución', () => {
+  it('reportes semanales: un ciclo por viernes de la ventana (fin de GES → fin de Ejecución), numerados y encadenados el mismo día', () => {
     const r = construir()
-    const ctl = edt(r, 'Control y Seguimiento')
+    const elab = r.tareas.filter(t => t.catalogoServicioId === 'r1').sort((a, b) => a.fechaInicio.getTime() - b.fechaInicio.getTime())
+    const envio = r.tareas.filter(t => t.catalogoServicioId === 'r2').sort((a, b) => a.fechaInicio.getTime() - b.fechaInicio.getTime())
+    expect(elab.length).toBeGreaterThanOrEqual(3)
+    expect(envio.length).toBe(elab.length)
+    elab.forEach((t, i) => {
+      const nn = String(i + 1).padStart(2, '0')
+      expect(t.nombre).toBe(`Elaboración de Reporte Semanal ${nn}`)
+      expect(envio[i].nombre).toBe(`Envío de Reporte Semanal ${nn}`)
+      expect(t.fechaInicio.getUTCDay()).toBe(5) // viernes
+      expect(t.fechaInicio.getUTCHours()).toBe(8)
+      expect(t.horasEstimadas).toBe(2)
+      expect(envio[i].fechaInicio.getTime()).toBe(t.fechaFin.getTime()) // Envío justo después, mismo día
+      expect(envio[i].horasEstimadas).toBe(0.5)
+      expect(r.dependenciasCiclos).toContainEqual({ tareaOrigenId: t.id, tareaDependienteId: envio[i].id, tipo: 'finish_to_start' })
+    })
+    // Dentro de la ventana
+    const ctl = edt(r, 'Control')
     expect(ctl.fechaInicioPlan.getTime()).toBeGreaterThan(edt(r, 'Planificación del Proyecto').fechaFinPlan.getTime())
-    expect(ctl.fechaInicioPlan.getTime()).toBeLessThan(edt(r, 'Seguridad').fechaFinPlan.getTime())
-    expect(fase(r, 'GESTION Y CONTROL').fechaFinPlan.getTime()).toBe(fase(r, 'EJECUCION').fechaFinPlan.getTime())
-    // Sus tareas cubren toda la ventana y conservan sus horas de trabajo.
-    for (const t of r.tareas.filter(t => ['t3', 't4'].includes(t.catalogoServicioId!))) {
-      expect(t.fechaInicio.getTime()).toBe(ctl.fechaInicioPlan.getTime())
-      expect(t.fechaFin.getTime()).toBe(fase(r, 'EJECUCION').fechaFinPlan.getTime())
-      expect(t.horasEstimadas).toBe(8)
+    expect(elab[elab.length - 1].fechaInicio.getTime()).toBeLessThanOrEqual(fase(r, 'EJECUCION').fechaFinPlan.getTime())
+  })
+
+  it('valorizaciones: un ciclo cada día 20, con sus 4 tareas en cadena', () => {
+    const r = construir()
+    const ciclo = ['v1', 'v2', 'v3', 'v4'].map(id => r.tareas.filter(t => t.catalogoServicioId === id))
+    expect(ciclo[0].length).toBe(1)
+    const [elab, envio, aprob, hes] = ciclo.map(l => l[0])
+    expect(elab.nombre).toBe('Elaboración de Valorización 01')
+    expect(hes.nombre).toBe('Recepción de Conformidad HES 01')
+    expect(elab.fechaInicio.getUTCDate()).toBe(20)
+    // Cada una empieza cuando termina la anterior (tras el almuerzo si cae a las 12:00), el mismo día.
+    for (const [ant, sig] of [[elab, envio], [envio, aprob], [aprob, hes]]) {
+      expect(sig.fechaInicio.getTime()).toBeGreaterThanOrEqual(ant.fechaFin.getTime())
+      expect(sig.fechaInicio.getUTCDate()).toBe(20)
     }
+  })
+
+  it('SSO: habilitación de personal una sola vez, al inicio de la ventana, en cadena', () => {
+    const r = construir()
+    const h = ['h1', 'h2', 'h3'].map(id => r.tareas.filter(t => t.catalogoServicioId === id))
+    h.forEach(l => expect(l.length).toBe(1))
+    expect(h[0][0].nombre).toBe('Solicitud de Validación de OC') // sin numerar
+    expect(h[1][0].fechaInicio.getTime()).toBe(h[0][0].fechaFin.getTime())
+    expect(fase(r, 'GESTION Y CONTROL').fechaInicioPlan.getTime()).toBe(h[0][0].fechaInicio.getTime())
   })
 
   it('PROCURA arranca al terminar toda Planificación y no retrasa a Ejecución', () => {

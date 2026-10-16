@@ -42,6 +42,7 @@ const REGLA_ROL_POR_EDT: Record<string, RolResponsable> = {
   CON: 'supervisor',
   CMM: 'supervisor',
   SEG: 'ssoma',
+  SSO: 'ssoma',
 }
 
 export interface ContextoRolResponsable {
