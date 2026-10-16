@@ -1553,12 +1553,9 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
               <Label className="text-sm">Duración estimada (semanas)</Label>
               <Input type="number" min={0} value={duracionSemanas} onChange={e => setDuracionSemanas(Math.max(0, Number(e.target.value)))} className="h-8 mt-1" />
             </div>
-            {edtEstaSeleccionada('SEG') && brownfield && (
-              <div>
-                <Label className="text-sm">N° de personas a habilitar</Label>
-                <Input type="number" min={0} value={nPersonas} onChange={e => setNPersonas(Math.max(0, Number(e.target.value)))} className="h-8 mt-1" />
-              </div>
-            )}
+            {/* "N° de personas a habilitar" se quitó: la habilitación de personal pasó a SSO
+                como 3 tareas fijas (ya no se cotiza por persona). nPersonas se conserva en la
+                configuración por compatibilidad con borradores guardados. */}
             {edtEstaSeleccionada('SEG') && (
               <div>
                 <Label className="text-sm">N° de PETS</Label>
