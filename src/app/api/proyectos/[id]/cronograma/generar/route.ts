@@ -340,11 +340,18 @@ async function generarCronogramaDesdeServicios({
     })
 
     if (fasesExistentes.length === 0 && fasesConfigConDuraciones.length > 0) {
-      // Crear fases desde configuración
+      // Crear fases desde configuración. GESTION Y CONTROL y PROCURA corren en
+      // paralelo: arrancan al terminar PLANIFICACION y no empujan las fases
+      // siguientes (mismas reglas que el asistente, construirEstructuraReal).
+      const clave = (n: string) => n.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toUpperCase()
+      let finPlanificacion: Date | null = null
       for (const faseDefault of fasesConfigConDuraciones) {
         const duracionDias = faseDefault.duracionDias || 30
+        const enParalelo = ['GESTION Y CONTROL', 'PROCURA'].includes(clave(faseDefault.nombre))
 
-        const fechaInicio = new Date(currentDate)
+        const fechaInicio = enParalelo && finPlanificacion
+          ? ajustarFechaADiaLaborable(new Date(finPlanificacion.getTime() + 86400000), calendarioLaboral)
+          : new Date(currentDate)
         const fechaFin = calcularFechaFinConCalendario(fechaInicio, duracionDias * calendarioLaboral.horasPorDia, calendarioLaboral)
 
         await prisma.proyectoFase.create({
@@ -364,6 +371,8 @@ async function generarCronogramaDesdeServicios({
         result.fasesGeneradas++
         console.log(`📅 Fase creada: ${faseDefault.nombre} (${fechaInicio.toISOString().split('T')[0]} - ${fechaFin.toISOString().split('T')[0]})`)
 
+        if (clave(faseDefault.nombre) === 'PLANIFICACION') finPlanificacion = fechaFin
+        if (enParalelo) continue
         currentDate = new Date(fechaFin)
         currentDate.setDate(currentDate.getDate() + 1)
         currentDate = ajustarFechaADiaLaborable(currentDate, calendarioLaboral)

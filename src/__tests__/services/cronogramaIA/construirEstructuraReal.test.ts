@@ -390,6 +390,70 @@ describe('construirEstructuraReal — PLANIFICACION en paralelo + Ingeniería ga
   })
 })
 
+describe('construirEstructuraReal — GESTION Y CONTROL transversal y PROCURA en paralelo', () => {
+  const fechaInicioProyecto = new Date('2026-08-03T00:00:00') // lunes
+  // Catálogo nuevo: CTL en su fase transversal, PRO en la fase PROCURA.
+  const CATALOGO = new Map<string, EdtCatalogoInfo>([
+    ['GES', { id: 'edt-ges', nombre: 'GES', descripcionEdt: 'Planificación del Proyecto', faseNombre: 'PLANIFICACION', faseOrden: 0, edtOrden: 0 }],
+    ['SEG', { id: 'edt-seg', nombre: 'SEG', descripcionEdt: 'Seguridad', faseNombre: 'PLANIFICACION', faseOrden: 0, edtOrden: 1 }],
+    ['CTL', { id: 'edt-ctl', nombre: 'CTL', descripcionEdt: 'Control y Seguimiento', faseNombre: 'GESTION Y CONTROL', faseOrden: 1, edtOrden: 0 }],
+    ['ING', { id: 'edt-ing', nombre: 'ING', descripcionEdt: 'Ingenieria', faseNombre: 'INGENIERIA', faseOrden: 2, edtOrden: 0 }],
+    ['PRO', { id: 'edt-pro', nombre: 'PRO', descripcionEdt: 'Procura', faseNombre: 'PROCURA', faseOrden: 3, edtOrden: 0 }],
+    ['CON', { id: 'edt-con', nombre: 'CON', descripcionEdt: 'Construccion', faseNombre: 'EJECUCION', faseOrden: 4, edtOrden: 0 }],
+    ['CIE', { id: 'edt-cie', nombre: 'CIE', descripcionEdt: 'Cierre', faseNombre: 'CIERRE', faseOrden: 5, edtOrden: 0 }],
+  ])
+  const construir = () => construirEstructuraReal({
+    actividades: [
+      { edtNombre: 'GES', actividadNombre: 'Inicio', tareas: [tarea('t1', 'Kickoff', 24)], origen: 'determinista' }, // 3 días
+      { edtNombre: 'SEG', actividadNombre: 'Documentos de Seguridad', tareas: [tarea('t2', 'IPERC', 40)], origen: 'determinista' }, // 5 días
+      { edtNombre: 'CTL', actividadNombre: 'Control y Seguimiento', tareas: [tarea('t3', 'Reporte Semanal', 8), tarea('t4', 'Valorizaciones', 8, 1)], origen: 'determinista' },
+      { edtNombre: 'ING', actividadNombre: 'Diseño', tareas: [tarea('t5', 'Diseño', 40)], origen: 'determinista' },
+      { edtNombre: 'PRO', actividadNombre: 'Cables', tareas: [tarea('t6', 'Compra', 80)], origen: 'determinista' }, // 10 días
+      { edtNombre: 'CON', actividadNombre: 'Obra', tareas: [tarea('t7', 'Montaje', 40)], origen: 'determinista' },
+      { edtNombre: 'CIE', actividadNombre: 'Cierre', tareas: [tarea('t8', 'Acta', 8)], origen: 'determinista' },
+    ],
+    edtsCatalogo: CATALOGO,
+    proyectoId: 'p1',
+    proyectoCronogramaId: 'cron1',
+    fechaInicioProyecto,
+    calendarioLaboral: mockCalendario(),
+    recursoPorServicio: new Map(),
+  })
+  const edt = (r: ReturnType<typeof construir>, nombre: string) => r.edts.find(e => e.nombre === nombre)!
+  const fase = (r: ReturnType<typeof construir>, nombre: string) => r.fases.find(f => f.nombre === nombre)!
+
+  it('CTL arranca después de GES (no del fin de toda Planificación) y se estira hasta el fin de Ejecución', () => {
+    const r = construir()
+    const ctl = edt(r, 'Control y Seguimiento')
+    expect(ctl.fechaInicioPlan.getTime()).toBeGreaterThan(edt(r, 'Planificación del Proyecto').fechaFinPlan.getTime())
+    expect(ctl.fechaInicioPlan.getTime()).toBeLessThan(edt(r, 'Seguridad').fechaFinPlan.getTime())
+    expect(fase(r, 'GESTION Y CONTROL').fechaFinPlan.getTime()).toBe(fase(r, 'EJECUCION').fechaFinPlan.getTime())
+    // Sus tareas cubren toda la ventana y conservan sus horas de trabajo.
+    for (const t of r.tareas.filter(t => ['t3', 't4'].includes(t.catalogoServicioId!))) {
+      expect(t.fechaInicio.getTime()).toBe(ctl.fechaInicioPlan.getTime())
+      expect(t.fechaFin.getTime()).toBe(fase(r, 'EJECUCION').fechaFinPlan.getTime())
+      expect(t.horasEstimadas).toBe(8)
+    }
+  })
+
+  it('PROCURA arranca al terminar toda Planificación y no retrasa a Ejecución', () => {
+    const r = construir()
+    const pro = edt(r, 'Procura')
+    expect(pro.fechaInicioPlan.getTime()).toBeGreaterThan(fase(r, 'PLANIFICACION').fechaFinPlan.getTime())
+    // Ejecución sigue a Ingeniería aunque Procura termine después.
+    const ing = edt(r, 'Ingenieria')
+    const con = edt(r, 'Construccion')
+    expect(con.fechaInicioPlan.getTime()).toBeGreaterThan(ing.fechaFinPlan.getTime())
+    expect(con.fechaInicioPlan.getTime()).toBeLessThan(pro.fechaFinPlan.getTime())
+  })
+
+  it('INGENIERIA sigue arrancando tras SEG y CIERRE tras Ejecución (la cadena principal no cambia)', () => {
+    const r = construir()
+    expect(edt(r, 'Ingenieria').fechaInicioPlan.getTime()).toBeGreaterThan(edt(r, 'Seguridad').fechaFinPlan.getTime())
+    expect(edt(r, 'Cierre').fechaInicioPlan.getTime()).toBeGreaterThan(fase(r, 'EJECUCION').fechaFinPlan.getTime())
+  })
+})
+
 describe('agruparYOrdenarPorEstructura — única fuente de verdad del orden, compartida por construirEstructuraReal y el preview del Paso 2', () => {
   // Mismo caso que el test de más arriba: CMM llega PRIMERO en el array de
   // entrada pero su edtOrden (3) es mayor que el de CON (2) — el orden

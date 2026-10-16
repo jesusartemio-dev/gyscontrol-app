@@ -219,6 +219,13 @@ function generarCIE(servicios: CatalogoServicioParaWizard[], config: Configuraci
   return agruparPorTag(servicios, 'CIE', { Tecnico: 'Cierre Técnico', Gestion: 'Cierre de Gestión' }, config)
 }
 
+/** CTL: una sola actividad con las tareas recurrentes de control (reuniones, reportes, valorizaciones). */
+function generarCTL(servicios: CatalogoServicioParaWizard[], config: ConfiguracionWizardPaso1): ActividadPropuesta[] {
+  const tareas = servicios.map(s => construirTareaPropuesta(s, config))
+  if (!tieneAlMenosUnaTareaIncluida(tareas)) return []
+  return [{ edtNombre: 'CTL', actividadNombre: 'Control y Seguimiento', tareas, origen: 'determinista' }]
+}
+
 function generarSEG(servicios: CatalogoServicioParaWizard[], config: ConfiguracionWizardPaso1): ActividadPropuesta[] {
   const tareas = servicios.map(s => construirTareaPropuesta(s, config))
   if (!tieneAlMenosUnaTareaIncluida(tareas)) return []
@@ -376,6 +383,9 @@ export function generarActividadesDeterministas(
         break
       case 'SEG':
         actividades.push(...generarSEG(edt.servicios, config))
+        break
+      case 'CTL':
+        actividades.push(...generarCTL(edt.servicios, config))
         break
       case 'CMM':
         actividades.push(...generarCMM(edt.servicios, config, subalcanceCMM))

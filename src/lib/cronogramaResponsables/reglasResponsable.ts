@@ -31,6 +31,7 @@ export const ROL_RESPONSABLE_LABELS: Record<RolResponsable, string> = {
  */
 const REGLA_ROL_POR_EDT: Record<string, RolResponsable> = {
   GES: 'gestor',
+  CTL: 'gestor',
   PRO: 'gestor',
   CIE: 'gestor',
   ING: 'residente',

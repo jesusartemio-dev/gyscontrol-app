@@ -124,6 +124,22 @@ const FASE_PARALELA_CONTINUA = 'PLANIFICACION'
  * incluido en esta generación, se cae al fin real de la fase. */
 const EDT_GATILLO_SIGUIENTE_FASE: Record<string, string> = { PLANIFICACION: 'SEG' }
 
+/**
+ * Fases que corren en paralelo con la cadena principal (Planificación →
+ * Ingeniería → Ejecución → Cierre): tienen su propio inicio y NO empujan el
+ * inicio de la fase siguiente.
+ * - GESTION Y CONTROL (EDT CTL): empieza al terminar GES (plan aprobado) y se
+ *   estira hasta el fin de Ejecución — ver estirarFaseHasta más abajo.
+ * - PROCURA (EDT PRO): empieza al terminar toda Planificación (GES y SEG). La
+ *   espera de materiales la cubre la dependencia PRO "Recepción en Almacén" →
+ *   CON "Preparación y Traslado", no el inicio de Ejecución.
+ */
+const FASE_GESTION_CONTROL = 'GESTION Y CONTROL'
+const FASE_PROCURA = 'PROCURA'
+const FASE_EJECUCION = 'EJECUCION'
+/** "Gestión y Control" → "GESTION Y CONTROL" (los nombres de fase vienen del catálogo). */
+const claveFase = (nombre: string) => nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase()
+
 const DURACION_MINIMA_DIAS = 1
 
 function duracionDiasDesdeHoras(horas: number, horasPorDia: number): number {
@@ -180,12 +196,23 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
   const edtIdACodigo = new Map<string, string>()
 
   let cursorFase = ajustarFechaADiaLaborable(fechaInicioProyecto, calendarioLaboral)
+  // Fines ya calculados, para las fases con inicio propio (ver FASE_GESTION_CONTROL).
+  const finPorEdtCodigo = new Map<string, Date>()
+  const finPorFase = new Map<string, Date>()
 
   for (const faseInfo of fasesAgrupadas) {
     const horasFase = faseInfo.grupos.reduce((acc, g) => acc + g.actividades.reduce((a2, act) => a2 + act.tareas.reduce((a3, t) => a3 + t.horasEstimadas, 0), 0), 0)
 
     const faseId = randomUUID()
-    const fechaInicioFase = cursorFase
+    const clave = claveFase(faseInfo.faseNombre)
+    const finPlanificacion = finPorFase.get(FASE_PARALELA_CONTINUA)
+    // Inicio propio (no sigue la cadena): Gestión y Control tras GES; Procura tras Planificación.
+    const inicioPropio =
+      clave === FASE_GESTION_CONTROL ? (finPorEdtCodigo.get('GES') ?? finPlanificacion)
+      : clave === FASE_PROCURA ? finPlanificacion
+      : undefined
+    const corrEnParalelo = clave === FASE_GESTION_CONTROL || clave === FASE_PROCURA
+    const fechaInicioFase = inicioPropio ? avanzarSiguienteInicio(inicioPropio, calendarioLaboral) : cursorFase
     // Fase paralela (PLANIFICACION): todas sus EDTs arrancan el mismo día
     // (fechaInicioFase), nunca encadenadas entre sí — ver FASE_PARALELA_CONTINUA.
     const esFaseParalela = faseInfo.faseNombre === FASE_PARALELA_CONTINUA
@@ -314,6 +341,7 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
         fechaFinFase = fechaFinEdt
       }
       if (edtGatillo && edtInfo.nombre === edtGatillo) fechaGatilloSiguienteFase = fechaFinEdt
+      finPorEdtCodigo.set(edtInfo.nombre, fechaFinEdt)
 
       if (!esFaseParalela) cursorEdt = avanzarSiguienteInicio(fechaFinEdt, calendarioLaboral)
     }
@@ -336,8 +364,26 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
     // una fase paralela puede seguir corriendo. Sin gatillo configurado (el
     // caso de todas las demás fases hoy), cae exactamente al comportamiento
     // de siempre: fin real de la fase.
-    const fechaBaseSiguienteFase = fechaGatilloSiguienteFase ?? fechaFinFase
-    cursorFase = avanzarSiguienteInicio(fechaBaseSiguienteFase, calendarioLaboral)
+    finPorFase.set(clave, fechaFinFase)
+    // Las fases en paralelo (Gestión y Control, Procura) no mueven la cadena principal.
+    if (!corrEnParalelo) {
+      const fechaBaseSiguienteFase = fechaGatilloSiguienteFase ?? fechaFinFase
+      cursorFase = avanzarSiguienteInicio(fechaBaseSiguienteFase, calendarioLaboral)
+    }
+  }
+
+  // Gestión y Control es transversal: sus tareas (reuniones y reportes
+  // semanales, valorizaciones) son de esfuerzo nivelado, corren desde su
+  // inicio hasta el fin de Ejecución con las mismas horas de trabajo.
+  const finEjecucion = finPorFase.get(FASE_EJECUCION)
+  const faseGC = fases.find(f => claveFase(f.nombre) === FASE_GESTION_CONTROL)
+  if (faseGC && finEjecucion && finEjecucion.getTime() > faseGC.fechaFinPlan.getTime()) {
+    const edtsGC = new Set(edts.filter(e => e.proyectoFaseId === faseGC.id).map(e => e.id))
+    const actsGC = new Set(actividadesFilas.filter(a => edtsGC.has(a.proyectoEdtId)).map(a => a.id))
+    for (const t of tareas) if (actsGC.has(t.proyectoActividadId)) { t.fechaInicio = faseGC.fechaInicioPlan; t.fechaFin = finEjecucion }
+    for (const a of actividadesFilas) if (actsGC.has(a.id)) { a.fechaInicioPlan = faseGC.fechaInicioPlan; a.fechaFinPlan = finEjecucion }
+    for (const e of edts) if (edtsGC.has(e.id)) { e.fechaInicioPlan = faseGC.fechaInicioPlan; e.fechaFinPlan = finEjecucion }
+    faseGC.fechaFinPlan = finEjecucion
   }
 
   return { fases, edts, actividades: actividadesFilas, tareas, advertencias, edtIdACodigo }

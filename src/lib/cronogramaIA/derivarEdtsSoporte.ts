@@ -34,6 +34,7 @@ export interface EdtSugeridoConOrigen {
 
 const EDTS_SIEMPRE: Record<string, string> = {
   GES: 'Gestión del proyecto — siempre aplica.',
+  CTL: 'Control y seguimiento del proyecto — siempre aplica.',
   CIE: 'Cierre del proyecto — siempre aplica.',
 }
 
