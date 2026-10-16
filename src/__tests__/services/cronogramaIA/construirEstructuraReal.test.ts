@@ -407,8 +407,12 @@ describe('construirEstructuraReal — GESTION Y CONTROL transversal y PROCURA en
     actividades: [
       { edtNombre: 'GES', actividadNombre: 'Inicio', tareas: [tarea('t1', 'Kickoff', 24)], origen: 'determinista' }, // 3 días
       { edtNombre: 'SEG', actividadNombre: 'Documentos de Seguridad', tareas: [tarea('t2', 'IPERC', 40)], origen: 'determinista' }, // 5 días
-      { edtNombre: 'CTL', actividadNombre: 'Reporte Avance Semanal', tareas: [tarea('r1', 'Elaboración de Reporte Semanal', 2), tarea('r2', 'Envío de Reporte Semanal', 0.5, 1)], origen: 'determinista' },
-      { edtNombre: 'CTL', actividadNombre: 'Valorizaciones', tareas: [tarea('v1', 'Elaboración de Valorización', 4), tarea('v2', 'Envío de Valorización', 0.5, 1), tarea('v3', 'Aprobación de Valorización', 0.5, 2), tarea('v4', 'Recepción de Conformidad HES', 0.5, 3)], origen: 'determinista' },
+      { edtNombre: 'CTL', actividadNombre: 'Reporte Avance Semanal', tareas: [tarea('r1', 'Elaboración y Envío de Reporte Semanal', 2.5)], origen: 'determinista' },
+      { edtNombre: 'CTL', actividadNombre: 'Valorizaciones', tareas: [
+        tarea('v1', 'Elaboración y Envío de Valorización', 4.5),
+        { ...tarea('v2', 'Aprobación de Valorización', 0, 1), hitoDiasDespues: 2 },
+        { ...tarea('v3', 'Recepción de Conformidad HES', 0, 2), hitoDiasDespues: 5 },
+      ], origen: 'determinista' },
       { edtNombre: 'SSO', actividadNombre: 'Habilitación de Personal', tareas: [tarea('h1', 'Solicitud de Validación de OC', 1), tarea('h2', 'Solicitud Ingreso Personal SPOT', 1, 1), tarea('h3', 'Habilitación de Personal Sistema Rainbow', 1, 2)], origen: 'determinista' },
       { edtNombre: 'ING', actividadNombre: 'Diseño', tareas: [tarea('t5', 'Diseño', 40)], origen: 'determinista' },
       { edtNombre: 'PRO', actividadNombre: 'Cables', tareas: [tarea('t6', 'Compra', 80)], origen: 'determinista' }, // 10 días
@@ -425,42 +429,39 @@ describe('construirEstructuraReal — GESTION Y CONTROL transversal y PROCURA en
   const edt = (r: ReturnType<typeof construir>, nombre: string) => r.edts.find(e => e.nombre === nombre)!
   const fase = (r: ReturnType<typeof construir>, nombre: string) => r.fases.find(f => f.nombre === nombre)!
 
-  it('reportes semanales: un ciclo por viernes de la ventana (fin de GES → fin de Ejecución), numerados y encadenados el mismo día', () => {
+  it('reportes semanales: una tarea por viernes de la ventana (fin de GES → fin de Ejecución), numerada', () => {
     const r = construir()
-    const elab = r.tareas.filter(t => t.catalogoServicioId === 'r1').sort((a, b) => a.fechaInicio.getTime() - b.fechaInicio.getTime())
-    const envio = r.tareas.filter(t => t.catalogoServicioId === 'r2').sort((a, b) => a.fechaInicio.getTime() - b.fechaInicio.getTime())
-    expect(elab.length).toBeGreaterThanOrEqual(3)
-    expect(envio.length).toBe(elab.length)
-    elab.forEach((t, i) => {
-      const nn = String(i + 1).padStart(2, '0')
-      expect(t.nombre).toBe(`Elaboración de Reporte Semanal ${nn}`)
-      expect(envio[i].nombre).toBe(`Envío de Reporte Semanal ${nn}`)
+    const reportes = r.tareas.filter(t => t.catalogoServicioId === 'r1').sort((a, b) => a.fechaInicio.getTime() - b.fechaInicio.getTime())
+    expect(reportes.length).toBeGreaterThanOrEqual(3)
+    reportes.forEach((t, i) => {
+      expect(t.nombre).toBe(`Elaboración y Envío de Reporte Semanal ${String(i + 1).padStart(2, '0')}`)
       expect(t.fechaInicio.getUTCDay()).toBe(5) // viernes
       expect(t.fechaInicio.getUTCHours()).toBe(8)
-      expect(t.horasEstimadas).toBe(2)
-      expect(envio[i].fechaInicio.getTime()).toBe(t.fechaFin.getTime()) // Envío justo después, mismo día
-      expect(envio[i].horasEstimadas).toBe(0.5)
-      expect(r.dependenciasCiclos).toContainEqual({ tareaOrigenId: t.id, tareaDependienteId: envio[i].id, tipo: 'finish_to_start' })
+      expect(t.horasEstimadas).toBe(2.5)
     })
-    // Dentro de la ventana
-    const ctl = edt(r, 'Control')
-    expect(ctl.fechaInicioPlan.getTime()).toBeGreaterThan(edt(r, 'Planificación del Proyecto').fechaFinPlan.getTime())
-    expect(elab[elab.length - 1].fechaInicio.getTime()).toBeLessThanOrEqual(fase(r, 'EJECUCION').fechaFinPlan.getTime())
+    // Todas en la misma actividad
+    expect(new Set(reportes.map(t => t.proyectoActividadId)).size).toBe(1)
+    expect(edt(r, 'Control').fechaInicioPlan.getTime()).toBeGreaterThan(edt(r, 'Planificación del Proyecto').fechaFinPlan.getTime())
+    expect(reportes[reportes.length - 1].fechaInicio.getTime()).toBeLessThanOrEqual(fase(r, 'EJECUCION').fechaFinPlan.getTime())
   })
 
-  it('valorizaciones: un ciclo cada día 20, con sus 4 tareas en cadena', () => {
+  it('valorizaciones: una actividad por cada día 20, con Aprobación (+2d) y HES (+5d) como hitos', () => {
     const r = construir()
-    const ciclo = ['v1', 'v2', 'v3', 'v4'].map(id => r.tareas.filter(t => t.catalogoServicioId === id))
-    expect(ciclo[0].length).toBe(1)
-    const [elab, envio, aprob, hes] = ciclo.map(l => l[0])
-    expect(elab.nombre).toBe('Elaboración de Valorización 01')
-    expect(hes.nombre).toBe('Recepción de Conformidad HES 01')
+    expect(r.actividades.find(a => a.nombre === 'Valorizaciones')).toBeUndefined()
+    const act = r.actividades.find(a => a.nombre === 'Valorización 01')!
+    expect(act).toBeDefined()
+    const [elab, aprob, hes] = ['v1', 'v2', 'v3'].map(id => r.tareas.find(t => t.catalogoServicioId === id)!)
+    for (const t of [elab, aprob, hes]) expect(t.proyectoActividadId).toBe(act.id)
+    expect(elab.nombre).toBe('Elaboración y Envío de Valorización 01')
     expect(elab.fechaInicio.getUTCDate()).toBe(20)
-    // Cada una empieza cuando termina la anterior (tras el almuerzo si cae a las 12:00), el mismo día.
-    for (const [ant, sig] of [[elab, envio], [envio, aprob], [aprob, hes]]) {
-      expect(sig.fechaInicio.getTime()).toBeGreaterThanOrEqual(ant.fechaFin.getTime())
-      expect(sig.fechaInicio.getUTCDate()).toBe(20)
-    }
+    expect(elab.horasEstimadas).toBe(4.5)
+    // Hitos de espera: sin horas, 2 y 5 días hábiles (8 h/día en el calendario de prueba) después del envío
+    expect(aprob).toMatchObject({ nombre: 'Aprobación de Valorización 01', esHito: true, horasEstimadas: 0 })
+    expect(hes).toMatchObject({ nombre: 'Recepción de Conformidad HES 01', esHito: true, horasEstimadas: 0 })
+    expect(aprob.fechaInicio.getTime()).toBe(aprob.fechaFin.getTime())
+    expect(r.dependenciasCiclos).toContainEqual({ tareaOrigenId: elab.id, tareaDependienteId: aprob.id, tipo: 'finish_to_start', lagMinutos: 2 * 8 * 60 })
+    expect(r.dependenciasCiclos).toContainEqual({ tareaOrigenId: elab.id, tareaDependienteId: hes.id, tipo: 'finish_to_start', lagMinutos: 5 * 8 * 60 })
+    expect(hes.fechaInicio.getTime()).toBeGreaterThan(aprob.fechaInicio.getTime())
   })
 
   it('SSO: habilitación de personal una sola vez, al inicio de la ventana, en cadena', () => {

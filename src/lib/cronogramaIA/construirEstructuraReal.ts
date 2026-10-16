@@ -2,8 +2,8 @@ import { randomUUID } from 'crypto'
 import { ajustarFechaADiaLaborable, calcularFechaFinConCalendario } from '@/lib/utils/calendarioLaboral'
 import { agruparYOrdenarPorEstructura, type GrupoEdtOrdenado, type InfoOrdenEdt } from './agruparYOrdenarPorEstructura'
 import type { ActividadPropuesta, TareaPropuesta } from '@/types/cronogramaIA'
-import { type CalendarioHoras, siguienteMomentoLaborable, sumarHorasLaborables } from '@/lib/services/cronogramaHoras'
-import { RECURRENCIA_ACTIVIDAD } from './reglasActividades'
+import { type CalendarioHoras, desplazarHorasLaborables, horasPorDiaCalendario, siguienteMomentoLaborable, sumarHorasLaborables } from '@/lib/services/cronogramaHoras'
+import { ACTIVIDAD_POR_CICLO, RECURRENCIA_ACTIVIDAD } from './reglasActividades'
 
 // Re-exportado por compatibilidad — la implementación real vive en
 // agruparYOrdenarPorEstructura.ts (sin esta ruta, un import desde acá
@@ -110,8 +110,8 @@ export interface EstructuraReal {
   advertencias: string[]
   /** proyectoEdtId -> código corto del catálogo (ej. "CON") — uso interno (reglas de dependencias), no se persiste. */
   edtIdACodigo: Map<string, string>
-  /** Fin-Comienzo entre las tareas de cada ciclo de GESTION Y CONTROL (Elaboración → Envío → …). */
-  dependenciasCiclos: { tareaOrigenId: string; tareaDependienteId: string; tipo: 'finish_to_start' }[]
+  /** Fin-Comienzo entre las tareas de cada ciclo de GESTION Y CONTROL (con desfase para los hitos de espera). */
+  dependenciasCiclos: { tareaOrigenId: string; tareaDependienteId: string; tipo: 'finish_to_start'; lagMinutos: number }[]
 }
 
 /** Fase cuyas EDTs corren en PARALELO entre sí (todas arrancan el mismo día
@@ -458,43 +458,81 @@ export function programarGestionYControl(o: {
   const dependencias: EstructuraReal['dependenciasCiclos'] = []
   const inicioVentana = siguienteMomentoLaborable(cal, inicioDiaUTC(faseGC.fechaInicioPlan))
 
-  /** Encadena tareas desde `desde`: cada una empieza cuando termina la anterior. */
-  const encadenar = (base: FilaTarea[], desde: Date, horasDe: (t: FilaTarea) => number, sufijo: string) => {
+  const hpd = horasPorDiaCalendario(cal)
+  /**
+   * Encadena tareas desde `desde`: cada una empieza cuando termina la anterior.
+   * Un hito de espera (hitoDiasDespues) cae N días hábiles después de la última
+   * tarea con trabajo, sin horas y sin mover la cadena (FC con ese desfase).
+   */
+  const encadenar = (base: FilaTarea[], desde: Date, horasDe: (t: FilaTarea) => number, sufijo: string, actividadId?: string) => {
     let cursor = siguienteMomentoLaborable(cal, desde)
     let anterior: FilaTarea | null = null
     for (const t of base) {
+      const id = sufijo ? randomUUID() : t.id
+      const nombre = sufijo ? `${t.nombre} ${sufijo}` : t.nombre
+      const dias = o.propuestaPorTareaId.get(t.id)?.hitoDiasDespues
+      if (dias !== undefined && anterior) {
+        const lagMinutos = Math.round(dias * hpd * 60)
+        const fecha = desplazarHorasLaborables(cal, anterior.fechaFin, lagMinutos / 60, 'fin')
+        nuevas.push({ ...t, id, nombre, proyectoActividadId: actividadId ?? t.proyectoActividadId, fechaInicio: fecha, fechaFin: fecha, horasEstimadas: 0, esHito: true })
+        dependencias.push({ tareaOrigenId: anterior.id, tareaDependienteId: id, tipo: 'finish_to_start', lagMinutos })
+        continue
+      }
       const horas = Math.max(0, horasDe(t))
       const fin = sumarHorasLaborables(cal, cursor, horas)
-      const fila: FilaTarea = { ...t, id: sufijo ? randomUUID() : t.id, nombre: sufijo ? `${t.nombre} ${sufijo}` : t.nombre, fechaInicio: cursor, fechaFin: fin, horasEstimadas: horas }
+      const fila: FilaTarea = { ...t, id, nombre, proyectoActividadId: actividadId ?? t.proyectoActividadId, fechaInicio: cursor, fechaFin: fin, horasEstimadas: horas }
       nuevas.push(fila)
-      if (anterior) dependencias.push({ tareaOrigenId: anterior.id, tareaDependienteId: fila.id, tipo: 'finish_to_start' })
+      if (anterior) dependencias.push({ tareaOrigenId: anterior.id, tareaDependienteId: fila.id, tipo: 'finish_to_start', lagMinutos: 0 })
       anterior = fila
       cursor = siguienteMomentoLaborable(cal, fin)
     }
   }
 
-  for (const act of actsGC) {
-    const base = o.tareas.filter(t => t.proyectoActividadId === act.id).sort((a, b) => a.orden - b.orden)
-    if (!base.length) continue
-    const recurrencia = RECURRENCIA_ACTIVIDAD[act.nombre]
-    const desdeIdx = nuevas.length
-    if (recurrencia) {
-      diasDeCiclo(recurrencia, inicioVentana, finVentana).forEach((dia, k) => {
-        const nn = String(k + 1).padStart(2, '0')
-        encadenar(base, dia, t => {
-          const p = o.propuestaPorTareaId.get(t.id)
-          if (!p) return t.horasEstimadas
-          return k === 0 ? p.horaBase : (p.horaRepetido || p.horaBase)
-        }, nn)
-      })
-    } else {
-      encadenar(base, inicioVentana, t => t.horasEstimadas, '')
-    }
-    const delAct = nuevas.slice(desdeIdx)
+  /** Fechas y horas de una actividad a partir de sus tareas. */
+  const resumirActividad = (act: FilaActividad, delAct: FilaTarea[]) => {
     delAct.forEach((t, i) => { t.orden = i })
     act.fechaInicioPlan = new Date(Math.min(...delAct.map(t => t.fechaInicio.getTime())))
     act.fechaFinPlan = new Date(Math.max(...delAct.map(t => t.fechaFin.getTime())))
     act.horasPlan = delAct.reduce((s, t) => s + t.horasEstimadas, 0)
+  }
+
+  for (const act of [...actsGC]) {
+    const base = o.tareas.filter(t => t.proyectoActividadId === act.id).sort((a, b) => a.orden - b.orden)
+    if (!base.length) continue
+    const recurrencia = RECURRENCIA_ACTIVIDAD[act.nombre]
+    const horasCiclo = (k: number) => (t: FilaTarea) => {
+      const p = o.propuestaPorTareaId.get(t.id)
+      if (!p) return t.horasEstimadas
+      return k === 0 ? p.horaBase : (p.horaRepetido || p.horaBase)
+    }
+    const nombreCiclo = ACTIVIDAD_POR_CICLO[act.nombre]
+    if (recurrencia && nombreCiclo) {
+      // Una actividad por ciclo ("Valorización 01", "Valorización 02"…) en lugar de la original.
+      const dias = diasDeCiclo(recurrencia, inicioVentana, finVentana)
+      const ciclos = dias.map((dia, k) => {
+        const nn = String(k + 1).padStart(2, '0')
+        const actCiclo: FilaActividad = { ...act, id: randomUUID(), nombre: `${nombreCiclo} ${nn}`, orden: act.orden + k }
+        const desdeIdx = nuevas.length
+        encadenar(base, dia, horasCiclo(k), nn, actCiclo.id)
+        resumirActividad(actCiclo, nuevas.slice(desdeIdx))
+        return actCiclo
+      })
+      // Reemplaza la actividad original por las de cada ciclo y corre el orden de las siguientes.
+      const idxAll = o.actividades.indexOf(act)
+      o.actividades.splice(idxAll, 1, ...ciclos)
+      actsGC.splice(actsGC.indexOf(act), 1, ...ciclos)
+      for (const a of actsGC) if (a.proyectoEdtId === act.proyectoEdtId && !ciclos.includes(a) && a.orden > act.orden) a.orden += ciclos.length - 1
+      continue
+    }
+    const desdeIdx = nuevas.length
+    if (recurrencia) {
+      diasDeCiclo(recurrencia, inicioVentana, finVentana).forEach((dia, k) => {
+        encadenar(base, dia, horasCiclo(k), String(k + 1).padStart(2, '0'))
+      })
+    } else {
+      encadenar(base, inicioVentana, t => t.horasEstimadas, '')
+    }
+    resumirActividad(act, nuevas.slice(desdeIdx))
   }
 
   for (const e of edtsGC) {

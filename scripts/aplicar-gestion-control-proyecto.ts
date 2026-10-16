@@ -9,7 +9,9 @@
  *    Habilitación HSE de Personal de SEG) — solo si no tienen horas ni avance.
  *  - Orden de las fases según el catálogo. Responsables: Gestor (CTL), SSOMA (SSO).
  * No toca el resto del cronograma.
- * Uso: npx dotenv -e .env.production -o -- npx tsx scripts/aplicar-gestion-control-proyecto.ts CJM50 [--aplicar]
+ * --rehacer: si ya se aplicó, borra y reconstruye CTL y SSO (sin horas ni avance)
+ * con el catálogo vigente.
+ * Uso: npx dotenv -e .env.production -o -- npx tsx scripts/aplicar-gestion-control-proyecto.ts CJM50 [--rehacer] [--aplicar]
  */
 import fs from 'fs'
 import { randomUUID } from 'crypto'
@@ -17,13 +19,14 @@ import { prisma } from '../src/lib/prisma'
 import { obtenerCalendarioProyecto } from '../src/lib/services/cronogramaDesplazamiento'
 import { siguienteMomentoLaborable } from '../src/lib/services/cronogramaHoras'
 import { programarGestionYControl, type FilaFase, type FilaEdt, type FilaActividad, type FilaTarea } from '../src/lib/cronogramaIA/construirEstructuraReal'
-import { esServicioObsoleto, ACTIVIDAD_REPORTE_AVANCE, ACTIVIDAD_VALORIZACIONES, ACTIVIDAD_HABILITACION, ACTIVIDAD_REPORTE_SEGURIDAD } from '../src/lib/cronogramaIA/reglasActividades'
+import { esServicioObsoleto, diasHitoDeEtiquetas, ACTIVIDAD_REPORTE_AVANCE, ACTIVIDAD_VALORIZACIONES, ACTIVIDAD_HABILITACION, ACTIVIDAD_REPORTE_SEGURIDAD } from '../src/lib/cronogramaIA/reglasActividades'
 import { resolverOrganigramaProyecto } from '../src/lib/cronogramaResponsables/resolverOrganigrama'
 import { recalcularActividadPadre, recalcularEdtPadre, recalcularFasePadre } from '../src/lib/utils/cronogramaRollup'
 import type { TareaPropuesta } from '../src/types/cronogramaIA'
 
 const codigo = process.argv[2]
 const APLICAR = process.argv.includes('--aplicar')
+const REHACER = process.argv.includes('--rehacer')
 const ACTIVIDAD_POR_TAG: Record<string, string> = {
   ReporteAvance: ACTIVIDAD_REPORTE_AVANCE, Valorizaciones: ACTIVIDAD_VALORIZACIONES,
   Habilitacion: ACTIVIDAD_HABILITACION, ReporteSeguridad: ACTIVIDAD_REPORTE_SEGURIDAD,
@@ -46,20 +49,24 @@ async function main() {
   const ges = edtsProy.find(e => e.edt.nombre === 'GES')!
   const seg = edtsProy.find(e => e.edt.nombre === 'SEG')
   const ctl = edtsProy.find(e => e.edt.nombre === 'CTL')
-  if (edtsProy.some(e => e.edt.nombre === 'SSO')) throw new Error('El proyecto ya tiene SSO: no se vuelve a aplicar')
+  const sso = edtsProy.find(e => e.edt.nombre === 'SSO')
+  if (sso && !REHACER) throw new Error('El proyecto ya tiene SSO: no se vuelve a aplicar (usa --rehacer para reconstruir CTL y SSO)')
   const docsGestion = ges.proyectoActividad.find(a => a.nombre === 'Documentos de Gestión')!
 
   // Tareas a mover / reemplazar
   const tareasCtl = (ctl?.proyectoActividad ?? []).flatMap(a => a.proyectoTarea)
   const envioDocs = tareasCtl.find(t => t.nombre === QUEDA_EN_GES)
+  const tareasSso = (sso?.proyectoActividad ?? []).flatMap(a => a.proyectoTarea)
   const reemplazar = [
     ...tareasCtl.filter(t => t.id !== envioDocs?.id),
+    ...tareasSso,
     ...(seg?.proyectoActividad ?? []).flatMap(a => a.proyectoTarea).filter(t => REEMPLAZADAS.includes(t.nombre)),
   ]
   const conAvance = reemplazar.filter(t => Number(t.horasReales) > 0 || t.porcentajeCompletado > 0)
   if (conAvance.length) throw new Error(`Tienen horas o avance, no se reemplazan: ${conAvance.map(t => t.nombre).join(', ')}`)
   const actividadesAEliminar = [
     ...(ctl?.proyectoActividad ?? []),
+    ...(sso?.proyectoActividad ?? []),
     ...(seg?.proyectoActividad ?? []).filter(a => a.proyectoTarea.length > 0 && a.proyectoTarea.every(t => REEMPLAZADAS.includes(t.nombre))),
   ]
 
@@ -80,7 +87,8 @@ async function main() {
   const propuesta = new Map<string, TareaPropuesta>()
   for (const cod of ['CTL', 'SSO'] as const) {
     const cat = edtsCat.find(e => e.nombre === cod)!
-    const edtId = cod === 'CTL' && ctl ? ctl.id : randomUUID()
+    const existente = cod === 'CTL' ? ctl : sso
+    const edtId = existente ? existente.id : randomUUID()
     filasEdt.push({ id: edtId, proyectoId: cron.proyectoId, proyectoCronogramaId: cron.id, proyectoFaseId: faseGC.id, edtId: cat.id, nombre: cat.descripcion ?? cod, descripcion: null, orden: cod === 'CTL' ? 0 : 1, horasPlan: 0, fechaInicioPlan: inicioVentana, fechaFinPlan: inicioVentana, updatedAt: new Date(), responsableId: responsable[cod] })
     const actPorNombre = new Map<string, FilaActividad>()
     for (const s of cat.catalogoServicio.filter(x => !esServicioObsoleto(x))) {
@@ -93,7 +101,8 @@ async function main() {
         filasAct.push(act)
       }
       const id = randomUUID()
-      propuesta.set(id, { catalogoServicioId: s.id, nombre: s.nombre, cantidad: 1, nivelDificultad: 1, horaBase: s.horaBase ?? 0, horaRepetido: s.horaRepetido ?? 0, horasEstimadas: s.horaBase ?? 0, incluida: true, orden: s.orden ?? 0 })
+      const hitoDias = diasHitoDeEtiquetas(s.actividadTag)
+      propuesta.set(id, { catalogoServicioId: s.id, nombre: s.nombre, cantidad: 1, nivelDificultad: 1, horaBase: s.horaBase ?? 0, horaRepetido: s.horaRepetido ?? 0, horasEstimadas: s.horaBase ?? 0, incluida: true, orden: s.orden ?? 0, ...(hitoDias !== undefined && { hitoDiasDespues: hitoDias }) })
       filasTarea.push({ id, proyectoEdtId: edtId, proyectoActividadId: act.id, proyectoCronogramaId: cron.id, nombre: s.nombre, orden: s.orden ?? 0, fechaInicio: inicioVentana, fechaFin: inicioVentana, horasEstimadas: s.horaBase ?? 0, updatedAt: new Date(), catalogoServicioId: s.id, recursoId: s.recursoId, responsableId: responsable[cod], esPropuestaIA: false, justificacionIA: null, cantidad: null })
     }
   }
@@ -105,15 +114,22 @@ async function main() {
   console.log(`QUITAR ${reemplazar.length} tareas: ${reemplazar.map(t => t.nombre).join(' | ')}`)
   console.log(`QUITAR actividades: ${actividadesAEliminar.map(a => a.nombre).join(' | ')}`)
   for (const e of filasEdt) {
-    console.log(`${e.id === ctl?.id ? 'EDT' : '+EDT'} ${e.nombre} (responsable: ${e.responsableId ? 'sí' : 'NO'})`)
+    console.log(`${e.id === ctl?.id || e.id === sso?.id ? 'EDT' : '+EDT'} ${e.nombre} (responsable: ${e.responsableId ? 'sí' : 'NO'})`)
     for (const a of filasAct.filter(x => x.proyectoEdtId === e.id)) {
       const ts = r.tareas.filter(t => t.proyectoActividadId === a.id)
       console.log(`  + ${a.nombre}: ${ts.length} tareas, ${f(a.fechaInicioPlan)} → ${f(a.fechaFinPlan)}`)
-      for (const t of ts.slice(0, 4)) console.log(`      ${t.nombre} ${f(t.fechaInicio)} (${t.horasEstimadas} h)`)
+      for (const t of ts.slice(0, 4)) console.log(`      ${t.esHito ? '◆ ' : ''}${t.nombre} ${f(t.fechaInicio)} (${t.horasEstimadas} h)`)
       if (ts.length > 4) console.log(`      … hasta ${ts[ts.length - 1].nombre} ${f(ts[ts.length - 1].fechaInicio)}`)
     }
   }
   console.log(`+ ${r.dependencias.length} dependencias FC de los ciclos`)
+  // Dependencias con tareas de fuera que se perderían al borrar las tareas reemplazadas
+  const idsReemplazo = new Set(reemplazar.map(t => t.id))
+  const externas = (await prisma.proyectoDependenciasTarea.findMany({
+    where: { OR: [{ tareaOrigenId: { in: [...idsReemplazo] } }, { tareaDependienteId: { in: [...idsReemplazo] } }] },
+    include: { tareaOrigen: { select: { nombre: true } }, tareaDependiente: { select: { nombre: true } } },
+  })).filter(d => !idsReemplazo.has(d.tareaOrigenId) || !idsReemplazo.has(d.tareaDependienteId))
+  if (externas.length) console.log(`⚠ Se pierden ${externas.length} dependencias con otras tareas: ${externas.map(d => `${d.tareaOrigen.nombre} → ${d.tareaDependiente.nombre}`).join(' | ')}`)
   const ordenCat = new Map((await prisma.faseDefault.findMany()).map(x => [x.nombre, x.orden]))
   const reordenar = fases.filter(x => ordenCat.has(x.nombre) && ordenCat.get(x.nombre) !== x.orden)
   console.log(`ORDEN de fases: ${reordenar.map(x => `${x.nombre} ${x.orden}→${ordenCat.get(x.nombre)}`).join(', ') || 'sin cambio'}`)
@@ -124,7 +140,6 @@ async function main() {
     JSON.stringify({ envioDocs, reemplazar, actividadesAEliminar: actividadesAEliminar.map(({ proyectoTarea, ...a }) => a), deps, ctl: ctl && { ...ctl, proyectoActividad: undefined }, fases: fases.map(({ proyectoEdt, ...x }) => x) }, null, 2))
 
   const ahora = new Date()
-  const ctlFila = filasEdt.find(e => e.id === ctl?.id)
   await prisma.$transaction(async (tx) => {
     if (envioDocs) {
       const maxOrden = Math.max(0, ...docsGestion.proyectoTarea.map(t => t.orden))
@@ -132,8 +147,10 @@ async function main() {
     }
     await tx.proyectoTarea.deleteMany({ where: { id: { in: reemplazar.map(t => t.id) } } })
     await tx.proyectoActividad.deleteMany({ where: { id: { in: actividadesAEliminar.map(a => a.id) } } })
-    if (ctlFila) await tx.proyectoEdt.update({ where: { id: ctlFila.id }, data: { responsableId: ctlFila.responsableId, nombre: ctlFila.nombre, updatedAt: ahora } })
-    await tx.proyectoEdt.createMany({ data: filasEdt.filter(e => e.id !== ctl?.id) })
+    for (const e of filasEdt.filter(x => x.id === ctl?.id || x.id === sso?.id)) {
+      await tx.proyectoEdt.update({ where: { id: e.id }, data: { responsableId: e.responsableId, nombre: e.nombre, updatedAt: ahora } })
+    }
+    await tx.proyectoEdt.createMany({ data: filasEdt.filter(e => e.id !== ctl?.id && e.id !== sso?.id) })
     await tx.proyectoActividad.createMany({ data: filasAct })
     await tx.proyectoTarea.createMany({ data: r.tareas })
     await tx.proyectoDependenciasTarea.createMany({ data: r.dependencias.map(d => ({ id: randomUUID(), ...d })) })

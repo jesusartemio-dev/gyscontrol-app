@@ -76,6 +76,12 @@ export interface TareaPropuesta {
   notaCantidad?: string | null
   /** true si `cantidad` fue resuelta por el mapeo determinístico o sugerida por IA (ver sugerirCantidadesReales) — false/ausente si es el default "1" del catálogo, o si el usuario ya la editó a mano en el Paso 2. Solo para mostrar un badge de aviso, nunca cambia el cálculo. */
   cantidadSugeridaPorIA?: boolean
+  /**
+   * Hito ◆ de espera (sin horas) que cae N días hábiles después de la tarea
+   * anterior de su ciclo — ej. Aprobación de Valorización (+2d), Recepción de
+   * Conformidad HES (+5d). Sale de la etiqueta "Hito+Nd" del servicio.
+   */
+  hitoDiasDespues?: number
 }
 
 export interface ActividadPropuesta {

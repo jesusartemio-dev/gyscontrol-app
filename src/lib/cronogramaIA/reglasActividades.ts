@@ -113,6 +113,15 @@ export function evaluarAlcance(
   return { incluida: true }
 }
 
+/** Etiqueta "Hito+2d" → 2: hito de espera N días hábiles después de la tarea anterior del ciclo. */
+export function diasHitoDeEtiquetas(tags: string[] | null | undefined): number | undefined {
+  for (const t of tags ?? []) {
+    const m = /^hito\+(\d+)d$/i.exec(t.trim())
+    if (m) return Number(m[1])
+  }
+  return undefined
+}
+
 /** Servicio reemplazado en el catálogo: no se propone al generar cronogramas. */
 export function esServicioObsoleto(servicio: Pick<CatalogoServicioParaWizard, 'actividadTag'>): boolean {
   return (servicio.actividadTag ?? []).some(t => /^obsoleto$/i.test(t))
@@ -140,6 +149,7 @@ export function construirTareaPropuesta(
     unidadNombre: servicio.unidadNombre,
     cantidadSugeridaPorIA: cantidadDeterminista !== null,
     notaCantidad: servicio.notaCantidad,
+    ...(diasHitoDeEtiquetas(servicio.actividadTag) !== undefined && { hitoDiasDespues: diasHitoDeEtiquetas(servicio.actividadTag) }),
   }
 }
 
@@ -234,11 +244,19 @@ export const ACTIVIDAD_VALORIZACIONES = 'Valorizaciones'
 export const ACTIVIDAD_HABILITACION = 'Habilitación de Personal'
 export const ACTIVIDAD_REPORTE_SEGURIDAD = 'Reporte Semanal de Seguridad'
 
-/** Semanal: un ciclo cada viernes. Mensual: un ciclo cada día 20 (valorizaciones). */
+/**
+ * Semanal: un ciclo cada viernes. Mensual: un ciclo cada día 20 (valorizaciones).
+ * Las de ACTIVIDAD_POR_CICLO generan una actividad por ciclo ("Valorización 01",
+ * "Valorización 02"…) en vez de numerar tareas dentro de una sola actividad.
+ */
 export const RECURRENCIA_ACTIVIDAD: Record<string, 'semanal' | 'mensual'> = {
   [ACTIVIDAD_REPORTE_AVANCE]: 'semanal',
   [ACTIVIDAD_REPORTE_SEGURIDAD]: 'semanal',
   [ACTIVIDAD_VALORIZACIONES]: 'mensual',
+}
+/** Actividad recurrente → nombre de la actividad de cada ciclo (se le agrega " 01", " 02"…). */
+export const ACTIVIDAD_POR_CICLO: Record<string, string> = {
+  [ACTIVIDAD_VALORIZACIONES]: 'Valorización',
 }
 
 /** CTL (Control): reportes semanales de avance y valorizaciones mensuales. */
