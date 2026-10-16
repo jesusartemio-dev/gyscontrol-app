@@ -16,6 +16,8 @@
 // Fechas en "hora de obra": la hora tal cual en obra, en los campos UTC. MS
 // Project no maneja zonas horarias, así que se escriben sin zona.
 
+import { type CalendarioHoras, horasLaborablesEntre, inicioJornada } from '@/lib/services/cronogramaHoras'
+
 const DIAS_MSP: Record<string, number> = {
   domingo: 1, lunes: 2, martes: 3, miercoles: 4, jueves: 5, viernes: 6, sabado: 7,
 }
@@ -134,6 +136,54 @@ const calendarioRecursoXml = (uid: number, nombre: string) => `    <Calendar>
       <IsBaselineCalendar>0</IsBaselineCalendar>
       <BaseCalendarUID>1</BaseCalendarUID>
     </Calendar>`
+
+/** Calendario de la exportación → calendario por horas (para repartir el trabajo por día). */
+function calendarioParaHoras(cal: CalendarioExport): CalendarioHoras {
+  return {
+    ...cal,
+    diasLaborables: cal.diasLaborables?.length ? cal.diasLaborables : ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'],
+    diaCalendario: (cal.diaCalendario ?? []) as CalendarioHoras['diaCalendario'],
+    excepcionCalendario: (cal.excepcionCalendario ?? []).map((e) => ({ ...e, fecha: new Date(e.fecha) })),
+  } as CalendarioHoras
+}
+
+/**
+ * Trabajo de la asignación repartido por día (TimephasedData tipo 1, como lo
+ * guarda MS Project): un bloque por día con el trabajo proporcional a sus horas
+ * laborables, y un bloque en 0 para los días no laborables seguidos.
+ */
+function trabajoPorDia(cal: CalendarioHoras, uidAsignacion: number, inicio: string, fin: string, trabajo: number): string {
+  const ini = new Date(`${inicio}Z`)
+  const hasta = new Date(`${fin}Z`)
+  const total = horasLaborablesEntre(cal, ini, hasta)
+  const minutosTotales = Math.round(trabajo * 60)
+  if (!(total > 0) || minutosTotales <= 0) return ''
+  const bloques: { desde: Date; hasta: Date; minutos: number }[] = []
+  let cursor = ini
+  let asignados = 0
+  for (let i = 0; i < 4000 && cursor < hasta; i++) {
+    const manana = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth(), cursor.getUTCDate() + 1))
+    const finTramo = new Date(Math.min(inicioJornada(cal, manana).getTime(), hasta.getTime()))
+    if (finTramo <= cursor) break
+    const horas = horasLaborablesEntre(cal, cursor, finTramo)
+    const ultimo = finTramo.getTime() === hasta.getTime()
+    const minutos = horas > 0 ? (ultimo ? minutosTotales - asignados : Math.round((minutosTotales * horas) / total)) : 0
+    const previo = bloques[bloques.length - 1]
+    if (minutos === 0 && previo && previo.minutos === 0) previo.hasta = finTramo // días no laborables seguidos: un solo bloque
+    else bloques.push({ desde: cursor, hasta: finTramo, minutos })
+    asignados += minutos
+    cursor = finTramo
+  }
+  const fmt = (min: number) => `PT${Math.floor(min / 60)}H${min % 60}M0S`
+  return bloques.map((b) => `      <TimephasedData>
+        <Type>1</Type>
+        <UID>${uidAsignacion}</UID>
+        <Start>${fechaMsp(b.desde)}</Start>
+        <Finish>${fechaMsp(b.hasta)}</Finish>
+        <Unit>1</Unit>
+        <Value>${fmt(b.minutos)}</Value>
+      </TimephasedData>`).join('\n')
+}
 
 interface FilaTarea {
   uid: number
@@ -288,17 +338,26 @@ ${preds}
       <CalendarUID>${r.uid + 1}</CalendarUID>
     </Resource>`).join('\n')
 
-  // Sin números con decimales: en una PC con coma decimal (español), MS Project
-  // leía "0.2632" como 0 % y recalculaba las duraciones en 0. Las unidades las
-  // calcula MS Project con el trabajo y la duración (tarea de duración fija).
-  // Orden del esquema: Finish, Start, …, Work.
+  // Asignación con los mismos campos y orden que escribe MS Project al guardar
+  // en XML, incluida la distribución diaria del trabajo (TimephasedData). Sin
+  // ella, algunas instalaciones (MS Project en español) ponían la asignación —
+  // y con ella la tarea manual — al inicio del proyecto, con unidades en 0 %.
+  const calHoras = calendarioParaHoras(calendario)
   const asignacionesXml = asignaciones.map((a) => `    <Assignment>
       <UID>${a.uid}</UID>
       <TaskUID>${a.tareaUid}</TaskUID>
       <ResourceUID>${a.recursoUid}</ResourceUID>
+      <PercentWorkComplete>0</PercentWorkComplete>
+      <ActualWork>PT0H0M0S</ActualWork>
+      <Delay>0</Delay>
       <Finish>${a.fin}</Finish>
+      <RegularWork>${duracionMsp(a.trabajo)}</RegularWork>
+      <RemainingWork>${duracionMsp(a.trabajo)}</RemainingWork>
       <Start>${a.inicio}</Start>
+      <Units>${Math.round(a.unidades * 100000) / 100000}</Units>
       <Work>${duracionMsp(a.trabajo)}</Work>
+      <WorkContour>0</WorkContour>
+${trabajoPorDia(calHoras, a.uid, a.inicio, a.fin, a.trabajo)}
     </Assignment>`).join('\n')
 
   const minDia = Math.round(hpd * 60)
