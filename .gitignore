@@ -46,6 +46,8 @@ nul
 scripts/fix-codes.ts
 scripts/test-ssoma.ts
 scripts/migration-snapshot-*.json
+# Respaldos de datos de producción que generan los scripts (no van al repo)
+scripts/respaldo-*.json
 docs/
 .claude/settings.local.json
 
