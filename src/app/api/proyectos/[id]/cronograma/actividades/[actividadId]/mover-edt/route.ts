@@ -1,8 +1,8 @@
 // ===================================================
 // 📁 Archivo: route.ts
 // 📌 Ubicación: src/app/api/proyectos/[id]/cronograma/actividades/[actividadId]/mover-edt/
-// 🔧 Descripción: Mover una actividad (y sus tareas) de un EDT a otro dentro
-//    de la misma fase, sin tocar fechas/horas — solo reasigna el padre.
+// 🔧 Descripción: Mover una actividad (y sus tareas) a otro EDT del mismo
+//    cronograma, de cualquier fase, sin tocar fechas/horas — solo reasigna el padre.
 // ===================================================
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -18,7 +18,7 @@ interface RouteContext {
   params: Promise<{ id: string; actividadId: string }>
 }
 
-// ✅ GET - EDTs candidatos para mover la actividad (misma fase, distinto EDT)
+// ✅ GET - EDTs candidatos para mover la actividad (mismo cronograma, cualquier fase)
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const session = await getServerSession(authOptions)
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       select: {
         id: true,
         proyectoEdtId: true,
-        proyectoEdt: { select: { proyectoId: true, proyectoFaseId: true } },
+        proyectoEdt: { select: { proyectoId: true, proyectoCronogramaId: true } },
       },
     })
 
@@ -41,21 +41,19 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Actividad no encontrada' }, { status: 404 })
     }
 
-    if (!actividad.proyectoEdt?.proyectoFaseId) {
-      return NextResponse.json({ error: 'El EDT actual no pertenece a ninguna fase' }, { status: 400 })
-    }
-
+    // En el orden del cronograma: por fase y luego por EDT.
     const edtsCandidatos = await prisma.proyectoEdt.findMany({
       where: {
-        proyectoFaseId: actividad.proyectoEdt.proyectoFaseId,
+        proyectoCronogramaId: actividad.proyectoEdt.proyectoCronogramaId,
         id: { not: actividad.proyectoEdtId },
       },
       select: {
         id: true,
         nombre: true,
         edt: { select: { nombre: true } },
+        proyectoFase: { select: { nombre: true } },
       },
-      orderBy: { nombre: 'asc' },
+      orderBy: [{ proyectoFase: { orden: 'asc' } }, { orden: 'asc' }],
     })
 
     return NextResponse.json({ success: true, data: edtsCandidatos })
@@ -90,7 +88,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         id: true,
         nombre: true,
         proyectoEdtId: true,
-        proyectoEdt: { select: { proyectoId: true, proyectoFaseId: true, nombre: true } },
+        proyectoEdt: { select: { proyectoId: true, proyectoFaseId: true, proyectoCronogramaId: true, nombre: true } },
       },
     })
 
@@ -114,9 +112,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'EDT destino no encontrado en este proyecto' }, { status: 404 })
     }
 
-    if (edtDestino.proyectoFaseId !== faseOrigenId) {
+    // Cualquier fase, pero del mismo cronograma (línea base y ejecución no se mezclan).
+    if (edtDestino.proyectoCronogramaId !== actividad.proyectoEdt.proyectoCronogramaId) {
       return NextResponse.json(
-        { error: 'Solo se puede mover la actividad a otro EDT de la misma fase' },
+        { error: 'Solo se puede mover la actividad a un EDT del mismo cronograma' },
         { status: 400 }
       )
     }
@@ -155,6 +154,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     await recalcularEdtPadre(edtOrigenId)
     await recalcularEdtPadre(nuevoEdtId)
     if (faseOrigenId) await recalcularFasePadre(faseOrigenId)
+    if (edtDestino.proyectoFaseId && edtDestino.proyectoFaseId !== faseOrigenId) await recalcularFasePadre(edtDestino.proyectoFaseId)
 
     logger.info(`✅ [API MOVER-EDT] Actividad ${actividadId} movida de EDT ${edtOrigenId} a ${nuevoEdtId} (${tareasMovidas} tareas)`)
 

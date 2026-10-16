@@ -2,12 +2,12 @@
 
 /**
  * MoverActividadEdtModal - Mueve una actividad (con sus tareas) de su EDT
- * actual a otro EDT de la MISMA fase, sin tocar fechas ni horas.
+ * actual a otro EDT del mismo cronograma (cualquier fase), sin tocar fechas ni horas.
  */
 
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ArrowRightLeft, Loader2, AlertCircle } from 'lucide-react'
@@ -17,6 +17,7 @@ interface EdtCandidato {
   id: string
   nombre: string
   edt?: { nombre: string } | null
+  proyectoFase?: { nombre: string } | null
 }
 
 interface MoverActividadEdtModalProps {
@@ -60,7 +61,7 @@ export function MoverActividadEdtModal({
       setEdtsCandidatos(data.data || [])
     } catch (error) {
       console.error('Error cargando EDTs candidatos:', error)
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los EDTs de la fase' })
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los EDTs del cronograma' })
     } finally {
       setLoadingEdts(false)
     }
@@ -110,7 +111,7 @@ export function MoverActividadEdtModal({
           </div>
 
           <div className="space-y-2">
-            <Label>EDT destino (misma fase)</Label>
+            <Label>EDT destino</Label>
             {loadingEdts ? (
               <div className="flex items-center gap-2 py-2 text-sm text-gray-600">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -118,7 +119,7 @@ export function MoverActividadEdtModal({
               </div>
             ) : edtsCandidatos.length === 0 ? (
               <p className="text-sm text-gray-500 py-2">
-                No hay otro EDT en esta fase para mover la actividad.
+                No hay otro EDT en este cronograma para mover la actividad.
               </p>
             ) : (
               <Select value={edtDestinoId} onValueChange={setEdtDestinoId}>
@@ -126,10 +127,16 @@ export function MoverActividadEdtModal({
                   <SelectValue placeholder="Seleccionar EDT..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {edtsCandidatos.map(e => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.edt?.nombre ? `${e.edt.nombre} - ${e.nombre}` : e.nombre}
-                    </SelectItem>
+                  {/* Agrupados por fase, en el orden del cronograma */}
+                  {[...new Set(edtsCandidatos.map(e => e.proyectoFase?.nombre ?? 'Sin fase'))].map(fase => (
+                    <SelectGroup key={fase}>
+                      <SelectLabel className="text-xs text-muted-foreground">{fase}</SelectLabel>
+                      {edtsCandidatos.filter(e => (e.proyectoFase?.nombre ?? 'Sin fase') === fase).map(e => (
+                        <SelectItem key={e.id} value={e.id}>
+                          {e.edt?.nombre ? `${e.edt.nombre} - ${e.nombre}` : e.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))}
                 </SelectContent>
               </Select>
