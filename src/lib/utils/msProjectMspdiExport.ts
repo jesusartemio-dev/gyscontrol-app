@@ -318,7 +318,9 @@ ${fechas}
       <Estimated>0</Estimated>
       <Milestone>${esHito ? 1 : 0}</Milestone>
       <Summary>${f.esResumen ? 1 : 0}</Summary>
-      <PercentComplete>${avance}</PercentComplete>${duracionesAvance}${limite}${d.descripcion ? `
+      <PercentComplete>${avance}</PercentComplete>${duracionesAvance}
+      <ConstraintType>0</ConstraintType>
+      <CalendarUID>-1</CalendarUID>${limite}${d.descripcion ? `
       <Notes>${esc(String(d.descripcion))}</Notes>` : ''}
 ${preds}
       <ExtendedAttribute>
@@ -360,6 +362,11 @@ ${preds}
 ${trabajoPorDia(calHoras, a.uid, a.inicio, a.fin, a.trabajo)}
     </Assignment>`).join('\n')
 
+  // Cabecera con las opciones que escribe MS Project al guardar en XML. La
+  // clave es ProjectExternallyEdited = 0: sin ella MS Project toma el archivo
+  // como editado por otro programa, recalcula todo al abrirlo y, en algunas
+  // instalaciones (MS Project 2016 en español), adelanta el inicio de las
+  // tareas manuales vinculadas.
   const minDia = Math.round(hpd * 60)
   const diasSemana = calendario.diasLaborables.length || 5
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -378,8 +385,34 @@ ${trabajoPorDia(calHoras, a.uid, a.inicio, a.fin, a.trabajo)}
   <DefaultTaskType>1</DefaultTaskType>
   <DurationFormat>7</DurationFormat>
   <WorkFormat>2</WorkFormat>
+  <EditableActualCosts>0</EditableActualCosts>
+  <HonorConstraints>0</HonorConstraints>
+  <InsertedProjectsLikeSummary>0</InsertedProjectsLikeSummary>
+  <MultipleCriticalPaths>0</MultipleCriticalPaths>
   <NewTasksEffortDriven>0</NewTasksEffortDriven>
   <NewTasksEstimated>0</NewTasksEstimated>
+  <SplitsInProgressTasks>1</SplitsInProgressTasks>
+  <SpreadActualCost>0</SpreadActualCost>
+  <SpreadPercentComplete>0</SpreadPercentComplete>
+  <TaskUpdatesResource>1</TaskUpdatesResource>
+  <FiscalYearStart>0</FiscalYearStart>
+  <WeekStartDay>1</WeekStartDay>
+  <MoveCompletedEndsBack>0</MoveCompletedEndsBack>
+  <MoveRemainingStartsBack>0</MoveRemainingStartsBack>
+  <MoveRemainingStartsForward>0</MoveRemainingStartsForward>
+  <MoveCompletedEndsForward>0</MoveCompletedEndsForward>
+  <BaselineForEarnedValue>0</BaselineForEarnedValue>
+  <AutoAddNewResourcesAndTasks>1</AutoAddNewResourcesAndTasks>
+  <Autolink>0</Autolink>
+  <NewTaskStartDate>0</NewTaskStartDate>
+  <NewTasksAreManual>1</NewTasksAreManual>
+  <DefaultTaskEVMethod>0</DefaultTaskEVMethod>
+  <ProjectExternallyEdited>0</ProjectExternallyEdited>
+  <ActualsInSync>0</ActualsInSync>
+  <RemoveFileProperties>0</RemoveFileProperties>
+  <AdminProject>0</AdminProject>
+  <UpdateManuallyScheduledTasksWhenEditingLinks>1</UpdateManuallyScheduledTasksWhenEditingLinks>
+  <KeepTaskOnNearestWorkingTimeWhenMadeAutoScheduled>0</KeepTaskOnNearestWorkingTimeWhenMadeAutoScheduled>
   <ExtendedAttributes>
     <ExtendedAttribute>
       <FieldID>${FIELD_ID_TEXT1}</FieldID>
