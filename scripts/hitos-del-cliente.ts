@@ -32,12 +32,26 @@ async function main() {
   console.log(SOLO_PROYECTO ? 'Catálogo: sin cambios (--solo-proyecto)' : existe ? 'Catálogo: "Parada de Planta" ya existe en CTL' : '+ Catálogo: "Parada de Planta" en CTL (hito, 0 h, HitosCliente, orden 0)')
 
   // 2. Proyecto
+  // Los hitos llevan el recurso Gestor, como el servicio del catálogo.
+  const gestorRec = await prisma.recurso.findFirstOrThrow({ where: { nombre: 'Gestor' }, select: { id: true } })
   let plan: { cron: { id: string; proyectoId: string }; ctlProy: { id: string; proyectoFaseId: string | null }; fecha: Date; gestor: string | null; actsCtl: { id: string; orden: number }[] } | null = null
   if (PROYECTO) {
-    if (!HITOS.length) throw new Error('Indica al menos un --hito="Nombre"')
     const cron = await prisma.proyectoCronograma.findFirstOrThrow({ where: { tipo: 'planificacion', proyecto: { codigo: PROYECTO } }, select: { id: true, proyectoId: true } })
     const ctlProy = await prisma.proyectoEdt.findFirstOrThrow({ where: { proyectoCronogramaId: cron.id, edt: { nombre: 'CTL' } }, select: { id: true, proyectoFaseId: true, proyectoActividad: { select: { id: true, nombre: true, orden: true } } } })
-    if (ctlProy.proyectoActividad.some(a => a.nombre === ACTIVIDAD)) throw new Error(`${PROYECTO} ya tiene "${ACTIVIDAD}"`)
+    const yaExiste = ctlProy.proyectoActividad.find(a => a.nombre === ACTIVIDAD)
+    if (yaExiste) {
+      // Ya agregada: solo completa el recurso de los hitos que no lo tengan.
+      const sinRecurso = await prisma.proyectoTarea.findMany({ where: { proyectoActividadId: yaExiste.id, recursoId: null }, select: { id: true, nombre: true } })
+      console.log(`${PROYECTO} ya tiene "${ACTIVIDAD}": ${sinRecurso.length} hito(s) sin recurso`)
+      for (const t of sinRecurso) console.log(`    + recurso Gestor → ${t.nombre}`)
+      if (!APLICAR) { console.log('\nVista previa. Para aplicar: --aplicar'); return }
+      if (sinRecurso.length) {
+        await prisma.proyectoTarea.updateMany({ where: { id: { in: sinRecurso.map(t => t.id) } }, data: { recursoId: gestorRec.id, updatedAt: new Date() } })
+      }
+      console.log('\nAplicado.')
+      return
+    }
+    if (!HITOS.length) throw new Error('Indica al menos un --hito="Nombre"')
     const eje = await prisma.proyectoFase.findFirstOrThrow({ where: { proyectoCronogramaId: cron.id, nombre: 'EJECUCION' }, select: { fechaInicioPlan: true } })
     const cal = await obtenerCalendarioProyecto(cron.proyectoId)
     const fecha = siguienteMomentoLaborable(cal, eje.fechaInicioPlan ?? new Date())
@@ -51,7 +65,6 @@ async function main() {
   const ahora = new Date()
   if (!existe && !SOLO_PROYECTO) {
     const unidad = await prisma.unidadServicio.findFirstOrThrow({ where: { nombre: 'Evento' }, select: { id: true } })
-    const gestorRec = await prisma.recurso.findFirstOrThrow({ where: { nombre: 'Gestor' }, select: { id: true } })
     await prisma.catalogoServicio.create({ data: {
       id: randomUUID(), categoriaId: ctl.id, unidadServicioId: unidad.id, recursoId: gestorRec.id,
       nombre: 'Parada de Planta', descripcion: '[HitosCliente] Hito del cliente sin fecha al generar: se ubica al inicio de Ejecución; poner la fecha real y vincular las tareas que dependen de la parada.',
@@ -70,7 +83,7 @@ async function main() {
       prisma.proyectoTarea.createMany({ data: HITOS.map((nombre, i) => ({
         id: randomUUID(), proyectoEdtId: plan!.ctlProy.id, proyectoActividadId: actId, proyectoCronogramaId: plan!.cron.id,
         nombre, orden: i, fechaInicio: plan!.fecha, fechaFin: plan!.fecha, horasEstimadas: 0, esHito: true,
-        responsableId: plan!.gestor, updatedAt: ahora,
+        responsableId: plan!.gestor, recursoId: gestorRec.id, updatedAt: ahora,
       })) }),
     ])
     await recalcularEdtPadre(plan.ctlProy.id)
