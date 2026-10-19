@@ -50,17 +50,56 @@ export function esEdtDeDocumentacion(nombreEdt: string): boolean {
   return /plano|dibujo|documentaci/i.test(nombreEdt)
 }
 
+/** EDT de compras/servicios (PRO "Suministro de Equipos", SER "Servicios y Alquileres") — Logística es C ahí. */
+export function esEdtDeLogistica(nombreEdt: string): boolean {
+  return /suministro|procura|alquiler/i.test(nombreEdt)
+}
+
+/** EDT de arranque o cierre del proyecto (GES, CIE) — Comercial queda Informado ahí. */
+export function esEdtDeArranqueOCierre(nombreEdt: string): boolean {
+  return /planificaci[oó]n del proyecto|cierre/i.test(nombreEdt)
+}
+
+/**
+ * Clasificación del EDT para la RACI: por código de catálogo (CON, PLA…) si
+ * viene, y si no por palabras clave del nombre.
+ */
+export function clasificarEdtRaci(nombreEdt: string, codigoEdt?: string | null) {
+  const c = (codigoEdt ?? '').toUpperCase()
+  return {
+    tipoEdt: (['CON', 'CMM', 'COM'].includes(c) ? 'campo' : c ? 'gestion' : clasificarTipoEdt(nombreEdt)) as TipoEdt,
+    esEdtDeSeguridad: ['SEG', 'SSO'].includes(c) || esEdtDeSeguridad(nombreEdt),
+    esEdtDeDocumentacion: c === 'PLA' || esEdtDeDocumentacion(nombreEdt),
+    esEdtDeLogistica: ['PRO', 'SER'].includes(c) || esEdtDeLogistica(nombreEdt),
+    esEdtDeArranqueOCierre: ['GES', 'CIE'].includes(c) || esEdtDeArranqueOCierre(nombreEdt),
+  }
+}
+
 export interface ContextoRolRaci {
   cargoLabel: string
   tipoEdt: TipoEdt
-  esResponsableDelEdt: boolean
   esEdtDeSeguridad: boolean
   esEdtDeDocumentacion: boolean
+  esEdtDeLogistica?: boolean
+  esEdtDeArranqueOCierre?: boolean
 }
+
+/** '' = la persona no participa en ese EDT (celda vacía). */
+export type RolRaciCalculado = PlanRaciRol | ''
 
 interface ReglaRaci {
   patron: RegExp
-  calcular: (ctx: ContextoRolRaci) => PlanRaciRol
+  calcular: (ctx: ContextoRolRaci) => RolRaciCalculado
+}
+
+/** Gerencia General no entra en la RACI (salvo que no haya Gerencia de Proyectos que apruebe). */
+export function esGerenciaGeneral(cargoLabel: string): boolean {
+  return /(gerencia|gerente)\s+general/i.test(cargoLabel)
+}
+
+/** Gerencia de Proyectos — el Aprobador (A) de todos los EDTs. */
+export function esGerenciaDeProyectos(cargoLabel: string): boolean {
+  return /(gerencia|gerente)\s+de\s+proyectos?/i.test(cargoLabel)
 }
 
 /** Prioridad de "Aprobador" cuando 2+ cargos de gerencia matchean en el mismo EDT (ver calcularMatrizRaci). */
@@ -71,47 +110,41 @@ export function prioridadAprobador(cargoLabel: string): number {
 }
 
 /**
- * Tabla de mapeo cargoLabel → rol RACI, configurable en código.
- * Se evalúa en orden — el primer patrón que matchee gana.
+ * Rol RACI por CARGO, para quien no sale del cronograma. El orden completo
+ * (ver calcularMatrizRaci):
+ *   1. Gerencia de Proyectos → A en todos los EDTs (Gerencia General no entra).
+ *   2. Responsable del EDT o de alguna de sus tareas en el cronograma → R.
+ *   3. Esta tabla, por cargo (el primer patrón que matchee gana):
+ *   Gestor/Supervisor de Proyecto            → C (su R ya sale del cronograma)
+ *   Seguridad / SSOMA / SSO / HSEQ / HSE     → R en EDTs de Seguridad, C en los de campo
+ *   Residente*                               → R en EDTs de campo (CON/CMM), C en el resto
+ *   Supervisor* (genérico) / Construcción*   → R en EDTs de campo
+ *   Técnico*                                 → R en EDTs de campo
+ *   Cadista* / Dibujante* / CAD              → R en EDTs de planos
+ *   Logístic*                                → C en Suministro de Equipos / Servicios y Alquileres
+ *   Comercial*                               → I en Planificación del Proyecto y Cierre
+ *   Otra gerencia                            → I
+ * Fuera de eso la celda queda vacía ('' = no participa) — antes todo era "I"
+ * y la matriz decía que todos se enteraban de todo.
+ * Cargos que no matchean ninguna regla → vacío + advertencia (ver calcularDatos.ts).
  *
- * Los patrones cubren el vocabulario REAL del organigrama estándar de GYS
- * (verificado contra PlantillaOrganigrama / ProyectoOrgNodo en BD): usa
- * sustantivos de área ("GERENCIA GENERAL", "HSEQ") en vez de títulos de
- * persona ("Gerente", "Seguridad") — los patrones originales basados solo en
- * el prompt de IA no cubrían esto y dejaban casi todo en "I" por defecto.
- *
- * Semilla (informe §6 / cambio #13, ajustada a auditoría real — addendum D):
- *   Gerencia* / Gerente*                    → A (máximo uno por EDT, ver calcularMatrizRaci)
- *   Gestor/Supervisor de Proyecto*           → R en EDTs de gestión, C en EDTs de campo
- *   Seguridad / SSOMA / SSO / HSEQ / HSE     → C en todo, R en el EDT de Seguridad
- *   Residente*                               → R en EDTs de EJECUCIÓN (CON/CMN), C en el resto
- *   Supervisor* (genérico) / Construcción*   → R en EDTs de campo, I en el resto
- *   Técnico*                                 → R en el EDT del que es responsable o en
- *                                              cualquier EDT de campo (fallback si el
- *                                              cronograma no tiene responsableId cargado), I en el resto
- *   Cadista* / Dibujante* / CAD              → R en EDTs de planos/dibujo/documentación, I en el resto
- *   Comercial* / Logístic*                   → I en todo
- * Cargos que no matchean ninguna regla → I en todo + advertencia (ver calcularDatos.ts).
- *
- * IMPORTANTE — orden de evaluación (el primer patrón que matchee gana):
  * "seguridad|ssoma|..." va ANTES del patrón genérico de "supervisor" para que
- * "Supervisor de Seguridad (HSEQ)" caiga en la regla de seguridad; "residente"
- * tiene su propia regla (C en el resto, no I) separada del "supervisor"
- * genérico (I en el resto) — ver addendum D.3.
+ * "Supervisor de Seguridad (HSEQ)" caiga en la regla de seguridad.
  */
 export const REGLAS_RACI_CARGO: ReglaRaci[] = [
-  { patron: /gerenc|gerente/i, calcular: () => 'A' },
-  { patron: /(gestor|supervisor\s+de\s+proyecto)/i, calcular: ctx => (ctx.tipoEdt === 'gestion' ? 'R' : 'C') },
-  { patron: /seguridad|ssoma|sso|hseq|hse/i, calcular: ctx => (ctx.esEdtDeSeguridad ? 'R' : 'C') },
+  { patron: /(gestor|supervisor\s+de\s+proyecto)/i, calcular: () => 'C' },
+  { patron: /seguridad|ssoma|sso|hseq|hse/i, calcular: ctx => (ctx.esEdtDeSeguridad ? 'R' : ctx.tipoEdt === 'campo' ? 'C' : '') },
   { patron: /residente/i, calcular: ctx => (ctx.tipoEdt === 'campo' ? 'R' : 'C') },
-  { patron: /(supervisor|construcci[oó]n)/i, calcular: ctx => (ctx.tipoEdt === 'campo' ? 'R' : 'I') },
-  { patron: /t[eé]cnico/i, calcular: ctx => (ctx.esResponsableDelEdt || ctx.tipoEdt === 'campo' ? 'R' : 'I') },
-  { patron: /cadista|dibujante|cad\b/i, calcular: ctx => (ctx.esEdtDeDocumentacion ? 'R' : 'I') },
-  { patron: /(comercial|log[ií]stic)/i, calcular: () => 'I' },
+  { patron: /(supervisor|construcci[oó]n)/i, calcular: ctx => (ctx.tipoEdt === 'campo' ? 'R' : '') },
+  { patron: /t[eé]cnico/i, calcular: ctx => (ctx.tipoEdt === 'campo' ? 'R' : '') },
+  { patron: /cadista|dibujante|cad\b/i, calcular: ctx => (ctx.esEdtDeDocumentacion ? 'R' : '') },
+  { patron: /log[ií]stic/i, calcular: ctx => (ctx.esEdtDeLogistica ? 'C' : '') },
+  { patron: /comercial/i, calcular: ctx => (ctx.esEdtDeArranqueOCierre ? 'I' : '') },
+  { patron: /gerenc|gerente/i, calcular: () => 'I' },
 ]
 
-/** Devuelve el rol RACI para un cargo/EDT, o null si el cargo no matchea ninguna regla. */
-export function calcularRolRaci(ctx: ContextoRolRaci): PlanRaciRol | null {
+/** Devuelve el rol RACI por cargo para un EDT ('' = no participa), o null si el cargo no matchea ninguna regla. */
+export function calcularRolRaci(ctx: ContextoRolRaci): RolRaciCalculado | null {
   for (const regla of REGLAS_RACI_CARGO) {
     if (regla.patron.test(ctx.cargoLabel)) return regla.calcular(ctx)
   }

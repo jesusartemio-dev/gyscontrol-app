@@ -14,10 +14,10 @@ import type {
 import { deduplicarSiglas, calcularSiglasBase } from './siglas'
 import {
   calcularRolRaci,
-  clasificarTipoEdt,
-  esEdtDeSeguridad,
-  esEdtDeDocumentacion,
+  clasificarEdtRaci,
   esEdtDeConstruccionOComisionamiento,
+  esGerenciaDeProyectos,
+  esGerenciaGeneral,
   prioridadAprobador,
 } from './raciReglas'
 import { REFERENCIAS_BASE } from './referenciasBase'
@@ -131,22 +131,44 @@ interface EdtParaRaci {
   id: string
   nombre: string
   responsableId: string | null
+  /** Código del EDT de catálogo (CON, PLA…), si se conoce. */
+  codigoEdt?: string
+  /** Responsables de las tareas del EDT en el cronograma. */
+  responsablesTareas?: string[]
 }
 
 /**
- * matrizRaci — ProyectoEdt × personal, usando REGLAS_RACI_CARGO (raciReglas.ts).
- * Una fila por EDT; la grilla real (columnas por persona) se arma en
- * construirDataBag a partir de `asignaciones`, no acá.
- * Post-procesa cada fila para que haya máximo UN Aprobador (A) — si 2+ cargos
- * de gerencia matchean en el mismo EDT, prioridadAprobador() decide cuál queda
- * A y el resto baja a C (addendum D.2 — antes salían dos "A" por fila).
+ * matrizRaci — ProyectoEdt × personal. Una fila por EDT, en este orden:
+ *   1. Gerencia de Proyectos → A (un solo Aprobador por fila). Se busca en el
+ *      organigrama (`aprobadorUserId`), porque esa persona puede figurar en el
+ *      personal con otro cargo (p. ej. también es Residente).
+ *   2. Responsable del EDT o de alguna de sus tareas en el cronograma → R.
+ *   3. El resto por cargo, REGLAS_RACI_CARGO (raciReglas.ts).
+ * Gerencia General no entra (salvo que sea el único que puede aprobar).
+ * Una celda sin rol no va en `asignaciones` (la persona no participa en ese
+ * EDT); construirDataBag arma las columnas por sigla, no por posición.
  */
 export function calcularMatrizRaci(
   edts: EdtParaRaci[],
-  personal: PersonaCalculada[]
+  personalTodo: PersonaCalculada[],
+  opciones: { aprobadorUserId?: string | null } = {}
 ): ResultadoCalculo<PlanRaci> {
   const advertencias: string[] = []
   const cargosNoMapeados = new Set<string>()
+
+  // Aprobador: Gerencia de Proyectos del organigrama; si no hay, la gerencia
+  // con más prioridad entre el personal.
+  const aprobadorUserId =
+    opciones.aprobadorUserId ??
+    personalTodo.find(p => esGerenciaDeProyectos(p.cargo))?.userId ??
+    [...personalTodo]
+      .filter(p => prioridadAprobador(p.cargo) > 0)
+      .sort((a, b) => prioridadAprobador(b.cargo) - prioridadAprobador(a.cargo))[0]?.userId ??
+    null
+  if (!aprobadorUserId) {
+    advertencias.push('No hay Gerencia de Proyectos con persona asignada en el organigrama — la Matriz RACI queda sin Aprobador (A).')
+  }
+  const personal = personalTodo.filter(p => p.userId === aprobadorUserId || !esGerenciaGeneral(p.cargo))
 
   // La grilla RACI de la plantilla reserva 1 columna por persona (340dxa cada
   // una, textDirection btLr) — con 19+ columnas el ancho disponible (~340×19
@@ -159,44 +181,26 @@ export function calcularMatrizRaci(
   }
 
   const filas = edts.map(edt => {
-    const tipoEdt = clasificarTipoEdt(edt.nombre)
-    const esSeguridad = esEdtDeSeguridad(edt.nombre)
-    const esDocumentacion = esEdtDeDocumentacion(edt.nombre)
+    const clase = clasificarEdtRaci(edt.nombre, edt.codigoEdt)
+    const responsables = new Set([edt.responsableId, ...(edt.responsablesTareas ?? [])].filter(Boolean))
 
-    const asignacionesConCargo = personal.map(p => {
-      const rol = calcularRolRaci({
-        cargoLabel: p.cargo,
-        tipoEdt,
-        esResponsableDelEdt: edt.responsableId === p.userId,
-        esEdtDeSeguridad: esSeguridad,
-        esEdtDeDocumentacion: esDocumentacion,
-      })
+    const asignaciones = personal.flatMap(p => {
+      let rol: PlanRaciRol | '' | null
+      if (p.userId === aprobadorUserId) rol = 'A'
+      else if (responsables.has(p.userId)) rol = 'R'
+      else rol = calcularRolRaci({ cargoLabel: p.cargo, ...clase })
       if (rol === null) {
         cargosNoMapeados.add(p.cargo)
-        return { siglas: p.siglas ?? '', cargo: p.cargo, rol: 'I' as PlanRaciRol }
+        return []
       }
-      return { siglas: p.siglas ?? '', cargo: p.cargo, rol }
+      return rol ? [{ siglas: p.siglas ?? '', rol }] : []
     })
 
-    // Máximo un Aprobador por EDT — prioridad Gerencia de Proyectos > Gerencia General.
-    const aprobadores = asignacionesConCargo.filter(a => a.rol === 'A')
-    if (aprobadores.length > 1) {
-      const ganador = [...aprobadores].sort(
-        (a, b) => prioridadAprobador(b.cargo) - prioridadAprobador(a.cargo)
-      )[0]
-      for (const a of asignacionesConCargo) {
-        if (a.rol === 'A' && a !== ganador) a.rol = 'C'
-      }
-    }
-
-    return {
-      edt: edt.nombre,
-      asignaciones: asignacionesConCargo.map(({ siglas, rol }) => ({ siglas, rol })),
-    }
+    return { edt: edt.nombre, asignaciones }
   })
 
   for (const cargo of cargosNoMapeados) {
-    advertencias.push(`Cargo "${cargo}" no coincide con ninguna regla RACI configurada (src/lib/planTrabajo/raciReglas.ts) — se asignó "I" (Informado) por defecto.`)
+    advertencias.push(`Cargo "${cargo}" no coincide con ninguna regla RACI configurada (src/lib/planTrabajo/raciReglas.ts) — su celda queda vacía salvo que sea responsable en el cronograma.`)
   }
 
   return { data: { filas }, advertencias }
@@ -710,9 +714,17 @@ export function calcularDatosEtapa1(contexto: PlanTrabajoContexto): ResultadoCal
   const fases = cron ? cron.fases.map(f => ({ nombre: f.nombre, edts: f.edts })) : []
 
   const edtsPlanos: EdtParaRaci[] = fases.flatMap(f =>
-    f.edts.map(e => ({ id: e.id, nombre: e.nombre, responsableId: e.responsableId }))
+    f.edts.map(e => ({
+      id: e.id,
+      nombre: e.nombre,
+      responsableId: e.responsableId,
+      codigoEdt: e.codigoEdt,
+      responsablesTareas: e.actividades.flatMap(a => a.tareas.map(t => t.responsableId ?? '')).filter(Boolean),
+    }))
   )
-  const { data: matrizRaci, advertencias: advRaci } = calcularMatrizRaci(edtsPlanos, personalCalculado)
+  // Gerencia de Proyectos del organigrama (aunque en el personal figure con otro cargo).
+  const aprobadorUserId = contexto.organigrama.find(n => n.user && esGerenciaDeProyectos(n.cargoLabel))?.user?.id ?? null
+  const { data: matrizRaci, advertencias: advRaci } = calcularMatrizRaci(edtsPlanos, personalCalculado, { aprobadorUserId })
   advertencias.push(...advRaci)
 
   const { data: datosHistograma, advertencias: advHist } = calcularHistogramasYCronograma(fases)

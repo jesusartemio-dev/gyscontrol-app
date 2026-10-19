@@ -89,6 +89,13 @@ function construirImagenesDeNodo(
     })
 }
 
+/** Columnas de la RACI: siglas con algún rol, en el orden del personal (las que no estén en el personal, al final). */
+function siglasRaci(raci: PlanRaci, personal: { siglas?: string }[]): string[] {
+  const usadas = new Set(raci.filas.flatMap(f => f.asignaciones.map(a => a.siglas)))
+  const orden = personal.map(p => p.siglas ?? '').filter(s => usadas.has(s))
+  return [...new Set([...orden, ...usadas])]
+}
+
 function fmtDate(d: Date | string | null | undefined): string {
   if (!d) return ''
   const date = typeof d === 'string' ? new Date(d) : d
@@ -336,21 +343,16 @@ export function construirDataBag({
     personalAsignado: personalMapeado,
 
     // ─── RACI (BD/IA — grilla real, plantilla v7) ───
-    // `raciPersonas` (cabecera de columnas) y `roles` de cada fila de
-    // `matrizRaci` SIEMPRE salen de la MISMA fila (`raci.filas[0]`), nunca de
-    // `personalMapeado` por separado — evita que un desalineo entre
-    // `personalAsignado` y `matrizRaci` (persistidos como campos JSON
-    // independientes) rompa la correspondencia columna↔rol en la plantilla.
-    // Toda fila de `raci.filas` tiene el mismo largo/orden de asignaciones
-    // porque `calcularMatrizRaci` las genera con `personal.map(...)`
-    // (ver calcularDatos.ts) — tomar la cabecera de `filas[0]` es válido y,
-    // a diferencia de usar `personalMapeado`, no depende de esa invariante
-    // externa al construirla.
-    raciPersonas: (raci.filas[0]?.asignaciones ?? []).map(a => ({ sigla: a.siglas })),
+    // Columnas = siglas que aparecen en alguna fila, en el orden del personal;
+    // cada fila busca su rol POR SIGLA ('' = no participa). Las filas ya no
+    // traen una asignación por persona: la celda vacía no se guarda (cálculo
+    // de Etapa 1 y editor manual), así que alinear por posición desordenaba
+    // la grilla.
+    raciPersonas: siglasRaci(raci, personalMapeado).map(sigla => ({ sigla })),
     matrizRaci: raci.filas.map(fila => ({
       edtNombre: fila.edt,
       edt: fila.edt, // alias retrocompatible
-      roles: fila.asignaciones.map(a => ({ rol: a.rol })),
+      roles: siglasRaci(raci, personalMapeado).map(s => ({ rol: fila.asignaciones.find(a => a.siglas === s)?.rol ?? '' })),
     })),
 
     // ─── EPP ───

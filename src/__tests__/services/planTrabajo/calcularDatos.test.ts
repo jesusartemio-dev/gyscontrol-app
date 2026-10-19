@@ -435,8 +435,11 @@ describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO real (infor
   })
 })
 
-describe('calcularMatrizRaci — todas las filas comparten largo/orden de asignaciones (grilla RACI, plantilla v7)', () => {
-  it('cada fila trae exactamente 1 asignación por persona, en el MISMO orden que la lista de personal recibida', () => {
+describe('calcularMatrizRaci', () => {
+  const rolDe = (fila: { asignaciones: { siglas: string; rol: string }[] }, siglas: string) =>
+    fila.asignaciones.find(a => a.siglas === siglas)?.rol ?? ''
+
+  it('las asignaciones siguen el orden del personal; quien no participa no aparece (celda vacía)', () => {
     const personal = [
       personaRaci({ nombre: 'Residente', cargo: 'Residente', userId: 'u1' }),
       personaRaci({ nombre: 'Gerente', cargo: 'Gerente de Proyectos', userId: 'u2' }),
@@ -450,10 +453,41 @@ describe('calcularMatrizRaci — todas las filas comparten largo/orden de asigna
     const { data } = calcularMatrizRaci(edts, personal)
 
     expect(data.filas).toHaveLength(2)
-    for (const fila of data.filas) {
-      expect(fila.asignaciones).toHaveLength(personal.length)
-      expect(fila.asignaciones.map(a => a.siglas)).toEqual(personal.map(p => p.siglas))
+    expect(data.filas[0].asignaciones.map(a => a.siglas)).toEqual(['RE', 'GE']) // SSOMA no participa en Planificación
+    expect(data.filas[1].asignaciones.map(a => a.siglas)).toEqual(['RE', 'GE', 'SS'])
+  })
+
+  it('caso CJM50: A = Gerencia de Proyectos aunque en el personal figure como Residente; Gerencia General fuera; R desde el cronograma', () => {
+    const personal = [
+      personaRaci({ nombre: 'CS', cargo: 'GERENCIA GENERAL', userId: 'cs' }),
+      personaRaci({ nombre: 'JM', cargo: 'RESIDENTE', userId: 'jm' }),
+      personaRaci({ nombre: 'PR', cargo: 'GESTOR DE PROYECTOS', userId: 'pr' }),
+      personaRaci({ nombre: 'YA', cargo: 'SSOMA', userId: 'ya' }),
+      personaRaci({ nombre: 'NL', cargo: 'SUPERVISOR', userId: 'nl' }),
+      personaRaci({ nombre: 'VP', cargo: 'LOGISTICA', userId: 'vp' }),
+    ]
+    const edts = [
+      { id: 'ing', nombre: 'Documentos de Ingeniería', codigoEdt: 'ING', responsableId: 'jm' },
+      { id: 'seg', nombre: 'Planificación de Seguridad', codigoEdt: 'SEG', responsableId: 'ya' },
+      { id: 'pro', nombre: 'Suministro de Equipos', codigoEdt: 'PRO', responsableId: 'pr' },
+      { id: 'cie', nombre: 'Cierre del Proyecto', codigoEdt: 'CIE', responsableId: 'pr', responsablesTareas: ['pr', 'nl'] },
+    ]
+
+    const { data } = calcularMatrizRaci(edts, personal, { aprobadorUserId: 'jm' })
+    const [ing, seg, pro, cie] = data.filas
+
+    for (const f of data.filas) {
+      expect(rolDe(f, 'CS')).toBe('') // Gerencia General no entra
+      expect(rolDe(f, 'JM')).toBe('A')
+      expect(f.asignaciones.filter(a => a.rol === 'A')).toHaveLength(1)
     }
+    expect(rolDe(ing, 'PR')).toBe('C') // Gestor no es R donde el cronograma no lo pone
+    expect(rolDe(seg, 'YA')).toBe('R')
+    expect(rolDe(seg, 'PR')).toBe('C')
+    expect(rolDe(pro, 'PR')).toBe('R')
+    expect(rolDe(pro, 'VP')).toBe('C')
+    expect(rolDe(cie, 'NL')).toBe('R') // tiene tareas en Cierre
+    expect(rolDe(ing, 'NL')).toBe('')
   })
 
   it('con más de 19 personas, emite una advertencia de Etapa 1 (grilla de la plantilla reserva 1 columna por persona)', () => {

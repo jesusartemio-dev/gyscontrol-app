@@ -153,6 +153,7 @@ export async function cargarContextoPlanTrabajo(
                 descripcion: true,
                 proyectoFaseId: true,
                 responsableId: true,
+                edt: { select: { nombre: true } },
                 proyectoActividad: {
                   select: {
                     id: true,
@@ -175,6 +176,7 @@ export async function cargarContextoPlanTrabajo(
                         personasEstimadas: true,
                         estado: true,
                         prioridad: true,
+                        responsableId: true,
                         // Dotación real por cargo (histograma §13.1, informe §13
                         // Bug 3) — personasEstimadas NO es la fuente (override
                         // manual sin usar). Cuadrilla: perfiles (recursos
@@ -348,6 +350,7 @@ export async function cargarContextoPlanTrabajo(
             descripcion: e.descripcion,
             proyectoFaseId: e.proyectoFaseId,
             responsableId: e.responsableId,
+            codigoEdt: e.edt?.nombre,
             actividades: e.proyectoActividad.map(a => ({
               id: a.id,
               nombre: a.nombre,
@@ -368,6 +371,7 @@ export async function cargarContextoPlanTrabajo(
                 personasEstimadas: t.personasEstimadas,
                 estado: t.estado,
                 prioridad: t.prioridad,
+                responsableId: t.responsableId,
                 recurso: t.recurso
                   ? {
                       id: t.recurso.id,

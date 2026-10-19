@@ -535,6 +535,21 @@ describe('construirDataBag — RACI en grilla (raciPersonas + matrizRaci.roles, 
     expect(construccion.roles[2]).toEqual({ rol: 'R' }) // YA
   })
 
+  it('celdas vacías: una fila sin asignación para alguien deja "" en SU columna, sin correr las demás', () => {
+    const plan = planFixture([])
+    ;(plan as unknown as { matrizRaci: unknown }).matrizRaci = {
+      filas: [
+        { edt: 'Planificación', asignaciones: [{ siglas: 'JM', rol: 'A' }, { siglas: 'PR', rol: 'R' }] },
+        { edt: 'Construcción', asignaciones: [{ siglas: 'JM', rol: 'A' }, { siglas: 'NL', rol: 'R' }] },
+      ],
+    } as unknown as PlanTrabajo['matrizRaci']
+    const dataBag = construirDataBag({ plan, proyecto: proyectoFixture, organigramaPngBase64: '' })
+    expect(dataBag.raciPersonas).toEqual([{ sigla: 'JM' }, { sigla: 'PR' }, { sigla: 'NL' }])
+    const matrizRaci = dataBag.matrizRaci as { edtNombre: string; roles: { rol: string }[] }[]
+    expect(matrizRaci[0].roles).toEqual([{ rol: 'A' }, { rol: 'R' }, { rol: '' }])
+    expect(matrizRaci[1].roles).toEqual([{ rol: 'A' }, { rol: '' }, { rol: 'R' }])
+  })
+
   it('sin matrizRaci en el plan (null), raciPersonas y matrizRaci llegan vacíos, sin romper', () => {
     const dataBag = construirDataBag({ plan: planFixture([]), proyecto: proyectoFixture, organigramaPngBase64: '' })
     expect(dataBag.raciPersonas).toEqual([])

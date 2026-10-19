@@ -418,6 +418,8 @@ export interface CronogramaContexto {
       descripcion: string | null
       proyectoFaseId: string | null
       responsableId: string | null
+      /** Código del EDT de catálogo (CON, CMM, PLA…) — clasifica el EDT en la RACI. */
+      codigoEdt?: string
       actividades: {
         id: string
         nombre: string
@@ -438,6 +440,8 @@ export interface CronogramaContexto {
           personasEstimadas: number
           estado: string
           prioridad: string
+          /** Responsable de la tarea — es R en la RACI de su EDT. */
+          responsableId?: string | null
           /** Recurso real asignado — fuente de la dotación por cargo del histograma §13.1 (informe §13, Bug 3: `personasEstimadas` nunca se usa, es un override manual que nadie llena). `null` si la tarea no tiene recurso. */
           recurso: {
             /** Identidad real del recurso — la MISMA cuadrilla/individual citada por N tareas concurrentes del mismo mes es la MISMA gente/rol, se deduplica por esto (confirmado: en CJM49, "Cuadrilla 4P" es un único recursoId citado por 5 tareas). */
