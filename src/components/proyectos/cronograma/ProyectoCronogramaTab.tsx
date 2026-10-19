@@ -1315,7 +1315,6 @@ export function ProyectoCronogramaTab({
             cronogramaId={selectedCronograma?.id}
             selectedId={nodoSeleccionadoId}
             onSelect={setNodoSeleccionadoId}
-            editable={!esBloqueado}
             refreshKey={refreshKey}
           />
         </TabsContent>
