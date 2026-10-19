@@ -15,7 +15,7 @@ import { logger } from '@/lib/logger'
 import { contarDiasLaborables } from '@/lib/utils/calendarioLaboral'
 import { clasificarRelacion, diferenciaDiasLaborables, inicioDiaUTC } from '@/lib/services/cronogramaDesplazamiento'
 import { type CalendarioHoras, formatearDuracion, horasLaborablesEntre, horasPorDiaCalendario } from '@/lib/services/cronogramaHoras'
-import { horasIncumplidas, formatearDesfase, ABREVIATURA_DEPENDENCIA, type TipoDependencia } from '@/lib/services/cronogramaDependencias'
+import { horasIncumplidas, horasHolgura, formatearDesfase, ABREVIATURA_DEPENDENCIA, type TipoDependencia } from '@/lib/services/cronogramaDependencias'
 import { calcularHHRealDeTarea } from '@/lib/planTrabajo/calcularDatos'
 
 // ✅ GET /api/proyectos/[id]/cronograma/tree - Obtener árbol jerárquico del cronograma
@@ -758,6 +758,8 @@ export async function GET(
             // "FC+2d", como la columna Predecesoras de MS Project (en español)
             tipoTexto: `${ABREVIATURA_DEPENDENCIA[dep.tipo as TipoDependencia] ?? 'FC'}${formatearDesfase(dep.lagMinutos, hpd)}`,
             horasIncumplidas: Math.round(incumple * 100) / 100,
+            // Va más tarde de lo que exige (permite "Ajustar" para acercarla).
+            horasHolgura: fp && fs && !incumple ? Math.round(horasHolgura(cal, dep, fp, fs) * 100) / 100 : 0,
           }
           ;(suc.nodo.data.predecesoras ??= []).push({ ...base, tareaId: dep.tareaOrigenId, nombre: pred.nodo.nombre, ruta: pred.ruta })
           ;(pred.nodo.data.sucesoras ??= []).push({ ...base, tareaId: dep.tareaDependienteId, nombre: suc.nodo.nombre, ruta: suc.ruta })

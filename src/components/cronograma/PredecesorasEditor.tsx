@@ -34,6 +34,8 @@ interface Dependencia {
   lagMinutos: number
   /** undefined = recién cambiada, se recalcula al recargar el árbol */
   horasIncumplidas?: number
+  /** Horas que la tarea va DESPUÉS de lo que exige (holgura); undefined = recién cambiada */
+  horasHolgura?: number
 }
 
 interface Props {
@@ -184,7 +186,7 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
         body: JSON.stringify(cambios),
       })
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'No se pudo guardar')
-      setLista((l) => l.map((d) => (d.id === dep.id ? { ...d, ...cambios, horasIncumplidas: undefined } : d)))
+      setLista((l) => l.map((d) => (d.id === dep.id ? { ...d, ...cambios, horasIncumplidas: undefined, horasHolgura: undefined } : d)))
       onCambio()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo guardar')
@@ -215,7 +217,7 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
       if (!r.ok) throw new Error(j.error || 'No se pudo ajustar')
       const aTexto = (v: string) => new Date(v).toISOString().slice(0, 16)
       onFechasAjustadas(aTexto(j.data.fechaInicio), aTexto(j.data.fechaFin))
-      setLista((l) => l.map((d) => (d.id === dep.id ? { ...d, horasIncumplidas: 0 } : d)))
+      setLista((l) => l.map((d) => (d.id === dep.id ? { ...d, horasIncumplidas: 0, horasHolgura: 0 } : d)))
       onCambio()
       toast.success('Tarea movida para cumplir la dependencia')
     } catch (e) {
@@ -352,6 +354,15 @@ function FilaDependencia({ dep, hpd, ocupado, onTipo, onDesfase, onQuitar, onAju
     setDesfase(formatearDesfase(min, hpd))
   }
   const incumple = (dep.horasIncumplidas ?? 0) > 0
+  const holgura = dep.horasHolgura ?? 0
+  // Recién agregada o con tipo/desfase cambiado: todavía no se sabe si se cumple.
+  const sinCalcular = dep.horasIncumplidas === undefined
+  const enDias = (h: number) => (h >= hpd ? `${Math.round((h / hpd) * 10) / 10}d` : `${Math.round(h * 10) / 10}h`)
+  const botonAjustar = (
+    <Button type="button" variant="outline" size="sm" className="h-6 shrink-0 px-2 text-[11px]" onClick={onAjustar} disabled={ocupado}>
+      <Wand2 className="mr-1 h-3 w-3" /> Ajustar esta tarea
+    </Button>
+  )
   return (
     <div className={`rounded border px-2 py-1.5 ${incumple ? 'border-red-300 bg-red-50' : 'bg-white'}`}>
       <div className="flex items-center gap-2">
@@ -382,11 +393,22 @@ function FilaDependencia({ dep, hpd, ocupado, onTipo, onDesfase, onQuitar, onAju
         <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-red-700">
           <span className="flex items-center gap-1">
             <AlertTriangle className="h-3 w-3" />
-            No se cumple: esta tarea va {dep.horasIncumplidas! >= hpd ? `${Math.round((dep.horasIncumplidas! / hpd) * 10) / 10}d` : `${dep.horasIncumplidas}h`} antes de lo que exige.
+            No se cumple: esta tarea va {enDias(dep.horasIncumplidas!)} antes de lo que exige.
           </span>
-          <Button type="button" variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={onAjustar} disabled={ocupado}>
-            <Wand2 className="mr-1 h-3 w-3" /> Ajustar esta tarea
-          </Button>
+          {botonAjustar}
+        </div>
+      )}
+      {/* Cumple pero va más tarde: modo manual, no se mueve sola; se ofrece acercarla. */}
+      {!incumple && holgura > 0 && (
+        <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <span>Va {enDias(holgura)} después de lo que exige la dependencia.</span>
+          {botonAjustar}
+        </div>
+      )}
+      {sinCalcular && (
+        <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <span>La fecha de esta tarea no cambia sola. Para moverla según esta dependencia:</span>
+          {botonAjustar}
         </div>
       )}
     </div>

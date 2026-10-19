@@ -86,6 +86,25 @@ export function horasIncumplidas(
   return horasLaborablesEntre(cal, real, exigido)
 }
 
+/**
+ * Holgura: horas laborables que la sucesora va DESPUÉS de lo que exige la
+ * dependencia (0 si va justo o antes). Sirve para ofrecer "Ajustar" y acercarla.
+ */
+export function horasHolgura(
+  cal: CalendarioHoras,
+  dep: { tipo: string; lagMinutos?: number | null },
+  pred: Rango,
+  suc: Rango,
+): number {
+  const duracion = horasLaborablesEntre(cal, suc.inicio, suc.fin)
+  const req = fechasRequeridas(cal, dep, pred, duracion)
+  const tipo = dep.tipo as TipoDependencia
+  const real = tipo === 'finish_to_finish' || tipo === 'start_to_finish' ? suc.fin : suc.inicio
+  const exigido = tipo === 'finish_to_finish' || tipo === 'start_to_finish' ? req.fin : req.inicio
+  if (real.getTime() <= exigido.getTime()) return 0
+  return horasLaborablesEntre(cal, exigido, real)
+}
+
 /** ¿Agregar origen → dependiente cierra un ciclo? (el origen ya depende del dependiente) */
 export function creaCiclo(
   deps: { tareaOrigenId: string; tareaDependienteId: string }[],
