@@ -188,7 +188,7 @@ describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO real (infor
       expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'SSOMA')!.valoresPorMes).toEqual([1])
     })
 
-    it('2 recursos con el mismo cargo, activos el MISMO día: el mes da 2', () => {
+    it('SSOMA cuenta 1 por día aunque haya cuadrillas en paralelo (cada una lo trae en su composición)', () => {
       const ssomaIndividual = recursoIndividual('rec-ssoma', 'SSOMA')
       const cuadrillaConSsoma = recursoCuadrilla('rec-4p', 'Cuadrilla 4P', [{ recursoMiembroNombre: 'SSOMA', cantidad: 1 }])
 
@@ -207,7 +207,29 @@ describe('calcularHistogramasYCronograma — equipoTrabajo por CARGO real (infor
 
       const { data } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
 
-      expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'SSOMA')!.valoresPorMes).toEqual([2])
+      expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'SSOMA')!.valoresPorMes).toEqual([1])
+    })
+
+    it('2 recursos con el mismo cargo, activos el MISMO día: el mes da 2', () => {
+      const ssomaIndividual = recursoIndividual('rec-ssoma', 'Tecnico')
+      const cuadrillaConSsoma = recursoCuadrilla('rec-4p', 'Cuadrilla 4P', [{ recursoMiembroNombre: 'Tecnico', cantidad: 1 }])
+
+      const construccion = edt({
+        nombre: 'Construccion', fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'), horasPlan: 10,
+        actividades: [{
+          id: 'a1', nombre: 'Seguridad y montaje', orden: 0,
+          fechaInicioPlan: new Date('2026-08-01'), fechaFinPlan: new Date('2026-08-31'),
+          horasPlan: 10, estado: 'pendiente', prioridad: 'media', descripcion: null,
+          tareas: [
+            tarea({ nombre: 'Elaboración de IPERC', fechaInicio: new Date('2026-08-04'), fechaFin: new Date('2026-08-28'), recurso: ssomaIndividual }),
+            tarea({ nombre: 'Montaje', fechaInicio: new Date('2026-08-28'), fechaFin: new Date('2026-08-31'), recurso: cuadrillaConSsoma }),
+          ],
+        }],
+      })
+
+      const { data } = calcularHistogramasYCronograma([{ nombre: 'Ejecución', edts: [construccion] }])
+
+      expect(data.histogramas.equipoTrabajo.find(f => f.etiqueta === 'Tecnico')!.valoresPorMes).toEqual([2])
     })
 
     it('el MISMO recurso citado por 5 tareas del MISMO día aporta UNA sola vez', () => {

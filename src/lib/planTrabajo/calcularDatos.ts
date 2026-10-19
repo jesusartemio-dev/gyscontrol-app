@@ -64,7 +64,8 @@ export function calcularPersonalAsignado(
   organigrama: OrgNodoContexto[]
 ): ResultadoCalculo<PersonaCalculada[]> {
   const advertencias: string[] = []
-  const nodosConPersona = organigrama.filter(n => n.user !== null)
+  // Gerencia General solo va en el organigrama, no en el personal del Plan (ni en la RACI).
+  const nodosConPersona = organigrama.filter(n => n.user !== null && !esGerenciaGeneral(n.cargoLabel))
 
   if (nodosConPersona.length < 3) {
     advertencias.push(
@@ -285,6 +286,10 @@ interface AportePersona {
   cantidad: number
 }
 
+function esCargoSsoma(cargo: string): boolean {
+  return /ssoma|sso\b|hseq|hse\b|seguridad/i.test(cargo)
+}
+
 function aportesDeRecurso(recurso: RecursoDeTarea): AportePersona[] {
   if (recurso.tipo === 'individual') {
     return [{ cargo: recurso.nombre, cantidad: 1 }]
@@ -475,6 +480,11 @@ export function calcularHistogramasYCronograma(
       for (const aporte of aportesDeRecurso(recurso)) {
         porCargo.set(aporte.cargo, (porCargo.get(aporte.cargo) ?? 0) + aporte.cantidad)
       }
+    }
+    // SSOMA: uno por día aunque haya cuadrillas en paralelo — cada cuadrilla
+    // trae su SSOMA en la composición, pero en obra es el mismo para todo el frente.
+    for (const [cargo, n] of porCargo) {
+      if (n > 1 && esCargoSsoma(cargo)) porCargo.set(cargo, 1)
     }
     personasPorCargoPorDia.set(dia, porCargo)
   }
