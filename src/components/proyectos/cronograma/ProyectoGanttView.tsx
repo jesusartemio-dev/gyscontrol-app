@@ -215,6 +215,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   const containerWidth = anchoCard > 0 ? Math.max(0, anchoCard - anchoNombres) : 0
   const { toast } = useToast()
   const bodyScrollRef = useRef<HTMLDivElement>(null)
+  const headerScrollRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const scrollInicialHecho = useRef(false)
 
@@ -734,14 +735,14 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
       </div>
 
       <CardContent className="p-0">
-        {/* Encabezado y filas comparten un solo scroll (horizontal y vertical): la
-            columna de nombres queda fija a la izquierda al recorrer la línea de
-            tiempo y la cabecera de fechas fija arriba al bajar por las tareas,
-            como en MS Project. */}
-        <div className="overflow-auto" ref={bodyScrollRef} style={{ maxHeight: 'calc(100vh - 220px)' }}>
+        {/* Cabecera de fechas fija arriba al bajar por la página (como MS Project).
+            Va fuera del scroll horizontal (que impediría fijarla) y se desplaza
+            en horizontal junto con las barras (ver onScroll del cuerpo). La
+            columna de nombres queda fija a la izquierda en ambos. */}
+        <div ref={headerScrollRef} className="sticky top-14 md:top-0 z-50 overflow-hidden bg-white">
           <div style={{ width: anchoNombres + timeline.totalWidth, minWidth: '100%' }}>
           {/* Header row: name col + timeline months */}
-          <div className="sticky top-0 z-50 flex border-b bg-white">
+          <div className="flex border-b bg-white">
             <div
               className="sticky left-0 z-40 flex-shrink-0 border-r border-gray-200 bg-gray-50 px-2 py-1.5"
               style={{ width: anchoNombres }}
@@ -781,7 +782,15 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
               )}
             </div>
           </div>
+          </div>
+        </div>
 
+        <div
+          className="overflow-x-auto"
+          ref={bodyScrollRef}
+          onScroll={(e) => { if (headerScrollRef.current) headerScrollRef.current.scrollLeft = e.currentTarget.scrollLeft }}
+        >
+          <div style={{ width: anchoNombres + timeline.totalWidth, minWidth: '100%' }}>
           <div className="flex">
             {/* Name column (fija a la izquierda; fondos opacos para tapar las barras al pasar debajo) */}
             <div
