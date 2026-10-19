@@ -23,6 +23,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { PredecesorasEditor } from '@/components/cronograma/PredecesorasEditor'
+import type { TreeNode } from '@/components/cronograma/types'
 import {
   Calendar,
   ZoomIn,
@@ -89,6 +92,8 @@ interface GanttItem {
   predecesoras?: DependenciaGantt[]
   /** Tareas que dependen de esta. */
   sucesoras?: DependenciaGantt[]
+  /** data del nodo tal como viene del árbol (la usa el editor de predecesoras). */
+  datos?: Record<string, any>
 }
 
 interface ProyectoGanttViewProps {
@@ -216,6 +221,9 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   const { toast } = useToast()
   const bodyScrollRef = useRef<HTMLDivElement>(null)
   const headerScrollRef = useRef<HTMLDivElement>(null)
+  // Editor de predecesoras abierto desde el Gantt (mismo que en Jerarquía).
+  const [predecesorasDe, setPredecesorasDe] = useState<string | null>(null)
+  const dependenciasCambiaron = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const scrollInicialHecho = useRef(false)
 
@@ -281,6 +289,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
           diasPasadoLimite: Number(data.diasPasadoLimite) || 0,
           predecesoras: Array.isArray(data.predecesoras) ? data.predecesoras : undefined,
           sucesoras: Array.isArray(data.sucesoras) ? data.sucesoras : undefined,
+          datos: data,
           hijos: node.children?.map((child: any) => processNode(child, nivel + 1, node.id)) || []
         }
 
@@ -432,6 +441,15 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   }
 
   // Flatten visible items
+  // Ítems del Gantt en el formato de nodos del árbol que espera PredecesorasEditor.
+  const nodosParaEditor = useMemo(() => {
+    const m = new Map<string, TreeNode>()
+    for (const i of aplanar(items)) {
+      m.set(i.id, { id: i.id, type: i.tipo, nombre: i.nombre, parentId: i.padreId, level: i.nivel, expanded: !!i.expanded, data: i.datos ?? {}, metadata: {} } as unknown as TreeNode)
+    }
+    return m
+  }, [items])
+
   // La tarea seleccionada tiene dependencias: sus flechas se resaltan y el resto se atenúa.
   const seleccionTieneDependencias = useMemo(() => {
     const sel = seleccionId ? aplanar(items).find(i => i.id === seleccionId) : undefined
@@ -734,6 +752,37 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
         </div>
       </div>
 
+      {/* Predecesoras desde el Gantt (mismo editor que Jerarquía); al cerrar se recarga. */}
+      <Dialog
+        open={!!predecesorasDe}
+        onOpenChange={(abierto) => {
+          if (abierto) return
+          setPredecesorasDe(null)
+          if (dependenciasCambiaron.current) {
+            dependenciasCambiaron.current = false
+            loadGanttData(true)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[620px] max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base">
+              Predecesoras de “{predecesorasDe ? aplanar(items).find(i => i.id === predecesorasDe)?.nombre : ''}”
+            </DialogTitle>
+          </DialogHeader>
+          {predecesorasDe && (
+            <PredecesorasEditor
+              proyectoId={proyectoId}
+              tareaNodeId={predecesorasDe}
+              nodes={nodosParaEditor}
+              horasPorDia={Number(items[0]?.datos?.horasPorDia) || 8}
+              onCambio={() => { dependenciasCambiaron.current = true }}
+              onFechasAjustadas={() => { dependenciasCambiaron.current = true }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
       <CardContent className="p-0">
         {/* Cabecera de fechas fija arriba al bajar por la página (como MS Project).
             Va fuera del scroll horizontal (que impediría fijarla) y se desplaza
@@ -803,7 +852,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                 return (
                   <div
                     key={item.id}
-                    className={`flex items-center border-b border-gray-200/70 cursor-pointer ${
+                    className={`group flex items-center border-b border-gray-200/70 cursor-pointer ${
                       item.id === seleccionId
                         ? 'bg-blue-100 shadow-[inset_4px_0_0_0_#2563eb]'
                         : rowIdx === filaHover ? 'bg-blue-50' : fondoFila(rowIdx)
@@ -840,19 +889,30 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                         {item.nombre}
                       </span>
                       {item.tipo === 'tarea' && (item.predecesoras?.length || item.sucesoras?.length) ? (
-                        <span
-                          className={`inline-flex flex-shrink-0 items-center gap-0.5 rounded border px-1 text-[9px] leading-[14px] ${
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setPredecesorasDe(item.id) }}
+                          className={`inline-flex flex-shrink-0 items-center gap-0.5 rounded border px-1 text-[9px] leading-[14px] hover:bg-blue-50 hover:text-blue-700 ${
                             item.predecesoras?.some(d => (d.horasIncumplidas ?? 0) > 0) ? 'border-red-300 bg-red-50 text-red-700' : 'border-gray-300 bg-white text-gray-500'
                           }`}
                           title={[
                             ...(item.predecesoras?.length ? ['Predecesoras:', ...item.predecesoras.map(d => lineaDependencia('←', d))] : []),
                             ...(item.sucesoras?.length ? ['Sucesoras:', ...item.sucesoras.map(d => lineaDependencia('→', d))] : []),
-                            '', 'Clic en la fila para abrir sus ramas y ver las flechas.',
+                            '', 'Clic para editar las predecesoras. Clic en la fila para abrir sus ramas.',
                           ].join('\n')}
                         >
                           <Link2 className="h-2.5 w-2.5" />
                           {item.predecesoras?.length ?? 0}/{item.sucesoras?.length ?? 0}
-                        </span>
+                        </button>
+                      ) : item.tipo === 'tarea' && !item.datos?.esExtra ? (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setPredecesorasDe(item.id) }}
+                          className="inline-flex flex-shrink-0 items-center rounded border border-transparent px-1 text-[9px] leading-[14px] text-gray-400 opacity-0 group-hover:opacity-100 hover:border-gray-300 hover:text-blue-700"
+                          title="Agregar predecesoras"
+                        >
+                          <Link2 className="h-2.5 w-2.5" />
+                        </button>
                       ) : null}
                       <Badge variant="outline" className={`text-[9px] leading-none px-1 py-0 h-3.5 flex-shrink-0 ${colors.text} border-current/30`}>
                         {item.tipo}
