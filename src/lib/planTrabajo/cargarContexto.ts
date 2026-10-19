@@ -22,6 +22,7 @@ export async function cargarContextoPlanTrabajo(
     matriz,
     tdr,
     iaPlanTrabajoHabilitada,
+    contactosCliente,
   ] = await Promise.all([
     prisma.proyecto.findUnique({
       where: { id: proyectoId },
@@ -282,6 +283,13 @@ export async function cargarContextoPlanTrabajo(
     }),
 
     isIAFeatureEnabled('planTrabajo'),
+
+    // Contactos del cliente del proyecto (los mismos de la Matriz de Comunicaciones).
+    prisma.proyectoContactoCliente.findMany({
+      where: { proyectoId },
+      select: { rolEnProyecto: true, crmContacto: { select: { nombre: true } } },
+      orderBy: { createdAt: 'asc' },
+    }),
   ])
 
   if (!proyecto) return null
@@ -449,6 +457,7 @@ export async function cargarContextoPlanTrabajo(
       advertenciaPlanificacionFaltante,
     },
     organigrama,
+    contactosCliente: contactosCliente.map(c => ({ nombre: c.crmContacto.nombre, rolEnProyecto: c.rolEnProyecto })),
     matriz,
     tdr,
     prerrequisitos,

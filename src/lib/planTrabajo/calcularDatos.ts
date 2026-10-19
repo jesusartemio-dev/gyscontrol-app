@@ -156,7 +156,7 @@ interface EdtParaRaci {
 export function calcularMatrizRaci(
   edts: EdtParaRaci[],
   personalTodo: PersonaCalculada[],
-  opciones: { aprobadorUserId?: string | null; clienteNombre?: string | null } = {}
+  opciones: { aprobadorUserId?: string | null; siglaCliente?: string | null } = {}
 ): ResultadoCalculo<PlanRaci> {
   const advertencias: string[] = []
   const cargosNoMapeados = new Set<string>()
@@ -186,7 +186,7 @@ export function calcularMatrizRaci(
   }
 
   // Columna del cliente (sin cliente cargado, aprueba la Gerencia de Proyectos en todo).
-  let siglaCliente = opciones.clienteNombre ? siglasCliente(opciones.clienteNombre) : null
+  let siglaCliente = opciones.siglaCliente || null
   if (siglaCliente && personal.some(p => p.siglas === siglaCliente)) siglaCliente = `${siglaCliente}-C`
 
   const filas = edts.map(edt => {
@@ -723,6 +723,9 @@ export interface DatosEtapa1 {
   totalHH: number
 }
 
+/** Qué contacto del cliente aprueba en la RACI cuando hay varios (ver rolesContactoCliente.ts). */
+const PRIORIDAD_CONTACTO_APROBADOR = ['jefe_proyecto_cliente', 'administrador_contrato', 'inspector_supervisor']
+
 /** Orquesta el cálculo completo de la Etapa 1 a partir del contexto ya cargado. */
 export function calcularDatosEtapa1(contexto: PlanTrabajoContexto): ResultadoCalculo<DatosEtapa1> {
   const advertencias: string[] = []
@@ -744,9 +747,17 @@ export function calcularDatosEtapa1(contexto: PlanTrabajoContexto): ResultadoCal
   )
   // Gerencia de Proyectos del organigrama (aunque en el personal figure con otro cargo).
   const aprobadorUserId = contexto.organigrama.find(n => n.user && esGerenciaDeProyectos(n.cargoLabel))?.user?.id ?? null
+  // Aprobador del cliente: el contacto del proyecto (el mismo de la Matriz de
+  // Comunicaciones, p. ej. "HP"); sin contacto, la empresa ("NEXA").
+  const contactoCliente = [...(contexto.contactosCliente ?? [])].sort(
+    (a, b) => PRIORIDAD_CONTACTO_APROBADOR.indexOf(a.rolEnProyecto) - PRIORIDAD_CONTACTO_APROBADOR.indexOf(b.rolEnProyecto)
+  )[0]
+  const siglaCliente = contactoCliente
+    ? calcularSiglasBase(contactoCliente.nombre)
+    : contexto.proyecto.cliente?.nombre ? siglasCliente(contexto.proyecto.cliente.nombre) : null
   const { data: matrizRaci, advertencias: advRaci } = calcularMatrizRaci(edtsPlanos, personalCalculado, {
     aprobadorUserId,
-    clienteNombre: contexto.proyecto.cliente?.nombre,
+    siglaCliente,
   })
   advertencias.push(...advRaci)
 

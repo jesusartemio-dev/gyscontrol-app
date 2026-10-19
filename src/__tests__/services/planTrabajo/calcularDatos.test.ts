@@ -522,12 +522,12 @@ describe('calcularMatrizRaci', () => {
       { id: 'ctl', nombre: 'Monitoreo y Control', codigoEdt: 'CTL', responsableId: 'pr' },
     ]
 
-    const { data } = calcularMatrizRaci(edts, personal, { aprobadorUserId: 'jm', clienteNombre: 'NEXA RESOURCES CAJAMARQUILLA S.A.' })
+    const { data } = calcularMatrizRaci(edts, personal, { aprobadorUserId: 'jm', siglaCliente: 'HP' })
     const [ing, ctl] = data.filas
 
-    expect(rolDe(ing, 'NEXA')).toBe('A')
+    expect(rolDe(ing, 'HP')).toBe('A')
     expect(rolDe(ing, 'JM')).toBe('R')
-    expect(rolDe(ctl, 'NEXA')).toBe('')
+    expect(rolDe(ctl, 'HP')).toBe('')
     expect(rolDe(ctl, 'JM')).toBe('A')
     for (const f of data.filas) expect(f.asignaciones.filter(a => a.rol === 'A')).toHaveLength(1)
   })

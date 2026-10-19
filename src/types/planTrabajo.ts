@@ -332,6 +332,8 @@ export interface PlanTrabajoContexto {
   }
 
   organigrama: OrgNodoContexto[]
+  /** Contactos del cliente del proyecto (ProyectoContactoCliente) — el aprobador del cliente en la RACI. */
+  contactosCliente?: { nombre: string; rolEnProyecto: string }[]
   matriz: MatrizContexto | null
   tdr: TdrContexto | null
 
