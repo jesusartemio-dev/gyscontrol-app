@@ -314,6 +314,20 @@ function diaKey(d: Date): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
+/**
+ * Redondea a 1 decimal y deja la diferencia de redondeo en el mes con más
+ * horas, para que la fila siga sumando su total.
+ */
+function redondearConTotal(valores: number[], total: number): number[] {
+  const r = valores.map(v => Math.round(v * 10) / 10)
+  const dif = Math.round((total - r.reduce((s, v) => s + v, 0)) * 10) / 10
+  if (dif !== 0 && r.length > 0) {
+    const i = r.reduce((im, v, k) => (v > r[im] ? k : im), 0)
+    r[i] = Math.round((r[i] + dif) * 10) / 10
+  }
+  return r
+}
+
 /** Días (inclusive) entre dos fechas — usado por `equipoTrabajo` para el pico DIARIO (§13.1). */
 function diasEntre(inicio: Date, fin: Date): string[] {
   const dias: string[] = []
@@ -490,13 +504,23 @@ export function calcularHistogramasYCronograma(
   const { data: hhPorActividadConCmn, advertencias: advHHActividad } = calcularHHPorActividadConCmn(fases)
   advertencias.push(...advHHActividad)
 
+  // Cada tarea reparte su HH entre los meses según sus días hábiles (L–V) en
+  // cada uno — antes el HH del EDT se dividía en partes iguales entre todos sus
+  // meses (31 h en 3 meses = 10.333… aunque casi todo caía en uno solo).
   const horasHombre = edtsConHH.map(e => {
-    const mesesEdt = mesesEntre(e.fechaInicioPlan, e.fechaFinPlan)
-    const horas = e.hhReal
-    const horasPorMes = mesesEdt.length > 0 ? horas / mesesEdt.length : 0
-    const mesesEdtSet = new Set(mesesEdt)
-    const valoresPorMes = meses.map(m => (mesesEdtSet.has(m) ? horasPorMes : 0))
-    return { etiqueta: e.nombre, valoresPorMes, total: horas }
+    const porMes = new Map<string, number>()
+    for (const t of e.tareasConFecha) {
+      const hh = calcularHHRealDeTarea(t)
+      if (hh <= 0) continue
+      const dias = diasEntre(t.fechaInicio, t.fechaFin)
+      const habiles = dias.filter(d => { const w = new Date(`${d}T00:00:00Z`).getUTCDay(); return w !== 0 && w !== 6 })
+      const reparto = habiles.length > 0 ? habiles : dias
+      for (const d of reparto) {
+        const mes = d.slice(0, 7)
+        porMes.set(mes, (porMes.get(mes) ?? 0) + hh / reparto.length)
+      }
+    }
+    return { etiqueta: e.nombre, valoresPorMes: redondearConTotal(meses.map(m => porMes.get(m) ?? 0), e.hhReal), total: e.hhReal }
   })
 
   const cronogramaFilas = edtsConHH.map(e => ({
