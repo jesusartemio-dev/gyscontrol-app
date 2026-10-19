@@ -242,15 +242,12 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
     try {
       if (!silencioso) setLoading(true)
 
-      // Load project info
-      const [proyectoRes, treeRes] = await Promise.all([
-        fetch(`/api/proyectos/${proyectoId}`),
-        fetch(`/api/proyectos/${proyectoId}/cronograma/tree${cronogramaId ? `?cronogramaId=${cronogramaId}` : ''}`)
-      ])
+      // Solo el árbol del cronograma (como Jerarquía). Antes también pedía
+      // /api/proyectos/[id] sin usarlo, y a roles sin acceso a esa ficha (p. ej.
+      // "proyectos") el Gantt les fallaba con "Error cargando datos".
+      const treeRes = await fetch(`/api/proyectos/${proyectoId}/cronograma/tree${cronogramaId ? `?cronogramaId=${cronogramaId}` : ''}`)
+      if (!treeRes.ok) throw new Error('Error cargando datos')
 
-      if (!proyectoRes.ok || !treeRes.ok) throw new Error('Error cargando datos')
-
-      const proyectoData = (await proyectoRes.json()).data
       const treeData = await treeRes.json()
       const treeArray = treeData?.data?.tree || []
 
