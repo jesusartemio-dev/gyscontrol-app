@@ -6,7 +6,7 @@
  *  - --proyecto=COD --hito="Nombre" [--hito="…"]: agrega la actividad al CTL de la
  *    Línea Base del proyecto con esos hitos, al inicio de Ejecución, primera de CTL.
  * Idempotente. Uso:
- *   npx dotenv -e .env.production -o -- npx tsx scripts/hitos-del-cliente.ts [--proyecto=CJM50 --hito="…"] [--aplicar]
+ *   npx dotenv -e .env.production -o -- npx tsx scripts/hitos-del-cliente.ts [--proyecto=CJM50 --hito="…"] [--solo-proyecto] [--aplicar]
  */
 import fs from 'fs'
 import { randomUUID } from 'crypto'
@@ -19,6 +19,8 @@ import { recalcularEdtPadre, recalcularFasePadre } from '../src/lib/utils/cronog
 const args = process.argv.slice(2)
 const APLICAR = args.includes('--aplicar')
 const PROYECTO = args.find(a => a.startsWith('--proyecto='))?.split('=')[1]
+// --solo-proyecto: no toca el catálogo (p. ej. antes de desplegar el generador que lo usa).
+const SOLO_PROYECTO = args.includes('--solo-proyecto')
 const HITOS = args.filter(a => a.startsWith('--hito=')).map(a => a.slice('--hito='.length))
 const ACTIVIDAD = 'Hitos del Cliente'
 const f = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 16).replace('T', ' ') : '-')
@@ -27,7 +29,7 @@ async function main() {
   // 1. Catálogo
   const ctl = await prisma.edt.findUniqueOrThrow({ where: { nombre: 'CTL' }, select: { id: true } })
   const existe = await prisma.catalogoServicio.findFirst({ where: { categoriaId: ctl.id, nombre: 'Parada de Planta' }, select: { id: true } })
-  console.log(existe ? 'Catálogo: "Parada de Planta" ya existe en CTL' : '+ Catálogo: "Parada de Planta" en CTL (hito, 0 h, HitosCliente, orden 0)')
+  console.log(SOLO_PROYECTO ? 'Catálogo: sin cambios (--solo-proyecto)' : existe ? 'Catálogo: "Parada de Planta" ya existe en CTL' : '+ Catálogo: "Parada de Planta" en CTL (hito, 0 h, HitosCliente, orden 0)')
 
   // 2. Proyecto
   let plan: { cron: { id: string; proyectoId: string }; ctlProy: { id: string; proyectoFaseId: string | null }; fecha: Date; gestor: string | null; actsCtl: { id: string; orden: number }[] } | null = null
@@ -47,7 +49,7 @@ async function main() {
   if (!APLICAR) { console.log('\nVista previa. Para aplicar: --aplicar'); return }
 
   const ahora = new Date()
-  if (!existe) {
+  if (!existe && !SOLO_PROYECTO) {
     const unidad = await prisma.unidadServicio.findFirstOrThrow({ where: { nombre: 'Evento' }, select: { id: true } })
     const gestorRec = await prisma.recurso.findFirstOrThrow({ where: { nombre: 'Gestor' }, select: { id: true } })
     await prisma.catalogoServicio.create({ data: {
