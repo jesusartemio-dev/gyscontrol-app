@@ -697,12 +697,14 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
       </div>
 
       <CardContent className="p-0">
-        {/* Encabezado y filas comparten un solo scroll horizontal; la columna de
-            nombres es sticky, así queda visible al recorrer la línea de tiempo. */}
-        <div className="overflow-x-auto" ref={bodyScrollRef}>
+        {/* Encabezado y filas comparten un solo scroll (horizontal y vertical): la
+            columna de nombres queda fija a la izquierda al recorrer la línea de
+            tiempo y la cabecera de fechas fija arriba al bajar por las tareas,
+            como en MS Project. */}
+        <div className="overflow-auto" ref={bodyScrollRef} style={{ maxHeight: 'calc(100vh - 220px)' }}>
           <div style={{ width: anchoNombres + timeline.totalWidth, minWidth: '100%' }}>
           {/* Header row: name col + timeline months */}
-          <div className="flex border-b bg-white">
+          <div className="sticky top-0 z-50 flex border-b bg-white">
             <div
               className="sticky left-0 z-40 flex-shrink-0 border-r border-gray-200 bg-gray-50 px-2 py-1.5"
               style={{ width: anchoNombres }}
