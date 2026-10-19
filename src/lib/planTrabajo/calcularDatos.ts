@@ -19,6 +19,7 @@ import {
   esGerenciaDeProyectos,
   esGerenciaGeneral,
   prioridadAprobador,
+  siglasCliente,
 } from './raciReglas'
 import { REFERENCIAS_BASE } from './referenciasBase'
 
@@ -139,12 +140,15 @@ interface EdtParaRaci {
 }
 
 /**
- * matrizRaci — ProyectoEdt × personal. Una fila por EDT, en este orden:
- *   1. Gerencia de Proyectos → A (un solo Aprobador por fila). Se busca en el
- *      organigrama (`aprobadorUserId`), porque esa persona puede figurar en el
- *      personal con otro cargo (p. ej. también es Residente).
- *   2. Responsable del EDT o de alguna de sus tareas en el cronograma → R.
- *   3. El resto por cargo, REGLAS_RACI_CARGO (raciReglas.ts).
+ * matrizRaci — ProyectoEdt × personal (+ columna del cliente). Un solo A por fila:
+ *   - EDTs cuyos entregables aprueba el cliente (EDTS_APROBADOS_POR_CLIENTE:
+ *     plan, seguridad, ingeniería, planos, comisionamiento, cierre) → A = cliente.
+ *   - El resto → A = Gerencia de Proyectos. Se busca en el organigrama
+ *     (`aprobadorUserId`), porque esa persona puede figurar en el personal con
+ *     otro cargo (p. ej. también es Residente).
+ * Luego: responsable del EDT o de alguna de sus tareas en el cronograma → R
+ * (también la Gerencia de Proyectos en las filas donde aprueba el cliente),
+ * y el resto por cargo, REGLAS_RACI_CARGO (raciReglas.ts).
  * Gerencia General no entra (salvo que sea el único que puede aprobar).
  * Una celda sin rol no va en `asignaciones` (la persona no participa en ese
  * EDT); construirDataBag arma las columnas por sigla, no por posición.
@@ -152,7 +156,7 @@ interface EdtParaRaci {
 export function calcularMatrizRaci(
   edts: EdtParaRaci[],
   personalTodo: PersonaCalculada[],
-  opciones: { aprobadorUserId?: string | null } = {}
+  opciones: { aprobadorUserId?: string | null; clienteNombre?: string | null } = {}
 ): ResultadoCalculo<PlanRaci> {
   const advertencias: string[] = []
   const cargosNoMapeados = new Set<string>()
@@ -181,13 +185,18 @@ export function calcularMatrizRaci(
     )
   }
 
+  // Columna del cliente (sin cliente cargado, aprueba la Gerencia de Proyectos en todo).
+  let siglaCliente = opciones.clienteNombre ? siglasCliente(opciones.clienteNombre) : null
+  if (siglaCliente && personal.some(p => p.siglas === siglaCliente)) siglaCliente = `${siglaCliente}-C`
+
   const filas = edts.map(edt => {
     const clase = clasificarEdtRaci(edt.nombre, edt.codigoEdt)
     const responsables = new Set([edt.responsableId, ...(edt.responsablesTareas ?? [])].filter(Boolean))
+    const apruebaCliente = Boolean(siglaCliente && clase.esEdtAprobadoPorCliente)
 
     const asignaciones = personal.flatMap(p => {
       let rol: PlanRaciRol | '' | null
-      if (p.userId === aprobadorUserId) rol = 'A'
+      if (p.userId === aprobadorUserId && !apruebaCliente) rol = 'A'
       else if (responsables.has(p.userId)) rol = 'R'
       else rol = calcularRolRaci({ cargoLabel: p.cargo, ...clase })
       if (rol === null) {
@@ -196,6 +205,7 @@ export function calcularMatrizRaci(
       }
       return rol ? [{ siglas: p.siglas ?? '', rol }] : []
     })
+    if (apruebaCliente) asignaciones.push({ siglas: siglaCliente!, rol: 'A' })
 
     return { edt: edt.nombre, asignaciones }
   })
@@ -286,8 +296,8 @@ interface AportePersona {
   cantidad: number
 }
 
-function esCargoSsoma(cargo: string): boolean {
-  return /ssoma|sso\b|hseq|hse\b|seguridad/i.test(cargo)
+function esCargoUnoPorDia(cargo: string): boolean {
+  return /ssoma|sso\b|hseq|hse\b|seguridad|supervisor/i.test(cargo)
 }
 
 function aportesDeRecurso(recurso: RecursoDeTarea): AportePersona[] {
@@ -481,10 +491,10 @@ export function calcularHistogramasYCronograma(
         porCargo.set(aporte.cargo, (porCargo.get(aporte.cargo) ?? 0) + aporte.cantidad)
       }
     }
-    // SSOMA: uno por día aunque haya cuadrillas en paralelo — cada cuadrilla
-    // trae su SSOMA en la composición, pero en obra es el mismo para todo el frente.
+    // SSOMA y Supervisor: uno por día aunque haya cuadrillas en paralelo — cada
+    // cuadrilla los trae en su composición, pero en obra son los mismos para todo el frente.
     for (const [cargo, n] of porCargo) {
-      if (n > 1 && esCargoSsoma(cargo)) porCargo.set(cargo, 1)
+      if (n > 1 && esCargoUnoPorDia(cargo)) porCargo.set(cargo, 1)
     }
     personasPorCargoPorDia.set(dia, porCargo)
   }
@@ -734,7 +744,10 @@ export function calcularDatosEtapa1(contexto: PlanTrabajoContexto): ResultadoCal
   )
   // Gerencia de Proyectos del organigrama (aunque en el personal figure con otro cargo).
   const aprobadorUserId = contexto.organigrama.find(n => n.user && esGerenciaDeProyectos(n.cargoLabel))?.user?.id ?? null
-  const { data: matrizRaci, advertencias: advRaci } = calcularMatrizRaci(edtsPlanos, personalCalculado, { aprobadorUserId })
+  const { data: matrizRaci, advertencias: advRaci } = calcularMatrizRaci(edtsPlanos, personalCalculado, {
+    aprobadorUserId,
+    clienteNombre: contexto.proyecto.cliente?.nombre,
+  })
   advertencias.push(...advRaci)
 
   const { data: datosHistograma, advertencias: advHist } = calcularHistogramasYCronograma(fases)

@@ -72,7 +72,26 @@ export function clasificarEdtRaci(nombreEdt: string, codigoEdt?: string | null) 
     esEdtDeDocumentacion: c === 'PLA' || esEdtDeDocumentacion(nombreEdt),
     esEdtDeLogistica: ['PRO', 'SER'].includes(c) || esEdtDeLogistica(nombreEdt),
     esEdtDeArranqueOCierre: ['GES', 'CIE'].includes(c) || esEdtDeArranqueOCierre(nombreEdt),
+    esEdtAprobadoPorCliente: c ? EDTS_APROBADOS_POR_CLIENTE.includes(c) : esEdtAprobadoPorCliente(nombreEdt),
   }
+}
+
+/**
+ * EDTs cuyos entregables aprueba el CLIENTE (plan de trabajo, plan de
+ * seguridad, documentos y planos, comisionamiento, acta de conformidad): ahí
+ * la A de la RACI es del cliente. En el resto (monitoreo, procura,
+ * construcción, seguimiento de seguridad) aprueba la Gerencia de Proyectos.
+ */
+export const EDTS_APROBADOS_POR_CLIENTE = ['GES', 'SEG', 'ING', 'PLA', 'CMM', 'COM', 'CIE']
+
+export function esEdtAprobadoPorCliente(nombreEdt: string): boolean {
+  return /planificaci[oó]n|ingenier|plano|comision|cierre/i.test(nombreEdt)
+}
+
+/** Siglas de la columna del cliente en la RACI: primera palabra del nombre ("NEXA RESOURCES…" → "NEXA"). */
+export function siglasCliente(nombreCliente: string): string {
+  const palabra = nombreCliente.trim().split(/\s+/)[0] ?? ''
+  return palabra.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9]/g, '').toUpperCase().slice(0, 8) || 'CLIENTE'
 }
 
 export interface ContextoRolRaci {
@@ -82,6 +101,7 @@ export interface ContextoRolRaci {
   esEdtDeDocumentacion: boolean
   esEdtDeLogistica?: boolean
   esEdtDeArranqueOCierre?: boolean
+  esEdtAprobadoPorCliente?: boolean
 }
 
 /** '' = la persona no participa en ese EDT (celda vacía). */

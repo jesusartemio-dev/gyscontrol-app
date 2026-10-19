@@ -512,6 +512,26 @@ describe('calcularMatrizRaci', () => {
     expect(rolDe(ing, 'NL')).toBe('')
   })
 
+  it('con cliente: A del cliente en sus entregables (ING, CIE…) y JM pasa a R donde es responsable; A de JM en lo interno', () => {
+    const personal = [
+      personaRaci({ nombre: 'JM', cargo: 'RESIDENTE', userId: 'jm' }),
+      personaRaci({ nombre: 'PR', cargo: 'GESTOR DE PROYECTOS', userId: 'pr' }),
+    ]
+    const edts = [
+      { id: 'ing', nombre: 'Documentos de Ingeniería', codigoEdt: 'ING', responsableId: 'jm' },
+      { id: 'ctl', nombre: 'Monitoreo y Control', codigoEdt: 'CTL', responsableId: 'pr' },
+    ]
+
+    const { data } = calcularMatrizRaci(edts, personal, { aprobadorUserId: 'jm', clienteNombre: 'NEXA RESOURCES CAJAMARQUILLA S.A.' })
+    const [ing, ctl] = data.filas
+
+    expect(rolDe(ing, 'NEXA')).toBe('A')
+    expect(rolDe(ing, 'JM')).toBe('R')
+    expect(rolDe(ctl, 'NEXA')).toBe('')
+    expect(rolDe(ctl, 'JM')).toBe('A')
+    for (const f of data.filas) expect(f.asignaciones.filter(a => a.rol === 'A')).toHaveLength(1)
+  })
+
   it('con más de 19 personas, emite una advertencia de Etapa 1 (grilla de la plantilla reserva 1 columna por persona)', () => {
     const personal = Array.from({ length: 20 }, (_, i) =>
       personaRaci({ nombre: `Persona${i}`, cargo: 'Técnico', userId: `u${i}` })
