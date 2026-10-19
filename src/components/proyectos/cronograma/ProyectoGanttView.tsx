@@ -43,6 +43,21 @@ import { toast as sonnerToast } from 'sonner'
 import { differenceInDays, differenceInCalendarDays, addDays, addMonths, startOfMonth, startOfWeek, format, isSameMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
 
+interface DependenciaGantt {
+  tareaId: string
+  nombre: string
+  /** Fase › EDT › Actividad de la otra tarea */
+  ruta?: string
+  tipo: string
+  tipoTexto?: string
+  horasIncumplidas?: number
+  holguraTexto?: string
+}
+
+/** "← Traslado 2: En Obra (FC) · PROCURA › Suministro de Equipos › Seguimiento…" */
+const lineaDependencia = (flecha: string, d: DependenciaGantt) =>
+  `${flecha} ${d.nombre} (${d.tipoTexto ?? 'FC'})${d.ruta ? ` · ${d.ruta}` : ''}`
+
 interface GanttItem {
   id: string
   nombre: string
@@ -71,7 +86,9 @@ interface GanttItem {
   /** Días laborables que el hito pasa su fecha límite (0 = a tiempo). */
   diasPasadoLimite?: number
   /** Predecesoras guardadas (solo tareas); horasIncumplidas > 0 = no se cumple. */
-  predecesoras?: { tareaId: string; nombre: string; tipo: string; tipoTexto?: string; horasIncumplidas?: number }[]
+  predecesoras?: DependenciaGantt[]
+  /** Tareas que dependen de esta. */
+  sucesoras?: DependenciaGantt[]
 }
 
 interface ProyectoGanttViewProps {
@@ -262,6 +279,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
           fechaLimite: data.esHito && data.fechaLimite ? diaLocalDesdeUTC(data.fechaLimite) : undefined,
           diasPasadoLimite: Number(data.diasPasadoLimite) || 0,
           predecesoras: Array.isArray(data.predecesoras) ? data.predecesoras : undefined,
+          sucesoras: Array.isArray(data.sucesoras) ? data.sucesoras : undefined,
           hijos: node.children?.map((child: any) => processNode(child, nivel + 1, node.id)) || []
         }
 
@@ -372,6 +390,19 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
     setSeleccionId(item.id)
     onSelect?.(item.id)
     onItemClick?.(item)
+    // Abre las ramas (fase/EDT/actividad) donde están sus predecesoras y
+    // sucesoras, para que sus flechas se vean sin buscarlas a mano.
+    const relacionadas = [...(item.predecesoras ?? []), ...(item.sucesoras ?? [])].map(d => `tarea-${d.tareaId}`)
+    if (!relacionadas.length) return
+    const porId = new Map(aplanar(items).map(i => [i.id, i]))
+    const abrir = new Set<string>()
+    for (const id of relacionadas) {
+      for (let p = porId.get(id)?.padreId; p; p = porId.get(p)?.padreId) abrir.add(p)
+    }
+    if (![...abrir].some(id => porId.get(id) && !porId.get(id)!.expanded)) return
+    const update = (list: GanttItem[]): GanttItem[] =>
+      list.map(i => ({ ...i, expanded: abrir.has(i.id) ? true : i.expanded, hijos: i.hijos ? update(i.hijos) : i.hijos }))
+    setItems(update)
   }
 
   // Ctrl + rueda = zoom. Listener nativo no pasivo: con el de React no se puede
@@ -400,6 +431,12 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   }
 
   // Flatten visible items
+  // La tarea seleccionada tiene dependencias: sus flechas se resaltan y el resto se atenúa.
+  const seleccionTieneDependencias = useMemo(() => {
+    const sel = seleccionId ? aplanar(items).find(i => i.id === seleccionId) : undefined
+    return !!(sel?.predecesoras?.length || sel?.sucesoras?.length)
+  }, [items, seleccionId])
+
   const visibleItems = useMemo(() => {
     const result: GanttItem[] = []
     const walk = (list: GanttItem[]) => {
@@ -793,6 +830,21 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                       >
                         {item.nombre}
                       </span>
+                      {item.tipo === 'tarea' && (item.predecesoras?.length || item.sucesoras?.length) ? (
+                        <span
+                          className={`inline-flex flex-shrink-0 items-center gap-0.5 rounded border px-1 text-[9px] leading-[14px] ${
+                            item.predecesoras?.some(d => (d.horasIncumplidas ?? 0) > 0) ? 'border-red-300 bg-red-50 text-red-700' : 'border-gray-300 bg-white text-gray-500'
+                          }`}
+                          title={[
+                            ...(item.predecesoras?.length ? ['Predecesoras:', ...item.predecesoras.map(d => lineaDependencia('←', d))] : []),
+                            ...(item.sucesoras?.length ? ['Sucesoras:', ...item.sucesoras.map(d => lineaDependencia('→', d))] : []),
+                            '', 'Clic en la fila para abrir sus ramas y ver las flechas.',
+                          ].join('\n')}
+                        >
+                          <Link2 className="h-2.5 w-2.5" />
+                          {item.predecesoras?.length ?? 0}/{item.sucesoras?.length ?? 0}
+                        </span>
+                      ) : null}
                       <Badge variant="outline" className={`text-[9px] leading-none px-1 py-0 h-3.5 flex-shrink-0 ${colors.text} border-current/30`}>
                         {item.tipo}
                       </Badge>
@@ -894,11 +946,25 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                   return (dia + frac) * timeline.dayWidth
                 }
                 const yMedio = (fila: number) => fila * ROW_HEIGHT + ROW_HEIGHT / 2
-                const flechas: { key: string; d: string; roja: boolean; titulo: string }[] = []
+                const flechas: { key: string; d: string; roja: boolean; titulo: string; oculta?: boolean; activa?: boolean }[] = []
                 visibleItems.forEach((suc, filaSuc) => {
                   for (const dep of suc.predecesoras ?? []) {
                     const filaPred = filaDe.get(`tarea-${dep.tareaId}`)
-                    if (filaPred === undefined) continue
+                    if (filaPred === undefined) {
+                      // Predecesora en una rama cerrada: flecha corta punteada que llega a la barra.
+                      const haciaFinOculta = dep.tipo === 'finish_to_finish' || dep.tipo === 'start_to_finish'
+                      const xs = x(haciaFinOculta ? suc.fechaFin : suc.fechaInicio)
+                      const ys = yMedio(filaSuc)
+                      flechas.push({
+                        key: `oculta-${dep.tareaId}-${suc.id}`,
+                        d: haciaFinOculta ? `M ${xs + 22} ${ys} H ${xs}` : `M ${xs - 22} ${ys} H ${xs}`,
+                        roja: (dep.horasIncumplidas ?? 0) > 0,
+                        oculta: true,
+                        activa: suc.id === seleccionId,
+                        titulo: `${lineaDependencia('←', dep)}\n(rama cerrada: clic en la tarea para abrirla)`,
+                      })
+                      continue
+                    }
                     const pred = visibleItems[filaPred]
                     const desdeFin = dep.tipo === 'finish_to_start' || dep.tipo === 'finish_to_finish'
                     const haciaFin = dep.tipo === 'finish_to_finish' || dep.tipo === 'start_to_finish'
@@ -915,7 +981,11 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                       ? `M ${x1} ${y1} H ${salida} V ${y2} H ${x2}`
                       : `M ${x1} ${y1} H ${salida} V ${yCruce} H ${llegada} V ${y2} H ${x2}`
                     const roja = (dep.horasIncumplidas ?? 0) > 0
-                    flechas.push({ key: `${dep.tareaId}-${suc.id}`, d, roja, titulo: `${pred.nombre} → ${suc.nombre} (${dep.tipoTexto ?? 'FC'})${roja ? ' · no se cumple' : ''}` })
+                    flechas.push({
+                      key: `${dep.tareaId}-${suc.id}`, d, roja,
+                      activa: suc.id === seleccionId || pred.id === seleccionId,
+                      titulo: `${pred.nombre} → ${suc.nombre} (${dep.tipoTexto ?? 'FC'})${roja ? ' · no se cumple' : ''}`,
+                    })
                   }
                 })
                 if (flechas.length === 0) return null
@@ -938,8 +1008,11 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                         key={f.key}
                         d={f.d}
                         fill="none"
-                        stroke={f.roja ? '#dc2626' : '#6b7280'}
-                        strokeWidth={f.roja ? 1.5 : 1}
+                        stroke={f.roja ? '#dc2626' : f.activa ? '#2563eb' : '#6b7280'}
+                        strokeWidth={f.roja || f.activa ? 1.75 : 1}
+                        strokeDasharray={f.oculta ? '3 2' : undefined}
+                        // Con una tarea seleccionada, sus flechas resaltan y el resto se atenúa.
+                        opacity={seleccionId && seleccionTieneDependencias && !f.activa ? 0.35 : 1}
                         markerEnd={`url(#${f.roja ? 'gantt-flecha-roja' : 'gantt-flecha'})`}
                       >
                         <title>{f.titulo}</title>
@@ -1051,7 +1124,14 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                             )}
                             {item.predecesoras?.map(dep => (
                               <div key={dep.tareaId} className={dep.horasIncumplidas ? 'text-red-300 font-medium' : 'text-muted-foreground'}>
-                                ← {dep.nombre} ({dep.tipoTexto ?? 'FC'}){dep.horasIncumplidas ? ' · no se cumple' : ''}
+                                ← {dep.nombre} ({dep.tipoTexto ?? 'FC'}){dep.horasIncumplidas ? ' · no se cumple' : dep.holguraTexto ? ` · +${dep.holguraTexto}` : ''}
+                                {dep.ruta && <div className="pl-3 text-[10px] opacity-75">{dep.ruta}</div>}
+                              </div>
+                            ))}
+                            {item.sucesoras?.map(dep => (
+                              <div key={`s-${dep.tareaId}`} className="text-muted-foreground">
+                                → {dep.nombre} ({dep.tipoTexto ?? 'FC'})
+                                {dep.ruta && <div className="pl-3 text-[10px] opacity-75">{dep.ruta}</div>}
                               </div>
                             ))}
                           </div>
