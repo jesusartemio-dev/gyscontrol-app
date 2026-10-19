@@ -1,5 +1,5 @@
 import type { PlanTrabajo } from '@prisma/client'
-import type { PlanRaci } from '@/types/planTrabajo'
+import type { PlanPersonal, PlanRaci } from '@/types/planTrabajo'
 
 interface Props { plan: PlanTrabajo }
 
@@ -14,7 +14,10 @@ export function MatrizRaciView({ plan }: Props) {
   const raci = plan.matrizRaci as PlanRaci | null
   if (!raci?.filas?.length) return null
 
-  const siglas = [...new Set(raci.filas.flatMap(f => f.asignaciones.map(a => a.siglas)))]
+  // Columnas en el orden del Personal Asignado (igual que el docx), no por aparición.
+  const usadas = new Set(raci.filas.flatMap(f => f.asignaciones.map(a => a.siglas)))
+  const personal = (plan.personalAsignado as PlanPersonal[] | null) ?? []
+  const siglas = [...new Set([...personal.map(p => p.siglas ?? '').filter(s => usadas.has(s)), ...usadas])]
 
   return (
     <div className="overflow-x-auto">
