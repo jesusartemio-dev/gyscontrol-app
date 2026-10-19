@@ -82,6 +82,12 @@ export interface TareaPropuesta {
    * Conformidad HES (+5d). Sale de la etiqueta "Hito+Nd" del servicio.
    */
   hitoDiasDespues?: number
+  /**
+   * Hito del cliente sin fecha conocida al generar (p. ej. "Parada de Planta"):
+   * se ubica provisionalmente al inicio de Ejecución para poder colgarle
+   * dependencias; el usuario pone la fecha real. Etiqueta "HitosCliente" (la misma que agrupa la actividad "Hitos del Cliente").
+   */
+  hitoSinFecha?: boolean
 }
 
 export interface ActividadPropuesta {

@@ -150,6 +150,7 @@ export function construirTareaPropuesta(
     cantidadSugeridaPorIA: cantidadDeterminista !== null,
     notaCantidad: servicio.notaCantidad,
     ...(diasHitoDeEtiquetas(servicio.actividadTag) !== undefined && { hitoDiasDespues: diasHitoDeEtiquetas(servicio.actividadTag) }),
+    ...((servicio.actividadTag ?? []).some(t => /^hitoscliente$/i.test(t)) && { hitoSinFecha: true }),
   }
 }
 
@@ -239,6 +240,7 @@ function generarCIE(servicios: CatalogoServicioParaWizard[], config: Configuraci
  * numeradas (01, 02…) al construir la estructura — ver
  * RECURRENCIA_ACTIVIDAD y construirEstructuraReal.
  */
+export const ACTIVIDAD_HITOS_CLIENTE = 'Hitos del Cliente'
 export const ACTIVIDAD_REPORTE_AVANCE = 'Reporte Avance Semanal'
 export const ACTIVIDAD_VALORIZACIONES = 'Valorizaciones'
 export const ACTIVIDAD_HABILITACION = 'Habilitación de Personal'
@@ -259,9 +261,13 @@ export const ACTIVIDAD_POR_CICLO: Record<string, string> = {
   [ACTIVIDAD_VALORIZACIONES]: 'Valorización',
 }
 
-/** CTL (Control): reportes semanales de avance y valorizaciones mensuales. */
+/** CTL (Control): hitos del cliente (paradas), reportes semanales de avance y valorizaciones mensuales. */
 function generarCTL(servicios: CatalogoServicioParaWizard[], config: ConfiguracionWizardPaso1): ActividadPropuesta[] {
-  return agruparPorTag(servicios, 'CTL', { ReporteAvance: ACTIVIDAD_REPORTE_AVANCE, Valorizaciones: ACTIVIDAD_VALORIZACIONES }, config)
+  return agruparPorTag(servicios, 'CTL', {
+    HitosCliente: ACTIVIDAD_HITOS_CLIENTE,
+    ReporteAvance: ACTIVIDAD_REPORTE_AVANCE,
+    Valorizaciones: ACTIVIDAD_VALORIZACIONES,
+  }, config)
 }
 
 /** SSO (Gestión de Seguridad): habilitación de personal y reportes semanales de seguridad. */

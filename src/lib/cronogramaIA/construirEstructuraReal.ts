@@ -395,7 +395,13 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
     const nuevas = programarGestionYControl({
       cal: calendarioHoras(calendarioLaboral),
       faseGC, finVentana, edts, actividades: actividadesFilas, tareas, propuestaPorTareaId,
+      inicioEjecucion: fases.find(f => claveFase(f.nombre) === FASE_EJECUCION)?.fechaInicioPlan,
     })
+    for (const t of nuevas.tareas) {
+      if (propuestaPorTareaId.get(t.id)?.hitoSinFecha) {
+        advertencias.push(`"${t.nombre}" quedó provisionalmente al inicio de Ejecución: pon su fecha real y vincula las tareas que dependen de ella.`)
+      }
+    }
     tareas.splice(0, tareas.length, ...nuevas.tareas)
     dependenciasCiclos.push(...nuevas.dependencias)
   }
@@ -449,6 +455,8 @@ export function programarGestionYControl(o: {
   actividades: FilaActividad[]
   tareas: FilaTarea[]
   propuestaPorTareaId: Map<string, TareaPropuesta>
+  /** Dónde ubicar los hitos del cliente sin fecha (p. ej. Parada de Planta). */
+  inicioEjecucion?: Date
 }): { tareas: FilaTarea[]; dependencias: EstructuraReal['dependenciasCiclos'] } {
   const { cal, faseGC, finVentana } = o
   const edtsGC = o.edts.filter(e => e.proyectoFaseId === faseGC.id)
@@ -472,6 +480,12 @@ export function programarGestionYControl(o: {
     for (const t of base) {
       const id = sufijo ? randomUUID() : t.id
       const nombre = sufijo ? `${t.nombre} ${sufijo}` : t.nombre
+      // Hito del cliente sin fecha: provisional al inicio de Ejecución, suelto (sin cadena).
+      if (o.propuestaPorTareaId.get(t.id)?.hitoSinFecha) {
+        const fecha = siguienteMomentoLaborable(cal, o.inicioEjecucion ?? inicioVentana)
+        nuevas.push({ ...t, id, nombre, proyectoActividadId: actividadId ?? t.proyectoActividadId, fechaInicio: fecha, fechaFin: fecha, horasEstimadas: 0, esHito: true })
+        continue
+      }
       const dias = o.propuestaPorTareaId.get(t.id)?.hitoDiasDespues
       if (dias !== undefined && anterior) {
         const lagMinutos = Math.round(dias * hpd * 60)

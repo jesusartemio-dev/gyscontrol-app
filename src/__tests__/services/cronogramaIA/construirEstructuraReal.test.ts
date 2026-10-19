@@ -407,6 +407,7 @@ describe('construirEstructuraReal — GESTION Y CONTROL transversal y PROCURA en
     actividades: [
       { edtNombre: 'GES', actividadNombre: 'Inicio', tareas: [tarea('t1', 'Kickoff', 24)], origen: 'determinista' }, // 3 días
       { edtNombre: 'SEG', actividadNombre: 'Documentos de Seguridad', tareas: [tarea('t2', 'IPERC', 40)], origen: 'determinista' }, // 5 días
+      { edtNombre: 'CTL', actividadNombre: 'Hitos del Cliente', tareas: [{ ...tarea('pp', 'Parada de Planta', 0), hitoSinFecha: true }], origen: 'determinista' },
       { edtNombre: 'CTL', actividadNombre: 'Reporte Avance Semanal', tareas: [tarea('r1', 'Elaboración y Envío de Reporte Semanal', 2.5)], origen: 'determinista' },
       { edtNombre: 'CTL', actividadNombre: 'Valorizaciones', tareas: [
         tarea('v1', 'Elaboración y Envío de Valorización', 4.5),
@@ -462,6 +463,18 @@ describe('construirEstructuraReal — GESTION Y CONTROL transversal y PROCURA en
     expect(r.dependenciasCiclos).toContainEqual({ tareaOrigenId: elab.id, tareaDependienteId: aprob.id, tipo: 'finish_to_start', lagMinutos: 2 * 8 * 60 })
     expect(r.dependenciasCiclos).toContainEqual({ tareaOrigenId: elab.id, tareaDependienteId: hes.id, tipo: 'finish_to_start', lagMinutos: 5 * 8 * 60 })
     expect(hes.fechaInicio.getTime()).toBeGreaterThan(aprob.fechaInicio.getTime())
+  })
+
+  it('Hitos del Cliente: la Parada de Planta (sin fecha) queda como hito al inicio de Ejecución, con aviso', () => {
+    const r = construir()
+    const parada = r.tareas.find(t => t.catalogoServicioId === 'pp')!
+    expect(parada).toMatchObject({ nombre: 'Parada de Planta', esHito: true, horasEstimadas: 0 })
+    expect(parada.fechaInicio.getTime()).toBe(parada.fechaFin.getTime())
+    const ejecucion = r.fases.find(f => f.nombre === 'EJECUCION')!
+    expect(parada.fechaInicio.toISOString().slice(0, 10)).toBe(ejecucion.fechaInicioPlan.toISOString().slice(0, 10))
+    // Sin dependencias automáticas: el usuario vincula lo que depende de la parada
+    expect(r.dependenciasCiclos.some(d => d.tareaOrigenId === parada.id || d.tareaDependienteId === parada.id)).toBe(false)
+    expect(r.advertencias.some(a => a.includes('Parada de Planta'))).toBe(true)
   })
 
   it('SSO: habilitación de personal una sola vez, al inicio de la ventana, en cadena', () => {
