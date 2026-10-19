@@ -59,13 +59,38 @@ interface DependenciaNodo {
   ruta?: string
   tipoTexto?: string
   horasIncumplidas?: number
+  incumplidaTexto?: string
+  holguraTexto?: string
+}
+
+/**
+ * Columna Fechas de una tarea con predecesoras: muestra la dependencia (como la
+ * columna Predecesoras de MS Project) en vez del espacio con la fila de arriba.
+ * Rojo si no se cumple; ámbar con "+2d" si va más tarde de lo que exige.
+ */
+function DependenciaFechas({ predecesoras }: { predecesoras: DependenciaNodo[] }) {
+  const incumplida = predecesoras.find((d) => (d.horasIncumplidas ?? 0) > 0)
+  const conHolgura = predecesoras.find((d) => d.holguraTexto)
+  const principal = incumplida ?? conHolgura ?? predecesoras[0]
+  const texto = predecesoras.length > 1 ? `${principal.tipoTexto ?? 'FC'} +${predecesoras.length - 1}` : (principal.tipoTexto ?? 'FC')
+  const color = incumplida ? 'text-red-600' : conHolgura ? 'text-amber-600' : 'text-blue-500'
+  const detalle = incumplida
+    ? `No se cumple: va ${incumplida.incumplidaTexto ?? ''} antes de lo que exige "${incumplida.nombre}" (${incumplida.tipoTexto ?? 'FC'}).`
+    : conHolgura
+      ? `Va ${conHolgura.holguraTexto} después de lo que exige "${conHolgura.nombre}" (${conHolgura.tipoTexto ?? 'FC'}). Para acercarla: Editar › Predecesoras › Ajustar esta tarea.`
+      : `Depende de "${principal.nombre}" (${principal.tipoTexto ?? 'FC'}) y se cumple.`
+  return (
+    <span className={`shrink-0 whitespace-nowrap text-[9px] font-medium ${color}`} title={`${detalle}${predecesoras.length > 1 ? `\nTiene ${predecesoras.length} predecesoras.` : ''}`}>
+      {texto}{!incumplida && conHolgura ? ` · +${conHolgura.holguraTexto}` : ''}
+    </span>
+  )
 }
 
 /** Texto del tooltip: predecesoras (←) y sucesoras (→) con su ubicación. */
 function textoDependencias(data: { predecesoras?: DependenciaNodo[]; sucesoras?: DependenciaNodo[] }): string {
   const linea = (flecha: string, d: DependenciaNodo) =>
     `${flecha} ${d.nombre} (${d.tipoTexto ?? 'FC'})${d.ruta ? ` · ${d.ruta}` : ''}${
-      d.horasIncumplidas ? '  ⚠ no se cumple' : ''}`
+      d.horasIncumplidas ? '  ⚠ no se cumple' : d.holguraTexto ? `  · va ${d.holguraTexto} después de lo que exige` : ''}`
   const partes: string[] = []
   if (data.predecesoras?.length) partes.push('Predecesoras:', ...data.predecesoras.map((d) => linea('←', d)))
   if (data.sucesoras?.length) partes.push(`${partes.length ? '\n' : ''}Sucesoras:`, ...data.sucesoras.map((d) => linea('→', d)))
@@ -486,7 +511,9 @@ export function TreeNode({
 
         {/* Columna 4: Fechas (+ relación con el elemento de arriba) */}
         <div className="flex items-center justify-center gap-1 text-[11px] text-gray-500 min-w-0">
-          <RelacionAnteriorIcono relacion={node.data.relacionAnterior} />
+          {node.type === 'tarea' && node.data?.predecesoras?.length
+            ? <DependenciaFechas predecesoras={node.data.predecesoras} />
+            : <RelacionAnteriorIcono relacion={node.data.relacionAnterior} />}
           <span className="truncate">{formatDates()}</span>
         </div>
 

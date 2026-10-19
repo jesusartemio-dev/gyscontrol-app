@@ -753,13 +753,17 @@ export async function GET(
           const fp = fechasDe(pred.nodo)
           const fs = fechasDe(suc.nodo)
           const incumple = fp && fs ? horasIncumplidas(cal, dep, fp, fs) : 0
+          // Va más tarde de lo que exige (permite "Ajustar" para acercarla).
+          const holgura = fp && fs && !incumple ? horasHolgura(cal, dep, fp, fs) : 0
           const base = {
             id: dep.id, tipo: dep.tipo, lagMinutos: dep.lagMinutos,
             // "FC+2d", como la columna Predecesoras de MS Project (en español)
             tipoTexto: `${ABREVIATURA_DEPENDENCIA[dep.tipo as TipoDependencia] ?? 'FC'}${formatearDesfase(dep.lagMinutos, hpd)}`,
             horasIncumplidas: Math.round(incumple * 100) / 100,
-            // Va más tarde de lo que exige (permite "Ajustar" para acercarla).
-            horasHolgura: fp && fs && !incumple ? Math.round(horasHolgura(cal, dep, fp, fs) * 100) / 100 : 0,
+            horasHolgura: Math.round(holgura * 100) / 100,
+            // "2d" / "4h" para mostrar en Jerarquía y tooltips
+            ...(incumple > 0 && { incumplidaTexto: formatearDuracion(incumple, hpd) }),
+            ...(holgura > 0 && { holguraTexto: formatearDuracion(holgura, hpd) }),
           }
           ;(suc.nodo.data.predecesoras ??= []).push({ ...base, tareaId: dep.tareaOrigenId, nombre: pred.nodo.nombre, ruta: pred.ruta })
           ;(pred.nodo.data.sucesoras ??= []).push({ ...base, tareaId: dep.tareaDependienteId, nombre: suc.nodo.nombre, ruta: suc.ruta })
