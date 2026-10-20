@@ -331,7 +331,7 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
     }
   }
 
-  const handleSaveSeccion = async (seccion: SeccionEditable, valor: unknown) => {
+  const handleSaveSeccion = async (seccion: SeccionEditable, valor: unknown, { cerrar = true } = {}) => {
     const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -342,7 +342,7 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
       throw new Error(e.error ?? `HTTP ${res.status}`)
     }
     await fetchContexto()
-    setEditandoSeccion(null)
+    if (cerrar) setEditandoSeccion(null)
   }
 
   if (loading) {
@@ -430,6 +430,7 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
           imagenes={plan.imagenes}
           onImagenesChanged={fetchContexto}
           onSave={(v) => handleSaveSeccion('alcanceDetallado', v)}
+          onGuardarParcial={(v) => handleSaveSeccion('alcanceDetallado', v, { cerrar: false })}
           onCancel={() => setEditandoSeccion(null)}
         />
       )}

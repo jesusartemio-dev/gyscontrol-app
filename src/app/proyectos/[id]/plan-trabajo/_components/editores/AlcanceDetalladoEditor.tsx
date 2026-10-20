@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Trash2, PlusCircle, ChevronUp, ChevronDown, EyeOff, ListChecks, ImageIcon, Camera, Sparkles, Lock } from 'lucide-react'
+import { Plus, Trash2, PlusCircle, ChevronUp, ChevronDown, EyeOff, ListChecks, ImageIcon, Camera, Sparkles, Lock, Save } from 'lucide-react'
 import { GaleriaImagenesAlcance, type GaleriaImagenesAlcanceHandle } from './GaleriaImagenesAlcance'
 import { HintFotoSugerida } from '@/components/catalogoImagenes/HintFotoSugerida'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
@@ -27,6 +27,8 @@ interface Props {
   imagenes: PlanTrabajoImagen[]
   onImagenesChanged: () => Promise<void>
   onSave: (v: PlanAlcanceDetalladoEdt[]) => Promise<void>
+  /** Guarda sin cerrar el panel (botón "Guardar actividad"). */
+  onGuardarParcial: (v: PlanAlcanceDetalladoEdt[]) => Promise<void>
   onCancel: () => void
 }
 
@@ -71,15 +73,47 @@ function contarEstadoEdt(item: PlanAlcanceDetalladoEdt, imagenes: PlanTrabajoIma
   return { tareas, imagenes: totalImagenes, fotosPendientes, sugeridasIA }
 }
 
-export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos, imagenes, onImagenesChanged, onSave, onCancel }: Props) {
+export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos, imagenes, onImagenesChanged, onSave, onGuardarParcial, onCancel }: Props) {
   const [items, setItems] = useState<PlanAlcanceDetalladoEdt[]>(
     valor.length > 0 ? valor : [edtVacio()]
   )
   const [saving, setSaving] = useState(false)
+  // Lo que está guardado en el servidor: base para "Guardar actividad" (que
+  // guarda solo esa actividad sobre lo ya guardado) y para saber qué cambió.
+  const [guardado, setGuardado] = useState<PlanAlcanceDetalladoEdt[]>(() => (valor.length > 0 ? valor : [edtVacio()]))
+  const [guardandoActividad, setGuardandoActividad] = useState<string | null>(null)
   // Cambios sin guardar: el panel se cerraba al hacer clic afuera o con Esc y
   // se perdía todo lo editado sin aviso (el botón Guardar está al final).
-  const [inicial] = useState(() => JSON.stringify(valor.length > 0 ? valor : [edtVacio()]))
-  const hayCambios = JSON.stringify(items) !== inicial
+  const hayCambios = JSON.stringify(items) !== JSON.stringify(guardado)
+  const actividadCambiada = (edtIdx: number, subIdx: number) =>
+    JSON.stringify(items[edtIdx]?.subItems?.[subIdx]) !== JSON.stringify(guardado[edtIdx]?.subItems?.[subIdx])
+
+  // Guarda SOLO esta actividad: la copia sobre lo ya guardado y manda todo el
+  // alcance (el PATCH es por sección). Si la estructura del EDT cambió
+  // (actividades agregadas/quitadas), se guarda el EDT completo.
+  const guardarActividad = async (edtIdx: number, subIdx: number) => {
+    const local = items[edtIdx]
+    const base = guardado[edtIdx]
+    const mismaEstructura =
+      base && base.edtRefId === local.edtRefId && (base.subItems ?? []).length === (local.subItems ?? []).length
+    const nuevo = [...guardado]
+    if (mismaEstructura) {
+      nuevo[edtIdx] = { ...base, subItems: (base.subItems ?? []).map((s, i) => (i === subIdx ? local.subItems![subIdx] : s)) }
+    } else {
+      nuevo[edtIdx] = local
+    }
+    setGuardandoActividad(`${edtIdx}-${subIdx}`)
+    try {
+      await onGuardarParcial(nuevo)
+      setGuardado(nuevo)
+      toast.success(`Actividad guardada${mismaEstructura ? '' : ' (con su EDT)'}`)
+    } catch (e) {
+      toast.error(`No se pudo guardar: ${e instanceof Error ? e.message : 'error desconocido'}`)
+    } finally {
+      setGuardandoActividad(null)
+    }
+  }
+
   const cerrar = () => {
     if (hayCambios && !window.confirm('Tenés cambios sin guardar en el Alcance Detallado. ¿Cerrar y descartarlos?')) return
     onCancel()
@@ -127,8 +161,11 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
   // Regenerar SOLO un EDT (Bloque 4.2 sesión 5) — reemplaza únicamente ese
   // EDT en el estado local por el que devolvió el servidor; los demás EDTs
   // (incluidas sus ediciones locales sin guardar) no se tocan.
-  const handleEdtRegenerado = (edtFresco: PlanAlcanceDetalladoEdt) =>
+  const handleEdtRegenerado = (edtFresco: PlanAlcanceDetalladoEdt) => {
     setItems(prev => prev.map(it => it.edtRefId === edtFresco.edtRefId ? edtFresco : it))
+    // El servidor ya lo guardó al regenerar.
+    setGuardado(prev => prev.map(it => it.edtRefId === edtFresco.edtRefId ? edtFresco : it))
+  }
 
   const marcarDescripcionEditada = (edtIdx: number, texto: string) =>
     updateItem(edtIdx, { descripcion: texto, descripcionEditadaManualmente: true })
@@ -436,6 +473,18 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                 onSubir={() => galeriaRefs.current.get(claveGaleriaSub)?.abrirSelectorArchivo()}
                                 onElegirBiblioteca={() => galeriaRefs.current.get(claveGaleriaSub)?.abrirPicker()}
                               />
+                            )}
+                            {actividadCambiada(edtIdx, subIdx) && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-7 px-2 text-xs shrink-0"
+                                disabled={guardandoActividad !== null || saving}
+                                onClick={() => guardarActividad(edtIdx, subIdx)}
+                              >
+                                <Save size={12} className="mr-1" />
+                                {guardandoActividad === `${edtIdx}-${subIdx}` ? 'Guardando…' : 'Guardar actividad'}
+                              </Button>
                             )}
                             <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" onClick={() => removeSubItem(edtIdx, subIdx)}>
                               <Trash2 size={12} />
