@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { toast } from 'sonner'
 import type { PlanAlcanceDetalladoEdt, PlanAlcanceDetalladoSubItem, PlanAlcanceDetalladoTarea } from '@/types/planTrabajo'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
@@ -75,6 +76,14 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
     valor.length > 0 ? valor : [edtVacio()]
   )
   const [saving, setSaving] = useState(false)
+  // Cambios sin guardar: el panel se cerraba al hacer clic afuera o con Esc y
+  // se perdía todo lo editado sin aviso (el botón Guardar está al final).
+  const [inicial] = useState(() => JSON.stringify(valor.length > 0 ? valor : [edtVacio()]))
+  const hayCambios = JSON.stringify(items) !== inicial
+  const cerrar = () => {
+    if (hayCambios && !window.confirm('Tenés cambios sin guardar en el Alcance Detallado. ¿Cerrar y descartarlos?')) return
+    onCancel()
+  }
 
   // Refs a cada instancia de galería (una por tarea/subItem/EDT) — el popover
   // de "Foto sugerida" (Prioridad 2) dispara subir/elegir-de-biblioteca de la
@@ -211,12 +220,26 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
 
   const handleSave = async () => {
     setSaving(true)
-    try { await onSave(items) } finally { setSaving(false) }
+    try {
+      await onSave(items)
+      toast.success('Alcance Detallado guardado')
+    } catch (e) {
+      // Antes el error se tragaba: parecía guardado y al cerrar se perdía.
+      toast.error(`No se pudo guardar: ${e instanceof Error ? e.message : 'error desconocido'}`)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
-    <Sheet open onOpenChange={(open) => !open && onCancel()}>
-      <SheetContent side="right" className="w-full sm:max-w-3xl lg:max-w-5xl overflow-y-auto">
+    <Sheet open onOpenChange={(open) => !open && cerrar()}>
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-3xl lg:max-w-5xl overflow-y-auto"
+        // Solo se cierra con Cancelar, la X o Esc: un clic afuera (o en el
+        // diálogo de biblioteca/subida de imágenes) lo cerraba y se perdía lo editado.
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <SheetHeader>
           <SheetTitle>Editar Alcance Detallado</SheetTitle>
         </SheetHeader>
@@ -570,9 +593,11 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
             <Plus size={14} className="mr-1" /> Agregar EDT
           </Button>
 
-          <div className="flex justify-end gap-2 pt-2 border-t">
-            <Button variant="outline" onClick={onCancel} disabled={saving}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving}>
+          {/* Fija abajo: el panel es largo y el botón quedaba fuera de vista. */}
+          <div className="sticky bottom-0 z-10 -mx-6 -mb-6 flex items-center justify-end gap-2 border-t bg-background px-6 py-3">
+            {hayCambios && <span className="mr-auto text-xs text-amber-600">Cambios sin guardar</span>}
+            <Button variant="outline" onClick={cerrar} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleSave} disabled={saving || !hayCambios}>
               {saving ? 'Guardando...' : 'Guardar'}
             </Button>
           </div>
