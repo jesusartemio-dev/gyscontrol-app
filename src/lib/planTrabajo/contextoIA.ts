@@ -36,6 +36,13 @@ export function construirBloqueHechosEtapa1(plan: Pick<PlanTrabajo, 'personalAsi
   } else {
     partes.push('(sin desglose por fase disponible — no menciones horas por fase)')
   }
+  // Por EDT: sin esto la IA citaba el HH de la FASE como si fuera del EDT
+  // (CJM50: "Construcción … 425.5 HH" era EJECUCIÓN = Construcción 416 + Comisionamiento 9.5).
+  if (histogramas.horasHombre.length > 0) {
+    partes.push('')
+    partes.push('HORAS-HOMBRE POR EDT (si mencionás las horas de un EDT, usá EXACTAMENTE el valor de ESE EDT, nunca el de su fase):')
+    for (const f of histogramas.horasHombre) partes.push(`- ${f.etiqueta}: ${f.total} HH`)
+  }
 
   return partes.join('\n')
 }

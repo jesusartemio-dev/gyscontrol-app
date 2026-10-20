@@ -105,8 +105,11 @@ ESTILO (plan de trabajo Nexa):
   visible.", "Verificar ausencia de tensión con multímetro certificado antes
   de manipular los conductores."
 - Fundamentá la descripción y las viñetas en las tareas reales de cada
-  actividad (nombres, horas, personas) que se incluyen más abajo — no
-  inventes actividades, tareas, equipos ni cifras que no estén en el contexto.
+  actividad (nombre, duración, recurso y horas-hombre) que se incluyen más
+  abajo — no inventes actividades, tareas, equipos ni cifras que no estén en
+  el contexto. Si nombrás quién ejecuta una tarea, usá su "recurso" (no
+  inventes cargos como "técnico instrumentista" si el recurso es una
+  cuadrilla o el Supervisor).
 - Cada subItem.fotoSugerida: UNA línea (10-20 palabras) indicando qué foto
   tomar en el levantamiento de información para esa actividad — nunca una
   instrucción de trabajo, sino qué registrar visualmente antes/durante la
@@ -131,11 +134,15 @@ REGLAS:
 - Devolvé SOLO el JSON, sin markdown ni texto antes o después.
 `.trim()
 
-interface TareaParaDetalle {
+export interface TareaParaDetalle {
   id: string
   nombre: string
+  /** Duración en horas de obra. */
   horasEstimadas: number | null
-  personasEstimadas: number
+  /** Recurso del cronograma (Cuadrilla 4P, Andamiero, Supervisor…) — quién la ejecuta. */
+  recurso: string | null
+  /** Horas-hombre reales (duración × personas del recurso). */
+  horasHombre: number
 }
 
 interface SubItemParaDetalle {

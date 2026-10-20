@@ -9,9 +9,10 @@ import {
   SYSTEM_DETALLE_EDT,
   buildUserDetalleEdt,
   type CatalogoImagenParaPrompt,
+  type TareaParaDetalle,
 } from './prompts/alcanceDetallado'
 import type { CronogramaContexto, PlanAlcanceDetalladoEdt, PlanAlcanceDetalladoTarea, PlanPersonal } from '@/types/planTrabajo'
-import type { ResultadoCalculo } from './calcularDatos'
+import { calcularHHRealDeTarea, type ResultadoCalculo } from './calcularDatos'
 
 /**
  * Orquesta la generación de `alcanceDetallado` (Bloque 4, Tarea 1):
@@ -316,7 +317,7 @@ async function generarDescripcionesResumido(
 
 async function generarDescripcionesDetallado(
   edt: PlanAlcanceDetalladoEdt,
-  tareasPorActividad: Map<string, { id: string; nombre: string; horasEstimadas: number | null; personasEstimadas: number }[]>,
+  tareasPorActividad: Map<string, TareaParaDetalle[]>,
   hechosEtapa1: string,
   catalogoImagenes: CatalogoImagenParaPrompt[],
   instruccionesUsuario: string,
@@ -521,13 +522,21 @@ export async function generarAlcanceDetallado(
 
   // Mapa actividadId -> tareas (para el contexto de los EDT 'detallado' — incluye
   // el id real de cada tarea para que la IA pueda referenciarlas por id, Tarea 4)
-  const tareasPorActividad = new Map<string, { id: string; nombre: string; horasEstimadas: number | null; personasEstimadas: number }[]>()
+  // Recurso real y HH real de cada tarea (calcularHHRealDeTarea) — nunca
+  // personasEstimadas, que casi siempre vale 1 aunque sea una Cuadrilla 4P.
+  const tareasPorActividad = new Map<string, TareaParaDetalle[]>()
   for (const fase of cron.fases) {
     for (const edt of fase.edts) {
       for (const act of edt.actividades) {
         tareasPorActividad.set(
           act.id,
-          act.tareas.map(t => ({ id: t.id, nombre: t.nombre, horasEstimadas: t.horasEstimadas, personasEstimadas: t.personasEstimadas }))
+          act.tareas.map(t => ({
+            id: t.id,
+            nombre: t.nombre,
+            horasEstimadas: t.horasEstimadas,
+            recurso: t.recurso?.nombre ?? null,
+            horasHombre: calcularHHRealDeTarea(t),
+          }))
         )
       }
     }
