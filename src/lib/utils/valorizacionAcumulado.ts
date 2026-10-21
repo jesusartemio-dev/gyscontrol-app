@@ -14,6 +14,7 @@
 // =============================================================================
 
 import { calcularAdelantoValorizacion } from './adelantoUtils'
+import { montoTotalPartidas } from './valorizacionPartidas'
 
 // Tipo permisivo: acepta el cliente Prisma o un tx de transacción.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -96,9 +97,7 @@ export async function recalcularValorizacionPorId(
   if (recalcularDesdePartidas) {
     const partidas = await client.partidaValorizacion.findMany({ where: { valorizacionId } })
     if (partidas.length > 0) {
-      montoValorizacion = round2(
-        partidas.reduce((sum: number, p: { montoAvance: number }) => sum + p.montoAvance, 0)
-      )
+      montoValorizacion = montoTotalPartidas(partidas)
     }
   }
 

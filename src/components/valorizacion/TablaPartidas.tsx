@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Plus, Trash2, Loader2, FileDown } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { montoTotalPartidas } from '@/lib/utils/valorizacionPartidas'
 
 interface Partida {
   id?: string
@@ -72,8 +73,7 @@ export default function TablaPartidas({ valorizacionId, proyectoId, readOnly, ti
         porcentajeAvance: Math.round(p.porcentajeAvance * 100) / 100,
       }))
       setPartidas(partidas)
-      const total = partidas.reduce((s: number, p: Partida) => s + p.montoAvance, 0)
-      onMontoChange(Math.round(total * 100) / 100)
+      onMontoChange(montoTotalPartidas(data.partidas || []))
     } catch {
       toast.error('Error al cargar partidas')
     } finally {
@@ -107,9 +107,8 @@ export default function TablaPartidas({ valorizacionId, proyectoId, readOnly, ti
     cargarAvancesEdt()
   }, [cargarPartidas, cargarAvancesEdt])
 
-  const calcularTotal = (items: Partida[]) => {
-    return Math.round(items.reduce((s, p) => s + p.montoAvance, 0) * 100) / 100
-  }
+  // Σ contractual × % sin redondear cada partida (ver montoTotalPartidas).
+  const calcularTotal = (items: Partida[]) => montoTotalPartidas(items)
 
   const guardarPartidas = useCallback(async (items: Partida[]) => {
     setGuardando(true)
