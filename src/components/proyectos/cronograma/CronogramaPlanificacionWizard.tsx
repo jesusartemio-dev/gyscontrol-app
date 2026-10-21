@@ -1851,7 +1851,8 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
                           className="mt-0.5 shrink-0"
                         />
                         <div className="flex-1 min-w-0">
-                          <p className={`truncate ${tarea.incluida ? '' : 'text-muted-foreground'}`} title={tarea.nombre}>
+                          {/* Nombre completo en varias líneas: con `truncate` se veía "…tuberías co" sin indicar que seguía. */}
+                          <p className={`break-words ${tarea.incluida ? '' : 'text-muted-foreground'}`} title={tarea.nombre}>
                             {tarea.nombre}
                           </p>
                           {tarea.motivoExclusion && (
