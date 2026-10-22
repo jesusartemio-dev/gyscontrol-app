@@ -518,29 +518,16 @@ export function useProyectoCronogramaTree(proyectoId: string, cronogramaId?: str
 
       if (!response.ok) throw new Error('Error eliminando nodo en proyecto')
 
-      setState(prev => {
-        const newNodes = new Map(prev.nodes)
-        const nodeToDelete = newNodes.get(nodeId)
-
-        if (nodeToDelete) {
-          // Remover de hijos del padre
-          const parent = nodeToDelete.parentId ? newNodes.get(nodeToDelete.parentId) : null
-          if (parent && parent.children) {
-            parent.children = parent.children.filter(child => child.id !== nodeId)
-            parent.metadata.totalChildren--
-          }
-
-          // Remover nodo
-          newNodes.delete(nodeId)
-        }
-
-        return { ...prev, nodes: newNodes }
-      })
+      // Recargar el árbol (con las mismas filas abiertas): borrar una tarea
+      // también borra sus dependencias en la BD, y las otras tareas seguían
+      // mostrando la predecesora vieja (al quitarla: "Dependencia no
+      // encontrada"). También se actualizan horas y fechas de los padres.
+      await loadTree([...state.expandedNodes].filter(id => id !== nodeId))
 
     } catch (error) {
       throw error
     }
-  }, [proyectoId, cronogramaId, state.nodes])
+  }, [proyectoId, cronogramaId, loadTree, state.expandedNodes])
 
   // Seleccionar nodo
   const selectNode = useCallback((nodeId: string) => {

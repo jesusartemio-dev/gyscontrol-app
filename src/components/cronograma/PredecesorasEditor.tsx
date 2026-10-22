@@ -201,7 +201,8 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
     setOcupado(true)
     try {
       const r = await fetch(`${base}/${dep.id}`, { method: 'DELETE' })
-      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'No se pudo quitar')
+      // 404: ya no existe (p. ej. se borró la otra tarea y la dependencia se fue con ella).
+      if (!r.ok && r.status !== 404) throw new Error((await r.json().catch(() => ({}))).error || 'No se pudo quitar')
       setLista((l) => l.filter((d) => d.id !== dep.id))
       onCambio()
     } catch (e) {
