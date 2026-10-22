@@ -1195,7 +1195,7 @@ export function CronogramaPlanificacionWizard({ proyectoId, open, onOpenChange, 
       const catalogo = tarea.catalogoServicioId
         ? catalogoPorEdt[prev[actividadOrigenIndex].edtNombre]?.find(c => c.catalogoServicioId === tarea.catalogoServicioId)
         : undefined
-      // Nombre completo del catálogo si ya está cargado (el prefijado puede venir recortado a 45 caracteres).
+      // Nombre completo del catálogo si ya está cargado (el prefijado puede venir recortado, ver prefijarNombreTarea).
       const base = catalogo?.nombre ?? nombreSinAlias(tarea.nombre, aliasDeActividad(actividadOrigenIndex, prev))
       const aliasDestino = aliasDeActividad(actividadDestinoIndex, prev)
       const copia: TareaPropuesta = { ...tarea, nombre: aliasDestino ? prefijarNombreTarea(aliasDestino, base) : base }

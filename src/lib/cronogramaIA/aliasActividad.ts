@@ -14,7 +14,9 @@ import type { ActividadPropuesta } from '@/types/cronogramaIA'
  */
 
 const MAX_LARGO_ALIAS = 12
-const MAX_LARGO_NOMBRE_TAREA = 45
+// Antes 45: cortaba nombres reales del catálogo ("Bomba - Instalación de
+// bandejas y tuberías co"). MS Project admite 255; 120 solo evita casos absurdos.
+const MAX_LARGO_NOMBRE_TAREA = 120
 
 /** Conectores sin valor distintivo — nunca elegidos como alias salvo que no quede ninguna otra palabra en el nombre. */
 const STOPWORDS_ALIAS = new Set(['zona', 'área', 'area', 'de', 'del', 'por', 'la', 'el', 'los', 'las', 'y', 'en', 'a', 'al', 'tablero'])

@@ -66,6 +66,10 @@ describe('prefijarNombreTarea — largo máximo', () => {
     expect(prefijarNombreTarea('Elevador', 'Armado de Andamios')).toBe('Elevador - Armado de Andamios')
   })
 
+  it('no recorta nombres normales del catálogo (antes cortaba a 45: "…tuberías co")', () => {
+    expect(prefijarNombreTarea('Bomba', 'Instalación de bandejas y tuberías conduit')).toBe('Bomba - Instalación de bandejas y tuberías conduit')
+  })
+
   it('recorta el nombre de tarea si el total supera el largo máximo', () => {
     const resultado = prefijarNombreTarea('MCC', 'Instalación de bandejas portacables en todo el recorrido eléctrico', 45)
     expect(resultado.length).toBeLessThanOrEqual(45)
