@@ -332,12 +332,13 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
         const primeraTareaDeActividad = tareas.length
 
         for (const tarea of actividad.tareas) {
-          const horasTareaRedondeadas = duracionDiasDesdeHoras(tarea.horasEstimadas, horasPorDia) * horasPorDia
+          // Hito ◆ (p. ej. "Aprobación por NEXA"): 0 días, al terminar la tarea anterior.
+          const horasTareaRedondeadas = tarea.esHito ? 0 : duracionDiasDesdeHoras(tarea.horasEstimadas, horasPorDia) * horasPorDia
           const tareaId = randomUUID()
           propuestaPorTareaId.set(tareaId, tarea)
           const fechaInicioTarea = calcularFechaFinConCalendario(fechaInicioActividad, horasAcumActividad, calendarioLaboral)
           horasAcumActividad += horasTareaRedondeadas
-          const fechaFinTarea = calcularFechaFinConCalendario(fechaInicioActividad, horasAcumActividad, calendarioLaboral)
+          const fechaFinTarea = tarea.esHito ? fechaInicioTarea : calcularFechaFinConCalendario(fechaInicioActividad, horasAcumActividad, calendarioLaboral)
 
           tareas.push({
             id: tareaId,
@@ -356,6 +357,7 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
             esPropuestaIA: tarea.esPropuestaIA ?? false,
             justificacionIA: tarea.justificacion ?? null,
             cantidad: tarea.cantidad ?? null,
+            ...(tarea.esHito && { esHito: true }),
           })
         }
         // Fin = fin de su última tarea. Antes salía de redondear a días el TOTAL

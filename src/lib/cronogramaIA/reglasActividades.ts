@@ -151,6 +151,7 @@ export function construirTareaPropuesta(
     notaCantidad: servicio.notaCantidad,
     ...(diasHitoDeEtiquetas(servicio.actividadTag) !== undefined && { hitoDiasDespues: diasHitoDeEtiquetas(servicio.actividadTag) }),
     ...((servicio.actividadTag ?? []).some(t => /^hitoscliente$/i.test(t)) && { hitoSinFecha: true }),
+    ...((servicio.actividadTag ?? []).some(t => /^hito$/i.test(t)) && { esHito: true, horasEstimadas: 0 }),
   }
 }
 

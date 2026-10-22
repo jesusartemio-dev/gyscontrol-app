@@ -12,6 +12,7 @@ import { resolverAliasParaNombres } from '@/lib/cronogramaIA/aliasActividad'
 import { FAMILIA_SOPORTES_FABRICADOS, NOMBRE_FAMILIA_OFICIAL_PRO } from '@/lib/cronogramaIA/vocabularioFamiliasPro'
 import { EDT_SERVICIOS_ALQUILERES, separarServiciosYAlquileres } from '@/lib/cronogramaIA/separarServiciosAlquileres'
 import { agregarEntregaEnObra } from '@/lib/cronogramaIA/entregaEnObraPro'
+import { aplicarAprobacionCliente } from '@/lib/cronogramaIA/aprobacionClientePro'
 import { normalizarNombreTarea } from '@/lib/cronogramaIA/matchTareaCatalogo'
 import type { ActividadPropuesta, CatalogoServicioParaWizard, ConfiguracionWizardPaso1, EsquemaElegido, NombreConAlias } from '@/types/cronogramaIA'
 import type { ContextoCotizacionParaPrompt, EquipoRealParaPrompt } from '@/lib/cronogramaIA/prompts'
@@ -254,6 +255,16 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           hmiCantidad: config.hmiCantidad,
         }, aliasPorNombre)
       }
+      // Equipos e instrumentos: Recepción de Cotizaciones → Evaluación Técnica → ◆ Aprobación por {cliente} antes de la OC.
+      const proyectoCliente = await prisma.proyecto.findUnique({ where: { id: proyectoId }, select: { cliente: { select: { nombre: true } } } })
+      resultado.actividades = aplicarAprobacionCliente(resultado.actividades, serviciosPermitidos, {
+        brownfield: config.brownfield,
+        ingenieriaDetalle: config.ingenieriaDetalle,
+        nPets: config.nPets,
+        tableros: config.tableros,
+        plcs: config.plcs,
+        hmiCantidad: config.hmiCantidad,
+      }, proyectoCliente?.cliente?.nombre)
       // Traslados: una actividad final "Seguimiento y Entrega en Obra" en vez de uno por familia.
       resultado.actividades = agregarEntregaEnObra(resultado.actividades)
     }

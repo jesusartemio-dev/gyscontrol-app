@@ -88,6 +88,11 @@ export interface TareaPropuesta {
    * dependencias; el usuario pone la fecha real. Etiqueta "HitosCliente" (la misma que agrupa la actividad "Hitos del Cliente").
    */
   hitoSinFecha?: boolean
+  /**
+   * Hito ◆ (0 días) al terminar la tarea anterior de su actividad — p. ej.
+   * "Aprobación por NEXA" en una familia de PRO. Sale de la etiqueta "Hito" del servicio.
+   */
+  esHito?: boolean
 }
 
 export interface ActividadPropuesta {
