@@ -1,9 +1,9 @@
 /**
- * PRO: en las familias de EQUIPOS e INSTRUMENTOS (las que el cliente aprueba
- * técnicamente), después de la Solicitud de Cotización van:
+ * PRO: en las familias de CABLES, EQUIPOS e INSTRUMENTOS (las que el cliente
+ * aprueba técnicamente), después de la Solicitud de Cotización van:
  *   Recepción de Cotizaciones → Evaluación Técnica → ◆ Aprobación por {Cliente}
  * y recién entonces la Emisión de OC (como CJM50). Los materiales estándar
- * (cables, canalización, bandejas, comunicación…) no pasan por aprobación.
+ * (canalización, bandejas, comunicación…) no pasan por aprobación.
  *
  * La IA reparte los servicios del catálogo entre familias a su criterio; este
  * paso determinista normaliza: quita esos 3 servicios de donde los haya puesto
@@ -18,8 +18,8 @@ export const SERVICIO_APROBACION_CLIENTE = 'Aprobación del Cliente'
 const SERVICIOS_APROBACION = [SERVICIO_RECEPCION_COTIZACIONES, SERVICIO_EVALUACION_TECNICA, SERVICIO_APROBACION_CLIENTE]
 const SERVICIO_SOLICITUD = 'Solicitud de Cotización'
 
-/** Familias oficiales que el cliente aprueba técnicamente (vocabularioFamiliasPro.ts). */
-const FAMILIAS_CON_APROBACION = new Set(['Equipos Eléctricos', 'Equipos de Control', 'Tableros', 'Instrumentos'])
+/** Familias oficiales que el cliente aprueba técnicamente (vocabularioFamiliasPro.ts). Cables: fuerza, control e instrumentación (NEXA los aprueba). */
+const FAMILIAS_CON_APROBACION = new Set(['Cables', 'Equipos Eléctricos', 'Equipos de Control', 'Tableros', 'Instrumentos'])
 const normalizar = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
 /** ¿El cliente aprueba técnicamente esta familia? Vocabulario oficial y, si no, palabras clave. */
@@ -27,7 +27,7 @@ export function familiaRequiereAprobacion(nombre: string): boolean {
   if (FAMILIAS_CON_APROBACION.has(nombre)) return true
   const n = normalizar(nombre)
   if (/material/.test(n)) return false
-  return /equipo|instrument|valvul|transmisor|variador|arrancador|plc|hmi|tablero|cubiculo/.test(n)
+  return /cable|equipo|instrument|valvul|transmisor|variador|arrancador|plc|hmi|tablero|cubiculo/.test(n)
 }
 
 /** "Aprobación del Cliente" → "Aprobación por NEXA" (primera palabra del nombre del cliente). */

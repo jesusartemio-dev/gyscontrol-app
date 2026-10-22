@@ -24,22 +24,22 @@ const familia = (alias: string, nombre: string, extra: TareaPropuesta[] = []): A
 })
 
 describe('familiaRequiereAprobacion', () => {
-  it('equipos e instrumentos sí; materiales estándar no', () => {
-    for (const n of ['Equipos Eléctricos', 'Instrumentos', 'Equipos de Control', 'Tableros', 'Instrumentos – Válvulas Automáticas', 'Equipos Eléctricos – Schneider'])
+  it('cables, equipos e instrumentos sí; materiales estándar no', () => {
+    for (const n of ['Cables', 'Cables de Fuerza y Control', 'Cable de Instrumentación', 'Equipos Eléctricos', 'Instrumentos', 'Equipos de Control', 'Tableros', 'Instrumentos – Válvulas Automáticas', 'Equipos Eléctricos – Schneider'])
       expect(familiaRequiereAprobacion(n)).toBe(true)
-    for (const n of ['Cables', 'Tuberías y Canalización', 'Bandejas y Soportería', 'Materiales de Tablero', 'Comunicación'])
+    for (const n of ['Tuberías y Canalización', 'Bandejas y Soportería', 'Materiales de Tablero', 'Comunicación'])
       expect(familiaRequiereAprobacion(n)).toBe(false)
   })
 })
 
 describe('aplicarAprobacionCliente', () => {
-  it('inserta Recepción → Evaluación → ◆ Aprobación por NEXA tras la cotización, solo en equipos/instrumentos', () => {
-    // La IA puso la evaluación en Cables: se quita de ahí.
+  it('inserta Recepción → Evaluación → ◆ Aprobación por NEXA tras la cotización, solo donde corresponde', () => {
+    // La IA puso la evaluación en Bandejas (material estándar): se quita de ahí.
     const r = aplicarAprobacionCliente(
-      [familia('Cables', 'Cables', [tarea('eva', 'Cables - Evaluación Técnica', 2)]), familia('Instrum', 'Instrumentos')],
+      [familia('Bandejas', 'Bandejas y Soportería', [tarea('eva', 'Bandejas - Evaluación Técnica', 2)]), familia('Instrum', 'Instrumentos')],
       SERVICIOS, CONFIG, 'NEXA RESOURCES CAJAMARQUILLA S.A.',
     )
-    expect(r[0].tareas.map(t => t.nombre)).toEqual(['Cables - Solicitud de Cotización', 'Cables - Emisión de Orden de Compra'])
+    expect(r[0].tareas.map(t => t.nombre)).toEqual(['Bandejas - Solicitud de Cotización', 'Bandejas - Emisión de Orden de Compra'])
     expect(r[1].tareas.map(t => t.nombre)).toEqual([
       'Instrum - Solicitud de Cotización', 'Instrum - Recepción de Cotizaciones', 'Instrum - Evaluación Técnica',
       'Instrum - Aprobación por NEXA', 'Instrum - Emisión de Orden de Compra',
