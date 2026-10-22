@@ -5,6 +5,8 @@
  * volvieron feriado después (--feriados-nuevos) se descuentan del cálculo de la
  * duración original, así la tarea se alarga en vez de acortarse.
  * Tareas con avance real no se mueven (se avisa).
+ * ⚠ --feriados-nuevos se usa UNA sola vez (la corrida que alarga las tareas):
+ *   repetirlo las vuelve a alargar. Para verificar, correr sin esa opción.
  * Uso:
  *   npx dotenv -e .env.production -o -- npx tsx scripts/ajustar-cronograma-dependencias.ts CJM51 \
  *     [--feriados-nuevos=2026-12-08,2026-12-25] [--aplicar]
