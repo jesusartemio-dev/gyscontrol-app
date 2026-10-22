@@ -5,8 +5,19 @@
 // ✅ Estado global, operaciones CRUD, generación automática para proyectos
 // ===================================================
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { TreeNode, CronogramaTreeState, UseCronogramaTreeReturn, GenerateOptions, NodeType } from '../../../cronograma/types'
+
+/** Filas expandidas de la Jerarquía, por proyecto y cronograma (sobreviven a recargar la página). */
+const claveExpandidos = (proyectoId: string, cronogramaId: string) => `cronograma-expandidos:${proyectoId}:${cronogramaId}`
+function leerExpandidos(clave: string): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(clave) ?? '[]')
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
 
 export function useProyectoCronogramaTree(proyectoId: string, cronogramaId?: string): UseCronogramaTreeReturn {
   const [state, setState] = useState<CronogramaTreeState>({
@@ -15,6 +26,9 @@ export function useProyectoCronogramaTree(proyectoId: string, cronogramaId?: str
     expandedNodes: new Set(),
     loadingNodes: new Set()
   })
+  // Cronograma cuyas filas expandidas ya se restauraron: hasta entonces no se
+  // guarda nada (si no, el Set vacío inicial borraría lo guardado).
+  const restauradoPara = useRef<string | null>(null)
 
   // Cargar árbol inicial del proyecto
   const loadTree = useCallback(async (expandedNodes: string[] = []) => {
@@ -536,10 +550,22 @@ export function useProyectoCronogramaTree(proyectoId: string, cronogramaId?: str
   // Cargar datos iniciales. Esperar a que haya cronogramaId para evitar
   // una carga prematura que use el fallback del API (otro cronograma) y
   // luego sea sobreescrita/confundida cuando el padre resuelve el seleccionado.
+  // Al recargar la página se reabren las filas que estaban expandidas.
   useEffect(() => {
     if (!cronogramaId) return
-    loadTree()
-  }, [loadTree, cronogramaId])
+    const guardados = leerExpandidos(claveExpandidos(proyectoId, cronogramaId))
+    loadTree(guardados).then(() => { restauradoPara.current = cronogramaId })
+  }, [loadTree, cronogramaId, proyectoId])
+
+  // Cada vez que se expande o contrae una fila, se guarda.
+  useEffect(() => {
+    if (!cronogramaId || restauradoPara.current !== cronogramaId) return
+    try {
+      localStorage.setItem(claveExpandidos(proyectoId, cronogramaId), JSON.stringify([...state.expandedNodes]))
+    } catch {
+      // Sin almacenamiento (modo privado, cuota llena): la Jerarquía funciona igual, solo no recuerda.
+    }
+  }, [state.expandedNodes, proyectoId, cronogramaId])
 
   return {
     state,
