@@ -53,6 +53,9 @@ async function main() {
   if (sso && !REHACER) throw new Error('El proyecto ya tiene SSO: no se vuelve a aplicar (usa --rehacer para reconstruir CTL y SSO)')
   const docsGestion = ges.proyectoActividad.find(a => a.nombre === 'Documentos de Gestión')!
 
+  // "Hitos del Cliente" (paradas de planta, fechas puestas a mano) no se reconstruye: se conserva tal cual.
+  const conservar = (a: { nombre: string }) => a.nombre === 'Hitos del Cliente'
+  if (ctl) ctl.proyectoActividad = ctl.proyectoActividad.filter(a => !conservar(a))
   // Tareas a mover / reemplazar
   const tareasCtl = (ctl?.proyectoActividad ?? []).flatMap(a => a.proyectoTarea)
   const envioDocs = tareasCtl.find(t => t.nombre === QUEDA_EN_GES)
