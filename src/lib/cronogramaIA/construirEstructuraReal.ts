@@ -4,6 +4,7 @@ import { agruparYOrdenarPorEstructura, type GrupoEdtOrdenado, type InfoOrdenEdt 
 import type { ActividadPropuesta, TareaPropuesta } from '@/types/cronogramaIA'
 import { type CalendarioHoras, desplazarHorasLaborables, horasPorDiaCalendario, siguienteMomentoLaborable, sumarHorasLaborables } from '@/lib/services/cronogramaHoras'
 import { ACTIVIDAD_POR_CICLO, RECURRENCIA_ACTIVIDAD } from './reglasActividades'
+import { ACTIVIDAD_ENTREGA_OBRA, HITO_MATERIALES_EN_OBRA, TAREA_SEGUIMIENTO_PROVEEDORES, TAREA_TRASLADO_OBRA } from './entregaEnObraPro'
 
 // Re-exportado por compatibilidad — la implementación real vive en
 // agruparYOrdenarPorEstructura.ts (sin esta ruta, un import desde acá
@@ -147,6 +148,15 @@ const FASE_EJECUCION = 'EJECUCION'
 /** "Gestión y Control" → "GESTION Y CONTROL" (los nombres de fase vienen del catálogo). */
 const claveFase = (nombre: string) => nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase()
 
+/**
+ * EDTs cuyas actividades arrancan juntas (al inicio del EDT) en vez de
+ * encadenarse: cada familia de compra/alquiler es un proveedor distinto y se
+ * gestiona en paralelo. La actividad "Seguimiento y Entrega en Obra" de PRO va
+ * aparte: el seguimiento cubre toda la procura y el traslado va después de la
+ * última recepción (ver entregaEnObraPro.ts).
+ */
+const EDTS_ACTIVIDADES_EN_PARALELO = new Set(['PRO', 'SER'])
+
 const DURACION_MINIMA_DIAS = 1
 
 function duracionDiasDesdeHoras(horas: number, horasPorDia: number): number {
@@ -208,6 +218,8 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
   const finPorFase = new Map<string, Date>()
   // Propuesta original de cada tarea (horas por vez para los ciclos de Gestión y Control).
   const propuestaPorTareaId = new Map<string, TareaPropuesta>()
+  // Fin-Comienzo de procura: cadena de cada familia → traslado → hito (ver programarEntregaEnObra).
+  const dependenciasProcura: EstructuraReal['dependenciasCiclos'] = []
 
   for (const faseInfo of fasesAgrupadas) {
     const horasFase = faseInfo.grupos.reduce((acc, g) => acc + g.actividades.reduce((a2, act) => a2 + act.tareas.reduce((a3, t) => a3 + t.horasEstimadas, 0), 0), 0)
@@ -268,15 +280,41 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
       // origen fijo, así que el acumulado sí "gasta" los días ya usados.
       let horasAcumEdt = 0
       let ordenActividad = 0
+      const actividadesEnParalelo = EDTS_ACTIVIDADES_EN_PARALELO.has(edtInfo.nombre)
+      if (actividadesEnParalelo) fechaFinEdt = fechaInicioEdt
+      // Familias de PRO creadas en este EDT: la entrega en obra va después de todas.
+      const tareasFamiliasPro: { actividadId: string; tareas: FilaTarea[] }[] = []
 
-      for (const actividad of actsDelEdt) {
+      // La entrega en obra siempre al final: necesita las fechas de todas las familias.
+      const actsOrdenadas = [
+        ...actsDelEdt.filter(a => a.actividadNombre !== ACTIVIDAD_ENTREGA_OBRA),
+        ...actsDelEdt.filter(a => a.actividadNombre === ACTIVIDAD_ENTREGA_OBRA),
+      ]
+      for (const actividad of actsOrdenadas) {
         const horasActividad = actividad.tareas.reduce((a, t) => a + t.horasEstimadas, 0)
         const horasActividadRedondeadas = duracionDiasDesdeHoras(horasActividad, horasPorDia) * horasPorDia
         const actividadId = randomUUID()
-        const fechaInicioActividad = calcularFechaFinConCalendario(fechaInicioEdt, horasAcumEdt, calendarioLaboral)
-        horasAcumEdt += horasActividadRedondeadas
-        const fechaFinActividad = calcularFechaFinConCalendario(fechaInicioEdt, horasAcumEdt, calendarioLaboral)
-        fechaFinEdt = fechaFinActividad
+        const esEntregaObra = edtInfo.nombre === 'PRO' && actividad.actividadNombre === ACTIVIDAD_ENTREGA_OBRA
+        if (esEntregaObra) {
+          const r = programarEntregaEnObra({
+            actividad, actividadId, edtId, proyectoCronogramaId, fechaInicioEdt, familias: tareasFamiliasPro,
+            cal: calendarioHoras(calendarioLaboral), recursoPorServicio, orden: ordenActividad++,
+          })
+          actividadesFilas.push(r.actividad)
+          tareas.push(...r.tareas)
+          dependenciasProcura.push(...r.dependencias)
+          for (const t of r.tareas) propuestaPorTareaId.set(t.id, actividad.tareas.find(p => p.nombre === t.nombre) ?? actividad.tareas[0])
+          if (r.actividad.fechaFinPlan.getTime() > fechaFinEdt.getTime()) fechaFinEdt = r.actividad.fechaFinPlan
+          continue
+        }
+        const fechaInicioActividad = actividadesEnParalelo
+          ? fechaInicioEdt
+          : calcularFechaFinConCalendario(fechaInicioEdt, horasAcumEdt, calendarioLaboral)
+        if (!actividadesEnParalelo) horasAcumEdt += horasActividadRedondeadas
+        const fechaFinActividad = actividadesEnParalelo
+          ? calcularFechaFinConCalendario(fechaInicioEdt, horasActividadRedondeadas, calendarioLaboral)
+          : calcularFechaFinConCalendario(fechaInicioEdt, horasAcumEdt, calendarioLaboral)
+        if (!actividadesEnParalelo || fechaFinActividad.getTime() > fechaFinEdt.getTime()) fechaFinEdt = fechaFinActividad
 
         actividadesFilas.push({
           id: actividadId,
@@ -296,6 +334,7 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
         // anterior.
         let horasAcumActividad = 0
         let ordenTarea = 0
+        const primeraTareaDeActividad = tareas.length
 
         for (const tarea of actividad.tareas) {
           const horasTareaRedondeadas = duracionDiasDesdeHoras(tarea.horasEstimadas, horasPorDia) * horasPorDia
@@ -324,6 +363,7 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
             cantidad: tarea.cantidad ?? null,
           })
         }
+        if (edtInfo.nombre === 'PRO') tareasFamiliasPro.push({ actividadId, tareas: tareas.slice(primeraTareaDeActividad) })
       }
 
       edts.push({
@@ -406,7 +446,76 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
     dependenciasCiclos.push(...nuevas.dependencias)
   }
 
+  dependenciasCiclos.push(...dependenciasProcura)
   return { fases, edts, actividades: actividadesFilas, tareas, advertencias, edtIdACodigo, dependenciasCiclos }
+}
+
+/**
+ * "Seguimiento y Entrega en Obra" de PRO, ya conocidas las fechas de las familias:
+ *  - Seguimiento a Proveedores: del inicio del EDT al fin de la última recepción.
+ *  - Traslado a Obra: el día laborable siguiente (duración por sus horas).
+ *  - ◆ Materiales en Obra: hito al terminar el traslado.
+ * Dependencias FC: cadena de cada familia, última tarea de cada familia → traslado → hito.
+ */
+function programarEntregaEnObra(o: {
+  actividad: ActividadPropuesta
+  actividadId: string
+  edtId: string
+  proyectoCronogramaId: string
+  fechaInicioEdt: Date
+  familias: { actividadId: string; tareas: FilaTarea[] }[]
+  cal: CalendarioHoras
+  recursoPorServicio: Map<string, string>
+  orden: number
+}): { actividad: FilaActividad; tareas: FilaTarea[]; dependencias: EstructuraReal['dependenciasCiclos'] } {
+  const { actividad, actividadId, edtId, proyectoCronogramaId, fechaInicioEdt, familias, cal, recursoPorServicio } = o
+  const ultimas = familias.map(f => f.tareas[f.tareas.length - 1]).filter((t): t is FilaTarea => !!t)
+  const finRecepciones = ultimas.length ? new Date(Math.max(...ultimas.map(t => t.fechaFin.getTime()))) : fechaInicioEdt
+  const fila = (p: TareaPropuesta, i: number, inicio: Date, fin: Date): FilaTarea => ({
+    id: randomUUID(), proyectoEdtId: edtId, proyectoActividadId: actividadId, proyectoCronogramaId,
+    nombre: p.nombre, orden: i, fechaInicio: inicio, fechaFin: fin, horasEstimadas: p.horasEstimadas, updatedAt: new Date(),
+    catalogoServicioId: p.catalogoServicioId, recursoId: p.catalogoServicioId ? recursoPorServicio.get(p.catalogoServicioId) ?? null : null,
+    responsableId: null, esPropuestaIA: p.esPropuestaIA ?? false, justificacionIA: p.justificacion ?? null, cantidad: p.cantidad ?? null,
+  })
+
+  const filas: FilaTarea[] = []
+  let traslado: FilaTarea | undefined
+  actividad.tareas.forEach((p, i) => {
+    if (p.nombre === TAREA_SEGUIMIENTO_PROVEEDORES) {
+      filas.push(fila(p, i, fechaInicioEdt, finRecepciones))
+    } else if (p.nombre === TAREA_TRASLADO_OBRA) {
+      const inicio = siguienteMomentoLaborable(cal, finRecepciones)
+      const dias = duracionDiasDesdeHoras(p.horasEstimadas, horasPorDiaCalendario(cal))
+      traslado = fila(p, i, inicio, sumarHorasLaborables(cal, inicio, dias * horasPorDiaCalendario(cal)))
+      filas.push(traslado)
+    } else {
+      // Tarea agregada a mano en el asistente: después de las recepciones, 1 día.
+      const inicio = siguienteMomentoLaborable(cal, finRecepciones)
+      filas.push(fila(p, i, inicio, sumarHorasLaborables(cal, inicio, horasPorDiaCalendario(cal))))
+    }
+  })
+  const dependencias: EstructuraReal['dependenciasCiclos'] = []
+  const fc = (a: FilaTarea, b: FilaTarea) => dependencias.push({ tareaOrigenId: a.id, tareaDependienteId: b.id, tipo: 'finish_to_start', lagMinutos: 0 })
+  for (const f of familias) f.tareas.slice(1).forEach((t, i) => fc(f.tareas[i], t))
+  if (traslado) {
+    for (const u of ultimas) fc(u, traslado)
+    const hito: FilaTarea = {
+      ...fila({ ...actividad.tareas[0], nombre: HITO_MATERIALES_EN_OBRA, horasEstimadas: 0, catalogoServicioId: null }, filas.length, traslado.fechaFin, traslado.fechaFin),
+      esHito: true,
+    }
+    filas.push(hito)
+    fc(traslado, hito)
+  }
+  const inicio = new Date(Math.min(...filas.map(t => t.fechaInicio.getTime())))
+  const fin = new Date(Math.max(...filas.map(t => t.fechaFin.getTime())))
+  return {
+    actividad: {
+      id: actividadId, proyectoEdtId: edtId, proyectoCronogramaId, nombre: actividad.actividadNombre, orden: o.orden,
+      horasPlan: filas.reduce((s, t) => s + t.horasEstimadas, 0), fechaInicioPlan: inicio, fechaFinPlan: fin, updatedAt: new Date(), responsableId: null,
+    },
+    tareas: filas,
+    dependencias,
+  }
 }
 
 /** Calendario del generador → calendario por horas (con valores por defecto si faltan). */

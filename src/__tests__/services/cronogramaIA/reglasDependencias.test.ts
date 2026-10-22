@@ -39,12 +39,13 @@ describe('sugerirDependencias', () => {
     )
   })
 
-  it('sugiere Recepción en Almacén (PRO) antes de Preparación y Traslado de Materiales (CON)', () => {
+  it('sugiere el Traslado a Obra (PRO) antes de Preparación y Traslado de Materiales (CON), no la recepción', () => {
     const r = sugerirDependencias([
       { id: 'a', nombreCatalogo: 'Recepción en Almacén GYS', edtNombre: 'PRO', actividadNombre: 'Cables' },
+      { id: 't', nombreCatalogo: 'Traslado y Entrega en Sitio', edtNombre: 'PRO', actividadNombre: 'Seguimiento y Entrega en Obra' },
       { id: 'b', nombreCatalogo: 'Preparación y Traslado de Materiales', edtNombre: 'CON', actividadNombre: 'Zona Elevador' },
     ])
-    expect(r.sugerencias).toEqual([{ tareaOrigenId: 'a', tareaDependienteId: 'b', tipo: 'finish_to_start' }])
+    expect(r.sugerencias).toEqual([{ tareaOrigenId: 't', tareaDependienteId: 'b', tipo: 'finish_to_start' }])
   })
 
   it('no sugiere nada si falta una de las dos tareas de la regla (proyecto sin ese EDT)', () => {
