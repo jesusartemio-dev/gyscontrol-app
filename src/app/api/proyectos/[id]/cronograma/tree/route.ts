@@ -15,7 +15,7 @@ import { logger } from '@/lib/logger'
 import { contarDiasLaborables } from '@/lib/utils/calendarioLaboral'
 import { clasificarRelacion, diferenciaDiasLaborables, inicioDiaUTC } from '@/lib/services/cronogramaDesplazamiento'
 import { type CalendarioHoras, formatearDuracion, horasLaborablesEntre, horasPorDiaCalendario } from '@/lib/services/cronogramaHoras'
-import { horasIncumplidas, horasHolgura, formatearDesfase, ABREVIATURA_DEPENDENCIA, type TipoDependencia } from '@/lib/services/cronogramaDependencias'
+import { horasIncumplidas, horasHolgura, formatearDesfase, fechasPorPredecesoras, ABREVIATURA_DEPENDENCIA, type TipoDependencia } from '@/lib/services/cronogramaDependencias'
 import { calcularHHRealDeTarea } from '@/lib/planTrabajo/calcularDatos'
 
 // ✅ GET /api/proyectos/[id]/cronograma/tree - Obtener árbol jerárquico del cronograma
@@ -746,6 +746,8 @@ export async function GET(
           where: { tareaDependienteId: { in: [...tareasPorId.keys()] } },
           select: { id: true, tipo: true, lagMinutos: true, tareaOrigenId: true, tareaDependienteId: true },
         })
+        // Por sucesora: sus predecesoras con fechas, para marcar cuál "determina la fecha".
+        const predsPorSucesora = new Map<string, { anotacion: Record<string, unknown>; dep: (typeof deps)[number]; fp: { inicio: Date; fin: Date } }[]>()
         for (const dep of deps) {
           const pred = tareasPorId.get(dep.tareaOrigenId)
           const suc = tareasPorId.get(dep.tareaDependienteId)
@@ -765,9 +767,24 @@ export async function GET(
             ...(incumple > 0 && { incumplidaTexto: formatearDuracion(incumple, hpd) }),
             ...(holgura > 0 && { holguraTexto: formatearDuracion(holgura, hpd) }),
           }
-          ;(suc.nodo.data.predecesoras ??= []).push({ ...base, tareaId: dep.tareaOrigenId, nombre: pred.nodo.nombre, ruta: pred.ruta })
+          const anotacion: Record<string, unknown> = { ...base, tareaId: dep.tareaOrigenId, nombre: pred.nodo.nombre, ruta: pred.ruta }
+          ;(suc.nodo.data.predecesoras ??= []).push(anotacion)
           ;(pred.nodo.data.sucesoras ??= []).push({ ...base, tareaId: dep.tareaDependienteId, nombre: suc.nodo.nombre, ruta: suc.ruta })
           if (incumple > 0) suc.nodo.data.dependenciaIncumplida = true
+          if (fp) {
+            const l = predsPorSucesora.get(dep.tareaDependienteId) ?? []
+            l.push({ anotacion, dep, fp })
+            predsPorSucesora.set(dep.tareaDependienteId, l)
+          }
+        }
+        // Con 2+ predecesoras manda la más exigente (como MS Project): se marca
+        // para que el editor diga cuál fija la fecha y ofrezca un solo "Ajustar".
+        for (const [sucId, preds] of predsPorSucesora) {
+          if (preds.length < 2) continue
+          const fs = fechasDe(tareasPorId.get(sucId)!.nodo)
+          const duracion = fs && !tareasPorId.get(sucId)!.nodo.data?.esHito ? horasLaborablesEntre(cal, fs.inicio, fs.fin) : 0
+          const r = fechasPorPredecesoras(cal, preds.map(p => ({ tipo: p.dep.tipo, lagMinutos: p.dep.lagMinutos, pred: p.fp })), duracion)
+          preds[r.determinante].anotacion.determina = true
         }
       }
     }

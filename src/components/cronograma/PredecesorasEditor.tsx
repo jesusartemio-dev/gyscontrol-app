@@ -36,6 +36,8 @@ interface Dependencia {
   horasIncumplidas?: number
   /** Horas que la tarea va DESPUÉS de lo que exige (holgura); undefined = recién cambiada */
   horasHolgura?: number
+  /** Con 2+ predecesoras: es la más exigente, la que fija la fecha (como MS Project). */
+  determina?: boolean
 }
 
 interface Props {
@@ -209,23 +211,39 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
     }
   }
 
-  const ajustar = async (dep: Dependencia) => {
+  // Ajusta la tarea a TODAS sus predecesoras: va donde la pone la más exigente.
+  // (Antes había un "Ajustar" por dependencia: usar el de una con margen la
+  // adelantaba y dejaba en rojo a la que de verdad mandaba.)
+  const ajustar = async () => {
     setOcupado(true)
     try {
-      const r = await fetch(`${base}/${dep.id}/ajustar`, { method: 'POST' })
+      const r = await fetch(`${base}/ajustar-tarea`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tareaId: realId(tareaNodeId) }),
+      })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(j.error || 'No se pudo ajustar')
       const aTexto = (v: string) => new Date(v).toISOString().slice(0, 16)
       onFechasAjustadas(aTexto(j.data.fechaInicio), aTexto(j.data.fechaFin))
-      setLista((l) => l.map((d) => (d.id === dep.id ? { ...d, horasIncumplidas: 0, horasHolgura: 0 } : d)))
+      // Se cumplen todas; el margen exacto de las demás se ve al recargar.
+      setLista((l) => l.map((d) => ({ ...d, horasIncumplidas: 0, horasHolgura: d.id === j.data.determinanteId ? 0 : undefined, determina: d.id === j.data.determinanteId })))
       onCambio()
-      toast.success('Tarea movida para cumplir la dependencia')
+      toast.success(lista.length > 1 ? `Tarea ajustada: la fecha la determina "${j.data.determinanteNombre}"` : 'Tarea ajustada a su predecesora')
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo ajustar')
     } finally {
       setOcupado(false)
     }
   }
+
+  const variasPredecesoras = lista.length > 1
+  const algunaIncumple = lista.some((d) => (d.horasIncumplidas ?? 0) > 0)
+  const algunaSinCalcular = lista.some((d) => d.horasIncumplidas === undefined)
+  // Todas con margen: la tarea podría ir antes (modo manual, no se mueve sola).
+  const todasConMargen = lista.length > 0 && lista.every((d) => (d.horasIncumplidas ?? 0) === 0 && (d.horasHolgura ?? 0) > 0)
+  const margenMinimo = todasConMargen ? Math.min(...lista.map((d) => d.horasHolgura ?? 0)) : 0
+  const enDias = (h: number) => (h >= horasPorDia ? `${Math.round((h / horasPorDia) * 10) / 10}d` : `${Math.round(h * 10) / 10}h`)
 
   return (
     <div className="space-y-2 rounded-md border p-3">
@@ -244,12 +262,29 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
           dep={dep}
           hpd={horasPorDia}
           ocupado={ocupado}
+          variasPredecesoras={variasPredecesoras}
           onTipo={(tipo) => actualizar(dep, { tipo })}
           onDesfase={(lagMinutos) => actualizar(dep, { lagMinutos })}
           onQuitar={() => quitar(dep)}
-          onAjustar={() => ajustar(dep)}
         />
       ))}
+
+      {/* Un solo ajuste para la tarea: cumple TODAS sus predecesoras (manda la más exigente). */}
+      {(algunaIncumple || algunaSinCalcular || todasConMargen) && (
+        <div className={`flex items-center justify-between gap-2 rounded border px-2 py-1.5 text-[11px] ${algunaIncumple ? 'border-red-300 bg-red-50 text-red-700' : 'bg-muted/40 text-muted-foreground'}`}>
+          <span>
+            {algunaIncumple
+              ? 'No cumple todas sus predecesoras.'
+              : algunaSinCalcular
+                ? 'La fecha no cambia sola al editar las predecesoras.'
+                : `Podría empezar ${enDias(margenMinimo)} antes.`}
+            {variasPredecesoras && ' Se ubica donde la pone la más exigente.'}
+          </span>
+          <Button type="button" variant="outline" size="sm" className="h-6 shrink-0 px-2 text-[11px]" onClick={ajustar} disabled={ocupado}>
+            <Wand2 className="mr-1 h-3 w-3" /> {variasPredecesoras ? 'Ajustar a sus predecesoras' : 'Ajustar a su predecesora'}
+          </Button>
+        </div>
+      )}
 
       {/* Agregar: tipo + desfase + buscador de tareas con su ubicación */}
       <div className="flex items-center gap-2 pt-1">
@@ -337,14 +372,14 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
   )
 }
 
-function FilaDependencia({ dep, hpd, ocupado, onTipo, onDesfase, onQuitar, onAjustar }: {
+function FilaDependencia({ dep, hpd, ocupado, variasPredecesoras, onTipo, onDesfase, onQuitar }: {
   dep: Dependencia
   hpd: number
   ocupado: boolean
+  variasPredecesoras: boolean
   onTipo: (t: Tipo) => void
   onDesfase: (min: number) => void
   onQuitar: () => void
-  onAjustar: () => void
 }) {
   const [desfase, setDesfase] = useState(formatearDesfase(dep.lagMinutos, hpd))
   const guardarDesfase = () => {
@@ -355,19 +390,19 @@ function FilaDependencia({ dep, hpd, ocupado, onTipo, onDesfase, onQuitar, onAju
   }
   const incumple = (dep.horasIncumplidas ?? 0) > 0
   const holgura = dep.horasHolgura ?? 0
-  // Recién agregada o con tipo/desfase cambiado: todavía no se sabe si se cumple.
-  const sinCalcular = dep.horasIncumplidas === undefined
   const enDias = (h: number) => (h >= hpd ? `${Math.round((h / hpd) * 10) / 10}d` : `${Math.round(h * 10) / 10}h`)
-  const botonAjustar = (
-    <Button type="button" variant="outline" size="sm" className="h-6 shrink-0 px-2 text-[11px]" onClick={onAjustar} disabled={ocupado}>
-      <Wand2 className="mr-1 h-3 w-3" /> Ajustar esta tarea
-    </Button>
-  )
   return (
-    <div className={`rounded border px-2 py-1.5 ${incumple ? 'border-red-300 bg-red-50' : 'bg-white'}`}>
+    <div className={`rounded border px-2 py-1.5 ${incumple ? 'border-red-300 bg-red-50' : dep.determina && variasPredecesoras ? 'border-blue-300 bg-blue-50/40' : 'bg-white'}`}>
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-medium" title={dep.nombre}>{dep.nombre}</p>
+          <p className="flex items-center gap-1.5 truncate text-xs font-medium" title={dep.nombre}>
+            <span className="truncate">{dep.nombre}</span>
+            {dep.determina && variasPredecesoras && (
+              <span className="shrink-0 rounded bg-blue-100 px-1 text-[9px] font-semibold uppercase tracking-wide text-blue-700" title="Es la predecesora más exigente: fija la fecha de esta tarea">
+                Determina la fecha
+              </span>
+            )}
+          </p>
           {dep.ruta && <p className="truncate text-[10px] text-muted-foreground" title={dep.ruta}>{dep.ruta}</p>}
         </div>
         <Select value={dep.tipo} onValueChange={(v) => onTipo(v as Tipo)} disabled={ocupado}>
@@ -390,26 +425,18 @@ function FilaDependencia({ dep, hpd, ocupado, onTipo, onDesfase, onQuitar, onAju
         </Button>
       </div>
       {incumple && (
-        <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-red-700">
-          <span className="flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3" />
-            No se cumple: esta tarea va {enDias(dep.horasIncumplidas!)} antes de lo que exige.
-          </span>
-          {botonAjustar}
-        </div>
+        <p className="mt-1 flex items-center gap-1 text-[11px] text-red-700">
+          <AlertTriangle className="h-3 w-3" />
+          No se cumple: esta tarea va {enDias(dep.horasIncumplidas!)} antes de lo que exige.
+        </p>
       )}
-      {/* Cumple pero va más tarde: modo manual, no se mueve sola; se ofrece acercarla. */}
+      {/* Cumple con margen: solo informativo (el ajuste es uno solo, para todas). */}
       {!incumple && holgura > 0 && (
-        <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-          <span>Va {enDias(holgura)} después de lo que exige la dependencia.</span>
-          {botonAjustar}
-        </div>
-      )}
-      {sinCalcular && (
-        <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-          <span>La fecha de esta tarea no cambia sola. Para moverla según esta dependencia:</span>
-          {botonAjustar}
-        </div>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          {variasPredecesoras && !dep.determina
+            ? `Margen de ${enDias(holgura)}: otra predecesora es más exigente.`
+            : `Va ${enDias(holgura)} después de lo que exige la dependencia.`}
+        </p>
       )}
     </div>
   )

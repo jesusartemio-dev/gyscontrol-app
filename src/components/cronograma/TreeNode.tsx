@@ -61,24 +61,33 @@ interface DependenciaNodo {
   horasIncumplidas?: number
   incumplidaTexto?: string
   holguraTexto?: string
+  /** Con 2+ predecesoras: la más exigente, la que fija la fecha. */
+  determina?: boolean
 }
 
 /**
  * Columna Fechas de una tarea con predecesoras: muestra la dependencia (como la
  * columna Predecesoras de MS Project) en vez del espacio con la fila de arriba.
  * Rojo si no se cumple; ámbar con "+2d" si va más tarde de lo que exige.
+ * Con varias predecesoras, el margen es el de la que determina la fecha: que
+ * otra tenga margen no significa que la tarea pueda ir antes.
  */
 function DependenciaFechas({ predecesoras }: { predecesoras: DependenciaNodo[] }) {
   const incumplida = predecesoras.find((d) => (d.horasIncumplidas ?? 0) > 0)
-  const conHolgura = predecesoras.find((d) => d.holguraTexto)
-  const principal = incumplida ?? conHolgura ?? predecesoras[0]
+  const determinante = predecesoras.length > 1 ? predecesoras.find((d) => d.determina) : undefined
+  const conHolgura = predecesoras.length > 1
+    ? (determinante?.holguraTexto ? determinante : undefined)
+    : predecesoras.find((d) => d.holguraTexto)
+  const principal = incumplida ?? conHolgura ?? determinante ?? predecesoras[0]
   const texto = predecesoras.length > 1 ? `${principal.tipoTexto ?? 'FC'} +${predecesoras.length - 1}` : (principal.tipoTexto ?? 'FC')
   const color = incumplida ? 'text-red-600' : conHolgura ? 'text-amber-600' : 'text-blue-500'
   const detalle = incumplida
     ? `No se cumple: va ${incumplida.incumplidaTexto ?? ''} antes de lo que exige "${incumplida.nombre}" (${incumplida.tipoTexto ?? 'FC'}).`
     : conHolgura
-      ? `Va ${conHolgura.holguraTexto} después de lo que exige "${conHolgura.nombre}" (${conHolgura.tipoTexto ?? 'FC'}). Para acercarla: Editar › Predecesoras › Ajustar esta tarea.`
-      : `Depende de "${principal.nombre}" (${principal.tipoTexto ?? 'FC'}) y se cumple.`
+      ? `Va ${conHolgura.holguraTexto} después de lo que exige "${conHolgura.nombre}" (${conHolgura.tipoTexto ?? 'FC'}). Para acercarla: Editar › Predecesoras › Ajustar a sus predecesoras.`
+      : determinante
+        ? `Se cumplen todas; la fecha la determina "${determinante.nombre}" (${determinante.tipoTexto ?? 'FC'}).`
+        : `Depende de "${principal.nombre}" (${principal.tipoTexto ?? 'FC'}) y se cumple.`
   return (
     <span className={`shrink-0 whitespace-nowrap text-[9px] font-medium ${color}`} title={`${detalle}${predecesoras.length > 1 ? `\nTiene ${predecesoras.length} predecesoras.` : ''}`}>
       {texto}{!incumplida && conHolgura ? ` · +${conHolgura.holguraTexto}` : ''}

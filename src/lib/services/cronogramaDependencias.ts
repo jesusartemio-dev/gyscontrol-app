@@ -66,6 +66,27 @@ export function fechasRequeridas(
 }
 
 /**
+ * Con 2+ predecesoras, como MS Project: la tarea va donde la pone la MÁS
+ * exigente (la que pide el inicio más tardío). Devuelve esas fechas (conservando
+ * la duración) y el índice de la predecesora que "determina la fecha".
+ * Ajustar a una sola predecesora (la menos exigente) dejaba en rojo a las otras.
+ */
+export function fechasPorPredecesoras(
+  cal: CalendarioHoras,
+  deps: { tipo: string; lagMinutos?: number | null; pred: Rango }[],
+  duracionHoras: number,
+): Rango & { determinante: number } {
+  let mejor: Rango | null = null
+  let determinante = -1
+  deps.forEach((d, i) => {
+    const req = fechasRequeridas(cal, d, d.pred, duracionHoras)
+    if (!mejor || req.inicio.getTime() > mejor.inicio.getTime()) { mejor = req; determinante = i }
+  })
+  if (!mejor) throw new Error('Sin predecesoras')
+  return { ...(mejor as Rango), determinante }
+}
+
+/**
  * Horas laborables que la sucesora va ANTES de lo que exige la dependencia
  * (0 si se cumple). Como en modo manual de MS Project, ir después no es error.
  */
