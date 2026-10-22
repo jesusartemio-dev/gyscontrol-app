@@ -267,18 +267,12 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
       let fechaFinEdt = calcularFechaFinConCalendario(fechaInicioEdt, duracionDiasDesdeHoras(horasEdt, horasPorDia) * horasPorDia, calendarioLaboral)
       edtIdACodigo.set(edtId, edtInfo.nombre)
 
-      // Horas acumuladas (ya redondeadas a días completos) desde el inicio
-      // FIJO del EDT — cada Actividad se ubica en ese acumulado, nunca
-      // encadenando el Date crudo de la Actividad anterior. Encadenar el
-      // Date crudo era el bug: `calcularFechaFinConCalendario` ignora la
-      // hora-del-día de su `fechaInicio` y le da a cada llamada el
-      // presupuesto COMPLETO del día, así que una Actividad que "empezaba"
-      // a las 17:00 del día 1 igual recibía las 9.5h enteras del día 1 —
-      // todo quedaba apilado en el primer día sin importar cuántas
-      // Actividades/Tareas hubiera. Anclar siempre a `fechaInicioEdt` +
-      // acumulado evita eso: cada llamada recorre los días desde el mismo
-      // origen fijo, así que el acumulado sí "gasta" los días ya usados.
-      let horasAcumEdt = 0
+      // `calcularFechaFinConCalendario` ignora la hora-del-día de su
+      // `fechaInicio` y le da el presupuesto COMPLETO de ese día: encadenar el
+      // fin crudo (18:30) de la actividad anterior apilaba trabajo en un día ya
+      // terminado. Cada actividad arranca al inicio del día laborable
+      // siguiente (avanzarSiguienteInicio fija la hora de entrada).
+      let finActividadAnterior: Date | null = null
       let ordenActividad = 0
       const actividadesEnParalelo = EDTS_ACTIVIDADES_EN_PARALELO.has(edtInfo.nombre)
       if (actividadesEnParalelo) fechaFinEdt = fechaInicioEdt
@@ -292,7 +286,6 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
       ]
       for (const actividad of actsOrdenadas) {
         const horasActividad = actividad.tareas.reduce((a, t) => a + t.horasEstimadas, 0)
-        const horasActividadRedondeadas = duracionDiasDesdeHoras(horasActividad, horasPorDia) * horasPorDia
         const actividadId = randomUUID()
         const esEntregaObra = edtInfo.nombre === 'PRO' && actividad.actividadNombre === ACTIVIDAD_ENTREGA_OBRA
         if (esEntregaObra) {
@@ -307,16 +300,17 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
           if (r.actividad.fechaFinPlan.getTime() > fechaFinEdt.getTime()) fechaFinEdt = r.actividad.fechaFinPlan
           continue
         }
-        const fechaInicioActividad = actividadesEnParalelo
+        // La Actividad arranca al INICIO del día laborable siguiente al fin de la
+        // anterior (avanzarSiguienteInicio pone la hora de entrada). Antes
+        // arrancaba en el fin crudo de la anterior (18:30): como
+        // `calcularFechaFinConCalendario` cuenta el día de inicio completo, su
+        // primera tarea "gastaba" ese día ya terminado y quedaba de 18:30 a
+        // 18:30 — 0 h (CJM51: Organigrama, Recorrido - Armado de Andamios…).
+        const fechaInicioActividad = actividadesEnParalelo || !finActividadAnterior
           ? fechaInicioEdt
-          : calcularFechaFinConCalendario(fechaInicioEdt, horasAcumEdt, calendarioLaboral)
-        if (!actividadesEnParalelo) horasAcumEdt += horasActividadRedondeadas
-        const fechaFinActividad = actividadesEnParalelo
-          ? calcularFechaFinConCalendario(fechaInicioEdt, horasActividadRedondeadas, calendarioLaboral)
-          : calcularFechaFinConCalendario(fechaInicioEdt, horasAcumEdt, calendarioLaboral)
-        if (!actividadesEnParalelo || fechaFinActividad.getTime() > fechaFinEdt.getTime()) fechaFinEdt = fechaFinActividad
+          : avanzarSiguienteInicio(finActividadAnterior, calendarioLaboral)
 
-        actividadesFilas.push({
+        const filaActividad: FilaActividad = {
           id: actividadId,
           proyectoEdtId: edtId,
           proyectoCronogramaId,
@@ -324,10 +318,11 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
           orden: ordenActividad++,
           horasPlan: horasActividad,
           fechaInicioPlan: fechaInicioActividad,
-          fechaFinPlan: fechaFinActividad,
+          fechaFinPlan: fechaInicioActividad, // se fija abajo con el fin de su última tarea
           updatedAt: new Date(),
           responsableId: null,
-        })
+        }
+        actividadesFilas.push(filaActividad)
 
         // Mismo mecanismo, un nivel abajo: horas acumuladas desde el inicio
         // FIJO de la Actividad, nunca encadenando el Date crudo de la Tarea
@@ -363,6 +358,14 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
             cantidad: tarea.cantidad ?? null,
           })
         }
+        // Fin = fin de su última tarea. Antes salía de redondear a días el TOTAL
+        // de horas de la actividad, pero cada tarea se redondea a días por
+        // separado: 3 tareas de 2 h son 3 días, no 1, y las tareas terminaban
+        // después que su actividad y su EDT.
+        const fechaFinActividad = calcularFechaFinConCalendario(fechaInicioActividad, horasAcumActividad, calendarioLaboral)
+        filaActividad.fechaFinPlan = fechaFinActividad
+        if (!actividadesEnParalelo) finActividadAnterior = fechaFinActividad
+        if (!actividadesEnParalelo || fechaFinActividad.getTime() > fechaFinEdt.getTime()) fechaFinEdt = fechaFinActividad
         if (edtInfo.nombre === 'PRO') tareasFamiliasPro.push({ actividadId, tareas: tareas.slice(primeraTareaDeActividad) })
       }
 

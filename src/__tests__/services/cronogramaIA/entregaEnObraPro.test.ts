@@ -39,6 +39,34 @@ describe('agregarEntregaEnObra', () => {
   })
 })
 
+describe('construirEstructuraReal — actividades encadenadas en un EDT (CJM51)', () => {
+  const EDTS: Map<string, EdtCatalogoInfo> = new Map([
+    ['CON', { id: 'edt-con', nombre: 'CON', descripcionEdt: 'Construcción', faseNombre: 'EJECUCION', faseOrden: 5, edtOrden: 0 }],
+  ])
+  const cal = { horasPorDia: 9.5, diasLaborables: ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'], horaInicioManana: '08:00', horaFinManana: '12:00', horaInicioTarde: '13:00', horaFinTarde: '18:30', diaCalendario: [], excepcionCalendario: [] }
+  const r = construirEstructuraReal({
+    actividades: [
+      { edtNombre: 'CON', actividadNombre: 'MCC', origen: 'ia', tareas: [tarea('a', 'MCC - Montaje', 8), tarea('b', 'MCC - Conexionado', 1)] },
+      { edtNombre: 'CON', actividadNombre: 'Recorrido', origen: 'ia', tareas: [tarea('c', 'Recorrido - Armado de Andamios', 3), tarea('d', 'Recorrido - Tendido', 1), tarea('e', 'Recorrido - Desmontaje', 1.5)] },
+    ],
+    edtsCatalogo: EDTS, proyectoId: 'p1', proyectoCronogramaId: 'c1',
+    fechaInicioProyecto: new Date('2026-12-02T00:00:00Z'), calendarioLaboral: cal, recursoPorServicio: new Map(),
+  })
+
+  it('la primera tarea de la 2.ª actividad no queda con duración 0 (antes: 18:30 → 18:30)', () => {
+    const armado = r.tareas.find(t => t.nombre === 'Recorrido - Armado de Andamios')!
+    expect(armado.fechaFin.getTime()).toBeGreaterThan(armado.fechaInicio.getTime())
+    const finMcc = r.actividades.find(a => a.nombre === 'MCC')!.fechaFinPlan
+    expect(armado.fechaInicio.getTime()).toBeGreaterThan(finMcc.getTime())
+  })
+
+  it('ninguna tarea termina después que su actividad, ni una actividad después que su EDT', () => {
+    const act = new Map(r.actividades.map(a => [a.id, a]))
+    for (const t of r.tareas) expect(t.fechaFin.getTime()).toBeLessThanOrEqual(act.get(t.proyectoActividadId)!.fechaFinPlan.getTime())
+    for (const a of r.actividades) expect(a.fechaFinPlan.getTime()).toBeLessThanOrEqual(r.edts[0].fechaFinPlan.getTime())
+  })
+})
+
 describe('construirEstructuraReal — PRO en paralelo con entrega en obra', () => {
   const EDTS: Map<string, EdtCatalogoInfo> = new Map([
     ['PRO', { id: 'edt-pro', nombre: 'PRO', descripcionEdt: 'Suministro de Equipos', faseNombre: 'PROCURA', faseOrden: 3, edtOrden: 0 }],
