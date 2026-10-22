@@ -39,7 +39,7 @@ describe('sugerirDependencias', () => {
     )
   })
 
-  it('sugiere el Traslado a Obra (PRO) antes de Preparación y Traslado de Materiales (CON), no la recepción', () => {
+  it('sugiere la Entrega en Obra (PRO) antes de Preparación y Traslado de Materiales (CON), no la recepción', () => {
     const r = sugerirDependencias([
       { id: 'a', nombreCatalogo: 'Recepción en Almacén GYS', edtNombre: 'PRO', actividadNombre: 'Cables' },
       { id: 't', nombreCatalogo: 'Traslado y Entrega en Sitio', edtNombre: 'PRO', actividadNombre: 'Seguimiento y Entrega en Obra' },

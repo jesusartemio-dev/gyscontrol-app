@@ -1,4 +1,4 @@
-import { agregarEntregaEnObra, ACTIVIDAD_ENTREGA_OBRA, HITO_MATERIALES_EN_OBRA } from '@/lib/cronogramaIA/entregaEnObraPro'
+import { agregarEntregaEnObra, ACTIVIDAD_ENTREGA_OBRA } from '@/lib/cronogramaIA/entregaEnObraPro'
 import { construirEstructuraReal, type EdtCatalogoInfo } from '@/lib/cronogramaIA/construirEstructuraReal'
 import type { ActividadPropuesta, TareaPropuesta } from '@/types/cronogramaIA'
 
@@ -26,7 +26,7 @@ describe('agregarEntregaEnObra', () => {
     for (const a of r.slice(0, 2)) expect(a.tareas.some(t => t.nombre.includes('Traslado'))).toBe(false)
     const entrega = r[2]
     expect(entrega.actividadNombre).toBe(ACTIVIDAD_ENTREGA_OBRA)
-    expect(entrega.tareas.map(t => t.nombre)).toEqual(['Seguimiento a Proveedores', 'Traslado a Obra'])
+    expect(entrega.tareas.map(t => t.nombre)).toEqual(['Seguimiento a Proveedores', 'Entrega en Obra'])
     expect(entrega.tareas[0].catalogoServicioId).toBe('exp') // recurso del expediting (Gestor)
     expect(entrega.tareas[1].catalogoServicioId).toBe('tras')
   })
@@ -93,30 +93,27 @@ describe('construirEstructuraReal — PRO en paralelo con entrega en obra', () =
     expect(cables.fechaInicioPlan.getTime()).toBe(tablero.fechaInicioPlan.getTime())
   })
 
-  it('el traslado va después de la última recepción y termina con el hito "Materiales en Obra"', () => {
+  it('la entrega en obra va después de la última recepción, sin hito aparte', () => {
     const r = construir()
     const porNombre = (n: string) => r.tareas.find(t => t.nombre === n)!
     const recepcionTablero = porNombre('Tablero - Recepción en Almacén GYS')
-    const traslado = porNombre('Traslado a Obra')
-    const hito = porNombre(HITO_MATERIALES_EN_OBRA)
+    const entrega = porNombre('Entrega en Obra')
     const seguimiento = porNombre('Seguimiento a Proveedores')
-    expect(traslado.fechaInicio.getTime()).toBeGreaterThanOrEqual(recepcionTablero.fechaFin.getTime())
-    expect(hito.esHito).toBe(true)
-    expect(hito.fechaInicio.getTime()).toBe(traslado.fechaFin.getTime())
+    expect(entrega.fechaInicio.getTime()).toBeGreaterThanOrEqual(recepcionTablero.fechaFin.getTime())
+    expect(r.tareas.some(t => t.esHito)).toBe(false)
     expect(seguimiento.fechaFin.getTime()).toBe(recepcionTablero.fechaFin.getTime())
-    expect(traslado.recursoId).toBe('rec-cuadrilla')
+    expect(entrega.recursoId).toBe('rec-cuadrilla')
     expect(seguimiento.recursoId).toBe('rec-gestor')
     // El EDT termina con la entrega en obra.
-    expect(r.edts[0].fechaFinPlan.getTime()).toBe(hito.fechaFin.getTime())
+    expect(r.edts[0].fechaFinPlan.getTime()).toBe(entrega.fechaFin.getTime())
   })
 
-  it('dependencias FC: cadena de cada familia, recepciones → traslado → hito', () => {
+  it('dependencias FC: cadena de cada familia y recepciones → entrega en obra', () => {
     const r = construir()
     const id = (n: string) => r.tareas.find(t => t.nombre === n)!.id
     const pares = new Set(r.dependenciasCiclos.map(d => `${d.tareaOrigenId}>${d.tareaDependienteId}`))
     expect(pares.has(`${id('Cables - Solicitud de Cotización')}>${id('Cables - Emisión de Orden de Compra')}`)).toBe(true)
-    expect(pares.has(`${id('Cables - Recepción en Almacén GYS')}>${id('Traslado a Obra')}`)).toBe(true)
-    expect(pares.has(`${id('Tablero - Recepción en Almacén GYS')}>${id('Traslado a Obra')}`)).toBe(true)
-    expect(pares.has(`${id('Traslado a Obra')}>${id(HITO_MATERIALES_EN_OBRA)}`)).toBe(true)
+    expect(pares.has(`${id('Cables - Recepción en Almacén GYS')}>${id('Entrega en Obra')}`)).toBe(true)
+    expect(pares.has(`${id('Tablero - Recepción en Almacén GYS')}>${id('Entrega en Obra')}`)).toBe(true)
   })
 })

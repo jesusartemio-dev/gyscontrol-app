@@ -2,16 +2,14 @@
  * PRO "Suministro de Equipos": en vez de un "Traslado y Entrega en Sitio" por
  * familia, una actividad final "Seguimiento y Entrega en Obra" (como CJM50/CJM51):
  *   - Seguimiento a Proveedores (desde el inicio de PROCURA hasta la última recepción)
- *   - Traslado a Obra (después de todas las recepciones)
- *   - ◆ Materiales en Obra (hito; lo agrega construirEstructuraReal)
- * El gestor después parte el traslado en varios (por fecha de llegada) si hace falta.
+ *   - Entrega en Obra (1 día, después de todas las recepciones; sin hito aparte)
+ * El gestor después la parte en "Entrega en Obra 1/2/3: …" por fecha de llegada si hace falta (CJM51).
  */
 import type { ActividadPropuesta, TareaPropuesta } from '@/types/cronogramaIA'
 
 export const ACTIVIDAD_ENTREGA_OBRA = 'Seguimiento y Entrega en Obra'
 export const TAREA_SEGUIMIENTO_PROVEEDORES = 'Seguimiento a Proveedores'
-export const TAREA_TRASLADO_OBRA = 'Traslado a Obra'
-export const HITO_MATERIALES_EN_OBRA = 'Materiales en Obra'
+export const TAREA_TRASLADO_OBRA = 'Entrega en Obra'
 /** Horas de gestión del seguimiento a proveedores en toda la procura (CJM50 ≈ 7 h, CJM51 8 h). */
 export const HORAS_SEGUIMIENTO_PROVEEDORES = 8
 

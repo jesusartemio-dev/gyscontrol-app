@@ -4,7 +4,7 @@ import { agruparYOrdenarPorEstructura, type GrupoEdtOrdenado, type InfoOrdenEdt 
 import type { ActividadPropuesta, TareaPropuesta } from '@/types/cronogramaIA'
 import { type CalendarioHoras, desplazarHorasLaborables, horasPorDiaCalendario, siguienteMomentoLaborable, sumarHorasLaborables } from '@/lib/services/cronogramaHoras'
 import { ACTIVIDAD_POR_CICLO, RECURRENCIA_ACTIVIDAD } from './reglasActividades'
-import { ACTIVIDAD_ENTREGA_OBRA, HITO_MATERIALES_EN_OBRA, TAREA_SEGUIMIENTO_PROVEEDORES, TAREA_TRASLADO_OBRA } from './entregaEnObraPro'
+import { ACTIVIDAD_ENTREGA_OBRA, TAREA_SEGUIMIENTO_PROVEEDORES, TAREA_TRASLADO_OBRA } from './entregaEnObraPro'
 
 // Re-exportado por compatibilidad — la implementación real vive en
 // agruparYOrdenarPorEstructura.ts (sin esta ruta, un import desde acá
@@ -507,8 +507,7 @@ function anclarAlquileresAObra(o: {
 /**
  * "Seguimiento y Entrega en Obra" de PRO, ya conocidas las fechas de las familias:
  *  - Seguimiento a Proveedores: del inicio del EDT al fin de la última recepción.
- *  - Traslado a Obra: el día laborable siguiente (duración por sus horas).
- *  - ◆ Materiales en Obra: hito al terminar el traslado.
+ *  - Entrega en Obra: el día laborable siguiente (duración por sus horas), sin hito aparte.
  * Dependencias FC: cadena de cada familia, última tarea de cada familia → traslado → hito.
  */
 function programarEntregaEnObra(o: {
@@ -551,15 +550,7 @@ function programarEntregaEnObra(o: {
   const dependencias: EstructuraReal['dependenciasCiclos'] = []
   const fc = (a: FilaTarea, b: FilaTarea) => dependencias.push({ tareaOrigenId: a.id, tareaDependienteId: b.id, tipo: 'finish_to_start', lagMinutos: 0 })
   for (const f of familias) f.tareas.slice(1).forEach((t, i) => fc(f.tareas[i], t))
-  if (traslado) {
-    for (const u of ultimas) fc(u, traslado)
-    const hito: FilaTarea = {
-      ...fila({ ...actividad.tareas[0], nombre: HITO_MATERIALES_EN_OBRA, horasEstimadas: 0, catalogoServicioId: null }, filas.length, traslado.fechaFin, traslado.fechaFin),
-      esHito: true,
-    }
-    filas.push(hito)
-    fc(traslado, hito)
-  }
+  if (traslado) for (const u of ultimas) fc(u, traslado)
   const inicio = new Date(Math.min(...filas.map(t => t.fechaInicio.getTime())))
   const fin = new Date(Math.max(...filas.map(t => t.fechaFin.getTime())))
   return {
