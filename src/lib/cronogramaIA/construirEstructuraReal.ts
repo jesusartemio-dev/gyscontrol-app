@@ -452,7 +452,56 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
   }
 
   dependenciasCiclos.push(...dependenciasProcura)
+  dependenciasCiclos.push(...anclarAlquileresAObra({ tareas, actividades: actividadesFilas, edts, fases, edtIdACodigo }))
   return { fases, edts, actividades: actividadesFilas, tareas, advertencias, edtIdACodigo, dependenciasCiclos }
+}
+
+/**
+ * SER se programa en PROCURA, antes de conocer las fechas de obra. Los hitos de
+ * un alquiler de andamios se anclan a CON al final:
+ *   ◆ Movilización a Obra  → en el inicio del primer "Armado de Andamios" (FC hacia cada armado)
+ *   ◆ Desmovilización      → al fin del último "Desmontaje de Andamios" (FC desde cada desmontaje)
+ * Así el alquiler (y su costo) cubre solo el tiempo en obra. Otros alquileres
+ * (manlift, etc.) no tienen un ancla clara: se quedan tras la OC.
+ */
+function anclarAlquileresAObra(o: {
+  tareas: FilaTarea[]
+  actividades: FilaActividad[]
+  edts: FilaEdt[]
+  fases: FilaFase[]
+  edtIdACodigo: Map<string, string>
+}): EstructuraReal['dependenciasCiclos'] {
+  const { tareas, actividades, edts, fases, edtIdACodigo } = o
+  const deps: EstructuraReal['dependenciasCiclos'] = []
+  const con = tareas.filter(t => edtIdACodigo.get(t.proyectoEdtId) === 'CON')
+  const armados = con.filter(t => /Armado de Andamios/i.test(t.nombre))
+  const desmontajes = con.filter(t => /Desmontaje de Andamios/i.test(t.nombre))
+  const fc = (a: string, b: string) => deps.push({ tareaOrigenId: a, tareaDependienteId: b, tipo: 'finish_to_start', lagMinutos: 0 })
+
+  for (const act of actividades.filter(a => edtIdACodigo.get(a.proyectoEdtId) === 'SER' && /andamio/i.test(a.nombre))) {
+    const propias = tareas.filter(t => t.proyectoActividadId === act.id)
+    const mov = propias.find(t => t.esHito && /Movilizaci[oó]n a Obra$/i.test(t.nombre))
+    const desmov = propias.find(t => t.esHito && /Desmovilizaci[oó]n$/i.test(t.nombre))
+    if (mov && armados.length) {
+      const primero = armados.reduce((a, b) => (b.fechaInicio < a.fechaInicio ? b : a))
+      mov.fechaInicio = mov.fechaFin = primero.fechaInicio
+      for (const a of armados) fc(mov.id, a.id)
+    }
+    if (desmov && desmontajes.length) {
+      const ultimo = desmontajes.reduce((a, b) => (b.fechaFin > a.fechaFin ? b : a))
+      desmov.fechaInicio = desmov.fechaFin = ultimo.fechaFin
+      for (const d of desmontajes) fc(d.id, desmov.id)
+    }
+    if (!mov && !desmov) continue
+    // Fechas hacia arriba: actividad, EDT SER y su fase.
+    act.fechaInicioPlan = new Date(Math.min(...propias.map(t => t.fechaInicio.getTime())))
+    act.fechaFinPlan = new Date(Math.max(...propias.map(t => t.fechaFin.getTime())))
+    const edt = edts.find(e => e.id === act.proyectoEdtId)
+    if (edt && act.fechaFinPlan > edt.fechaFinPlan) edt.fechaFinPlan = act.fechaFinPlan
+    const fase = edt && fases.find(f => f.id === edt.proyectoFaseId)
+    if (fase && act.fechaFinPlan > fase.fechaFinPlan) fase.fechaFinPlan = act.fechaFinPlan
+  }
+  return deps
 }
 
 /**
