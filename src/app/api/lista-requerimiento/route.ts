@@ -43,7 +43,7 @@ export async function POST(request: Request) {
 
     const creada = await prisma.listaEquipo.create({
       data: {
-        id: `lista-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: crypto.randomUUID(), // CUID/UUID: la página de detalle de la lista no acepta otro formato
         proyectoId: payload.proyectoId,
         responsableId: payload.responsableId || payload.proyectoId, // temporal fallback
         codigo: payload.codigo || `LST-${Date.now()}`, // generar código si no se proporciona

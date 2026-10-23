@@ -138,7 +138,7 @@ export async function POST(req: Request) {
         // Crear la ListaEquipo
         const lista = await tx.listaEquipo.create({
           data: {
-            id: `lista-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: crypto.randomUUID(), // CUID/UUID: la página de detalle de la lista no acepta otro formato
             codigo,
             nombre: sugerencia.nombre,
             estado: 'borrador',

@@ -46,7 +46,7 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     const resultado = await prisma.$transaction(async (tx) => {
       const nuevaLista = await tx.listaEquipo.create({
         data: {
-          id: `lista-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: crypto.randomUUID(), // CUID/UUID: la página de detalle de la lista no acepta otro formato
           proyectoId,
           responsableId: session.user.id,
           codigo: `LST-${Date.now()}`, // Código único temporal

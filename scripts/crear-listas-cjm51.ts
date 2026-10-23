@@ -76,7 +76,7 @@ async function main() {
   for (const p of plan) {
     const lista = await prisma.$transaction(async tx => {
       const lista = await tx.listaEquipo.create({ data: {
-        id: `lista-${randomUUID()}`, proyectoId: proyecto.id, codigo: p.codigo, nombre: p.nombre, numeroSecuencia: p.numero,
+        id: randomUUID(), proyectoId: proyecto.id, // UUID sin prefijo: la página de detalle solo acepta CUID/UUID codigo: p.codigo, nombre: p.nombre, numeroSecuencia: p.numero,
         orden: p.numero, estado: 'borrador', responsableId: responsable.id, fechaNecesaria: p.fechaNecesaria, createdAt: ahora, updatedAt: ahora,
       } })
       for (const [k, it] of p.items.entries()) {
