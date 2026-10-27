@@ -36,13 +36,18 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       catalogo = existente
     } else if (body.nuevoCatalogo) {
       const { codigo, descripcion, marca, precioLista, categoriaId, unidadId } = body.nuevoCatalogo
-      if (!codigo?.trim() || !descripcion?.trim() || !precioLista || !categoriaId || !unidadId) {
-        return NextResponse.json({ error: 'Faltan campos para crear en el catálogo: código, descripción, precio lista, categoría y unidad' }, { status: 400 })
+      // El precio es opcional: la ficha técnica la arma ingeniería y logística pone el
+      // precio después (queda en 0 y "pendiente"), igual que "+ Nuevo" del catálogo.
+      if (!codigo?.trim() || !descripcion?.trim() || !categoriaId || !unidadId) {
+        return NextResponse.json({ error: 'Faltan campos para crear en el catálogo: código, descripción, categoría y unidad' }, { status: 400 })
+      }
+      if (precioLista != null && (Number.isNaN(Number(precioLista)) || Number(precioLista) < 0)) {
+        return NextResponse.json({ error: 'El precio lista no puede ser negativo' }, { status: 400 })
       }
       const duplicado = await prisma.catalogoEquipo.findFirst({ where: { codigo: { equals: codigo.trim(), mode: 'insensitive' } }, select: { id: true } })
       if (duplicado) return NextResponse.json({ error: `Ya existe un equipo con código "${codigo.trim()}": búscalo en "Buscar existente"` }, { status: 400 })
 
-      const precio = Number(precioLista)
+      const precio = Number(precioLista) || 0
       const factorCosto = 1.0
       const factorVenta = 1.15
       catalogo = await prisma.catalogoEquipo.create({

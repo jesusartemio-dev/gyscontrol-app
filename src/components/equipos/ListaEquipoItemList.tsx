@@ -1323,6 +1323,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
         isOpen={!!itemVincular}
         onClose={() => setItemVincular(null)}
         endpoint={(id) => `/api/lista-equipo-item/${id}/vincular-catalogo`}
+        precioOpcional
         onVinculado={() => { onItemsUpdated ? onItemsUpdated() : onCreated?.() }}
       />
 

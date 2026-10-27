@@ -40,11 +40,17 @@ interface Props {
   onVinculado: (updatedItem: any) => void
   /** Ruta PATCH que vincula/crea. Por defecto, la de ítems de cotización. */
   endpoint?: (itemId: string) => string
+  /**
+   * Precio lista opcional al crear (listas de equipos: la ficha la arma
+   * ingeniería y el precio lo pone logística después; queda en 0 y "pendiente").
+   * En cotizaciones sigue siendo obligatorio: con él se cotiza al cliente.
+   */
+  precioOpcional?: boolean
 }
 
 const endpointCotizacion = (id: string) => `/api/cotizacion-equipo-item/${id}/vincular`
 
-export default function VincularCatalogoModal({ item, isOpen, onClose, onVinculado, endpoint = endpointCotizacion }: Props) {
+export default function VincularCatalogoModal({ item, isOpen, onClose, onVinculado, endpoint = endpointCotizacion, precioOpcional = false }: Props) {
   const [tab, setTab] = useState<Tab>('buscar')
   const [equipos, setEquipos] = useState<CatalogoEquipo[]>([])
   const [categorias, setCategorias] = useState<CategoriaEquipo[]>([])
@@ -111,7 +117,7 @@ export default function VincularCatalogoModal({ item, isOpen, onClose, onVincula
   }
 
   const handleCrearNuevo = async () => {
-    if (!nuevoCodigo || !nuevaDescripcion || !nuevoPrecioLista || !nuevaCategoriaId || !nuevaUnidadId) {
+    if (!nuevoCodigo || !nuevaDescripcion || (!precioOpcional && !nuevoPrecioLista) || !nuevaCategoriaId || !nuevaUnidadId) {
       toast.error('Completa los campos requeridos')
       return
     }
@@ -125,7 +131,7 @@ export default function VincularCatalogoModal({ item, isOpen, onClose, onVincula
             codigo: nuevoCodigo,
             descripcion: nuevaDescripcion,
             marca: nuevaMarca,
-            precioLista: Number(nuevoPrecioLista),
+            precioLista: Number(nuevoPrecioLista) || 0,
             categoriaId: nuevaCategoriaId,
             unidadId: nuevaUnidadId || undefined,
           },
@@ -242,8 +248,8 @@ export default function VincularCatalogoModal({ item, isOpen, onClose, onVincula
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <Label className="text-xs">Precio Lista *</Label>
-                <Input type="number" value={nuevoPrecioLista} onChange={e => setNuevoPrecioLista(e.target.value)} className="h-8 text-xs" />
+                <Label className="text-xs">{precioOpcional ? 'Precio Lista (lo pone logística)' : 'Precio Lista *'}</Label>
+                <Input type="number" min={0} value={nuevoPrecioLista} onChange={e => setNuevoPrecioLista(e.target.value)} placeholder={precioOpcional ? '0' : undefined} className="h-8 text-xs" />
               </div>
               <div>
                 <Label className="text-xs">Categoría *</Label>
