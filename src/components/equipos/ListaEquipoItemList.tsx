@@ -30,7 +30,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, RotateCcw, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers, MoreHorizontal, Lock, Zap, GripVertical } from 'lucide-react'
+import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, RotateCcw, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers, MoreHorizontal, Lock, Zap, GripVertical, Link2 } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
@@ -42,6 +42,7 @@ import ModalAgregarItemDesdeEquipo from './ModalAgregarItemDesdeEquipo'
 import ModalImportarExcelLista from './ModalImportarExcelLista'
 import ModalAgregarItemLibre from './ModalAgregarItemLibre'
 import ModalEditarListaItem from './ModalEditarListaItem'
+import VincularCatalogoModal from '@/components/cotizaciones/VincularCatalogoModal'
 import TipoItemBadge from '@/components/shared/TipoItemBadge'
 import {
   DropdownMenu,
@@ -178,6 +179,8 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
   const [editComentarioValues, setEditComentarioValues] = useState<Record<string, string>>({})
   const [editingItem, setEditingItem] = useState<ListaEquipoItem | null>(null)
   const [itemReemplazo, setItemReemplazo] = useState<ListaEquipoItem | null>(null)
+  // Ítem sin ficha de catálogo que se vincula (o se crea en el catálogo general).
+  const [itemVincular, setItemVincular] = useState<ListaEquipoItem | null>(null)
   const deleteValidation = useDeleteWithValidation({
     entity: 'listaEquipoItem',
     deleteEndpoint: (id) => `/api/lista-equipo-item/${id}`,
@@ -979,6 +982,12 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                             <RotateCcw className="h-3.5 w-3.5 mr-2" />
                             Reemplazar
                           </DropdownMenuItem>
+                          {!item.catalogoEquipoId && (item as any).tipoItem !== 'servicio' && (
+                            <DropdownMenuItem onSelect={() => setTimeout(() => setItemVincular(item), 0)}>
+                              <Link2 className="h-3.5 w-3.5 mr-2" />
+                              Vincular al catálogo
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem onSelect={() => setTimeout(() => setEditingItem(item), 0)}>
                             <Pencil className="h-3.5 w-3.5 mr-2" />
                             Editar
@@ -1300,6 +1309,21 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
         onConfirm={deleteValidation.confirmDelete}
         onCancel={deleteValidation.cancelDelete}
         entityLabel="item"
+      />
+
+      <VincularCatalogoModal
+        item={itemVincular ? {
+          id: itemVincular.id,
+          codigo: itemVincular.codigo,
+          descripcion: itemVincular.descripcion,
+          marca: itemVincular.marca,
+          categoria: itemVincular.categoria,
+          unidad: itemVincular.unidad,
+        } : null}
+        isOpen={!!itemVincular}
+        onClose={() => setItemVincular(null)}
+        endpoint={(id) => `/api/lista-equipo-item/${id}/vincular-catalogo`}
+        onVinculado={() => { onItemsUpdated ? onItemsUpdated() : onCreated?.() }}
       />
 
       {itemReemplazo && (

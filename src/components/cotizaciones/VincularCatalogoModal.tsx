@@ -17,18 +17,34 @@ import { toast } from 'sonner'
 import { getCatalogoEquipos } from '@/lib/services/catalogoEquipo'
 import { getCategoriasEquipo } from '@/lib/services/categoriaEquipo'
 import { getUnidades } from '@/lib/services/unidad'
-import type { CatalogoEquipo, CategoriaEquipo, Unidad, CotizacionEquipoItem } from '@/types'
+import type { CatalogoEquipo, CategoriaEquipo, Unidad } from '@/types'
 
 type Tab = 'buscar' | 'crear'
 
-interface Props {
-  item: CotizacionEquipoItem | null
-  isOpen: boolean
-  onClose: () => void
-  onVinculado: (updatedItem: CotizacionEquipoItem) => void
+/** Lo mínimo que necesita el modal: sirve para ítems de cotización y de lista de equipos. */
+export interface ItemParaVincular {
+  id: string
+  codigo: string
+  descripcion?: string | null
+  marca?: string | null
+  precioLista?: number | null
+  /** Nombres (no ids): se usan para preseleccionar en "Crear nuevo". */
+  categoria?: string | null
+  unidad?: string | null
 }
 
-export default function VincularCatalogoModal({ item, isOpen, onClose, onVinculado }: Props) {
+interface Props {
+  item: ItemParaVincular | null
+  isOpen: boolean
+  onClose: () => void
+  onVinculado: (updatedItem: any) => void
+  /** Ruta PATCH que vincula/crea. Por defecto, la de ítems de cotización. */
+  endpoint?: (itemId: string) => string
+}
+
+const endpointCotizacion = (id: string) => `/api/cotizacion-equipo-item/${id}/vincular`
+
+export default function VincularCatalogoModal({ item, isOpen, onClose, onVinculado, endpoint = endpointCotizacion }: Props) {
   const [tab, setTab] = useState<Tab>('buscar')
   const [equipos, setEquipos] = useState<CatalogoEquipo[]>([])
   const [categorias, setCategorias] = useState<CategoriaEquipo[]>([])
@@ -61,9 +77,11 @@ export default function VincularCatalogoModal({ item, isOpen, onClose, onVincula
       setNuevaDescripcion(item.descripcion?.replace(/\s*\[.*?\]\s*$/g, '') || '')
       setNuevaMarca(item.marca || '')
       setNuevoPrecioLista(String(item.precioLista || ''))
-      setNuevaCategoriaId(categorias[0]?.id || '')
+      const mismo = (a?: string | null, b?: string | null) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase()
+      setNuevaCategoriaId(categorias.find(c => mismo(c.nombre, item.categoria))?.id || categorias[0]?.id || '')
+      setNuevaUnidadId(unidades.find(u => mismo(u.nombre, item.unidad))?.id || '')
     }
-  }, [tab, isOpen, item, categorias])
+  }, [tab, isOpen, item, categorias, unidades])
 
   if (!item) return null
 
@@ -75,7 +93,7 @@ export default function VincularCatalogoModal({ item, isOpen, onClose, onVincula
   const handleVincularExistente = async (catalogo: CatalogoEquipo) => {
     setSaving(true)
     try {
-      const res = await fetch(`/api/cotizacion-equipo-item/${item.id}/vincular`, {
+      const res = await fetch(endpoint(item.id), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ catalogoEquipoId: catalogo.id }),
@@ -99,7 +117,7 @@ export default function VincularCatalogoModal({ item, isOpen, onClose, onVincula
     }
     setSaving(true)
     try {
-      const res = await fetch(`/api/cotizacion-equipo-item/${item.id}/vincular`, {
+      const res = await fetch(endpoint(item.id), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
