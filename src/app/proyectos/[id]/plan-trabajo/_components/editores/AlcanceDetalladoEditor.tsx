@@ -584,7 +584,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                   return (
                                     <div
                                       key={tarea.tareaRefId ?? tarea.manualId ?? tareaIdx}
-                                      className={`rounded-md border p-3 shadow-sm ${tarea.manualId ? 'bg-sky-50 border-dashed border-sky-300' : 'bg-white border-slate-200'} ${conGaleria ? 'grid gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]' : ''}`}
+                                      className={`rounded-md border p-3 shadow-sm ${tarea.manualId ? 'bg-sky-50 border-dashed border-sky-300' : 'bg-white border-slate-200'} ${conGaleria ? 'grid gap-3 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]' : ''}`}
                                     >
                                       <div className="flex items-start gap-2 min-w-0">
                                         <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-medium text-gray-600">

@@ -304,7 +304,7 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
       {propias.length === 0 ? (
         compacta ? null : <p className="text-[11px] text-muted-foreground italic">Sin imágenes adjuntas.</p>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-4 gap-2">
+        <div className={`grid gap-2 grid-cols-2 sm:grid-cols-3 ${compacta ? 'xl:grid-cols-2 2xl:grid-cols-3' : '2xl:grid-cols-4'}`}>
           {propias.map((img, idx) => {
             const esSugeridaIA = img.origen === 'IA_AUTO'
             return (
