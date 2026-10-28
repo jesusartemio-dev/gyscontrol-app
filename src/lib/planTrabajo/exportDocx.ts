@@ -3,6 +3,15 @@ import PizZip from 'pizzip'
 import ImageModule from 'docxtemplater-image-module-free'
 import { descargarPlantillaPlanTrabajo } from './descargarPlantilla'
 import { sincronizarTblGridDelDocumento } from './postProcesarTblGrid'
+import { asegurarEstilosIndice, poblarIndice } from './indiceDocx'
+
+/** Párrafo centrado con una imagen → keepNext, para que la foto no quede en una hoja y su "Figura N." en la siguiente. */
+export function mantenerImagenConPie(documentXml: string): string {
+  // keepNext va justo después de pStyle (orden del esquema de w:pPr).
+  return documentXml.replace(/<w:p><w:pPr>(<w:pStyle [^>]*\/>)?((?:(?!<\/w:p>)[\s\S])*?<w:jc w:val="center"\/>(?:(?!<\/w:p>)[\s\S])*?<w:drawing>)/g, (m, pStyle: string | undefined, resto: string) =>
+    resto.includes('<w:keepNext/>') ? m : `<w:p><w:pPr>${pStyle ?? ''}<w:keepNext/>${resto}`
+  )
+}
 
 interface RenderInput {
   dataBag: Record<string, unknown>
@@ -15,7 +24,10 @@ export interface ImagenResueltaTag {
   height: number
 }
 
-const ANCHO_MAXIMO_PX = 566 // ~15cm a 96dpi (Tarea 4 — imágenes de alcance detallado)
+// Imágenes del alcance detallado: caja máx. ~11 × 9 cm (96 dpi), aspecto real preservado.
+// Antes solo se limitaba el ancho (15 cm) y una foto vertical ocupaba la hoja entera.
+const ANCHO_MAXIMO_PX = 415
+const ALTO_MAXIMO_PX = 340
 const ANCHO_ORGANIGRAMA_PX = 600
 const ALTO_ORGANIGRAMA_PX = 400
 
@@ -62,12 +74,11 @@ export async function renderizarPlanTrabajoDocx({ dataBag }: RenderInput): Promi
       return PNG_1X1
     },
     getSize: (_img: Buffer, tagValue: unknown): [number, number] => {
-      // {%img} de alcanceDetallado (Tarea 4) — límite ~15cm de ancho, aspecto real preservado.
+      // {%img} de alcanceDetallado (Tarea 4) — cabe en la caja máxima, sin agrandar las chicas.
       if (esImagenResuelta(tagValue)) {
         if (!tagValue.data || !tagValue.width || !tagValue.height) return [1, 1]
-        const ancho = Math.min(tagValue.width, ANCHO_MAXIMO_PX)
-        const alto = Math.round(ancho * (tagValue.height / tagValue.width))
-        return [ancho, alto]
+        const escala = Math.min(1, ANCHO_MAXIMO_PX / tagValue.width, ALTO_MAXIMO_PX / tagValue.height)
+        return [Math.round(tagValue.width * escala), Math.round(tagValue.height * escala)]
       }
       // {%organigramaPng} — tamaño fijo histórico, sin datos de aspecto disponibles.
       const isEmpty = !tagValue || (typeof tagValue === 'string' && !tagValue)
@@ -118,7 +129,11 @@ export async function renderizarPlanTrabajoDocx({ dataBag }: RenderInput): Promi
   if (tablasCorregidas.length > 0) {
     console.log(`[plan-trabajo] tblGrid corregido post-render en ${tablasCorregidas.length} tabla(s) (índices: ${tablasCorregidas.join(', ')})`)
   }
-  zipRenderizado.file('word/document.xml', documentXmlCorregido)
+  // Índice pre-llenado (ver indiceDocx.ts) e imagen pegada a su pie de figura en la misma hoja.
+  const { xml: documentXmlConIndice } = poblarIndice(documentXmlCorregido)
+  zipRenderizado.file('word/document.xml', mantenerImagenConPie(documentXmlConIndice))
+  const stylesXml = zipRenderizado.file('word/styles.xml')?.asText()
+  if (stylesXml) zipRenderizado.file('word/styles.xml', asegurarEstilosIndice(stylesXml))
 
   return zipRenderizado.generate({ type: 'nodebuffer' }) as Buffer
 }
