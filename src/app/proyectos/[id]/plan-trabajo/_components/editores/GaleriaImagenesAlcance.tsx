@@ -27,6 +27,8 @@ interface Props {
   onChanged: () => Promise<void>
   /** Versión para cada tarea: sugeridas plegadas (se repetían en todas las tareas) y sin el "Sin imágenes" de relleno. */
   compacta?: boolean
+  /** A qué nivel pertenecen (EDT/actividad/tarea): con tres galerías anidadas, "Imágenes" a secas confundía. */
+  titulo?: string
 }
 
 const MAX_IMAGENES = 10
@@ -45,7 +47,7 @@ export interface GaleriaImagenesAlcanceHandle {
  * endpoints REST directos a Google Drive (mismo patrón que evidencias/seguridad).
  */
 export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, Props>(function GaleriaImagenesAlcance(
-  { proyectoId, edtRef, subItemRef, tareaRef, nombreDefault, textosContexto = [], imagenes, onChanged, compacta = false },
+  { proyectoId, edtRef, subItemRef, tareaRef, nombreDefault, textosContexto = [], imagenes, onChanged, compacta = false, titulo = 'Imágenes' },
   ref
 ) {
   const [verSugeridas, setVerSugeridas] = useState(!compacta)
@@ -233,10 +235,10 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
   }
 
   return (
-    <div className="space-y-2 border rounded-md p-2 bg-gray-50/70">
+    <div className="space-y-2 border border-slate-200 rounded-md p-2 bg-slate-50">
       <div className="flex flex-wrap items-center justify-between gap-1">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-          <ImageIcon size={12} /> Imágenes ({propias.length}/{MAX_IMAGENES})
+        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1">
+          <ImageIcon size={12} /> {titulo} ({propias.length}/{MAX_IMAGENES})
         </p>
         <div className="flex items-center gap-1">
           {compacta && sugeridas.length > 0 && propias.length < MAX_IMAGENES && (
