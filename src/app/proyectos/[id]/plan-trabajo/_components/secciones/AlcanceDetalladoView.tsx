@@ -29,7 +29,10 @@ function GaleriaSoloLectura({
   imagenes,
   numerosDeFigura,
   nombreDefault,
+  compacta,
 }: {
+  /** Va al lado del texto de la tarea: menos columnas y fotos más altas. */
+  compacta?: boolean
   /** Nombre del EDT/actividad/tarea: pie de las imágenes sin pie propio (igual que el docx). */
   nombreDefault: string
   proyectoId: string
@@ -52,7 +55,7 @@ function GaleriaSoloLectura({
   if (propias.length === 0) return null
 
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+    <div className={`grid gap-2 ${compacta ? 'grid-cols-2 xl:grid-cols-3' : 'grid-cols-3 sm:grid-cols-4'}`}>
       {propias.map(img => {
         const n = numerosDeFigura.get(img.id)
         const caption = n ? `Figura ${n}. ${captionEfectivo(img, nombreDefault)}` : captionEfectivo(img, nombreDefault)
@@ -61,9 +64,9 @@ function GaleriaSoloLectura({
             <ImagenConLightbox
               src={`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes/${img.id}/contenido`}
               alt={caption}
-              alturaClase="h-24"
+              alturaClase={compacta ? 'h-32' : 'h-24'}
             />
-            <figcaption className="text-[10px] text-gray-600 px-1 py-0.5 truncate" title={caption}>
+            <figcaption className="text-[10px] text-gray-600 px-1 py-0.5 line-clamp-2" title={caption}>
               {caption}
             </figcaption>
           </figure>
@@ -149,19 +152,27 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
                             </p>
                           )}
                           {(sub.tareas ?? []).filter(t => !t.excluida).length > 0 && (
-                            <ul className="list-disc list-inside space-y-1.5 pl-1">
+                            <ul className="space-y-2 pl-1">
                               {(sub.tareas ?? []).filter(t => !t.excluida).map((tarea, ti) => {
-                                const imagenesDeLaTarea = imagenes.filter(
-                                  img => img.edtRef === (item.edtRefId ?? '') && img.tareaRef === tarea.tareaRefId
-                                )
+                                const imagenesDeLaTarea = item.tipoDetalle === 'detallado' && tarea.tareaRefId
+                                  ? imagenes.filter(img => img.edtRef === (item.edtRefId ?? '') && img.tareaRef === tarea.tareaRefId)
+                                  : []
+                                const conImagenes = imagenesDeLaTarea.length > 0
                                 return (
-                                  <li key={tarea.tareaRefId ?? ti} className="text-xs text-gray-500 leading-relaxed">
-                                    {tarea.texto || tarea.nombre}
-                                    {item.tipoDetalle === 'detallado' && imagenesDeLaTarea.length === 0 && (
-                                      <HintFotoSugerida value={tarea.fotoSugerida ?? ''} />
-                                    )}
-                                    {item.tipoDetalle === 'detallado' && tarea.tareaRefId && (
-                                      <div className="list-none mt-1">
+                                  // Con imágenes: texto a la izquierda y fotos al lado (como en el editor), no debajo.
+                                  <li
+                                    key={tarea.tareaRefId ?? tarea.manualId ?? ti}
+                                    className={`flex gap-2 text-xs text-gray-500 leading-relaxed ${conImagenes ? 'rounded-md border border-slate-100 bg-slate-50/60 p-2' : ''}`}
+                                  >
+                                    <span className="shrink-0 select-none text-gray-400">•</span>
+                                    <div className={`min-w-0 flex-1 ${conImagenes ? 'grid gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]' : ''}`}>
+                                      <div>
+                                        {tarea.texto || tarea.nombre}
+                                        {item.tipoDetalle === 'detallado' && !conImagenes && (
+                                          <HintFotoSugerida value={tarea.fotoSugerida ?? ''} />
+                                        )}
+                                      </div>
+                                      {conImagenes && (
                                         <GaleriaSoloLectura
                                           proyectoId={proyectoId}
                                           edtRef={item.edtRefId ?? ''}
@@ -169,9 +180,10 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
                                           nombreDefault={tarea.nombre}
                                           imagenes={imagenes}
                                           numerosDeFigura={numerosDeFigura}
+                                          compacta
                                         />
-                                      </div>
-                                    )}
+                                      )}
+                                    </div>
                                   </li>
                                 )
                               })}
