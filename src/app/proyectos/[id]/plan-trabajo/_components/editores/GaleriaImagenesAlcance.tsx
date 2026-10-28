@@ -4,6 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Loader2, Trash2, Upload, ChevronUp, ChevronDown, ImageIcon, LibraryBig, Search, Sparkles, Check } from 'lucide-react'
@@ -24,6 +25,8 @@ interface Props {
   textosContexto?: string[]
   imagenes: PlanTrabajoImagen[]
   onChanged: () => Promise<void>
+  /** Versión para cada tarea: sugeridas plegadas (se repetían en todas las tareas) y sin el "Sin imágenes" de relleno. */
+  compacta?: boolean
 }
 
 const MAX_IMAGENES = 10
@@ -42,9 +45,10 @@ export interface GaleriaImagenesAlcanceHandle {
  * endpoints REST directos a Google Drive (mismo patrón que evidencias/seguridad).
  */
 export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, Props>(function GaleriaImagenesAlcance(
-  { proyectoId, edtRef, subItemRef, tareaRef, nombreDefault, textosContexto = [], imagenes, onChanged },
+  { proyectoId, edtRef, subItemRef, tareaRef, nombreDefault, textosContexto = [], imagenes, onChanged, compacta = false },
   ref
 ) {
+  const [verSugeridas, setVerSugeridas] = useState(!compacta)
   const [subiendo, setSubiendo] = useState(false)
   const [procesandoId, setProcesandoId] = useState<string | null>(null)
   const [catalogo, setCatalogo] = useState<CatalogoImagen[]>([])
@@ -127,7 +131,9 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
         } else if (subItemRef) {
           formData.append('subItemRef', subItemRef)
         }
-        formData.append('caption', nombreDefault)
+        // Sin pie propio: toma el nombre ACTUAL de la tarea/actividad (captionEfectivo).
+        // Guardar el nombre acá lo congelaba con las erratas que luego se corregían en el cronograma.
+        formData.append('caption', '')
 
         const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes`, {
           method: 'POST',
@@ -181,7 +187,12 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
     }
   }
 
-  const handleCaption = async (imagenId: string, caption: string) => {
+  const handleCaption = async (img: PlanTrabajoImagen, valor: string) => {
+    const texto = valor.trim()
+    // Igual al nombre (o vacío) = automático: sigue al nombre si después cambia.
+    const caption = texto === nombreDefault.trim() ? '' : texto
+    if (caption === (img.caption ?? '').trim()) return
+    const imagenId = img.id
     try {
       const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes/${imagenId}`, {
         method: 'PATCH',
@@ -223,11 +234,22 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
 
   return (
     <div className="space-y-2 border rounded-md p-2 bg-gray-50/70">
-      <div className="flex items-center justify-between gap-1">
+      <div className="flex flex-wrap items-center justify-between gap-1">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
           <ImageIcon size={12} /> Imágenes ({propias.length}/{MAX_IMAGENES})
         </p>
         <div className="flex items-center gap-1">
+          {compacta && sugeridas.length > 0 && propias.length < MAX_IMAGENES && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs px-2 text-indigo-700"
+              onClick={() => setVerSugeridas(v => !v)}
+            >
+              <Sparkles size={12} className="mr-1" /> Sugeridas ({sugeridas.length})
+            </Button>
+          )}
           <Button
             type="button"
             variant="outline"
@@ -260,7 +282,7 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
         />
       </div>
 
-      {sugeridas.length > 0 && propias.length < MAX_IMAGENES && (
+      {verSugeridas && sugeridas.length > 0 && propias.length < MAX_IMAGENES && (
         <div className="flex flex-wrap items-center gap-1">
           <span className="text-[10px] text-muted-foreground">Sugeridas:</span>
           {sugeridas.map(s => (
@@ -278,9 +300,9 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
       )}
 
       {propias.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground italic">Sin imágenes adjuntas.</p>
+        compacta ? null : <p className="text-[11px] text-muted-foreground italic">Sin imágenes adjuntas.</p>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-4 gap-2">
           {propias.map((img, idx) => {
             const esSugeridaIA = img.origen === 'IA_AUTO'
             return (
@@ -289,7 +311,7 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
                 <ImagenConLightbox
                   src={`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes/${img.id}/contenido`}
                   alt={img.caption ?? img.nombreArchivo}
-                  alturaClase="h-28"
+                  alturaClase="h-36"
                   className={esSugeridaIA ? 'opacity-80' : ''}
                 />
                 {esSugeridaIA && (
@@ -299,11 +321,15 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
                 )}
               </div>
               <div className="p-1.5 space-y-1">
-                <Input
+                {/* key: si el nombre de la tarea cambia, el pie automático se refresca. */}
+                <Textarea
+                  key={`${img.id}:${captionEfectivo(img, nombreDefault)}`}
                   defaultValue={captionEfectivo(img, nombreDefault)}
                   placeholder="Pie de imagen"
-                  className="h-6 text-[10px]"
-                  onBlur={e => handleCaption(img.id, e.target.value)}
+                  title="Pie de la figura en el documento. Si lo dejás igual al nombre de la tarea, se actualiza solo."
+                  rows={2}
+                  className="min-h-0 px-1.5 py-1 text-xs leading-snug resize-none"
+                  onBlur={e => handleCaption(img, e.target.value)}
                 />
                 <div className="flex items-center justify-between">
                   <div className="flex gap-0.5">

@@ -28,7 +28,10 @@ function GaleriaSoloLectura({
   tareaRef,
   imagenes,
   numerosDeFigura,
+  nombreDefault,
 }: {
+  /** Nombre del EDT/actividad/tarea: pie de las imágenes sin pie propio (igual que el docx). */
+  nombreDefault: string
   proyectoId: string
   edtRef: string
   subItemRef?: string
@@ -52,7 +55,7 @@ function GaleriaSoloLectura({
     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
       {propias.map(img => {
         const n = numerosDeFigura.get(img.id)
-        const caption = n ? `Figura ${n}. ${captionEfectivo(img, '')}` : captionEfectivo(img, '')
+        const caption = n ? `Figura ${n}. ${captionEfectivo(img, nombreDefault)}` : captionEfectivo(img, nombreDefault)
         return (
           <figure key={img.id} className="border rounded overflow-hidden bg-gray-50">
             <ImagenConLightbox
@@ -121,7 +124,7 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
                   )}
                   {item.tipoDetalle === 'detallado' && item.edtRefId && (
                     <div className="ml-8">
-                      <GaleriaSoloLectura proyectoId={proyectoId} edtRef={item.edtRefId} imagenes={imagenes} numerosDeFigura={numerosDeFigura} />
+                      <GaleriaSoloLectura proyectoId={proyectoId} edtRef={item.edtRefId} nombreDefault={item.edtNombre} imagenes={imagenes} numerosDeFigura={numerosDeFigura} />
                     </div>
                   )}
                   {(item.subItems ?? []).length > 0 && (
@@ -163,6 +166,7 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
                                           proyectoId={proyectoId}
                                           edtRef={item.edtRefId ?? ''}
                                           tareaRef={tarea.tareaRefId}
+                                          nombreDefault={tarea.nombre}
                                           imagenes={imagenes}
                                           numerosDeFigura={numerosDeFigura}
                                         />
@@ -178,6 +182,7 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
                               proyectoId={proyectoId}
                               edtRef={item.edtRefId ?? ''}
                               subItemRef={sub.actividadRefId}
+                              nombreDefault={sub.actividadNombre}
                               imagenes={imagenes}
                               numerosDeFigura={numerosDeFigura}
                             />

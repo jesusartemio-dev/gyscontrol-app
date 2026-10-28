@@ -59,7 +59,8 @@ export function CampoFotoTarea({ proyectoId, edtRef, tareaRef, nombreDefault, im
         formData.append('file', file)
         formData.append('edtRef', edtRef)
         formData.append('tareaRef', tareaRef)
-        formData.append('caption', nombreDefault)
+        // Sin pie propio: el pie sigue al nombre actual de la tarea (captionEfectivo).
+        formData.append('caption', '')
 
         const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes`, {
           method: 'POST',

@@ -327,7 +327,8 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
     <Sheet open onOpenChange={(open) => !open && cerrar()}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-3xl lg:max-w-5xl overflow-y-auto"
+        // Pantalla completa: con tareas, viñetas e imágenes lado a lado el panel angosto se leía mal.
+        className="w-screen sm:max-w-none overflow-y-auto"
         // Solo se cierra con Cancelar, la X o Esc: un clic afuera (o en el
         // diálogo de biblioteca/subida de imágenes) lo cerraba y se perdía lo editado.
         onInteractOutside={(e) => e.preventDefault()}
@@ -336,7 +337,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
           <SheetTitle>Editar Alcance Detallado</SheetTitle>
         </SheetHeader>
 
-        <div className="mt-4 space-y-3">
+        <div className="mx-auto mt-4 max-w-[1600px] space-y-3">
           {/* Colapsado por defecto lo 'resumido' (Planificación/Ingeniería/Procura/Cierre);
               expandido lo 'detallado' (Ejecución) — es donde hay más que revisar (Prioridad 4). */}
           <Accordion
@@ -561,7 +562,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                               <Lock size={10} /> Editado a mano · <span className="underline">Liberar</span>
                             </button>
                           )}
-                          <Textarea value={sub.descripcion} onChange={e => marcarDescripcionSubItemEditada(edtIdx, subIdx, e.target.value)} rows={3} className="text-xs resize-none" placeholder="Descripción narrativa de la actividad..." />
+                          <Textarea value={sub.descripcion} onChange={e => marcarDescripcionSubItemEditada(edtIdx, subIdx, e.target.value)} rows={3} className="text-sm resize-none" placeholder="Descripción narrativa de la actividad..." />
 
                           {(sub.tareas ?? []).length > 0 && (() => {
                             const conIndice = (sub.tareas ?? []).map((tarea, tareaIdx) => ({ tarea, tareaIdx }))
@@ -575,41 +576,55 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                     img => img.edtRef === (item.edtRefId ?? '') && img.tareaRef === tarea.tareaRefId
                                   )
                                   const claveGaleria = `tarea:${tarea.tareaRefId ?? `${edtIdx}-${subIdx}-${tareaIdx}`}`
+                                  const conGaleria = item.tipoDetalle === 'detallado' && Boolean(tarea.tareaRefId)
                                   return (
-                                    <div key={tarea.tareaRefId ?? tarea.manualId ?? tareaIdx} className={`space-y-1.5 border rounded-md p-2.5 ${tarea.manualId ? 'bg-sky-50/50 border-dashed border-sky-300' : 'bg-white'}`}>
-                                      <div className="flex flex-wrap items-start gap-1">
-                                        <span className="text-[10px] text-muted-foreground mt-1.5 shrink-0">•</span>
-                                        <Textarea
-                                          value={tarea.texto}
-                                          onChange={e => tarea.manualId
-                                            ? updateTarea(edtIdx, subIdx, tareaIdx, { texto: e.target.value, nombre: e.target.value.trim() })
-                                            : marcarTextoTareaEditado(edtIdx, subIdx, tareaIdx, e.target.value)}
-                                          rows={1}
-                                          className="text-xs resize-none min-h-0 py-1 flex-1 min-w-[160px]"
-                                          placeholder={tarea.manualId ? 'Ej: Pase de piso con pasamuro y transición' : tarea.nombre}
-                                          autoFocus={Boolean(tarea.manualId) && !tarea.texto}
-                                        />
-                                        {tarea.manualId && (
-                                          <Badge
-                                            variant="outline"
-                                            className="mt-1 shrink-0 text-[10px] font-normal text-sky-700 border-sky-300 bg-white"
-                                            title="Agregada a mano en el plan: no existe en el cronograma (no suma horas ni admite imágenes propias)"
-                                          >
-                                            manual
-                                          </Badge>
-                                        )}
-                                        {!tarea.manualId && tarea.textoEditadoManualmente && (
-                                          <button
-                                            type="button"
-                                            className="flex items-center shrink-0 mt-1.5 text-amber-700 hover:text-amber-800"
-                                            title="Editado a mano — se conservará al regenerar. Click para liberar."
-                                            onClick={() => liberarTextoTarea(edtIdx, subIdx, tareaIdx)}
-                                          >
-                                            <Lock size={11} />
-                                          </button>
-                                        )}
+                                    <div
+                                      key={tarea.tareaRefId ?? tarea.manualId ?? tareaIdx}
+                                      className={`rounded-md border p-3 ${tarea.manualId ? 'bg-sky-50/50 border-dashed border-sky-300' : 'bg-white'} ${conGaleria ? 'grid gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]' : ''}`}
+                                    >
+                                      <div className="flex items-start gap-2 min-w-0">
+                                        <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-medium text-gray-600">
+                                          {posVisible + 1}
+                                        </span>
+                                        <div className="flex-1 min-w-0 space-y-1">
+                                          {/* Nombre de la tarea en el cronograma: la viñeta es la redacción para el documento. */}
+                                          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                                            {tarea.manualId ? (
+                                              <Badge
+                                                variant="outline"
+                                                className="text-[10px] font-normal text-sky-700 border-sky-300 bg-white"
+                                                title="Agregada a mano en el plan: no existe en el cronograma (no suma horas ni admite imágenes propias)"
+                                              >
+                                                Tarea manual
+                                              </Badge>
+                                            ) : (
+                                              <span className="font-medium text-gray-600">{tarea.nombre}</span>
+                                            )}
+                                            {!tarea.manualId && tarea.textoEditadoManualmente && (
+                                              <button
+                                                type="button"
+                                                className="flex items-center gap-0.5 text-amber-700 hover:text-amber-800"
+                                                title="Editado a mano — se conservará al regenerar. Click para liberar."
+                                                onClick={() => liberarTextoTarea(edtIdx, subIdx, tareaIdx)}
+                                              >
+                                                <Lock size={10} /> editado
+                                              </button>
+                                            )}
+                                          </div>
+                                          <Textarea
+                                            value={tarea.texto}
+                                            onChange={e => tarea.manualId
+                                              ? updateTarea(edtIdx, subIdx, tareaIdx, { texto: e.target.value, nombre: e.target.value.trim() })
+                                              : marcarTextoTareaEditado(edtIdx, subIdx, tareaIdx, e.target.value)}
+                                            rows={2}
+                                            className="text-sm leading-relaxed resize-none min-h-0 py-1.5"
+                                            placeholder={tarea.manualId ? 'Ej: Pase de piso con pasamuro y transición' : tarea.nombre}
+                                            autoFocus={Boolean(tarea.manualId) && !tarea.texto}
+                                          />
+                                        </div>
+                                        <div className="flex shrink-0 items-center">
                                         {item.tipoDetalle === 'detallado' && !tarea.manualId && (
-                                          <div className="mt-1.5 shrink-0">
+                                          <div className="shrink-0">
                                             <HintFotoSugerida
                                               value={tarea.fotoSugerida ?? ''}
                                               editable
@@ -620,11 +635,10 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                             />
                                           </div>
                                         )}
-                                        <div className="flex shrink-0 mt-0.5">
-                                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={posVisible === 0} onClick={() => moverTarea(edtIdx, subIdx, tareaIdx, -1)}>
+                                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Subir tarea" disabled={posVisible === 0} onClick={() => moverTarea(edtIdx, subIdx, tareaIdx, -1)}>
                                             <ChevronUp size={14} />
                                           </Button>
-                                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={posVisible === visibles.length - 1} onClick={() => moverTarea(edtIdx, subIdx, tareaIdx, 1)}>
+                                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Bajar tarea" disabled={posVisible === visibles.length - 1} onClick={() => moverTarea(edtIdx, subIdx, tareaIdx, 1)}>
                                             <ChevronDown size={14} />
                                           </Button>
                                           <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-sky-700" title="Agregar tarea debajo" onClick={() => agregarTarea(edtIdx, subIdx, tareaIdx)}>
@@ -640,7 +654,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                               description="Se oculta de este documento (viñeta, imágenes y foto sugerida). El cronograma real del proyecto NO se modifica — podés restaurarla luego desde 'tareas ocultas'."
                                               onConfirm={() => excluirTarea(edtIdx, subIdx, tareaIdx)}
                                               trigger={
-                                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500">
+                                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" title="Quitar del plan">
                                                   <Trash2 size={14} />
                                                 </Button>
                                               }
@@ -648,9 +662,10 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                           )}
                                         </div>
                                       </div>
-                                      {item.tipoDetalle === 'detallado' && tarea.tareaRefId && (
-                                        <div className="mt-1">
+                                      {conGaleria && tarea.tareaRefId && (
+                                        <div className="min-w-0">
                                           <GaleriaImagenesAlcance
+                                            compacta
                                             ref={el => { galeriaRefs.current.set(claveGaleria, el) }}
                                             proyectoId={proyectoId}
                                             edtRef={item.edtRefId ?? ''}
