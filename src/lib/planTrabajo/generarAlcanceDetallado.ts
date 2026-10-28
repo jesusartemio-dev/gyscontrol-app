@@ -11,7 +11,7 @@ import {
   type CatalogoImagenParaPrompt,
   type TareaParaDetalle,
 } from './prompts/alcanceDetallado'
-import type { CronogramaContexto, PlanAlcanceDetalladoEdt, PlanAlcanceDetalladoTarea, PlanPersonal } from '@/types/planTrabajo'
+import type { CronogramaContexto, PlanAlcanceDetalladoEdt, PlanAlcanceDetalladoSubItem, PlanAlcanceDetalladoTarea, PlanPersonal } from '@/types/planTrabajo'
 import { calcularHHRealDeTarea, type ResultadoCalculo } from './calcularDatos'
 
 /**
@@ -125,6 +125,10 @@ export function mergearDescripcionesEnEstructura(
  * `catalogoImagenesRechazadas` se conservan, y el orden relativo del usuario
  * se reaplica. Una tarea nueva en el cronograma (no existía en el estado
  * anterior) se agrega al final, en su orden natural.
+ * Lo agregado a mano en el editor también sobrevive: las viñetas manuales
+ * (`manualId`) y las actividades sin `actividadRefId` vuelven a quedar debajo
+ * del elemento que tenían antes, y se respeta el orden de actividades que el
+ * usuario haya movido (la numeración se reasigna por posición).
  * Pura y testeable: no decide nada por IA, solo reconcilia dos estructuras.
  */
 export function preservarEstadoManualTareas(
@@ -132,7 +136,9 @@ export function preservarEstadoManualTareas(
   estructuraAnterior: PlanAlcanceDetalladoEdt[]
 ): PlanAlcanceDetalladoEdt[] {
   const tareasAnterioresPorSubItem = new Map<string, PlanAlcanceDetalladoTarea[]>()
+  const subItemsAnterioresPorEdt = new Map<string, PlanAlcanceDetalladoSubItem[]>()
   for (const edt of estructuraAnterior) {
+    if (edt.edtRefId) subItemsAnterioresPorEdt.set(edt.edtRefId, edt.subItems ?? [])
     for (const s of edt.subItems ?? []) {
       if (s.actividadRefId) tareasAnterioresPorSubItem.set(s.actividadRefId, s.tareas ?? [])
     }
@@ -140,7 +146,7 @@ export function preservarEstadoManualTareas(
 
   return estructuraNueva.map(edt => ({
     ...edt,
-    subItems: (edt.subItems ?? []).map(s => {
+    subItems: ordenarSubItemsComoAntes(edt.subItems ?? [], edt.edtRefId ? subItemsAnterioresPorEdt.get(edt.edtRefId) : undefined).map(s => {
       const anteriores = s.actividadRefId ? tareasAnterioresPorSubItem.get(s.actividadRefId) : undefined
       if (!anteriores || anteriores.length === 0) return s
 
@@ -163,9 +169,52 @@ export function preservarEstadoManualTareas(
         return a.i - b.i // ambas nuevas — mantener el orden natural del cronograma
       })
 
-      return { ...s, tareas: conExclusionYPosicion.map(({ t }) => t) }
+      const tareas = reinsertarManuales(conExclusionYPosicion.map(({ t }) => t), anteriores, t => t.tareaRefId ?? t.manualId, t => Boolean(t.manualId))
+      return { ...s, tareas }
     }),
   }))
+}
+
+/**
+ * Vuelve a meter en `resultado` los elementos manuales de `anteriores`, cada
+ * uno debajo del elemento que tenía antes (si ese ya no existe, debajo del
+ * anterior a ese; si no queda ninguno, al inicio).
+ */
+function reinsertarManuales<T>(resultado: T[], anteriores: T[], clave: (x: T) => string | undefined, esManual: (x: T) => boolean): T[] {
+  const salida = [...resultado]
+  anteriores.forEach((x, k) => {
+    if (!esManual(x)) return
+    let pos = 0
+    for (let j = k - 1; j >= 0; j--) {
+      const c = clave(anteriores[j])
+      const idx = c ? salida.findIndex(y => clave(y) === c) : -1
+      if (idx >= 0) { pos = idx + 1; break }
+    }
+    salida.splice(pos, 0, x)
+  })
+  return salida
+}
+
+/**
+ * Actividades de un EDT en el orden que dejó el usuario (las que movió con las
+ * flechas del editor), las nuevas del cronograma al final y las agregadas a
+ * mano en su lugar. La numeración del cronograma se reasigna por posición para
+ * que siga correlativa; las manuales conservan la suya.
+ */
+function ordenarSubItemsComoAntes(nuevos: PlanAlcanceDetalladoSubItem[], anteriores?: PlanAlcanceDetalladoSubItem[]): PlanAlcanceDetalladoSubItem[] {
+  if (!anteriores || anteriores.length === 0) return nuevos
+  const posAnterior = new Map(anteriores.filter(s => s.actividadRefId).map((s, i) => [s.actividadRefId!, i]))
+  const ordenados = nuevos
+    .map((s, i) => ({ s, i, pos: s.actividadRefId ? posAnterior.get(s.actividadRefId) : undefined }))
+    .sort((a, b) => {
+      if (a.pos !== undefined && b.pos !== undefined) return a.pos - b.pos
+      if (a.pos !== undefined) return -1
+      if (b.pos !== undefined) return 1
+      return a.i - b.i
+    })
+  const numeraciones = nuevos.map(s => s.numeracion)
+  const renumerados = ordenados.map(({ s }, i) => ({ ...s, numeracion: numeraciones[i] }))
+  return reinsertarManuales(renumerados, anteriores, s => s.actividadRefId ?? `manual:${s.numeracion}:${s.actividadNombre}`, s => !s.actividadRefId)
 }
 
 /**

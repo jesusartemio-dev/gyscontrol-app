@@ -34,6 +34,13 @@ export interface PlanAlcanceDetalladoTarea {
    * (vuelve a false) al sobrescribir o al usar la acción "Liberar" del editor.
    */
   textoEditadoManualmente?: boolean
+  /**
+   * Id local de una viñeta agregada A MANO en el editor (no existe en el
+   * cronograma, por eso no tiene tareaRefId ni imágenes propias). Sobrevive a
+   * una regeneración quedando debajo de la tarea que tenía antes (ver
+   * preservarEstadoManualTareas).
+   */
+  manualId?: string
 }
 
 // ─── Alcance detallado (formato nuevo — basado en EDTs del cronograma) ───

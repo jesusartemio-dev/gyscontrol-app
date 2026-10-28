@@ -5,7 +5,7 @@ import {
   preservarEstadoManualTareas,
   aplicarAlcanceDeRegeneracion,
 } from '@/lib/planTrabajo/generarAlcanceDetallado'
-import type { CronogramaContexto, PlanPersonal, PlanAlcanceDetalladoEdt } from '@/types/planTrabajo'
+import type { CronogramaContexto, PlanPersonal, PlanAlcanceDetalladoEdt, PlanAlcanceDetalladoSubItem, PlanAlcanceDetalladoTarea } from '@/types/planTrabajo'
 
 function tarea(nombre: string) {
   return {
@@ -480,6 +480,52 @@ describe('tareas por subItem (Bloque 4.2, Tarea 4)', () => {
     it('sin estado anterior para ese subItem, devuelve la estructura nueva sin cambios', () => {
       const resultado = preservarEstadoManualTareas(estructuraRecienGenerada, [])
       expect(resultado).toEqual(estructuraRecienGenerada)
+    })
+  })
+
+  describe('preservarEstadoManualTareas — lo agregado/movido a mano en el editor', () => {
+    const tarea = (id: string): PlanAlcanceDetalladoTarea => ({ tareaRefId: id, nombre: id, texto: `Texto ${id}` })
+    const sub = (id: string, numeracion: string, tareas = [tarea(`${id}-t1`), tarea(`${id}-t2`)]): PlanAlcanceDetalladoSubItem =>
+      ({ numeracion, actividadNombre: id, descripcion: '', actividadRefId: id, tareas })
+    const edt = (subItems: PlanAlcanceDetalladoSubItem[]): PlanAlcanceDetalladoEdt => ({
+      numeracion: '11.5', edtNombre: 'Construcción', edtCodigo: 'CON', faseNombre: 'EJECUCIÓN', faseAbreviatura: 'EJEC',
+      descripcion: '', tipoDetalle: 'detallado' as const, edtRefId: 'edt-con', subItems,
+    })
+    const nueva = [edt([sub('a', '11.5.1'), sub('b', '11.5.2'), sub('c', '11.5.3')])]
+
+    it('una tarea manual vuelve a quedar debajo de la tarea que tenía antes', () => {
+      const manual = { manualId: 'm1', nombre: 'Pase de piso con pasamuro', texto: 'Pase de piso con pasamuro', textoEditadoManualmente: true }
+      const anterior = [edt([sub('a', '11.5.1', [tarea('a-t1'), manual, tarea('a-t2')]), sub('b', '11.5.2'), sub('c', '11.5.3')])]
+
+      const resultado = preservarEstadoManualTareas(nueva, anterior)
+      const tareas = resultado[0].subItems![0].tareas!
+
+      expect(tareas.map(t => t.tareaRefId ?? t.manualId)).toEqual(['a-t1', 'm1', 'a-t2'])
+      expect(tareas[1].texto).toBe('Pase de piso con pasamuro')
+    })
+
+    it('si la tarea de arriba ya no está en el cronograma, la manual sube a la anterior que sigue existiendo', () => {
+      const manual = { manualId: 'm1', nombre: 'x', texto: 'x' }
+      const anterior = [edt([sub('a', '11.5.1', [tarea('a-t1'), tarea('a-borrada'), manual, tarea('a-t2')]), sub('b', '11.5.2'), sub('c', '11.5.3')])]
+
+      const tareas = preservarEstadoManualTareas(nueva, anterior)[0].subItems![0].tareas!
+      expect(tareas.map(t => t.tareaRefId ?? t.manualId)).toEqual(['a-t1', 'm1', 'a-t2'])
+    })
+
+    it('el orden de actividades movido por el usuario se respeta y la numeración sigue correlativa', () => {
+      const anterior = [edt([sub('c', '11.5.1'), sub('a', '11.5.2'), sub('b', '11.5.3')])]
+
+      const subs = preservarEstadoManualTareas(nueva, anterior)[0].subItems!
+      expect(subs.map(s => s.actividadRefId)).toEqual(['c', 'a', 'b'])
+      expect(subs.map(s => s.numeracion)).toEqual(['11.5.1', '11.5.2', '11.5.3'])
+    })
+
+    it('una actividad agregada a mano (sin actividadRefId) sobrevive en su lugar', () => {
+      const manual: PlanAlcanceDetalladoSubItem = { numeracion: '11.5.9', actividadNombre: 'Pruebas extra', descripcion: 'x', tareas: [] }
+      const anterior = [edt([sub('a', '11.5.1'), manual, sub('b', '11.5.2'), sub('c', '11.5.3')])]
+
+      const subs = preservarEstadoManualTareas(nueva, anterior)[0].subItems!
+      expect(subs.map(s => s.actividadRefId ?? s.actividadNombre)).toEqual(['a', 'Pruebas extra', 'b', 'c'])
     })
   })
 })

@@ -88,19 +88,29 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
   const actividadCambiada = (edtIdx: number, subIdx: number) =>
     JSON.stringify(items[edtIdx]?.subItems?.[subIdx]) !== JSON.stringify(guardado[edtIdx]?.subItems?.[subIdx])
 
+  // Las viñetas agregadas a mano se validan antes de guardar (el servidor
+  // rechaza una viñeta vacía y el error no dice cuál es).
+  const hayTareaManualVacia = (edts: PlanAlcanceDetalladoEdt[]) =>
+    edts.some(e => (e.subItems ?? []).some(s => (s.tareas ?? []).some(t => t.manualId && !t.texto.trim())))
+
   // Guarda SOLO esta actividad: la copia sobre lo ya guardado y manda todo el
   // alcance (el PATCH es por sección). Si la estructura del EDT cambió
-  // (actividades agregadas/quitadas), se guarda el EDT completo.
+  // (actividades agregadas/quitadas/movidas), se guarda el EDT completo.
   const guardarActividad = async (edtIdx: number, subIdx: number) => {
     const local = items[edtIdx]
     const base = guardado[edtIdx]
+    const idsActividades = (e: PlanAlcanceDetalladoEdt) => JSON.stringify((e.subItems ?? []).map(s => s.actividadRefId ?? ''))
     const mismaEstructura =
-      base && base.edtRefId === local.edtRefId && (base.subItems ?? []).length === (local.subItems ?? []).length
+      base && base.edtRefId === local.edtRefId && idsActividades(base) === idsActividades(local)
     const nuevo = [...guardado]
     if (mismaEstructura) {
       nuevo[edtIdx] = { ...base, subItems: (base.subItems ?? []).map((s, i) => (i === subIdx ? local.subItems![subIdx] : s)) }
     } else {
       nuevo[edtIdx] = local
+    }
+    if (hayTareaManualVacia(nuevo)) {
+      toast.error('Hay una tarea agregada a mano sin texto: escríbela o quítala')
+      return
     }
     setGuardandoActividad(`${edtIdx}-${subIdx}`)
     try {
@@ -201,10 +211,28 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
       return { ...it, subItems: (it.subItems ?? []).filter((_, si) => si !== subIdx) }
     }))
 
+  // Mueve una actividad dentro de su EDT. Entre dos actividades del cronograma
+  // se intercambia también la numeración, así queda correlativa (11.5.1, 11.5.2…).
+  const moverActividad = (edtIdx: number, subIdx: number, direccion: -1 | 1) =>
+    setItems(prev => prev.map((it, i) => {
+      if (i !== edtIdx) return it
+      const subs = [...(it.subItems ?? [])]
+      const otroIdx = subIdx + direccion
+      if (otroIdx < 0 || otroIdx >= subs.length) return it
+      let a = subs[subIdx]
+      let b = subs[otroIdx]
+      if (a.actividadRefId && b.actividadRefId) {
+        ;[a, b] = [{ ...a, numeracion: b.numeracion }, { ...b, numeracion: a.numeracion }]
+      }
+      subs[subIdx] = b
+      subs[otroIdx] = a
+      return { ...it, subItems: subs }
+    }))
+
   // Viñetas de tareas (Bloque 4.2, Tarea 1) y fotoSugerida por tarea (Bloque
-  // 4.2 sesión 2, Tarea 2) — el texto redactado por IA es corregible a mano;
-  // nunca se agregan/quitan tareas acá (vienen 1:1 del cronograma real, ver
-  // alcanceEstructura.ts).
+  // 4.2 sesión 2, Tarea 2) — el texto redactado por IA es corregible a mano.
+  // Las tareas del cronograma vienen 1:1 (alcanceEstructura.ts) y solo se
+  // ocultan; las agregadas a mano (manualId) sí se crean y se borran acá.
   const updateTarea = (edtIdx: number, subIdx: number, tareaIdx: number, patch: Partial<PlanAlcanceDetalladoTarea>) =>
     setItems(prev => prev.map((it, i) => {
       if (i !== edtIdx) return it
@@ -222,6 +250,29 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
   // usuario la restaure explícitamente con "Restaurar".
   const excluirTarea = (edtIdx: number, subIdx: number, tareaIdx: number) =>
     updateTarea(edtIdx, subIdx, tareaIdx, { excluida: true })
+
+  // Viñeta agregada a mano: va debajo de `despuesDe` (-1 = al inicio) y no
+  // existe en el cronograma, así que no lleva imágenes propias.
+  const agregarTarea = (edtIdx: number, subIdx: number, despuesDe: number) =>
+    setItems(prev => prev.map((it, i) => {
+      if (i !== edtIdx) return it
+      const subs = (it.subItems ?? []).map((s, si) => {
+        if (si !== subIdx) return s
+        const tareas = [...(s.tareas ?? [])]
+        tareas.splice(despuesDe + 1, 0, { manualId: crypto.randomUUID(), nombre: '', texto: '', textoEditadoManualmente: true })
+        return { ...s, tareas }
+      })
+      return { ...it, subItems: subs }
+    }))
+
+  const quitarTareaManual = (edtIdx: number, subIdx: number, tareaIdx: number) =>
+    setItems(prev => prev.map((it, i) => {
+      if (i !== edtIdx) return it
+      const subs = (it.subItems ?? []).map((s, si) =>
+        si === subIdx ? { ...s, tareas: (s.tareas ?? []).filter((_, ti) => ti !== tareaIdx) } : s
+      )
+      return { ...it, subItems: subs }
+    }))
 
   const restaurarTarea = (edtIdx: number, subIdx: number, tareaIdx: number) =>
     updateTarea(edtIdx, subIdx, tareaIdx, { excluida: false })
@@ -256,6 +307,10 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
     }))
 
   const handleSave = async () => {
+    if (hayTareaManualVacia(items)) {
+      toast.error('Hay una tarea agregada a mano sin texto: escríbela o quítala')
+      return
+    }
     setSaving(true)
     try {
       await onSave(items)
@@ -486,6 +541,12 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                 {guardandoActividad === `${edtIdx}-${subIdx}` ? 'Guardando…' : 'Guardar actividad'}
                               </Button>
                             )}
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Subir actividad" disabled={subIdx === 0} onClick={() => moverActividad(edtIdx, subIdx, -1)}>
+                              <ChevronUp size={14} />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Bajar actividad" disabled={subIdx === (item.subItems ?? []).length - 1} onClick={() => moverActividad(edtIdx, subIdx, 1)}>
+                              <ChevronDown size={14} />
+                            </Button>
                             <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" onClick={() => removeSubItem(edtIdx, subIdx)}>
                               <Trash2 size={12} />
                             </Button>
@@ -515,17 +576,29 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                   )
                                   const claveGaleria = `tarea:${tarea.tareaRefId ?? `${edtIdx}-${subIdx}-${tareaIdx}`}`
                                   return (
-                                    <div key={tarea.tareaRefId ?? tareaIdx} className="space-y-1.5 border rounded-md p-2.5 bg-white">
+                                    <div key={tarea.tareaRefId ?? tarea.manualId ?? tareaIdx} className={`space-y-1.5 border rounded-md p-2.5 ${tarea.manualId ? 'bg-sky-50/50 border-dashed border-sky-300' : 'bg-white'}`}>
                                       <div className="flex flex-wrap items-start gap-1">
                                         <span className="text-[10px] text-muted-foreground mt-1.5 shrink-0">•</span>
                                         <Textarea
                                           value={tarea.texto}
-                                          onChange={e => marcarTextoTareaEditado(edtIdx, subIdx, tareaIdx, e.target.value)}
+                                          onChange={e => tarea.manualId
+                                            ? updateTarea(edtIdx, subIdx, tareaIdx, { texto: e.target.value, nombre: e.target.value.trim() })
+                                            : marcarTextoTareaEditado(edtIdx, subIdx, tareaIdx, e.target.value)}
                                           rows={1}
                                           className="text-xs resize-none min-h-0 py-1 flex-1 min-w-[160px]"
-                                          placeholder={tarea.nombre}
+                                          placeholder={tarea.manualId ? 'Ej: Pase de piso con pasamuro y transición' : tarea.nombre}
+                                          autoFocus={Boolean(tarea.manualId) && !tarea.texto}
                                         />
-                                        {tarea.textoEditadoManualmente && (
+                                        {tarea.manualId && (
+                                          <Badge
+                                            variant="outline"
+                                            className="mt-1 shrink-0 text-[10px] font-normal text-sky-700 border-sky-300 bg-white"
+                                            title="Agregada a mano en el plan: no existe en el cronograma (no suma horas ni admite imágenes propias)"
+                                          >
+                                            manual
+                                          </Badge>
+                                        )}
+                                        {!tarea.manualId && tarea.textoEditadoManualmente && (
                                           <button
                                             type="button"
                                             className="flex items-center shrink-0 mt-1.5 text-amber-700 hover:text-amber-800"
@@ -535,7 +608,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                             <Lock size={11} />
                                           </button>
                                         )}
-                                        {item.tipoDetalle === 'detallado' && (
+                                        {item.tipoDetalle === 'detallado' && !tarea.manualId && (
                                           <div className="mt-1.5 shrink-0">
                                             <HintFotoSugerida
                                               value={tarea.fotoSugerida ?? ''}
@@ -554,16 +627,25 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={posVisible === visibles.length - 1} onClick={() => moverTarea(edtIdx, subIdx, tareaIdx, 1)}>
                                             <ChevronDown size={14} />
                                           </Button>
-                                          <DeleteAlertDialog
-                                            title="¿Quitar esta tarea del plan?"
-                                            description="Se oculta de este documento (viñeta, imágenes y foto sugerida). El cronograma real del proyecto NO se modifica — podés restaurarla luego desde 'tareas ocultas'."
-                                            onConfirm={() => excluirTarea(edtIdx, subIdx, tareaIdx)}
-                                            trigger={
-                                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500">
-                                                <Trash2 size={14} />
-                                              </Button>
-                                            }
-                                          />
+                                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-sky-700" title="Agregar tarea debajo" onClick={() => agregarTarea(edtIdx, subIdx, tareaIdx)}>
+                                            <Plus size={14} />
+                                          </Button>
+                                          {tarea.manualId ? (
+                                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500" title="Eliminar tarea agregada a mano" onClick={() => quitarTareaManual(edtIdx, subIdx, tareaIdx)}>
+                                              <Trash2 size={14} />
+                                            </Button>
+                                          ) : (
+                                            <DeleteAlertDialog
+                                              title="¿Quitar esta tarea del plan?"
+                                              description="Se oculta de este documento (viñeta, imágenes y foto sugerida). El cronograma real del proyecto NO se modifica — podés restaurarla luego desde 'tareas ocultas'."
+                                              onConfirm={() => excluirTarea(edtIdx, subIdx, tareaIdx)}
+                                              trigger={
+                                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500">
+                                                  <Trash2 size={14} />
+                                                </Button>
+                                              }
+                                            />
+                                          )}
                                         </div>
                                       </div>
                                       {item.tipoDetalle === 'detallado' && tarea.tareaRefId && (
@@ -605,6 +687,17 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                               </div>
                             )
                           })()}
+
+                          {item.tipoDetalle === 'detallado' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-[10px] text-sky-700"
+                              onClick={() => agregarTarea(edtIdx, subIdx, (sub.tareas ?? []).length - 1)}
+                            >
+                              <Plus size={11} className="mr-1" /> Agregar tarea
+                            </Button>
+                          )}
 
                           {item.tipoDetalle === 'detallado' && sub.actividadRefId && (
                             <GaleriaImagenesAlcance

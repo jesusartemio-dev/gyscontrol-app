@@ -44,6 +44,8 @@ export const planAlcanceDetalladoTareaSchema = z.object({
   catalogoImagenesRechazadas: z.array(z.string()).optional(),
   // El usuario editó "texto" a mano (Bloque 4.2 sesión 5) — se preserva al regenerar. Mismo riesgo.
   textoEditadoManualmente: z.boolean().optional(),
+  // Viñeta agregada a mano en el editor (no viene del cronograma).
+  manualId: z.string().optional(),
 })
 
 // ─── Nuevo formato (basado en EDTs del cronograma de planificación) ───
