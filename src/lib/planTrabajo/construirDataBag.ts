@@ -1,6 +1,7 @@
 import type { PlanTrabajo, Cliente, Proyecto, PlanTrabajoGeneracion, PlanTrabajoImagen } from '@prisma/client'
 import { agruparEpp, textoItemLista } from './eppGrupos'
 import { graficosDeHistogramas, marcadorGrafico } from './graficosDocx'
+import { marcadorTablaHistograma, tablasDeHistogramas } from './tablasHistogramaDocx'
 import type {
   PlanAlcanceDetalladoEdt,
   PlanAlcanceItem,
@@ -529,5 +530,9 @@ export function construirDataBag({
     graficoHHActividad: marcadorGrafico('hhActividad'),
     // No lo usa la plantilla: exportDocx arma los gráficos con estos datos.
     graficosNativos: graficos,
+    // Tablas de la sección 13 con una columna por mes (ver tablasHistogramaDocx.ts).
+    tablaHistogramaEquipo: marcadorTablaHistograma('equipo'),
+    tablaHistogramaHH: marcadorTablaHistograma('hh'),
+    tablasHistograma: tablasDeHistogramas(histogramas, totalHH),
   }
 }

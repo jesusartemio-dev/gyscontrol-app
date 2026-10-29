@@ -219,6 +219,22 @@ if (docConEpp.includes('{%histogramaEquipoPng}')) {
     .replace('{%histogramaHHActividadPng}', '{graficoHHActividad}'))
   cambios++
 }
+/** Cambia la tabla que contiene `loop` por un párrafo con `marcador` (la arma exportDocx). */
+function tablaPorMarcador(xml: string, loop: string, marcador: string): string {
+  const i = xml.indexOf(loop)
+  const inicio = xml.lastIndexOf('<w:tbl>', i)
+  const fin = xml.indexOf('</w:tbl>', i) + '</w:tbl>'.length
+  return xml.slice(0, inicio) + pMarcador(marcador) + xml.slice(fin)
+}
+const docConGraficos = zip.file('word/document.xml')!.asText()
+if (docConGraficos.includes('{#histogramaEquipo}')) {
+  // Tablas de histograma con una columna por mes (tablasHistogramaDocx.ts).
+  zip.file('word/document.xml', tablaPorMarcador(
+    tablaPorMarcador(docConGraficos, '{#histogramaEquipo}', '{tablaHistogramaEquipo}'),
+    '{#histogramaHH}', '{tablaHistogramaHH}'
+  ))
+  cambios++
+}
 const encabezado = zip.file('word/header1.xml')!.asText()
 if (!encabezado.includes('<w:vMerge')) {
   zip.file('word/header1.xml', encabezadoReferencia(encabezado))

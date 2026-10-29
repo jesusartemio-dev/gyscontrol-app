@@ -5,6 +5,7 @@ import { descargarPlantillaPlanTrabajo } from './descargarPlantilla'
 import { quitarColumnaCierreRaci, sincronizarTblGridDelDocumento } from './postProcesarTblGrid'
 import { asegurarEstilosIndice, poblarIndice } from './indiceDocx'
 import { insertarGraficosNativos, type ClaveGrafico, type GraficoNativo } from './graficosDocx'
+import { insertarTablasHistograma, type ClaveTablaHistograma, type TablaHistograma } from './tablasHistogramaDocx'
 
 /** Párrafo centrado con una imagen → keepNext, para que la foto no quede en una hoja y su "Figura N." en la siguiente. */
 export function mantenerImagenConPie(documentXml: string): string {
@@ -135,7 +136,10 @@ export async function renderizarPlanTrabajoDocx({ dataBag }: RenderInput): Promi
   // Histogramas como gráficos nativos de Word en lugar de su marcador (ver graficosDocx.ts).
   const documentXmlConGraficos = await insertarGraficosNativos(
     zipRenderizado,
-    documentXmlConIndice,
+    insertarTablasHistograma(
+      documentXmlConIndice,
+      (dataBag.tablasHistograma as Partial<Record<ClaveTablaHistograma, TablaHistograma>> | undefined) ?? {}
+    ),
     (dataBag.graficosNativos as Partial<Record<ClaveGrafico, GraficoNativo | null>> | undefined) ?? {}
   )
   zipRenderizado.file('word/document.xml', mantenerImagenConPie(documentXmlConGraficos))
