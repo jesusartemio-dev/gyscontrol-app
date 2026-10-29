@@ -451,3 +451,33 @@ describe('renderizarPlanTrabajoDocx — cuadro de EPP agrupado y recursos sin ca
     expect(documentXml).not.toMatch(/\{#?\/?(eppGruposBasico|eppGruposRiesgo|items|titulo|texto)\}/)
   })
 })
+
+describe('renderizarPlanTrabajoDocx — anexos nativos (organigrama con formas y Gantt)', () => {
+  it('con datos: anexos en hoja horizontal con organigrama de formas y Gantt; sin datos: la imagen y la nota de antes', async () => {
+    const anexos = {
+      organigrama: [
+        { id: 'r', parentId: null, orden: 0, cargo: 'Gerencia General', nombre: 'CARLOS', esFijoGys: false, empresa: null },
+        { id: 'a', parentId: 'r', orden: 1, cargo: 'Residente', nombre: 'JESUS', esFijoGys: false, empresa: null },
+      ],
+      gantt: {
+        general: [{ nivel: 'edt' as const, nombre: 'Construcción', inicio: '2026-11-03', fin: '2026-11-20', hh: 100, faseIndice: 0 }],
+        detalle: [{ nivel: 'tarea' as const, nombre: 'Tendido', inicio: '2026-11-03', fin: '2026-11-04', recurso: 'Cuadrilla 8P', faseIndice: 0 }],
+      },
+    }
+    const base = { plan: planFixture([edtDetallado()]), proyecto: proyectoFixture, organigramaPngBase64: `data:image/png;base64,${PNG_1X1_BASE64}` }
+
+    const conAnexos = asertarPaqueteBienFormado(await renderizarPlanTrabajoDocx({ dataBag: construirDataBag({ ...base, anexos }) }))
+    const doc = conAnexos.find(p => p.nombre === 'word/document.xml')!.contenido
+    expect(doc).not.toContain('§ANEXO')
+    expect(doc).toContain('<wpg:wgp>')
+    expect(doc).toContain('Cuadrilla 8P')
+    expect(doc).toContain('B.2 Detalle de Construcción y Comisionamiento')
+    expect(doc).not.toContain('se adjunta como documento independiente')
+    expect(doc).toMatch(/<w:pgSz w:w="16837" w:h="11905" w:orient="landscape"\/>/)
+
+    const sinAnexos = asertarPaqueteBienFormado(await renderizarPlanTrabajoDocx({ dataBag: construirDataBag(base) }))
+    const doc2 = sinAnexos.find(p => p.nombre === 'word/document.xml')!.contenido
+    expect(doc2).toContain('se adjunta como documento independiente')
+    expect(doc2).not.toContain('<wpg:wgp>')
+  })
+})

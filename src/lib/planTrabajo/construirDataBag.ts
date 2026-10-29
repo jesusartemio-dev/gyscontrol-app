@@ -2,6 +2,8 @@ import type { PlanTrabajo, Cliente, Proyecto, PlanTrabajoGeneracion, PlanTrabajo
 import { agruparEpp, textoItemLista } from './eppGrupos'
 import { graficosDeHistogramas, marcadorGrafico } from './graficosDocx'
 import { marcadorTablaHistograma, tablasDeHistogramas } from './tablasHistogramaDocx'
+import type { DatosAnexos } from './cargarDatosAnexos'
+import { marcadorAnexo } from './ganttDocx'
 import type {
   PlanAlcanceDetalladoEdt,
   PlanAlcanceItem,
@@ -39,6 +41,8 @@ export interface ConstruirDataBagOpciones {
   imagenesAlcance?: PlanTrabajoImagen[]
   /** {data,width,height} ya resueltas por imagen (ver resolverImagenesAlcance.ts) — null = imagen inaccesible → placeholder. */
   imagenesResueltas?: Map<string, ImagenResueltaTag | null>
+  /** Organigrama y cronograma de Línea Base para los anexos nativos (cargarDatosAnexos.ts). Sin ellos, los anexos quedan como antes. */
+  anexos?: DatosAnexos | null
 }
 
 /**
@@ -265,6 +269,7 @@ export function construirDataBag({
   ubicacionDetectadaTdr = null,
   imagenesAlcance = [],
   imagenesResueltas = new Map(),
+  anexos = null,
 }: ConstruirDataBagOpciones): Record<string, unknown> {
   const personal = (plan.personalAsignado as PlanPersonal[] | null) ?? []
   const raci = (plan.matrizRaci as PlanRaci | null) ?? { filas: [] }
@@ -534,5 +539,14 @@ export function construirDataBag({
     tablaHistogramaEquipo: marcadorTablaHistograma('equipo'),
     tablaHistogramaHH: marcadorTablaHistograma('hh'),
     tablasHistograma: tablasDeHistogramas(histogramas, totalHH),
+
+    // ─── Anexos A y B nativos (formas de Word y tabla Gantt, ver organigramaDocx.ts / ganttDocx.ts) ───
+    tieneOrganigramaNativo: (anexos?.organigrama.length ?? 0) > 0,
+    organigramaNativo: marcadorAnexo('organigrama'),
+    tieneGantt: !!anexos?.gantt,
+    ganttGeneral: marcadorAnexo('ganttGeneral'),
+    tieneGanttDetalle: (anexos?.gantt?.detalle.length ?? 0) > 0,
+    ganttDetalle: marcadorAnexo('ganttDetalle'),
+    anexosNativos: anexos,
   }
 }

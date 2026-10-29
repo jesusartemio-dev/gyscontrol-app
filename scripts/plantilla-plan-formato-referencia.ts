@@ -235,6 +235,69 @@ if (docConGraficos.includes('{#histogramaEquipo}')) {
   ))
   cambios++
 }
+/**
+ * Anexos en hoja horizontal: salto de sección antes del Anexo A (lo anterior
+ * sigue vertical), encabezado NEXA ensanchado al ancho horizontal, y
+ * marcadores para el organigrama con formas y el Gantt (organigramaDocx.ts,
+ * ganttDocx.ts). Sin datos, cada anexo muestra lo de antes.
+ */
+function anexosHorizontales(z: PizZip): void {
+  let xml = z.file('word/document.xml')!.asText()
+  const subtitulo = (texto: string, nuevaPagina = false) =>
+    `<w:p><w:pPr>${nuevaPagina ? '<w:pageBreakBefore/>' : ''}<w:keepNext/><w:spacing w:before="120" w:after="120"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="${FUENTE}" w:cs="${FUENTE}" w:eastAsia="${FUENTE}" w:hAnsi="${FUENTE}"/><w:b/><w:bCs/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">${texto}</w:t></w:r></w:p>`
+
+  // Salto de sección (vertical) en lugar del salto de página previo al Anexo A.
+  const iAnexoA = xml.indexOf('ANEXO A:')
+  const inicioTitulo = xml.lastIndexOf('<w:p>', iAnexoA)
+  const inicioSalto = xml.lastIndexOf('<w:p>', inicioTitulo - 1)
+  if (!xml.slice(inicioSalto, inicioTitulo).includes('w:type="page"')) throw new Error('No se encontró el salto de página antes del Anexo A')
+  const inicioSectFinal = xml.lastIndexOf('<w:sectPr>')
+  const sectVertical = xml.slice(inicioSectFinal, xml.indexOf('</w:sectPr>', inicioSectFinal) + '</w:sectPr>'.length)
+  xml = xml.slice(0, inicioSalto) + `<w:p><w:pPr>${sectVertical}</w:pPr></w:p>` + xml.slice(inicioTitulo)
+
+  // La sección final (anexos) pasa a horizontal, con su propio encabezado.
+  const sectHorizontal = sectVertical
+    .replace(/<w:pgSz [^>]*\/>/, '<w:pgSz w:w="16837" w:h="11905" w:orient="landscape"/>')
+    .replace(/(<w:headerReference w:type="default" r:id=")[^"]+"/, '$1rIdEncabezadoHorizontal"')
+  const ultimo = xml.lastIndexOf(sectVertical)
+  xml = xml.slice(0, ultimo) + sectHorizontal + xml.slice(ultimo + sectVertical.length)
+
+  // Anexo A: organigrama con formas; si no hay, la imagen de antes.
+  const iImg = xml.indexOf('{%organigramaPng}')
+  const pImgIni = xml.lastIndexOf('<w:p>', iImg), pImgFin = xml.indexOf('</w:p>', iImg) + '</w:p>'.length
+  xml = xml.slice(0, pImgIni) +
+    pMarcador('{#tieneOrganigramaNativo}') + pMarcador('{organigramaNativo}') + pMarcador('{/tieneOrganigramaNativo}') +
+    pMarcador('{^tieneOrganigramaNativo}') + xml.slice(pImgIni, pImgFin) + pMarcador('{/tieneOrganigramaNativo}') + xml.slice(pImgFin)
+
+  // Anexo B: Gantt general por semanas + detalle por días; si no hay, la nota de antes.
+  const iNota = xml.indexOf('El cronograma detallado del proyecto se adjunta')
+  const pNotaIni = xml.lastIndexOf('<w:p>', iNota), pNotaFin = xml.indexOf('</w:p>', iNota) + '</w:p>'.length
+  xml = xml.slice(0, pNotaIni) +
+    pMarcador('{#tieneGantt}') +
+    subtitulo('B.1 Cronograma general (por semanas)') + pMarcador('{ganttGeneral}') +
+    pMarcador('{#tieneGanttDetalle}') + subtitulo('B.2 Detalle de Construcción y Comisionamiento (por días)', true) + pMarcador('{ganttDetalle}') + pMarcador('{/tieneGanttDetalle}') +
+    pMarcador('{/tieneGantt}') +
+    pMarcador('{^tieneGantt}') + xml.slice(pNotaIni, pNotaFin) + pMarcador('{/tieneGantt}') +
+    xml.slice(pNotaFin)
+  z.file('word/document.xml', xml)
+
+  // Encabezado horizontal: el mismo de la referencia, con su tabla al ancho de la hoja horizontal.
+  const factor = 14571 / 9640
+  const escalar = (x: string) => x.replace(/(<w:(?:tblW|gridCol|tcW)\b[^>]*\bw:w=")(\d+)"/g, (_m, a, n) => `${a}${Math.round(Number(n) * factor)}"`)
+  z.file('word/header2.xml', escalar(z.file('word/header1.xml')!.asText()))
+  const relsHeader = z.file('word/_rels/header1.xml.rels')?.asText()
+  if (relsHeader) z.file('word/_rels/header2.xml.rels', relsHeader)
+  const rels = z.file('word/_rels/document.xml.rels')!.asText()
+  z.file('word/_rels/document.xml.rels', rels.replace('</Relationships>',
+    '<Relationship Id="rIdEncabezadoHorizontal" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header2.xml"/></Relationships>'))
+  const tipos = z.file('[Content_Types].xml')!.asText()
+  z.file('[Content_Types].xml', tipos.replace('</Types>',
+    '<Override PartName="/word/header2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/></Types>'))
+}
+if (!zip.file('word/document.xml')!.asText().includes('{organigramaNativo}')) {
+  anexosHorizontales(zip)
+  cambios++
+}
 const encabezado = zip.file('word/header1.xml')!.asText()
 if (!encabezado.includes('<w:vMerge')) {
   zip.file('word/header1.xml', encabezadoReferencia(encabezado))

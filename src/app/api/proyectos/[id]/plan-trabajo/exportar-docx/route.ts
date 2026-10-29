@@ -6,6 +6,7 @@ import { construirDataBag } from '@/lib/planTrabajo/construirDataBag'
 import { renderizarPlanTrabajoDocx } from '@/lib/planTrabajo/exportDocx'
 import { validarParaExportar } from '@/lib/planTrabajo/validarParaExportar'
 import { resolverImagenesAlcance } from '@/lib/planTrabajo/resolverImagenesAlcance'
+import { cargarDatosAnexos } from '@/lib/planTrabajo/cargarDatosAnexos'
 import { uploadFile } from '@/lib/services/googleDrive'
 import { getOrCreatePlanTrabajoFolder } from '@/lib/planTrabajo/getOrCreatePlanTrabajoFolder'
 
@@ -84,7 +85,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   // Resolver imágenes de Drive a base64+dimensiones ANTES del render (Tarea 4
   // — docxtemplater-image-module-free exige getImage/getSize síncronos).
   // Los histogramas van como gráficos nativos de Word (graficosDocx.ts), ya no como PNG.
-  const imagenesResueltas = await resolverImagenesAlcance(imagenesAlcance)
+  // Anexos nativos: organigrama con formas de Word y Gantt de la Línea Base.
+  const [imagenesResueltas, anexos] = await Promise.all([
+    resolverImagenesAlcance(imagenesAlcance),
+    cargarDatosAnexos(proyectoId),
+  ])
+  if (planDb.incluirOrganigrama === false) anexos.organigrama = []
 
   // Construir dataBag
   const dataBag = construirDataBag({
@@ -95,6 +101,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     ubicacionDetectadaTdr: tdr?.ubicacionDetectada ?? null,
     imagenesAlcance,
     imagenesResueltas,
+    anexos,
   })
 
   // Renderizar DOCX

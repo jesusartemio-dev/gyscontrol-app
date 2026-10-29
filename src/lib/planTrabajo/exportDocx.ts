@@ -6,6 +6,25 @@ import { quitarColumnaCierreRaci, sincronizarTblGridDelDocumento } from './postP
 import { asegurarEstilosIndice, poblarIndice } from './indiceDocx'
 import { insertarGraficosNativos, type ClaveGrafico, type GraficoNativo } from './graficosDocx'
 import { insertarTablasHistograma, type ClaveTablaHistograma, type TablaHistograma } from './tablasHistogramaDocx'
+import type { DatosAnexos } from './cargarDatosAnexos'
+import { xmlOrganigrama } from './organigramaDocx'
+import { marcadorAnexo, xmlGanttDetalle, xmlGanttGeneral } from './ganttDocx'
+
+/** Anexo A (organigrama con formas) y B (Gantt): reemplaza el párrafo de cada marcador por su XML. */
+function insertarAnexosNativos(documentXml: string, anexos: DatosAnexos | null | undefined): string {
+  if (!anexos) return documentXml
+  const contenidos: [string, string][] = [
+    [marcadorAnexo('organigrama'), xmlOrganigrama(anexos.organigrama)],
+    [marcadorAnexo('ganttGeneral'), anexos.gantt ? xmlGanttGeneral(anexos.gantt.general) : ''],
+    [marcadorAnexo('ganttDetalle'), anexos.gantt ? xmlGanttDetalle(anexos.gantt.detalle) : ''],
+  ]
+  let xml = documentXml
+  for (const [marcador, contenido] of contenidos) {
+    const re = new RegExp(`<w:p(?: [^>]*)?>(?:(?!</w:p>)[\\s\\S])*?${marcador}[\\s\\S]*?</w:p>`)
+    xml = xml.replace(re, () => contenido)
+  }
+  return xml
+}
 
 /** Párrafo centrado con una imagen → keepNext, para que la foto no quede en una hoja y su "Figura N." en la siguiente. */
 export function mantenerImagenConPie(documentXml: string): string {
@@ -137,7 +156,7 @@ export async function renderizarPlanTrabajoDocx({ dataBag }: RenderInput): Promi
   const documentXmlConGraficos = await insertarGraficosNativos(
     zipRenderizado,
     insertarTablasHistograma(
-      documentXmlConIndice,
+      insertarAnexosNativos(documentXmlConIndice, dataBag.anexosNativos as DatosAnexos | null | undefined),
       (dataBag.tablasHistograma as Partial<Record<ClaveTablaHistograma, TablaHistograma>> | undefined) ?? {}
     ),
     (dataBag.graficosNativos as Partial<Record<ClaveGrafico, GraficoNativo | null>> | undefined) ?? {}
