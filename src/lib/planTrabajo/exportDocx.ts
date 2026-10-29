@@ -4,6 +4,7 @@ import ImageModule from 'docxtemplater-image-module-free'
 import { descargarPlantillaPlanTrabajo } from './descargarPlantilla'
 import { quitarColumnaCierreRaci, sincronizarTblGridDelDocumento } from './postProcesarTblGrid'
 import { asegurarEstilosIndice, poblarIndice } from './indiceDocx'
+import { insertarGraficosNativos, type ClaveGrafico, type GraficoNativo } from './graficosDocx'
 
 /** Párrafo centrado con una imagen → keepNext, para que la foto no quede en una hoja y su "Figura N." en la siguiente. */
 export function mantenerImagenConPie(documentXml: string): string {
@@ -131,7 +132,13 @@ export async function renderizarPlanTrabajoDocx({ dataBag }: RenderInput): Promi
   }
   // Índice pre-llenado (ver indiceDocx.ts) e imagen pegada a su pie de figura en la misma hoja.
   const { xml: documentXmlConIndice } = poblarIndice(documentXmlCorregido)
-  zipRenderizado.file('word/document.xml', mantenerImagenConPie(documentXmlConIndice))
+  // Histogramas como gráficos nativos de Word en lugar de su marcador (ver graficosDocx.ts).
+  const documentXmlConGraficos = await insertarGraficosNativos(
+    zipRenderizado,
+    documentXmlConIndice,
+    (dataBag.graficosNativos as Partial<Record<ClaveGrafico, GraficoNativo | null>> | undefined) ?? {}
+  )
+  zipRenderizado.file('word/document.xml', mantenerImagenConPie(documentXmlConGraficos))
   const stylesXml = zipRenderizado.file('word/styles.xml')?.asText()
   if (stylesXml) zipRenderizado.file('word/styles.xml', asegurarEstilosIndice(stylesXml))
 

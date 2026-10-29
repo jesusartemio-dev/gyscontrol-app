@@ -6,8 +6,6 @@ import { getSnapshotPlan, getSnapshotPng } from '@/lib/planTrabajo/snapshotHelpe
 import { construirDataBag } from '@/lib/planTrabajo/construirDataBag'
 import { renderizarPlanTrabajoDocx } from '@/lib/planTrabajo/exportDocx'
 import { resolverImagenesAlcance } from '@/lib/planTrabajo/resolverImagenesAlcance'
-import { generarHistogramaEquipoPng, generarHistogramaHHPng, generarHistogramaHHActividadPng } from '@/lib/planTrabajo/generarHistogramaPng'
-import type { PlanHistogramas } from '@/types/planTrabajo'
 
 type Ctx = { params: Promise<{ id: string; generacionId: string }> }
 
@@ -73,13 +71,8 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
   }
 
-  const histogramas = (snapshotPlan.histogramas as PlanHistogramas | null) ?? { meses: [], equipoTrabajo: [], horasHombre: [] }
-  const [imagenesResueltas, histogramaEquipoPng, histogramaHHPng, histogramaHHActividadPng] = await Promise.all([
-    resolverImagenesAlcance(imagenesAlcance),
-    generarHistogramaEquipoPng(histogramas),
-    generarHistogramaHHPng(histogramas),
-    generarHistogramaHHActividadPng(histogramas),
-  ])
+  // Los histogramas van como gráficos nativos de Word (graficosDocx.ts), ya no como PNG.
+  const imagenesResueltas = await resolverImagenesAlcance(imagenesAlcance)
 
   const dataBag = construirDataBag({
     plan: snapshotPlan,
@@ -89,9 +82,6 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     ubicacionDetectadaTdr: tdr?.ubicacionDetectada ?? null,
     imagenesAlcance,
     imagenesResueltas,
-    histogramaEquipoPng,
-    histogramaHHPng,
-    histogramaHHActividadPng,
   })
 
   let docxBuffer: Buffer

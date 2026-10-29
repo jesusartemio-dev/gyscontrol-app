@@ -1,7 +1,6 @@
 import PizZip from 'pizzip'
 import { renderizarPlanTrabajoDocx, IMAGEN_PLACEHOLDER, type ImagenResueltaTag } from '@/lib/planTrabajo/exportDocx'
 import { construirDataBag } from '@/lib/planTrabajo/construirDataBag'
-import { generarHistogramaEquipoPng, generarHistogramaHHPng } from '@/lib/planTrabajo/generarHistogramaPng'
 import { asertarXmlBienFormado } from '@/__tests__/testUtils/xmlTestUtils'
 import type { PlanAlcanceDetalladoEdt, PlanHistogramas } from '@/types/planTrabajo'
 import type { PlanTrabajo, Cliente, Proyecto, PlanTrabajoImagen } from '@prisma/client'
@@ -240,30 +239,38 @@ describe('renderizarPlanTrabajoDocx — gráficos de histograma (Bloque 4.2, Tar
     horasHombre: [{ etiqueta: 'Construcción', valoresPorMes: [80, 80], total: 160 }],
   }
 
-  it('con datos: los dos gráficos se generan y el docx los renderiza sin drawings de tamaño cero', async () => {
-    const [histogramaEquipoPng, histogramaHHPng] = await Promise.all([
-      generarHistogramaEquipoPng(histogramasFixture),
-      generarHistogramaHHPng(histogramasFixture),
-    ])
-
-    const dataBag = construirDataBag({
-      plan: planFixture([edtDetallado()]),
-      proyecto: proyectoFixture,
-      organigramaPngBase64: `data:image/png;base64,${PNG_1X1_BASE64}`,
-      histogramaEquipoPng,
-      histogramaHHPng,
-    })
+  it('con datos: los histogramas salen como gráficos nativos de Word (chart + Excel embebido), sin marcador ni PNG', async () => {
+    const plan = planFixture([edtDetallado()])
+    plan.histogramas = {
+      ...histogramasFixture,
+      hhPorActividadConCmn: { actividades: ['Montaje', 'Cableado'], series: [{ cargo: 'Tecnico', valoresPorActividad: [10, 20] }] },
+    } as unknown as PlanTrabajo['histogramas']
+    const dataBag = construirDataBag({ plan, proyecto: proyectoFixture, organigramaPngBase64: `data:image/png;base64,${PNG_1X1_BASE64}` })
 
     expect(dataBag.tieneHistogramaEquipoPng).toBe(true)
     expect(dataBag.tieneHistogramaHHPng).toBe(true)
+    expect(dataBag.tieneHistogramaHHActividadPng).toBe(true)
 
     const buffer = await renderizarPlanTrabajoDocx({ dataBag })
     const partes = asertarPaqueteBienFormado(buffer)
-    const documentXml = partes.find(p => p.nombre === 'word/document.xml')!.contenido
-    for (const { cx, cy } of extentsDeImagenes(documentXml)) {
-      expect(cx).toBeGreaterThan(0)
-      expect(cy).toBeGreaterThan(0)
+    const xml = (nombre: string) => partes.find(p => p.nombre === nombre)!.contenido
+    const documentXml = xml('word/document.xml')
+
+    expect(documentXml).not.toContain('§GRAFICO')
+    expect(documentXml.match(/<c:chart [^>]*r:id="rIdGraficoGys\d+"/g)).toHaveLength(3)
+    for (const n of [1, 2, 3]) {
+      expect(xml('word/_rels/document.xml.rels')).toContain(`Target="charts/chartGys${n}.xml"`)
+      expect(xml('[Content_Types].xml')).toContain(`PartName="/word/charts/chartGys${n}.xml"`)
     }
+    expect(xml('[Content_Types].xml')).toContain('Extension="xlsx"')
+    // Equipo: columnas agrupadas; horas-hombre: apiladas, con los valores en caché que Word dibuja.
+    expect(xml('word/charts/chartGys1.xml')).toContain('<c:grouping val="clustered"/>')
+    expect(xml('word/charts/chartGys2.xml')).toContain('<c:grouping val="stacked"/>')
+    expect(xml('word/charts/chartGys2.xml')).toContain('<c:v>FEBRERO</c:v>')
+    expect(xml('word/charts/chartGys2.xml')).toContain('<c:v>80</c:v>')
+    // El Excel embebido existe (lo abre "Editar datos").
+    const zip = new PizZip(buffer)
+    expect(zip.file('word/embeddings/chartGys1.xlsx')!.asUint8Array().length).toBeGreaterThan(0)
   })
 
   it('sin datos (plan nuevo, aún sin Etapa 1 calculada): los flags quedan en false y el export no truena', async () => {

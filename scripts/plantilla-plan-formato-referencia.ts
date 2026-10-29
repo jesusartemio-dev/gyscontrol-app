@@ -210,6 +210,15 @@ if (!docConEmision.includes('{#eppGruposBasico}')) {
   zip.file('word/document.xml', tablaRecursosReferencia(tablaEppReferencia(docConEmision)))
   cambios++
 }
+const docConEpp = zip.file('word/document.xml')!.asText()
+if (docConEpp.includes('{%histogramaEquipoPng}')) {
+  // Histogramas como gráficos nativos de Word: marcador de texto que exportDocx reemplaza (graficosDocx.ts).
+  zip.file('word/document.xml', docConEpp
+    .replace('{%histogramaEquipoPng}', '{graficoEquipo}')
+    .replace('{%histogramaHHPng}', '{graficoHH}')
+    .replace('{%histogramaHHActividadPng}', '{graficoHHActividad}'))
+  cambios++
+}
 const encabezado = zip.file('word/header1.xml')!.asText()
 if (!encabezado.includes('<w:vMerge')) {
   zip.file('word/header1.xml', encabezadoReferencia(encabezado))
