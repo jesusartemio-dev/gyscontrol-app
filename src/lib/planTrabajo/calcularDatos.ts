@@ -40,6 +40,22 @@ interface PersonaCalculada extends PlanPersonal {
   userId: string
 }
 
+/** Rango de mando por cargo (texto libre del organigrama); menor = más alto. Sin match → entre ingeniería y apoyo. */
+const RANGOS_CARGO: RegExp[] = [
+  /gerent|gerenc/i,
+  /gestor|jefe de proyecto|project manager/i,
+  /residente/i,
+  /supervisor(?!.*segur)/i,
+  /ssoma|segur|prevenc/i,
+  /ingenier|coordinador|cadista|dibujant|proyectista/i,
+  /comercial|log[ií]stic|almac|administra|compras/i,
+  /t[ée]cnico|operario|oficial|ayudante|soldador|electricista|andamier/i,
+]
+function rangoCargo(cargo: string): number {
+  const i = RANGOS_CARGO.findIndex(r => r.test(cargo))
+  return i === -1 ? 5.5 : i
+}
+
 function profundidadNodo(nodo: OrgNodoContexto, todos: OrgNodoContexto[]): number {
   let profundidad = 0
   let actual: OrgNodoContexto | undefined = nodo
@@ -100,6 +116,15 @@ export function calcularPersonalAsignado(
       `"${nombre}" aparece en ${nodos.length} nodos del organigrama — se usó "${ordenados[0].cargoLabel}" (nivel jerárquico más profundo).`
     )
   }
+
+  // Orden jerárquico (izquierda→derecha en la RACI, arriba→abajo en el Personal):
+  // por rango del cargo; la profundidad del organigrama solo desempata (los
+  // cargos de apoyo — Comercial, SSOMA, Logística — cuelgan alto pero no mandan).
+  nodosGanadores.sort((a, b) =>
+    rangoCargo(a.cargoLabel) - rangoCargo(b.cargoLabel) ||
+    profundidadNodo(a, organigrama) - profundidadNodo(b, organigrama) ||
+    a.orden - b.orden
+  )
 
   const personalCrudo: PersonaCalculada[] = nodosGanadores.map(nodo => ({
     nombre: nodo.user!.name ?? nodo.user!.email,
@@ -702,6 +727,10 @@ export interface DatosEtapa1 {
 
 /** Qué contacto del cliente aprueba en la RACI cuando hay varios (ver rolesContactoCliente.ts). */
 const PRIORIDAD_CONTACTO_APROBADOR = ['jefe_proyecto_cliente', 'administrador_contrato', 'inspector_supervisor']
+const ordenAprobador = (rol: string) => {
+  const i = PRIORIDAD_CONTACTO_APROBADOR.indexOf(rol)
+  return i === -1 ? PRIORIDAD_CONTACTO_APROBADOR.length : i
+}
 
 /** Orquesta el cálculo completo de la Etapa 1 a partir del contexto ya cargado. */
 export function calcularDatosEtapa1(contexto: PlanTrabajoContexto): ResultadoCalculo<DatosEtapa1> {
@@ -727,7 +756,7 @@ export function calcularDatosEtapa1(contexto: PlanTrabajoContexto): ResultadoCal
   // Aprobador del cliente: el contacto del proyecto (el mismo de la Matriz de
   // Comunicaciones, p. ej. "HP"); sin contacto, la empresa ("NEXA").
   const contactoCliente = [...(contexto.contactosCliente ?? [])].sort(
-    (a, b) => PRIORIDAD_CONTACTO_APROBADOR.indexOf(a.rolEnProyecto) - PRIORIDAD_CONTACTO_APROBADOR.indexOf(b.rolEnProyecto)
+    (a, b) => ordenAprobador(a.rolEnProyecto) - ordenAprobador(b.rolEnProyecto)
   )[0]
   const siglaCliente = contactoCliente
     ? calcularSiglasBase(contactoCliente.nombre)
@@ -746,17 +775,27 @@ export function calcularDatosEtapa1(contexto: PlanTrabajoContexto): ResultadoCal
   // Involucrados del cliente (contactos del proyecto) al final del Personal, con
   // la empresa del cliente — como el plan de referencia NEXA. No entran a la RACI
   // como filas propias: ahí el cliente ya figura con su sigla de aprobador.
-  const personalCliente: PlanPersonal[] = (contexto.contactosCliente ?? []).map(c => ({
+  // Cliente PRIMERO (columnas de la RACI y filas del Personal), el aprobador adelante.
+  const contactosOrdenados = [...(contexto.contactosCliente ?? [])].sort(
+    (a, b) => ordenAprobador(a.rolEnProyecto) - ordenAprobador(b.rolEnProyecto)
+  )
+  const personalCliente: PlanPersonal[] = contactosOrdenados.map(c => ({
     // En mayúsculas como el resto de la tabla (los nombres del organigrama ya vienen así).
     nombre: c.nombre.toUpperCase(),
     cargo: (c.cargo?.trim() || ROL_CONTACTO_CLIENTE_LABELS[c.rolEnProyecto] || c.rolEnProyecto).toUpperCase(),
     empresa: contexto.proyecto.cliente?.nombre ?? '',
     siglas: calcularSiglasBase(c.nombre),
   }))
-  const personalAsignado: PlanPersonal[] = deduplicarSiglas([
+  // Siglas deduplicadas con el personal GYS adelante (sus siglas ya están en la
+  // RACI y no deben cambiar); recién después el cliente pasa al inicio.
+  const conSiglas = deduplicarSiglas([
     ...personalCalculado.map(({ userId: _userId, ...resto }) => resto),
     ...personalCliente,
   ])
+  const personalAsignado: PlanPersonal[] = [
+    ...conSiglas.slice(personalCalculado.length),
+    ...conSiglas.slice(0, personalCalculado.length),
+  ]
 
   return {
     data: {
