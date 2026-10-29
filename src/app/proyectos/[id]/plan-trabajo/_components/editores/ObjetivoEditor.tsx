@@ -31,7 +31,7 @@ export function ObjetivoEditor({ valor, onSave, onCancel }: Props) {
 
   return (
     <Sheet open onOpenChange={(open) => !open && onCancel()}>
-      <SheetContent side="right" className="sm:max-w-2xl">
+      <SheetContent side="right" className="w-screen sm:max-w-none flex flex-col">
         <SheetHeader>
           <SheetTitle>Editar Objetivo</SheetTitle>
         </SheetHeader>
@@ -39,9 +39,10 @@ export function ObjetivoEditor({ valor, onSave, onCancel }: Props) {
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           placeholder="Descripción del objetivo del proyecto..."
-          className="mt-4 min-h-[400px] resize-none"
+          // Alto fijo con scroll propio: con field-sizing-content crecía con el texto y empujaba Guardar fuera de la pantalla.
+          className="mx-auto mt-4 w-full max-w-5xl flex-1 min-h-0 [field-sizing:fixed] overflow-y-auto resize-none text-base leading-relaxed md:text-base"
         />
-        <SheetFooter className="mt-4">
+        <SheetFooter className="mx-auto mt-4 w-full max-w-5xl">
           <Button variant="outline" onClick={onCancel} disabled={guardando}>
             Cancelar
           </Button>

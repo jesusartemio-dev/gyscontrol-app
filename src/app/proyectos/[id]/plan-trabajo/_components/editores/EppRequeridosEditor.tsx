@@ -22,7 +22,7 @@ const filaVacia = (): PlanEPPItem => ({ nombre: '', norma: '', observaciones: ''
 export function EppRequeridosEditor({ valor, onSave, onCancel }: Props) {
   return (
     <Sheet open onOpenChange={(open) => !open && onCancel()}>
-      <SheetContent side="right" className="sm:max-w-3xl overflow-y-auto">
+      <SheetContent side="right" className="w-screen sm:max-w-none overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Editar EPP Requeridos</SheetTitle>
         </SheetHeader>

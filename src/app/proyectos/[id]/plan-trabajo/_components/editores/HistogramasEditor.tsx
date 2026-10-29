@@ -173,7 +173,7 @@ export function HistogramasEditor({ valor, onSave, onCancel }: Props) {
 
   return (
     <Sheet open onOpenChange={(open) => !open && onCancel()}>
-      <SheetContent side="right" className="w-full sm:max-w-5xl overflow-y-auto">
+      <SheetContent side="right" className="w-screen sm:max-w-none overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Editar Histogramas</SheetTitle>
         </SheetHeader>

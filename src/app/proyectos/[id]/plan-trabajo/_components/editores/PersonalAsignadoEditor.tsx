@@ -33,7 +33,7 @@ const filaVacia = (): PlanPersonal => ({
 export function PersonalAsignadoEditor({ valor, onSave, onCancel }: Props) {
   return (
     <Sheet open onOpenChange={(open) => !open && onCancel()}>
-      <SheetContent side="right" className="sm:max-w-5xl overflow-y-auto">
+      <SheetContent side="right" className="w-screen sm:max-w-none overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Editar Personal Asignado</SheetTitle>
         </SheetHeader>
