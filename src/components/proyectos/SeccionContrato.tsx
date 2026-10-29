@@ -393,6 +393,18 @@ export default function SeccionContrato({ proyecto, onUpdateProyecto }: Props) {
                     </Badge>
                   )}
                 </div>
+                {/* La OC del cliente se consulta seguido; verla obligaba a expandir */}
+                {proyecto.ordenCompraCliente && (
+                  <>
+                    <span className="text-muted-foreground">·</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">OC</span>
+                      <Badge variant="outline" className="h-5 px-1.5 text-xs font-mono">
+                        {proyecto.ordenCompraCliente}
+                      </Badge>
+                    </div>
+                  </>
+                )}
                 {cartasActivas.length > 0 && (
                   <>
                     <span className="text-muted-foreground">·</span>
