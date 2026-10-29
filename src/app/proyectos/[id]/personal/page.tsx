@@ -243,21 +243,20 @@ const RolesFijosCompact = memo(function RolesFijosCompact({
       {Object.entries(rolesFijosConfig).map(([key, config]) => {
         const user = rolesFijos[key as keyof typeof rolesFijos]
         const Icon = config.icon
-        const canEdit = key !== 'comercial'
 
         return (
           <button
             key={key}
-            onClick={() => canEdit && onEdit(key, user?.id || null)}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs transition-colors ${
-              canEdit ? 'hover:bg-muted cursor-pointer' : 'cursor-default'
-            } ${user ? config.className : 'bg-gray-100 text-gray-500'}`}
-            title={canEdit ? `Editar ${config.label}` : 'El comercial se asigna desde la cotización'}
+            onClick={() => onEdit(key, user?.id || null)}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs transition-colors hover:bg-muted cursor-pointer ${
+              user ? config.className : 'bg-gray-100 text-gray-500'
+            }`}
+            title={`Editar ${config.label}`}
           >
             <Icon className="h-3 w-3" />
             <span className="font-medium">{config.label}:</span>
             <span className={user ? '' : 'italic'}>{user?.name || 'Sin asignar'}</span>
-            {canEdit && <Pencil className="h-2.5 w-2.5 opacity-50" />}
+            <Pencil className="h-2.5 w-2.5 opacity-50" />
           </button>
         )
       })}
@@ -639,12 +638,13 @@ export default function PersonalPage({ params: _params }: PageProps) {
       const fieldMap: Record<string, string> = {
         gestor: 'gestorId',
         supervisor: 'supervisorId',
-        lider: 'liderId'
+        lider: 'liderId',
+        comercial: 'comercialId'
       }
 
       const field = fieldMap[editingRolFijo]
       if (!field) {
-        toast.error('No se puede editar el rol de Comercial')
+        toast.error('Rol no reconocido')
         return
       }
 
@@ -673,10 +673,6 @@ export default function PersonalPage({ params: _params }: PageProps) {
   }
 
   const openEditRolFijo = (rolKey: string, currentUserId: string | null) => {
-    if (rolKey === 'comercial') {
-      toast.info('El comercial se asigna desde la cotización')
-      return
-    }
     setEditingRolFijo(rolKey)
     setSelectedRolFijoUserId(currentUserId || '')
   }
