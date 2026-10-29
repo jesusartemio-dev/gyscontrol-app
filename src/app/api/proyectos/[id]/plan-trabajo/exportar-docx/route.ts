@@ -116,7 +116,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     )
   }
 
-  const archivoNombre = `PT_${proyecto.codigo}_Rev${planDb.numeroRevision}.docx`
+  // Con código del cliente: "PN-…-RB - Plan de Trabajo.docx"; sin código, el nombre interno de siempre.
+  const codigoDocumento = planDb.codigoDocumento?.trim().replace(/[\\/:*?"<>|]/g, '-')
+  const archivoNombre = codigoDocumento
+    ? `${codigoDocumento}-R${planDb.numeroRevision} - Plan de Trabajo.docx`
+    : `PT_${proyecto.codigo}_Rev${planDb.numeroRevision}.docx`
 
   // Subir a Drive (soft fail — si falla, igual devolvemos el buffer)
   let driveFileId: string | null = null
