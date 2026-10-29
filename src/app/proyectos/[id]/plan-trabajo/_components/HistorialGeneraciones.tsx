@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { DetalleGeneracion } from './DetalleGeneracion'
+import { descargarGeneracionPorPartes } from '@/lib/planTrabajo/descargarGeneracionPorPartes'
 
 interface Generacion {
   id: string
@@ -82,14 +83,8 @@ export function HistorialGeneraciones({ proyectoId }: Props) {
   const handleDescargar = async (gen: Generacion) => {
     setDescargandoId(gen.id)
     try {
-      const res = await fetch(
-        `/api/proyectos/${proyectoId}/plan-trabajo/generaciones/${gen.id}/descargar`
-      )
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({}))
-        throw new Error(e.error ?? `HTTP ${res.status}`)
-      }
-      downloadBlob(await res.blob(), gen.archivoNombre)
+      // Por partes: un plan con fotos supera el tope de respuesta de Vercel (~4.5MB).
+      await descargarGeneracionPorPartes(proyectoId, gen.id, gen.archivoNombre)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al descargar')
     } finally {

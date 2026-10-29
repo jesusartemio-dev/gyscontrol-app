@@ -13,6 +13,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { generarOrganigramaPng } from '@/lib/planTrabajo/generarOrganigramaPng'
+import { descargarGeneracionPorPartes } from '@/lib/planTrabajo/descargarGeneracionPorPartes'
 import type { OrgNodoContexto } from '@/types/planTrabajo'
 
 interface Props {
@@ -55,6 +56,16 @@ export function BotonExportarDocx({ proyectoId, orgNodos, incluirOrganigrama = t
           return
         }
         throw new Error(data.error ?? `HTTP ${res.status}`)
+      }
+
+      // Guardado en Drive: viene solo la referencia y se baja por partes (límite de respuesta de Vercel).
+      if (res.headers.get('Content-Type')?.includes('application/json')) {
+        const generado = await res.json() as { generacionId: string; archivoNombre: string; webViewLink: string }
+        await descargarGeneracionPorPartes(proyectoId, generado.generacionId, generado.archivoNombre)
+        toast.success('Documento descargado y guardado en Drive', {
+          action: { label: 'Ver en Drive', onClick: () => window.open(generado.webViewLink, '_blank') },
+        })
+        return
       }
 
       const blob = await res.blob()

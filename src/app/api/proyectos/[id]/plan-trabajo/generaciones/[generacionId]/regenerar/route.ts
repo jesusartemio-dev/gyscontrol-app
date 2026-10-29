@@ -95,6 +95,15 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     )
   }
 
+  // Una función de Vercel no puede responder más de ~4.5MB: un plan con fotos
+  // no entra. El archivo de esa generación ya está en Drive (botón Descargar).
+  if (docxBuffer.length > 4 * 1024 * 1024) {
+    return NextResponse.json(
+      { error: `El documento regenerado pesa ${(docxBuffer.length / 1e6).toFixed(1)} MB y no se puede entregar por aquí. Usa "Descargar": es el archivo guardado en Drive de esa versión.` },
+      { status: 413 }
+    )
+  }
+
   const headers = new Headers()
   headers.set('Content-Type', MIME_DOCX)
   headers.set('Content-Disposition', `attachment; filename="${generacion.archivoNombre}"`)

@@ -11,6 +11,9 @@ import { getOrCreatePlanTrabajoFolder } from '@/lib/planTrabajo/getOrCreatePlanT
 
 export const maxDuration = 120
 
+/** Tope práctico de una respuesta de función en Vercel (~4.5MB). */
+const LIMITE_RESPUESTA_BYTES = 4 * 1024 * 1024
+
 type Ctx = { params: Promise<{ id: string }> }
 
 const MIME_DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -135,9 +138,10 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
 
   // Crear registro PlanTrabajoGeneracion solo si Drive funcionó
+  let generacionId: string | null = null
   if (driveFileId && webViewLink) {
     try {
-      await prisma.planTrabajoGeneracion.create({
+      const generacion = await prisma.planTrabajoGeneracion.create({
         data: {
           planTrabajoId: planDb.id,
           numeroRevision: planDb.numeroRevision ?? 'A',
@@ -149,14 +153,29 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           snapshotData: { plan: planDb, organigramaPngBase64 },
           generadoPorId: session.user.id,
         },
+        select: { id: true },
       })
+      generacionId = generacion.id
     } catch (e) {
       console.error('[exportar-docx] Error creando PlanTrabajoGeneracion:', e)
       // No es crítico — el archivo ya se entregó al usuario
     }
   }
 
-  // Devolver el buffer con headers apropiados
+  // Guardado en Drive: se responde solo la referencia y el navegador lo baja
+  // por partes desde .../generaciones/[id]/descargar. Una función de Vercel no
+  // puede responder más de ~4.5MB y un plan con fotos pesa 10MB o más.
+  if (generacionId) {
+    return NextResponse.json({ generacionId, archivoNombre, tamanioBytes: docxBuffer.length, webViewLink })
+  }
+  if (docxBuffer.length > LIMITE_RESPUESTA_BYTES) {
+    return NextResponse.json(
+      { error: `El documento pesa ${(docxBuffer.length / 1e6).toFixed(1)} MB y no se pudo guardar en Drive para descargarlo${driveErrorMsg ? `: ${driveErrorMsg}` : ''}` },
+      { status: 502 }
+    )
+  }
+
+  // Sin Drive y archivo chico: se devuelve el buffer directo.
   const headers = new Headers()
   headers.set('Content-Type', MIME_DOCX)
   headers.set('Content-Disposition', `attachment; filename="${archivoNombre}"`)

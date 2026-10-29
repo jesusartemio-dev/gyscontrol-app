@@ -145,6 +145,27 @@ export async function getFile(fileId: string) {
   return res.data
 }
 
+/**
+ * Un tramo de bytes [inicio, fin] (inclusive) de un archivo binario, más el
+ * tamaño total — para que el navegador baje un archivo grande por partes:
+ * una función de Vercel no puede responder más de ~4.5MB (ver
+ * plan-trabajo/generaciones/[generacionId]/descargar/route.ts).
+ */
+export async function getFileContentRango(fileId: string, inicio: number, fin: number): Promise<{ data: Buffer; total: number }> {
+  const drive = getDriveClient()
+  const res = await drive.files.get(
+    { fileId, alt: 'media', supportsAllDrives: true },
+    { responseType: 'arraybuffer', headers: { Range: `bytes=${inicio}-${fin}` } }
+  )
+  const data = Buffer.from(res.data as ArrayBuffer)
+  // "bytes 0-2999999/12400000"; sin Content-Range, Drive devolvió el archivo completo.
+  // Según la versión de googleapis, headers es un objeto Headers o uno plano.
+  const cabeceras = res.headers as unknown as { get?: (k: string) => string | null } & Record<string, unknown>
+  const rango = String((typeof cabeceras.get === 'function' ? cabeceras.get('content-range') : cabeceras['content-range']) ?? '')
+  const total = Number(rango.split('/')[1]) || data.length
+  return { data, total }
+}
+
 export async function getFileContent(fileId: string): Promise<{
   data: Buffer
   mimeType: string
