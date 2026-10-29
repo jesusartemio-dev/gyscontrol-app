@@ -26,13 +26,16 @@ function textoDelParrafo(p: string): string {
     .trim()
 }
 
+/** Como la referencia NEXA: "1." | tab | "OBJETIVO" ------- página. */
 function parrafoEntrada(texto: string, nivel: 1 | 2, marcador: string, prefijoCampo = ''): string {
   const rPr = nivel === 1 ? '<w:rPr><w:b/><w:bCs/></w:rPr>' : ''
+  const [, numero, titulo] = texto.match(/^(\d+(?:\.\d+)*\.?)\s+(.+)$/) ?? [null, '', texto]
   return (
-    `<w:p><w:pPr><w:pStyle w:val="TOC${nivel}"/><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="${ANCHO_TEXTO_TWIPS}"/></w:tabs></w:pPr>` +
+    `<w:p><w:pPr><w:pStyle w:val="TOC${nivel}"/><w:tabs><w:tab w:val="right" w:leader="hyphen" w:pos="${ANCHO_TEXTO_TWIPS}"/></w:tabs></w:pPr>` +
     prefijoCampo +
     `<w:hyperlink w:anchor="${marcador}" w:history="1">` +
-    `<w:r>${rPr}<w:t xml:space="preserve">${escaparXml(texto)}</w:t></w:r>` +
+    (numero ? `<w:r>${rPr}<w:t xml:space="preserve">${escaparXml(numero)}</w:t></w:r><w:r>${rPr}<w:tab/></w:r>` : '') +
+    `<w:r>${rPr}<w:t xml:space="preserve">${escaparXml(titulo)}</w:t></w:r>` +
     `<w:r>${rPr}<w:tab/></w:r>` +
     `<w:r>${rPr}<w:fldChar w:fldCharType="begin"/></w:r>` +
     `<w:r>${rPr}<w:instrText xml:space="preserve"> PAGEREF ${marcador} \\h </w:instrText></w:r>` +
@@ -49,6 +52,8 @@ export function poblarIndice(documentXml: string): { xml: string; entradas: numb
   if (!tocMatch || tocMatch.index === undefined) return { xml: documentXml, entradas: 0 }
   const instr = tocMatch[0].match(/<w:instrText[^>]*>([^<]*)<\/w:instrText>/)![1]
   const finToc = tocMatch.index + tocMatch[0].length
+  // Niveles que pide el propio campo: \o "1-1" → solo títulos de nivel 1.
+  const nivelMaximo = Number(instr.match(/\\o (?:&quot;|")\d-(\d)/)?.[1] ?? 2)
 
   const entradas: { texto: string; nivel: 1 | 2; marcador: string }[] = []
   let siguienteId = ID_MARCADOR_INICIAL
@@ -56,7 +61,7 @@ export function poblarIndice(documentXml: string): { xml: string; entradas: numb
   const cuerpo = documentXml.slice(finToc).replace(/<w:p>(?:(?!<\/w:p>)[\s\S])*?<\/w:p>/g, p => {
     const estilo = p.match(/<w:pStyle w:val="([^"]+)"\/>/)?.[1]
     const nivel = estilo ? NIVEL_POR_ESTILO[estilo] : undefined
-    if (!nivel) return p
+    if (!nivel || nivel > nivelMaximo) return p
     const texto = textoDelParrafo(p)
     if (!texto) return p
     const id = siguienteId++
@@ -82,9 +87,9 @@ export function poblarIndice(documentXml: string): { xml: string; entradas: numb
 
 const ESTILOS_TOC =
   `<w:style w:type="paragraph" w:styleId="TOC1"><w:name w:val="toc 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:uiPriority w:val="39"/>` +
-  `<w:pPr><w:spacing w:before="120" w:after="40"/></w:pPr><w:rPr><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr></w:style>` +
+  `<w:pPr><w:tabs><w:tab w:val="left" w:pos="851"/></w:tabs><w:spacing w:before="200" w:after="100"/></w:pPr><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:style>` +
   `<w:style w:type="paragraph" w:styleId="TOC2"><w:name w:val="toc 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:uiPriority w:val="39"/>` +
-  `<w:pPr><w:spacing w:before="0" w:after="40"/><w:ind w:left="300"/></w:pPr><w:rPr><w:sz w:val="19"/><w:szCs w:val="19"/></w:rPr></w:style>`
+  `<w:pPr><w:tabs><w:tab w:val="left" w:pos="1700"/></w:tabs><w:spacing w:before="0" w:after="60"/><w:ind w:left="851"/></w:pPr><w:rPr><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:style>`
 
 /**
  * Estilos del índice: TOC1/TOC2 (si la plantilla no los trae) y nivel de esquema

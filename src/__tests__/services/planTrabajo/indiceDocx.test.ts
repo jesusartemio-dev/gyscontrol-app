@@ -16,7 +16,8 @@ describe('poblarIndice', () => {
 
     expect(entradas).toBe(2)
     expect(xml).toContain('<w:pStyle w:val="TOC1"/>')
-    expect(xml).toContain('11.9 Construcción &amp; montaje')
+    // Número y título separados por tabulación, como la referencia NEXA.
+    expect(xml).toContain('>11.9</w:t></w:r><w:r><w:tab/></w:r><w:r><w:t xml:space="preserve">Construcción &amp; montaje<')
     expect(xml).not.toMatch(/TOC\d"[^]*Carátula/)
     expect(xml).not.toMatch(/<w:t xml:space="preserve">11\.9\.1 Previos<\/w:t><\/w:r><w:r><w:tab/)
     expect(xml.match(/<w:bookmarkStart /g)).toHaveLength(2)
@@ -25,6 +26,11 @@ describe('poblarIndice', () => {
     expect(xml.match(/TOC \\h/g)).toHaveLength(1)
     expect(xml.match(/fldCharType="begin"/g)).toHaveLength(3) // TOC + 2 PAGEREF
     expect(xml.match(/fldCharType="end"/g)).toHaveLength(3)
+  })
+
+  it('respeta los niveles del campo: \\o "1-1" deja fuera los Heading2', () => {
+    const doc = `<w:body>${TOC_VACIO.replace('1-2', '1-1')}${titulo('Heading1', '1. OBJETIVO')}${titulo('Heading2', '1.1 Detalle')}</w:body>`
+    expect(poblarIndice(doc).entradas).toBe(1)
   })
 
   it('sin campo TOC no toca el documento', () => {
