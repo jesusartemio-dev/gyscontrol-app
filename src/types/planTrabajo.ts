@@ -326,6 +326,8 @@ export interface PlanTrabajoContexto {
   }) | null
 
   cotizacion: {
+    /** Código de la cotización ("GYS-4407-26 R08") — referencia "Propuesta técnica económica". */
+    codigo?: string | null
     aprobada: boolean
     equipos: EquipoCotizadoContexto[]
     servicios: ServicioCotizadoContexto[]
@@ -340,7 +342,7 @@ export interface PlanTrabajoContexto {
 
   organigrama: OrgNodoContexto[]
   /** Contactos del cliente del proyecto (ProyectoContactoCliente) — el aprobador del cliente en la RACI. */
-  contactosCliente?: { nombre: string; rolEnProyecto: string }[]
+  contactosCliente?: { nombre: string; cargo?: string | null; rolEnProyecto: string }[]
   matriz: MatrizContexto | null
   tdr: TdrContexto | null
 

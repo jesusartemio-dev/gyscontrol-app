@@ -93,6 +93,55 @@ function encabezadoReferencia(xml: string): string {
   return xml.replace(/<w:tbl>[\s\S]*<\/w:tbl>/, tabla)
 }
 
+/**
+ * Tabla "TIPO DE EMISIÓN" como la referencia: encabezado Rev. | TE: Tipo de Emisión | Des. | Ver. | Apr. | Aut. | Fecha,
+ * una fila por revisión, filas vacías hasta llenar la hoja ({#filasVacias}) y la
+ * leyenda de firmantes en filas de la misma tabla ("JM: JESÚS MAMANI").
+ * Se conservan el título y la fila de códigos de emisión.
+ */
+function tablaEmisionReferencia(xml: string): string {
+  const i = xml.indexOf('TIPO DE EMISI')
+  const inicio = xml.lastIndexOf('<w:tbl>', i)
+  const fin = xml.indexOf('</w:tbl>', i)
+  const tabla = xml.slice(inicio, fin)
+  const filas = tabla.split('</w:tr>')
+  const conservadas = filas.slice(0, 2).join('</w:tr>') + '</w:tr>' // título + códigos
+
+  const ANCHOS = [700, 700, 4240, 800, 800, 800, 800, 800]
+  const rPr = (sz: number, negrita = false, mayusculas = false) =>
+    `<w:rPr><w:rFonts w:ascii="${FUENTE}" w:cs="${FUENTE}" w:eastAsia="${FUENTE}" w:hAnsi="${FUENTE}"/>${negrita ? '<w:b/><w:bCs/>' : ''}${mayusculas ? '<w:caps/>' : ''}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr>`
+  const p = (texto: string, sz: number, { jc = 'center', negrita = false, mayusculas = false } = {}) =>
+    `<w:p><w:pPr><w:spacing w:before="0" w:after="0"/><w:jc w:val="${jc}"/></w:pPr>${texto ? `<w:r>${rPr(sz, negrita, mayusculas)}<w:t xml:space="preserve">${texto}</w:t></w:r>` : ''}</w:p>`
+  const tc = (ancho: number, contenido: string, { span = 1, sombreado = false } = {}) =>
+    `<w:tc><w:tcPr><w:tcW w:w="${ancho}" w:type="dxa"/>${span > 1 ? `<w:gridSpan w:val="${span}"/>` : ''}${sombreado ? '<w:shd w:val="clear" w:color="auto" w:fill="D9D9D9"/>' : ''}` +
+    `<w:tcMar><w:top w:w="20" w:type="dxa"/><w:left w:w="60" w:type="dxa"/><w:bottom w:w="20" w:type="dxa"/><w:right w:w="60" w:type="dxa"/></w:tcMar><w:vAlign w:val="center"/></w:tcPr>${contenido}</w:tc>`
+  const tr = (celdas: string) => `<w:tr><w:trPr><w:trHeight w:val="440" w:hRule="atLeast"/></w:trPr>${celdas}</w:tr>`
+
+  const encabezado = tr(
+    tc(ANCHOS[0], p('Rev.', 22, { negrita: true }), { sombreado: true }) +
+    tc(ANCHOS[1] + ANCHOS[2], p('TE: Tipo de Emisión', 22, { negrita: true }), { span: 2, sombreado: true }) +
+    ['Des.', 'Ver.', 'Apr.', 'Aut.', 'Fecha'].map((t, k) => tc(ANCHOS[3 + k], p(t, 22, { negrita: true }), { sombreado: true })).join('')
+  )
+  const revision = tr(
+    tc(ANCHOS[0], p('{#revisiones}{rev}', 18)) +
+    tc(ANCHOS[1], p('{te}', 18)) +
+    tc(ANCHOS[2], p('{descripcion}', 18, { jc: 'left' })) +
+    ['{des}', '{ver}', '{apr}', '{aut}'].map((t, k) => tc(ANCHOS[3 + k], p(t, 16))).join('') +
+    tc(ANCHOS[7], p('{fecha}{/revisiones}', 16))
+  )
+  const vacia = tr(
+    tc(ANCHOS[0], p('{#filasVacias}', 18)) +
+    ANCHOS.slice(1, 7).map(a => tc(a, p('', 18))).join('') +
+    tc(ANCHOS[7], p('{/filasVacias}', 18))
+  )
+  const firmante = tr(
+    tc(ANCHOS[0], p('{#firmantes}', 18)) +
+    tc(ANCHOS[1], p('', 18)) +
+    tc(ANCHOS.slice(2).reduce((a, b) => a + b, 0), p('{siglas}: {nombre}{/firmantes}', 20, { jc: 'left', mayusculas: true }), { span: 6 })
+  )
+  return xml.slice(0, inicio) + conservadas + encabezado + revision + vacia + firmante + xml.slice(fin)
+}
+
 const zip = new PizZip(fs.readFileSync(PLANTILLA))
 const doc = zip.file('word/document.xml')!.asText()
 let cambios = 0
@@ -105,6 +154,12 @@ if (doc.includes('w:ascii="Arial"')) {
     if (x) zip.file(f, subirTallas(cambiarFuente(x)))
   }
   zip.file('word/styles.xml', estilos(zip.file('word/styles.xml')!.asText()))
+  cambios++
+}
+const docActual = zip.file('word/document.xml')!.asText()
+if (!docActual.includes('{#filasVacias}')) {
+  // Referencias: "{texto}" ya trae "código — título" o solo el título (sin " — " colgando).
+  zip.file('word/document.xml', tablaEmisionReferencia(docActual).replace('{codigo} — {descripcion}', '{texto}'))
   cambios++
 }
 const encabezado = zip.file('word/header1.xml')!.asText()

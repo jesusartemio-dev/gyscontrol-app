@@ -1,7 +1,7 @@
 import { construirDataBag } from '@/lib/planTrabajo/construirDataBag'
 import type { ImagenResueltaTag } from '@/lib/planTrabajo/exportDocx'
 import type { PlanAlcanceDetalladoEdt, PlanHistogramas } from '@/types/planTrabajo'
-import type { PlanTrabajo, Cliente, Proyecto, PlanTrabajoImagen } from '@prisma/client'
+import type { PlanTrabajo, PlanTrabajoGeneracion, Cliente, Proyecto, PlanTrabajoImagen } from '@prisma/client'
 
 /**
  * Integración a nivel dataBag (no solo builder) — regresión del bug auditado
@@ -554,5 +554,27 @@ describe('construirDataBag — RACI en grilla (raciPersonas + matrizRaci.roles, 
     const dataBag = construirDataBag({ plan: planFixture([]), proyecto: proyectoFixture, organigramaPngBase64: '' })
     expect(dataBag.raciPersonas).toEqual([])
     expect(dataBag.matrizRaci).toEqual([])
+  })
+})
+
+describe('construirDataBag — tabla de emisión (formato NEXA)', () => {
+  const gen = (numeroRevision: string, iso: string, aprobadoPor: string) => ({
+    numeroRevision,
+    generadoEn: new Date(iso),
+    snapshotData: { plan: { ...planFixture([]), preparadoPor: 'JESUS MAMANI', aprobadoPor, tipoEmision: 'B - Para Revisión' }, organigramaPngBase64: '' } as unknown as PlanTrabajoGeneracion['snapshotData'],
+  })
+
+  it('una fila por revisión: la última emisión de cada letra y la revisión actual desde el plan', () => {
+    const plan = { ...planFixture([]), numeroRevision: 'B', tipoEmision: 'B - Para Revisión', fechaEmision: null,
+      preparadoPor: 'JESUS MAMANI', revisadoPor: 'HECTOR PALOMINO', aprobadoPor: 'CARLOS ORE', autorizadoPor: 'CARLOS SIHUAYRO' } as unknown as PlanTrabajo
+    const dataBag = construirDataBag({
+      plan, proyecto: proyectoFixture, organigramaPngBase64: '',
+      generaciones: [gen('A', '2026-10-20T06:00:00Z', 'X Y'), gen('A', '2026-10-28T16:00:00Z', 'CARLOS SIHUAYRO'), gen('B', '2026-10-29T00:26:00Z', 'CARLOS ORE')],
+    })
+    const revisiones = dataBag.revisiones as Array<Record<string, string>>
+    expect(revisiones.map(r => r.rev)).toEqual(['A', 'B'])
+    expect(revisiones[0]).toMatchObject({ te: 'B', descripcion: 'Para Revisión', apr: 'CS', aut: '-', fecha: '28/10/26' })
+    expect(revisiones[1]).toMatchObject({ des: 'JM', ver: 'HP', apr: 'CO', aut: 'CS' })
+    expect((dataBag.filasVacias as unknown[]).length).toBe(18 - 2 - 4)
   })
 })

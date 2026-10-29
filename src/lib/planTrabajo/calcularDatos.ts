@@ -8,7 +8,6 @@ import type {
   PlanHistogramaHHActividad,
   PlanCronograma,
   PlanReferencia,
-  TdrContexto,
   CronogramaContexto,
 } from '@/types/planTrabajo'
 import { deduplicarSiglas, calcularSiglasBase } from './siglas'
@@ -21,7 +20,8 @@ import {
   prioridadAprobador,
   siglasCliente,
 } from './raciReglas'
-import { REFERENCIAS_BASE } from './referenciasBase'
+import { referenciasDelProyecto } from './referenciasBase'
+import { ROL_CONTACTO_CLIENTE_LABELS } from '@/lib/config/rolesContactoCliente'
 
 /**
  * Cálculo determinista de las secciones de "Etapa 1" del Plan de Trabajo
@@ -671,38 +671,15 @@ function calcularHHPorActividadConCmn(
 }
 
 /**
- * referencias — REFERENCIAS_BASE (normativa SSOMA estándar) + normas del
- * análisis TDR si existe. construirDataBag ya deduplica esto mismo al
- * exportar; se persiste también acá para que la UI muestre el resultado
- * completo apenas corre la Etapa 1, no solo al exportar el docx.
+ * referencias — documentos contractuales del proyecto (ver referenciasBase.ts).
+ * Se persisten para que la UI las muestre y se editen; el docx exporta solo estas.
  */
-export function calcularReferencias(tdr: TdrContexto | null): PlanReferencia[] {
-  const extra: PlanReferencia[] = []
-  const normas = tdr?.normasAplicables
-  if (Array.isArray(normas)) {
-    for (const item of normas) {
-      if (typeof item === 'string' && item.trim()) {
-        extra.push({ titulo: item.trim(), origen: 'NORMATIVA' })
-        continue
-      }
-      if (item && typeof item === 'object') {
-        const obj = item as Record<string, unknown>
-        const titulo =
-          (typeof obj.titulo === 'string' && obj.titulo) ||
-          (typeof obj.nombre === 'string' && obj.nombre) ||
-          (typeof obj.descripcion === 'string' && obj.descripcion) ||
-          null
-        if (titulo) {
-          const codigoDocumento =
-            (typeof obj.codigo === 'string' && obj.codigo) ||
-            (typeof obj.codigoDocumento === 'string' && obj.codigoDocumento) ||
-            undefined
-          extra.push({ codigoDocumento, titulo, origen: 'NORMATIVA' })
-        }
-      }
-    }
-  }
-  return [...REFERENCIAS_BASE, ...extra]
+export function calcularReferencias(contexto: Pick<PlanTrabajoContexto, 'proyecto' | 'cotizacion'>): PlanReferencia[] {
+  return referenciasDelProyecto({
+    cotizacionCodigo: contexto.cotizacion.codigo,
+    ordenCompra: contexto.proyecto.ordenCompraCliente,
+    clienteNombre: contexto.proyecto.cliente?.nombre,
+  })
 }
 
 /**
@@ -764,9 +741,22 @@ export function calcularDatosEtapa1(contexto: PlanTrabajoContexto): ResultadoCal
   const { data: datosHistograma, advertencias: advHist } = calcularHistogramasYCronograma(fases)
   advertencias.push(...advHist)
 
-  const referencias = calcularReferencias(contexto.tdr)
+  const referencias = calcularReferencias(contexto)
 
-  const personalAsignado: PlanPersonal[] = personalCalculado.map(({ userId: _userId, ...resto }) => resto)
+  // Involucrados del cliente (contactos del proyecto) al final del Personal, con
+  // la empresa del cliente — como el plan de referencia NEXA. No entran a la RACI
+  // como filas propias: ahí el cliente ya figura con su sigla de aprobador.
+  const personalCliente: PlanPersonal[] = (contexto.contactosCliente ?? []).map(c => ({
+    // En mayúsculas como el resto de la tabla (los nombres del organigrama ya vienen así).
+    nombre: c.nombre.toUpperCase(),
+    cargo: (c.cargo?.trim() || ROL_CONTACTO_CLIENTE_LABELS[c.rolEnProyecto] || c.rolEnProyecto).toUpperCase(),
+    empresa: contexto.proyecto.cliente?.nombre ?? '',
+    siglas: calcularSiglasBase(c.nombre),
+  }))
+  const personalAsignado: PlanPersonal[] = deduplicarSiglas([
+    ...personalCalculado.map(({ userId: _userId, ...resto }) => resto),
+    ...personalCliente,
+  ])
 
   return {
     data: {

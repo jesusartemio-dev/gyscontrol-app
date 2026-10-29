@@ -195,6 +195,8 @@ export const planTrabajoUpdateSchema = z.object({
   revisadoCargo: z.string().max(200).nullish(),
   aprobadoPor: z.string().max(200).nullish(),
   aprobadoCargo: z.string().max(200).nullish(),
+  autorizadoPor: z.string().max(200).nullish(),
+  autorizadoCargo: z.string().max(200).nullish(),
 
   objetivo: z.string().max(20000).nullish(),
   alcanceGeneral: z.string().max(20000).nullish(),

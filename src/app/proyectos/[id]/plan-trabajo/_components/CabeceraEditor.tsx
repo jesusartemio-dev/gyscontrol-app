@@ -33,6 +33,8 @@ type FormState = {
   revisadoCargo: string
   aprobadoPor: string
   aprobadoCargo: string
+  autorizadoPor: string
+  autorizadoCargo: string
 }
 
 export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
@@ -59,6 +61,8 @@ export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
       revisadoCargo:   p.revisadoCargo   || '',
       aprobadoPor:     p.aprobadoPor     || '',
       aprobadoCargo:   p.aprobadoCargo   || '',
+      autorizadoPor:   p.autorizadoPor   || '',
+      autorizadoCargo: p.autorizadoCargo || '',
     }
     setForm(defaultForm)
     setEditing(true)
@@ -166,6 +170,7 @@ export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
               ['preparadoPor', 'preparadoCargo', 'Preparado por'],
               ['revisadoPor',  'revisadoCargo',  'Revisado por'],
               ['aprobadoPor',  'aprobadoCargo',  'Aprobado por'],
+              ['autorizadoPor', 'autorizadoCargo', 'Autorizado por'],
             ] as [keyof FormState, keyof FormState, string][]).map(([nombreKey, cargoKey, label]) => (
               <div key={nombreKey} className="grid grid-cols-2 gap-2">
                 <div>
@@ -191,11 +196,12 @@ export function CabeceraEditor({ proyectoId, plan, onUpdated }: Props) {
           </div>
 
           {/* Firmantes — vista */}
-          {(p.preparadoPor || p.revisadoPor || p.aprobadoPor) ? (
+          {(p.preparadoPor || p.revisadoPor || p.aprobadoPor || p.autorizadoPor) ? (
             <div className="border-t pt-2 grid grid-cols-1 gap-1.5">
               {p.preparadoPor && <Row label="Preparado por" value={`${p.preparadoPor}${p.preparadoCargo ? ` · ${p.preparadoCargo}` : ''}`} />}
               {p.revisadoPor  && <Row label="Revisado por"  value={`${p.revisadoPor}${p.revisadoCargo   ? ` · ${p.revisadoCargo}`   : ''}`} />}
               {p.aprobadoPor  && <Row label="Aprobado por"  value={`${p.aprobadoPor}${p.aprobadoCargo   ? ` · ${p.aprobadoCargo}`   : ''}`} />}
+              {p.autorizadoPor && <Row label="Autorizado por" value={`${p.autorizadoPor}${p.autorizadoCargo ? ` · ${p.autorizadoCargo}` : ''}`} />}
             </div>
           ) : (
             <p className="text-xs text-amber-600 italic border-t pt-2">

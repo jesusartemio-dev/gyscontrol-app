@@ -38,7 +38,7 @@ export async function cargarContextoPlanTrabajo(
         fechaFin: true,
         estado: true,
         cotizacionId: true,
-        cotizacion: { select: { id: true, estado: true } },
+        cotizacion: { select: { id: true, estado: true, codigo: true } },
         cliente: {
           select: { id: true, codigo: true, nombre: true, ruc: true, direccion: true },
         },
@@ -287,7 +287,7 @@ export async function cargarContextoPlanTrabajo(
     // Contactos del cliente del proyecto (los mismos de la Matriz de Comunicaciones).
     prisma.proyectoContactoCliente.findMany({
       where: { proyectoId },
-      select: { rolEnProyecto: true, crmContacto: { select: { nombre: true } } },
+      select: { rolEnProyecto: true, crmContacto: { select: { nombre: true, cargo: true } } },
       orderBy: { createdAt: 'asc' },
     }),
   ])
@@ -425,6 +425,7 @@ export async function cargarContextoPlanTrabajo(
     },
     planTrabajo,
     cotizacion: {
+      codigo: proyecto.cotizacion?.codigo ?? null,
       aprobada: cotizacionAprobada,
       equipos: equipos.map(e => ({
         id: e.id,
@@ -457,7 +458,7 @@ export async function cargarContextoPlanTrabajo(
       advertenciaPlanificacionFaltante,
     },
     organigrama,
-    contactosCliente: contactosCliente.map(c => ({ nombre: c.crmContacto.nombre, rolEnProyecto: c.rolEnProyecto })),
+    contactosCliente: contactosCliente.map(c => ({ nombre: c.crmContacto.nombre, cargo: c.crmContacto.cargo, rolEnProyecto: c.rolEnProyecto })),
     matriz,
     tdr,
     prerrequisitos,

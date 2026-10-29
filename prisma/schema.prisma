@@ -6234,6 +6234,9 @@ model PlanTrabajo {
   revisadoCargo  String?
   aprobadoPor    String?
   aprobadoCargo  String?
+  /// Columna "Aut." de la tabla de emisión (formato NEXA: Des./Ver./Apr./Aut.).
+  autorizadoPor   String?
+  autorizadoCargo String?
 
   // Secciones de texto largo
   objetivo       String? @db.Text

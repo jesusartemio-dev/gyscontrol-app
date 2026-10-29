@@ -13,7 +13,6 @@ import type {
 } from '@/types/planTrabajo'
 import { deduplicarSiglas, calcularSiglasBase } from './siglas'
 import { getSnapshotPlan } from './snapshotHelpers'
-import { REFERENCIAS_BASE } from './referenciasBase'
 import { calcularTotalHH } from './calcularDatos'
 import { IMAGEN_PLACEHOLDER, type ImagenResueltaTag } from './exportDocx'
 import { captionEfectivo } from './imagenCaption'
@@ -141,46 +140,70 @@ interface FilaRevision {
   fecha: string
 }
 
-function filaRevisionDesdePlan(plan: PlanTrabajo, descripcion: string): FilaRevision {
+/** "dd/mm/aa" como la tabla de emisión NEXA. fechaEmision es solo fecha (UTC); generadoEn es un instante (hora de Lima). */
+function fmtFechaEmision(d: Date, soloFecha: boolean): string {
+  return d.toLocaleDateString('es-PE', {
+    day: '2-digit', month: '2-digit', year: '2-digit',
+    timeZone: soloFecha ? 'UTC' : 'America/Lima',
+  })
+}
+
+/** "B - Para Revisión" → TE "B" + descripción "Para Revisión". */
+function separarTipoEmision(tipoEmision: string | null | undefined): { te: string; descripcion: string } {
+  const valor = (tipoEmision ?? '').trim()
+  const m = valor.match(/^([A-Z0-9])\s*-\s*(.+)$/)
+  return m ? { te: m[1], descripcion: m[2] } : { te: valor, descripcion: '' }
+}
+
+/** emitidoEn: fecha real del export de una revisión anterior; null = la revisión actual (su fechaEmision o hoy). */
+function filaRevisionDesdePlan(plan: PlanTrabajo, emitidoEn: Date | null): FilaRevision {
+  const fecha = emitidoEn
+    ? fmtFechaEmision(emitidoEn, false)
+    : plan.fechaEmision
+      ? fmtFechaEmision(new Date(plan.fechaEmision), true)
+      : fmtFechaEmision(new Date(), false)
   return {
     rev: plan.numeroRevision ?? 'A',
-    te: plan.tipoEmision ?? '',
-    descripcion,
+    ...separarTipoEmision(plan.tipoEmision),
     des: plan.preparadoPor ?? '',
     ver: plan.revisadoPor ?? '',
     apr: plan.aprobadoPor ?? '',
-    aut: '',
-    fecha: fmtDate(plan.fechaEmision ?? new Date()),
+    aut: plan.autorizadoPor ?? '',
+    fecha,
   }
 }
 
 /**
- * Histórico real de revisiones a partir de PlanTrabajoGeneracion (informe §4.5).
- * Si la revisión actual del plan todavía no tiene una generación registrada
- * (primer export, o cambios tras la última generación), se agrega como fila final.
+ * Una fila por REVISIÓN (A, B, C…), como la tabla de emisión NEXA — antes salía
+ * una fila por cada export, y re-exportar la misma revisión la repetía.
+ * Revisiones anteriores: la última generación de esa letra (lo que se emitió).
+ * Revisión actual: el plan tal como está ahora (es la que se está exportando).
  */
 function construirRevisiones(
   plan: PlanTrabajo,
   generaciones: Pick<PlanTrabajoGeneracion, 'numeroRevision' | 'generadoEn' | 'snapshotData'>[]
 ): FilaRevision[] {
-  const historicas = generaciones
-    .slice()
-    .sort((a, b) => a.generadoEn.getTime() - b.generadoEn.getTime())
-    .map((gen, i) => {
-      const snapshotPlan = getSnapshotPlan(gen.snapshotData)
-      const base = snapshotPlan ?? plan
-      const descripcion = i === 0 ? 'Emisión inicial' : 'Actualización de revisión'
-      return filaRevisionDesdePlan({ ...base, numeroRevision: gen.numeroRevision }, descripcion)
-    })
-
-  const ultimaRevisionRegistrada = historicas[historicas.length - 1]?.rev
-  const faltaRevisionActual = ultimaRevisionRegistrada !== (plan.numeroRevision ?? 'A')
-
-  if (historicas.length === 0 || faltaRevisionActual) {
-    historicas.push(filaRevisionDesdePlan(plan, historicas.length === 0 ? 'Emisión inicial' : 'Actualización de revisión'))
+  const revisionActual = plan.numeroRevision ?? 'A'
+  const ultimaPorRevision = new Map<string, Pick<PlanTrabajoGeneracion, 'numeroRevision' | 'generadoEn' | 'snapshotData'>>()
+  for (const gen of [...generaciones].sort((a, b) => a.generadoEn.getTime() - b.generadoEn.getTime())) {
+    ultimaPorRevision.set(gen.numeroRevision, gen)
   }
 
-  return historicas
+  const filas: FilaRevision[] = []
+  for (const [rev, gen] of ultimaPorRevision) {
+    if (rev === revisionActual) continue
+    const base = getSnapshotPlan(gen.snapshotData) ?? plan
+    filas.push(filaRevisionDesdePlan({ ...base, numeroRevision: rev }, gen.generadoEn))
+  }
+  filas.sort((a, b) => a.rev.localeCompare(b.rev, 'es', { numeric: true }))
+  filas.push(filaRevisionDesdePlan(plan, null))
+  return filas
+}
+
+/** Filas vacías para que la tabla de emisión ocupe la hoja, como la referencia NEXA. */
+const FILAS_TABLA_EMISION = 18
+function filasVaciasEmision(revisiones: number, firmantes: number): Record<string, never>[] {
+  return Array.from({ length: Math.max(2, FILAS_TABLA_EMISION - revisiones - firmantes) }, () => ({}))
 }
 
 interface Firmante {
@@ -297,6 +320,7 @@ export function construirDataBag({
 
     // {#revisiones}: Des./Ver./Apr./Aut. en siglas (formato Nexa) — nombres completos van en {firmantes}
     revisiones: revisionesParaTemplate,
+    filasVacias: filasVaciasEmision(revisionesParaTemplate.length, firmantes.length),
     firmantes,
 
     // Firmantes individuales (retrocompat con la cabecera actual)
@@ -306,6 +330,8 @@ export function construirDataBag({
     revisadoCargo: plan.revisadoCargo ?? '',
     aprobadoPor: plan.aprobadoPor ?? '',
     aprobadoCargo: plan.aprobadoCargo ?? '',
+    autorizadoPor: plan.autorizadoPor ?? '',
+    autorizadoCargo: plan.autorizadoCargo ?? '',
 
     // ─── Códigos derivados por regla (sin IA) ───
     codigoOR: derivarCodigo(codigoDocumento, 'OR-'),
@@ -317,11 +343,11 @@ export function construirDataBag({
     tieneUbicacion: Boolean(ubicacionProyecto),
     ubicacionProyecto,
 
-    // ─── Referencias: normativa base (código, siempre) + BD/IA — dedup por código ───
+    // ─── Referencias: las del plan tal cual (editables en la app) — dedup por código ───
+    // Antes se anteponía siempre REFERENCIAS_BASE: la normativa salía aunque se borrara.
     referencias: (() => {
-      const combinadas = [...REFERENCIAS_BASE, ...referencias]
       const vistos = new Set<string>()
-      return combinadas
+      return referencias
         .filter(r => {
           const clave = (r.codigoDocumento ?? r.titulo).trim().toLowerCase()
           if (vistos.has(clave)) return false
@@ -329,6 +355,7 @@ export function construirDataBag({
           return true
         })
         .map(r => ({
+          texto: r.codigoDocumento ? `${r.codigoDocumento} — ${r.titulo}` : r.titulo,
           codigo: r.codigoDocumento ?? '',
           descripcion: r.titulo,
           origen: r.origen, // alias retrocompatible
