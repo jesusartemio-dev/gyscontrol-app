@@ -13,11 +13,13 @@ interface Props {
 
 const COLUMNS: ColumnaTabla<PlanEPPItem>[] = [
   { key: 'nombre', label: 'Nombre', type: 'text', required: true },
+  // Subtítulo en el cuadro del docx ("EPP Altura:"…). Vacío: se deduce del nombre.
+  { key: 'grupo', label: 'Grupo', type: 'text', width: '200px', placeholder: 'Automático (Altura, Trabajos en Caliente…)' },
   { key: 'norma', label: 'Norma', type: 'text', width: '140px' },
   { key: 'observaciones', label: 'Observaciones', type: 'text' },
 ]
 
-const filaVacia = (): PlanEPPItem => ({ nombre: '', norma: '', observaciones: '' })
+const filaVacia = (): PlanEPPItem => ({ nombre: '', norma: '', observaciones: '', grupo: '' })
 
 export function EppRequeridosEditor({ valor, onSave, onCancel }: Props) {
   return (

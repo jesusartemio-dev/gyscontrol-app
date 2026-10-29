@@ -83,6 +83,7 @@ export const planEPPItemSchema = z.object({
   nombre: z.string().min(1),
   norma: z.string().optional(),
   observaciones: z.string().optional(),
+  grupo: z.string().optional(),
 })
 
 export const planEPPSchema = z.object({

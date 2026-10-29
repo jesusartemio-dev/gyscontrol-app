@@ -41,6 +41,8 @@ src/lib/planTrabajo/prompts/alcanceDetallado.ts.
    - bioseguridad: mascarilla KN95, guantes nitrilo, alcohol gel — solo si aplica.
    - riesgoEspecifico: arnés + línea de vida si hay altura; traje contra arco si hay
      trabajo eléctrico de alta tensión; respirador si hay productos químicos.
+     Cada ítem de riesgoEspecifico lleva "grupo" con el tipo de trabajo: "Altura",
+     "Trabajos en Caliente", "Trabajos Eléctricos" o "Protección Respiratoria y Química".
    - Incluí norma cuando sea conocida.
 
 3. HERRAMIENTAS Y EQUIPOS:

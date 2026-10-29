@@ -416,3 +416,31 @@ describe('renderizarPlanTrabajoDocx — personalRequerido condicional (plantilla
     expect(documentXml).not.toContain(LINEA_INTRO_PERSONAL)
   })
 })
+
+describe('renderizarPlanTrabajoDocx — cuadro de EPP agrupado y recursos sin cantidad (formato referencia NEXA)', () => {
+  it('EPP con subtítulos por grupo y equipos/herramientas/materiales solo con nombre', async () => {
+    const plan = planFixture([edtDetalladoConTareas()])
+    plan.eppRequeridos = {
+      basico: [{ nombre: 'Casco de seguridad tipo 1, clase E', norma: 'ANSI Z89.1-2014' }, { nombre: 'Barbiquejo de seguridad', norma: '' }],
+      bioseguridad: [],
+      riesgoEspecifico: [{ nombre: 'Arnés de 4 argollas' }, { nombre: 'Careta de esmerilar' }, { nombre: 'Guantes dieléctricos clase 00' }],
+    } as unknown as PlanTrabajo['eppRequeridos']
+    plan.herramientasYEquipos = {
+      equipos: [{ nombre: 'Esmeril', cantidad: 2 }],
+      herramientas: [{ nombre: 'Juego de dados', cantidad: 1 }],
+      materiales: [{ nombre: 'Cintillos', cantidad: 100 }],
+    } as unknown as PlanTrabajo['herramientasYEquipos']
+    const dataBag = construirDataBag({ plan, proyecto: proyectoFixture, organigramaPngBase64: `data:image/png;base64,${PNG_1X1_BASE64}` })
+
+    const buffer = await renderizarPlanTrabajoDocx({ dataBag })
+    const documentXml = asertarPaqueteBienFormado(buffer).find(p => p.nombre === 'word/document.xml')!.contenido
+    const texto = documentXml.replace(/<[^>]+>/g, '')
+
+    for (const t of ['EPP Generales:', 'Casco de seguridad tipo 1, clase E (ANSI Z89.1-2014).', 'Barbiquejo de seguridad.', 'EPP Altura:', 'Arnés de 4 argollas.', 'EPP Trabajos en Caliente:', 'EPP Trabajos Eléctricos:', 'Esmeril.', 'Juego de dados.', 'Cintillos.']) {
+      expect(texto).toContain(t)
+    }
+    expect(texto).not.toContain('()')
+    expect(texto).not.toMatch(/Esmeril\s*—/)
+    expect(documentXml).not.toMatch(/\{#?\/?(eppGruposBasico|eppGruposRiesgo|items|titulo|texto)\}/)
+  })
+})

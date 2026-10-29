@@ -142,6 +142,49 @@ function tablaEmisionReferencia(xml: string): string {
   return xml.slice(0, inicio) + conservadas + encabezado + revision + vacia + firmante + xml.slice(fin)
 }
 
+/** Párrafo de lista con viñeta (numId 2 de la plantilla), sin espacio extra entre ítems como la referencia. */
+const pVineta = (texto: string) =>
+  `<w:p><w:pPr><w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="2"/></w:numPr><w:spacing w:before="0" w:after="0"/><w:jc w:val="left"/></w:pPr>` +
+  `<w:r><w:rPr><w:rFonts w:ascii="${FUENTE}" w:cs="${FUENTE}" w:eastAsia="${FUENTE}" w:hAnsi="${FUENTE}"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">${texto}</w:t></w:r></w:p>`
+const pMarcador = (texto: string) =>
+  `<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr><w:r><w:t xml:space="preserve">${texto}</w:t></w:r></w:p>`
+
+/**
+ * Cuadro de EPP como la referencia NEXA: en cada columna, subtítulos
+ * subrayados ("EPP Generales:", "EPP Altura:"…) con su lista debajo.
+ */
+function tablaEppReferencia(xml: string): string {
+  const i = xml.indexOf('{#eppBasico}')
+  const inicio = xml.lastIndexOf('<w:tbl>', i)
+  const fin = xml.indexOf('</w:tbl>', i)
+  const tabla = xml.slice(inicio, fin)
+  const finCabecera = tabla.indexOf('</w:tr>') + '</w:tr>'.length
+
+  const columna = (loop: string) =>
+    pMarcador(`{#${loop}}`) +
+    `<w:p><w:pPr><w:keepNext/><w:spacing w:before="160" w:after="120"/><w:jc w:val="left"/></w:pPr>` +
+    `<w:r><w:rPr><w:rFonts w:ascii="${FUENTE}" w:cs="${FUENTE}" w:eastAsia="${FUENTE}" w:hAnsi="${FUENTE}"/><w:b/><w:bCs/><w:u w:val="single"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">{titulo}:</w:t></w:r></w:p>` +
+    pMarcador('{#items}') + pVineta('{texto}') + pMarcador('{/items}') +
+    pMarcador(`{/${loop}}`) +
+    `<w:p><w:pPr><w:spacing w:before="0" w:after="120"/></w:pPr></w:p>`
+  const celda = (contenido: string) =>
+    `<w:tc><w:tcPr><w:tcW w:w="4820" w:type="dxa"/><w:tcMar><w:left w:w="100" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tcMar><w:vAlign w:val="top"/></w:tcPr>${contenido}</w:tc>`
+  const fila = `<w:tr>${celda(columna('eppGruposBasico'))}${celda(columna('eppGruposRiesgo'))}</w:tr>`
+  return xml.slice(0, inicio) + tabla.slice(0, finCabecera) + fila + xml.slice(fin)
+}
+
+/** Equipos / herramientas / materiales: solo el nombre (sin "— cantidad"), lista compacta y alineada arriba. */
+function tablaRecursosReferencia(xml: string): string {
+  const i = xml.indexOf('{#equipos}')
+  const inicio = xml.lastIndexOf('<w:tbl>', i)
+  const fin = xml.indexOf('</w:tbl>', i)
+  const tabla = xml
+    .slice(inicio, fin)
+    .replace(/<w:p>(?:(?!<\/w:p>)[\s\S])*?\{nombre\} — \{cantidad\}[\s\S]*?<\/w:p>/g, () => pVineta('{texto}'))
+    .replace(/(<w:tcPr>(?:(?!<\/w:tcPr>)[\s\S])*?)<w:vAlign w:val="center"\/>(<\/w:tcPr>)/g, (m, a, b) => (a.includes('w:shd') ? m : `${a}<w:vAlign w:val="top"/>${b}`))
+  return xml.slice(0, inicio) + tabla + xml.slice(fin)
+}
+
 const zip = new PizZip(fs.readFileSync(PLANTILLA))
 const doc = zip.file('word/document.xml')!.asText()
 let cambios = 0
@@ -160,6 +203,11 @@ const docActual = zip.file('word/document.xml')!.asText()
 if (!docActual.includes('{#filasVacias}')) {
   // Referencias: "{texto}" ya trae "código — título" o solo el título (sin " — " colgando).
   zip.file('word/document.xml', tablaEmisionReferencia(docActual).replace('{codigo} — {descripcion}', '{texto}'))
+  cambios++
+}
+const docConEmision = zip.file('word/document.xml')!.asText()
+if (!docConEmision.includes('{#eppGruposBasico}')) {
+  zip.file('word/document.xml', tablaRecursosReferencia(tablaEppReferencia(docConEmision)))
   cambios++
 }
 const encabezado = zip.file('word/header1.xml')!.asText()

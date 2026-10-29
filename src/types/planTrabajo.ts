@@ -111,6 +111,8 @@ export interface PlanEPPItem {
   nombre: string
   norma?: string
   observaciones?: string
+  /** Subtítulo del cuadro de EPP ("Altura", "Trabajos en Caliente"…). Sin valor: se deduce del nombre (eppGrupos.ts). */
+  grupo?: string
 }
 
 export interface PlanEPP {

@@ -61,8 +61,10 @@ CAMPOS:
 - riesgoEspecifico: arnés de seguridad + línea de vida si hay trabajo en altura; guantes dieléctricos
   clase 0 si hay trabajo eléctrico en BT; traje contra arco si hay alta tensión; respirador con
   filtro orgánico si hay vapores.
+  Cada ítem de riesgoEspecifico lleva "grupo" con el tipo de trabajo: "Altura", "Trabajos en Caliente",
+  "Trabajos Eléctricos" o "Protección Respiratoria y Química".
 - Incluí la norma técnica cuando sea conocida (ANSI, EN, NTP).`,
-    schema: `{ "eppRequeridos": { "basico": [{ "nombre": "string", "norma": "string opcional", "observaciones": "string opcional" }], "bioseguridad": [], "riesgoEspecifico": [] } }`,
+    schema: `{ "eppRequeridos": { "basico": [{ "nombre": "string", "norma": "string opcional", "observaciones": "string opcional" }], "bioseguridad": [], "riesgoEspecifico": [{ "nombre": "string", "norma": "string opcional", "grupo": "Altura | Trabajos en Caliente | Trabajos Eléctricos | Protección Respiratoria y Química" }] } }`,
   },
 
   herramientasYEquipos: {

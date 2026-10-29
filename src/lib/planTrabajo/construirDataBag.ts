@@ -1,4 +1,5 @@
 import type { PlanTrabajo, Cliente, Proyecto, PlanTrabajoGeneracion, PlanTrabajoImagen } from '@prisma/client'
+import { agruparEpp, textoItemLista } from './eppGrupos'
 import type {
   PlanAlcanceDetalladoEdt,
   PlanAlcanceItem,
@@ -275,6 +276,7 @@ export function construirDataBag({
   const personal = (plan.personalAsignado as PlanPersonal[] | null) ?? []
   const raci = (plan.matrizRaci as PlanRaci | null) ?? { filas: [] }
   const epp = (plan.eppRequeridos as PlanEPP | null) ?? { basico: [], bioseguridad: [], riesgoEspecifico: [] }
+  const eppAgrupado = agruparEpp(epp)
   const herramientas = (plan.herramientasYEquipos as PlanHerramientasYEquipos | null) ?? { equipos: [], herramientas: [], materiales: [] }
   const restricciones = (plan.restricciones as PlanRestriccion[] | null) ?? []
   const alcanceDetallado = (plan.alcanceDetallado as Array<PlanAlcanceDetalladoEdt | PlanAlcanceItem> | null) ?? []
@@ -387,11 +389,14 @@ export function construirDataBag({
     eppBioseguridad: epp.bioseguridad.map(e => ({ nombre: e.nombre, norma: e.norma ?? '', observaciones: e.observaciones ?? '' })),
     eppRiesgoEspecifico: epp.riesgoEspecifico.map(e => ({ nombre: e.nombre, norma: e.norma ?? '', observaciones: e.observaciones ?? '' })),
     hayEppBioseguridad: epp.bioseguridad.length > 0,
+    // Cuadro de EPP como la referencia NEXA: subtítulos por grupo (EPP Generales / EPP Altura / …).
+    eppGruposBasico: eppAgrupado.basico,
+    eppGruposRiesgo: eppAgrupado.riesgoEspecifico,
 
     // ─── Herramientas y Equipos ───
-    equipos: herramientas.equipos.map(h => ({ nombre: h.nombre, cantidad: h.cantidad ?? '', unidad: h.unidad ?? '', observaciones: h.observaciones ?? '' })),
-    herramientas: herramientas.herramientas.map(h => ({ nombre: h.nombre, cantidad: h.cantidad ?? '', unidad: h.unidad ?? '', observaciones: h.observaciones ?? '' })),
-    materiales: herramientas.materiales.map(h => ({ nombre: h.nombre, cantidad: h.cantidad ?? '', unidad: h.unidad ?? '', observaciones: h.observaciones ?? '' })),
+    equipos: herramientas.equipos.map(h => ({ nombre: h.nombre, texto: textoItemLista(h.nombre), cantidad: h.cantidad ?? '', unidad: h.unidad ?? '', observaciones: h.observaciones ?? '' })),
+    herramientas: herramientas.herramientas.map(h => ({ nombre: h.nombre, texto: textoItemLista(h.nombre), cantidad: h.cantidad ?? '', unidad: h.unidad ?? '', observaciones: h.observaciones ?? '' })),
+    materiales: herramientas.materiales.map(h => ({ nombre: h.nombre, texto: textoItemLista(h.nombre), cantidad: h.cantidad ?? '', unidad: h.unidad ?? '', observaciones: h.observaciones ?? '' })),
 
     // ─── Restricciones ───
     restricciones: restricciones.map(r => ({ texto: r.texto, categoria: r.categoria ?? '' })),
