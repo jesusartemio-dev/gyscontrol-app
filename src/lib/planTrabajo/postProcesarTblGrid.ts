@@ -122,6 +122,33 @@ function reconstruirTablaSiHaceFalta(tablaXml: string): { xml: string; corregida
   }
 }
 
+/** Ancho (twips) de la celda auxiliar de la plantilla que solo aloja `{/matrizRaci}`. */
+const ANCHO_CELDA_CIERRE_RACI = 60
+
+/**
+ * La grilla RACI de la plantilla necesita una tercera celda angosta para
+ * cerrar el loop de filas (`{/matrizRaci}` no puede ir dentro del loop
+ * `{-w:tc roles}`). Ya renderizada, esa celda queda como una columna vacía
+ * de más al final de la tabla: se quita de cada fila. Correr ANTES de
+ * `sincronizarTblGridDelDocumento`, que rehace el tblGrid con las celdas que quedan.
+ */
+export function quitarColumnaCierreRaci(documentXml: string): string {
+  const posCabecera = documentXml.indexOf('EDT / ACTIVIDAD')
+  if (posCabecera === -1) return documentXml
+  const inicio = documentXml.lastIndexOf('<w:tbl>', posCabecera)
+  const fin = documentXml.indexOf('</w:tbl>', posCabecera)
+  if (inicio === -1 || fin === -1) return documentXml
+
+  const tabla = documentXml.slice(inicio, fin).replace(/<w:tr>[\s\S]*?<\/w:tr>/g, fila => {
+    const inicioUltima = fila.lastIndexOf('<w:tc>')
+    if (inicioUltima === -1) return fila
+    const ultima = fila.slice(inicioUltima)
+    const esCierre = new RegExp(`<w:tcW\\b[^>]*\\sw:w="${ANCHO_CELDA_CIERRE_RACI}"`).test(ultima)
+    return esCierre ? fila.slice(0, inicioUltima) + '</w:tr>' : fila
+  })
+  return documentXml.slice(0, inicio) + tabla + documentXml.slice(fin)
+}
+
 /**
  * Recorre TODAS las tablas de `document.xml` (documento renderizado, después
  * de `doc.renderAsync()`) y corrige el `<w:tblGrid>` de cualquiera cuyo

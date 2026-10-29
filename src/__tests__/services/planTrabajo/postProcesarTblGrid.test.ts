@@ -1,4 +1,4 @@
-import { sincronizarTblGridDelDocumento } from '@/lib/planTrabajo/postProcesarTblGrid'
+import { quitarColumnaCierreRaci, sincronizarTblGridDelDocumento } from '@/lib/planTrabajo/postProcesarTblGrid'
 
 /**
  * Reproduce el bug real (confirmado por el usuario renderizando la plantilla):
@@ -85,5 +85,23 @@ describe('sincronizarTblGridDelDocumento', () => {
     // Lo que se verifica acá es que la tabla EXTERIOR (2 celdas propias: 1000+8640) coincide con sus 2 gridCol — nada se corrige.
     expect(tablasCorregidas).toEqual([])
     expect(xml).toBe(doc)
+  })
+})
+
+describe('quitarColumnaCierreRaci', () => {
+  it('quita la celda auxiliar de 60 (cierre de {/matrizRaci}) de cada fila de la RACI y el tblGrid queda con las columnas reales', () => {
+    const filaCabecera = `<w:tr>${tc(2800, 'EDT / ACTIVIDAD')}${[1, 2, 3].map(() => tc(340, 'PR')).join('')}${tc(60, '')}</w:tr>`
+    const filaDatos = `<w:tr>${tc(2800, 'Planificación')}${[1, 2, 3].map(() => tc(340, 'R')).join('')}${tc(60, '')}</w:tr>`
+    const otra = tabla([1000], [`<w:tr>${tc(60, 'otra')}</w:tr>`])
+    const doc = otra + tabla([2800, 340, 60], [filaCabecera, filaDatos])
+
+    const { xml } = sincronizarTblGridDelDocumento(quitarColumnaCierreRaci(doc))
+
+    const raci = xml.slice(xml.indexOf('EDT / ACTIVIDAD'))
+    expect(raci).not.toContain('w:w="60"')
+    expect(raci.match(/<w:tc>/g)).toHaveLength(7) // desde el texto de la 1ª celda: 3 de cabecera + 4 de la fila
+    expect(xml.slice(xml.lastIndexOf('<w:tblGrid>'))).toContain('<w:gridCol w:w="2800"/><w:gridCol w:w="340"/><w:gridCol w:w="340"/><w:gridCol w:w="340"/></w:tblGrid>')
+    // Otras tablas no se tocan.
+    expect(xml).toContain('<w:t>otra</w:t>')
   })
 })

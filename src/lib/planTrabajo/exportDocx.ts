@@ -2,7 +2,7 @@ import Docxtemplater from 'docxtemplater'
 import PizZip from 'pizzip'
 import ImageModule from 'docxtemplater-image-module-free'
 import { descargarPlantillaPlanTrabajo } from './descargarPlantilla'
-import { sincronizarTblGridDelDocumento } from './postProcesarTblGrid'
+import { quitarColumnaCierreRaci, sincronizarTblGridDelDocumento } from './postProcesarTblGrid'
 import { asegurarEstilosIndice, poblarIndice } from './indiceDocx'
 
 /** Párrafo centrado con una imagen → keepNext, para que la foto no quede en una hoja y su "Figura N." en la siguiente. */
@@ -125,7 +125,7 @@ export async function renderizarPlanTrabajoDocx({ dataBag }: RenderInput): Promi
   // {-w:tc} (grilla RACI) duplica celdas — ver postProcesarTblGrid.ts.
   const zipRenderizado = doc.getZip()
   const documentXml = zipRenderizado.file('word/document.xml')!.asText()
-  const { xml: documentXmlCorregido, tablasCorregidas } = sincronizarTblGridDelDocumento(documentXml)
+  const { xml: documentXmlCorregido, tablasCorregidas } = sincronizarTblGridDelDocumento(quitarColumnaCierreRaci(documentXml))
   if (tablasCorregidas.length > 0) {
     console.log(`[plan-trabajo] tblGrid corregido post-render en ${tablasCorregidas.length} tabla(s) (índices: ${tablasCorregidas.join(', ')})`)
   }
