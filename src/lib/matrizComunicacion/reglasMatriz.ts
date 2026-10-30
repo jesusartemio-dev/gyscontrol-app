@@ -42,15 +42,31 @@ export const REGLAS_MATRIZ: Record<string, ReglaEdt> = {
   // ── Gestión ──────────────────────────────────────────────────────────────
   GES: {
     frecuencia: 'E', medio: 'IR', cliente: 'DV',
-    participacion: { 'Gestor de Proyectos': 'E' },
+    // El plan, el cronograma y el organigrama los tiene que conocer el equipo
+    // que ejecuta, no solo el cliente: antes nadie del equipo los recibía.
+    participacion: {
+      'Gestor de Proyectos': 'E',
+      'Supervisor de Campo': 'D',
+      'Ingeniero de Seguridad': 'D',
+      'Coordinador de Ingeniería': 'D',
+    },
   },
   CTL: {
     frecuencia: 'S', medio: 'IE', cliente: 'DV',
-    participacion: { 'Gestor de Proyectos': 'E' },
+    // Comercial recibe el seguimiento porque de ahí salen las valorizaciones.
+    participacion: { 'Gestor de Proyectos': 'E', 'Comercial': 'D' },
   },
   CIE: {
     frecuencia: 'E', medio: 'IR', cliente: 'DV',
-    participacion: { 'Cadista': 'E', 'Programador': 'S' },
+    // El informe de cierre, el dossier y el acta los emite el Gestor. El
+    // cadista aporta los planos as-built como soporte, no como emisor, y
+    // Comercial recibe por el cierre contractual.
+    participacion: {
+      'Gestor de Proyectos': 'E',
+      'Cadista': 'S',
+      'Programador': 'S',
+      'Comercial': 'D',
+    },
   },
 
   // ── Seguridad ────────────────────────────────────────────────────────────
