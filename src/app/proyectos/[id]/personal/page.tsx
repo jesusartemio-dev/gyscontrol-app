@@ -116,11 +116,15 @@ const rolesConfig: Record<string, { icon: any; className: string; label: string 
   asistente: { icon: Users, className: 'bg-slate-100 text-slate-700', label: 'Asistente' }
 }
 
+// Las etiquetas siguen la nomenclatura del catálogo de puestos, para que la
+// pantalla, el organigrama y lo que se le informa al cliente digan lo mismo.
+// Las claves son los campos del proyecto (gestorId, supervisorId, liderId…) y no
+// cambian: solo cambia cómo se muestran.
 const rolesFijosConfig: Record<string, { icon: any; className: string; label: string }> = {
   comercial: { icon: Briefcase, className: 'bg-emerald-100 text-emerald-700', label: 'Comercial' },
-  gestor: { icon: UserCog, className: 'bg-blue-100 text-blue-700', label: 'Gestor' },
-  supervisor: { icon: HardHat, className: 'bg-orange-100 text-orange-700', label: 'Supervisor' },
-  lider: { icon: Settings, className: 'bg-purple-100 text-purple-700', label: 'Residente' }
+  gestor: { icon: UserCog, className: 'bg-blue-100 text-blue-700', label: 'Gestor de Proyectos' },
+  supervisor: { icon: HardHat, className: 'bg-orange-100 text-orange-700', label: 'Supervisor de Campo' },
+  lider: { icon: Settings, className: 'bg-purple-100 text-purple-700', label: 'Supervisor de Proyecto' }
 }
 
 const roleDescriptions: Record<string, string> = {

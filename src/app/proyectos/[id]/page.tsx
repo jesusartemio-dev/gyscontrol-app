@@ -486,8 +486,8 @@ export default function ProyectoHubPage() {
       borderColor: 'border-teal-200',
       href: `${baseUrl}/personal`,
       stats: [
-        { label: 'Gestor', value: proyecto.gestor?.name ? 1 : 0 },
-        { label: 'Supervisor', value: proyecto.supervisor?.name ? 1 : 0 },
+        { label: 'Gestor de Proyectos', value: proyecto.gestor?.name ? 1 : 0 },
+        { label: 'Supervisor de Campo', value: proyecto.supervisor?.name ? 1 : 0 },
       ],
       badge: proyecto.gestor?.name || 'Sin asignar'
     },
