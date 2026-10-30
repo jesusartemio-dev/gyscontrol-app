@@ -272,10 +272,12 @@ const RolesFijosCompact = memo(function RolesFijosCompact({
 // Componente de tabla de personal
 const PersonalTable = memo(function PersonalTable({
   personal,
-  onRemove
+  onRemove,
+  onEdit
 }: {
   personal: PersonalProyecto[]
   onRemove: (id: string) => void
+  onEdit: (p: PersonalProyecto) => void
 }) {
   const [search, setSearch] = useState('')
   const [filterRol, setFilterRol] = useState('all')
@@ -457,14 +459,26 @@ const PersonalTable = memo(function PersonalTable({
                     {formatDate(p.fechaAsignacion)}
                   </TableCell>
                   <TableCell className="py-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => onRemove(p.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Editar puesto y rol"
+                        onClick={() => onEdit(p)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-700 hover:bg-red-50"
+                        title="Quitar del proyecto"
+                        onClick={() => onRemove(p.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -492,6 +506,11 @@ export default function PersonalPage({ params: _params }: PageProps) {
   const [selectedRol, setSelectedRol] = useState('')
   const [selectedPuestoId, setSelectedPuestoId] = useState('')
   const [puestos, setPuestos] = useState<Array<{ id: string; nombre: string }>>([])
+  // Edición de un miembro ya asignado: evita tener que quitarlo y volver a agregarlo
+  const [editandoMiembro, setEditandoMiembro] = useState<PersonalProyecto | null>(null)
+  const [editPuestoId, setEditPuestoId] = useState('')
+  const [editRol, setEditRol] = useState('')
+  const [guardandoMiembro, setGuardandoMiembro] = useState(false)
 
   // Estado para editar roles principales
   const [editingRolFijo, setEditingRolFijo] = useState<string | null>(null)
@@ -583,6 +602,43 @@ export default function PersonalPage({ params: _params }: PageProps) {
       toast.error(error instanceof Error ? error.message : 'Error al asignar personal')
     } finally {
       setAddingPersonal(false)
+    }
+  }
+
+  const abrirEditarMiembro = (p: PersonalProyecto) => {
+    setEditandoMiembro(p)
+    setEditPuestoId(p.puesto?.id || '')
+    setEditRol(p.rol)
+  }
+
+  const guardarMiembro = async () => {
+    if (!editandoMiembro || !proyecto?.id) return
+
+    try {
+      setGuardandoMiembro(true)
+      const response = await fetch(`/api/proyecto/${proyecto.id}/personal`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          personalId: editandoMiembro.id,
+          rol: editRol,
+          // null limpia el puesto; el endpoint distingue null de ausente
+          puestoId: editPuestoId || null
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Error al actualizar')
+      }
+
+      toast.success('Asignación actualizada')
+      setEditandoMiembro(null)
+      loadPersonal()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al actualizar')
+    } finally {
+      setGuardandoMiembro(false)
     }
   }
 
@@ -851,6 +907,77 @@ export default function PersonalPage({ params: _params }: PageProps) {
       />
 
       {/* Modal para editar Rol Fijo */}
+      {/* Editar un miembro ya asignado */}
+      <Dialog open={!!editandoMiembro} onOpenChange={(open) => !open && setEditandoMiembro(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar asignación</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="rounded-lg bg-muted/40 px-3 py-2">
+              <p className="text-sm font-medium">{editandoMiembro?.user.name}</p>
+              <p className="text-xs text-muted-foreground">{editandoMiembro?.user.email}</p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Puesto</label>
+              <Select value={editPuestoId || '__none__'} onValueChange={(v) => setEditPuestoId(v === '__none__' ? '' : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar puesto..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">
+                    <span className="text-muted-foreground">Sin puesto</span>
+                  </SelectItem>
+                  {puestos.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Es el puesto que se informa al cliente y con el que se arma el organigrama.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Rol interno</label>
+              <Select value={editRol} onValueChange={setEditRol}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar rol..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(rolesConfig).map(([key, config]) => {
+                    const Icon = config.icon
+                    return (
+                      <SelectItem key={key} value={key}>
+                        <div className="flex items-center gap-2">
+                          <Icon className="h-4 w-4" />
+                          {config.label}
+                        </div>
+                      </SelectItem>
+                    )
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setEditandoMiembro(null)}>
+                Cancelar
+              </Button>
+              <Button onClick={guardarMiembro} disabled={guardandoMiembro || !editRol}>
+                {guardandoMiembro ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Check className="h-4 w-4 mr-2" />
+                )}
+                Guardar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!editingRolFijo} onOpenChange={(open) => !open && setEditingRolFijo(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -943,6 +1070,7 @@ export default function PersonalPage({ params: _params }: PageProps) {
       <PersonalTable
         personal={personalDinamico}
         onRemove={handleRemovePersonal}
+        onEdit={abrirEditarMiembro}
       />
 
       {/* ── Contactos del Cliente ─────────────────────────────────────────── */}

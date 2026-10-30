@@ -249,7 +249,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         fechaFin: validatedData.fechaFin ? new Date(validatedData.fechaFin) : undefined
       },
       include: {
-        user: { select: { id: true, name: true, email: true, role: true } }
+        user: { select: { id: true, name: true, email: true, role: true } },
+        puesto: { select: { id: true, nombre: true } }
       }
     })
 

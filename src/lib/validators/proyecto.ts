@@ -126,6 +126,8 @@ export const createPersonalProyectoSchema = z.object({
 // ✅ Schema para actualizar personal del proyecto
 export const updatePersonalProyectoSchema = z.object({
   rol: rolPersonalProyectoSchema.optional(),
+  /// null limpia el puesto; undefined lo deja como está.
+  puestoId: z.string().nullable().optional(),
   fechaFin: z.string().nullable().optional(),
   activo: z.boolean().optional(),
   notas: z.string().nullable().optional()
