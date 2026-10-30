@@ -227,7 +227,15 @@ export async function POST(
       // la tabla EDT->rol + el organigrama de este proyecto y se fuerza en
       // la celda correspondiente (ver aplicarReglaResponsableAFilas).
       const organigramaResuelto = resolverOrganigramaProyecto(orgNodos)
-      const filas = aplicarReglaResponsableAFilas(filasCrudas, edtInfoPorNombre, organigramaResuelto.porRol, siglaPorUserId)
+      // Se pasan TODOS los nodos (no solo los participantes) porque la cadena de
+      // padres puede atravesar un nodo vacante antes de llegar al autorizador.
+      const filas = aplicarReglaResponsableAFilas(
+        filasCrudas,
+        edtInfoPorNombre,
+        organigramaResuelto.porRol,
+        siglaPorUserId,
+        proyecto.orgNodos.map(n => ({ id: n.id, parentId: n.parentId, userId: n.userId }))
+      )
 
       filasData = filas.map(f => ({
         orden: f.orden,
