@@ -5,7 +5,7 @@ import { ROL_CONTACTO_CLIENTE_LABELS } from '@/lib/config/rolesContactoCliente'
 import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Loader2, MessageSquare, Plus, Trash2, Download, Sparkles, Pencil, X, Check, FileText, ArrowUp, ArrowDown } from 'lucide-react'
+import { Loader2, MessageSquare, Plus, Trash2, Download, ListChecks, Pencil, X, Check, FileText, ArrowUp, ArrowDown } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -182,7 +182,7 @@ export default function MatrizComunicacionPage() {
       })
       if (!res.ok) { const e = await res.json(); throw new Error(e.error ?? 'Error') }
       setMatriz(await res.json())
-      toast.success(conIA ? 'Matriz generada con IA' : 'Matriz creada')
+      toast.success(conIA ? 'Matriz generada' : 'Matriz creada')
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Error')
     } finally {
@@ -342,8 +342,9 @@ export default function MatrizComunicacionPage() {
         </div>
         <h2 className="text-xl font-semibold text-gray-800">Matriz de Comunicaciones</h2>
         <p className="text-sm text-muted-foreground">
-          Crea la matriz vacía o genérala automáticamente con IA usando el
-          organigrama y las actividades del cronograma.
+          Crea la matriz vacía o genérala automáticamente a partir del
+          organigrama y los EDTs del cronograma, aplicando las reglas de
+          comunicación de GYS.
         </p>
       </div>
       <div className="flex gap-3">
@@ -353,8 +354,8 @@ export default function MatrizComunicacionPage() {
         </Button>
         <Button onClick={() => handleCrear(true)} disabled={creating || generating} className="bg-indigo-600 hover:bg-indigo-700 text-white">
           {generating
-            ? <><Loader2 className="animate-spin mr-2" size={14} />Generando con IA…</>
-            : <><Sparkles size={14} className="mr-2" />Generar con IA</>}
+            ? <><Loader2 className="animate-spin mr-2" size={14} />Generando…</>
+            : <><ListChecks size={14} className="mr-2" />Generar automáticamente</>}
         </Button>
       </div>
     </div>
@@ -369,7 +370,9 @@ export default function MatrizComunicacionPage() {
           <span className="font-semibold text-sm text-gray-700">Matriz de Comunicaciones</span>
           <span className="text-xs text-muted-foreground">
             v{matriz.version} · {matriz.filas.length} filas
-            {matriz.generadoConIA && <span className="ml-2 text-indigo-500 inline-flex items-center gap-0.5"><Sparkles size={10} />IA</span>}
+            {/* El campo sigue llamándose generadoConIA en BD; hoy significa
+                "generada por reglas" y no "escrita por un modelo". */}
+            {matriz.generadoConIA && <span className="ml-2 text-indigo-500 inline-flex items-center gap-0.5"><ListChecks size={10} />Generada</span>}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -592,7 +595,7 @@ export default function MatrizComunicacionPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar la Matriz de Comunicaciones?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminarán todas las filas y celdas. Podrás generar una nueva con IA.
+              Se eliminarán todas las filas y celdas. Podrás generar una nueva.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
