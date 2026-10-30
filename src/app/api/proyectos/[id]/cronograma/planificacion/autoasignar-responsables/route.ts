@@ -40,7 +40,7 @@ interface ResultadoCalculo {
 async function calcularPropuesta(proyectoId: string, proyectoCronogramaId: string): Promise<ResultadoCalculo> {
   const orgNodos = await prisma.proyectoOrgNodo.findMany({
     where: { proyectoId },
-    select: { id: true, userId: true, cargoLabel: true, orden: true, user: { select: { name: true } } },
+    select: { id: true, userId: true, cargoLabel: true, orden: true, user: { select: { name: true } }, puesto: { select: { rolFuncional: true, orden: true } } },
   })
   const sinOrganigrama = orgNodos.filter(n => n.userId).length === 0
   const organigramaResuelto = resolverOrganigramaProyecto(orgNodos)

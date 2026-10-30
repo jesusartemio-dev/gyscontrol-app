@@ -81,3 +81,43 @@ describe('resolverOrganigramaProyecto — organigrama SINTÉTICO de un proyecto 
     expect(porRol.get('logistica')).toBeNull()
   })
 })
+
+describe('resolverOrganigramaProyecto — el catálogo de puestos manda sobre el cargoLabel', () => {
+  // Caso real de CJM51 tras renombrar "Residente" a "Supervisor de Proyecto":
+  // el regex de cargoLabel dejó de encontrar al residente y, peor, lo mandaba a
+  // 'supervisor', donde competía con el Supervisor de Campo.
+  const nodos = [
+    { id: 'n-sup-proy', userId: 'u-jm', cargoLabel: 'Supervisor de Proyecto', orden: 2, user: { name: 'Jesús Mamani' }, puesto: { rolFuncional: 'residente', orden: 4 } },
+    { id: 'n-sup-campo', userId: 'u-nl', cargoLabel: 'Supervisor de Campo', orden: 5, user: { name: 'Nilton Lazo' }, puesto: { rolFuncional: 'supervisor', orden: 8 } },
+    { id: 'n-prog', userId: 'u-ac', cargoLabel: 'Programador', orden: 1, user: { name: 'Alonso Cruz' }, puesto: { rolFuncional: 'residente', orden: 6 } },
+    { id: 'n-coord', userId: 'u-hc', cargoLabel: 'Coordinador de Ingeniería', orden: 3, user: { name: 'Hilda Castro' }, puesto: { rolFuncional: 'residente', orden: 5 } },
+    { id: 'n-tecnico', userId: 'u-rs', cargoLabel: 'Técnico Operativo', orden: 9, user: { name: 'Raúl Silva' }, puesto: { rolFuncional: null, orden: 14 } },
+  ]
+
+  it('"Supervisor de Proyecto" resuelve a residente por su puesto, no a supervisor por su texto', () => {
+    const { porRol } = resolverOrganigramaProyecto(nodos)
+    expect(porRol.get('residente')?.nombre).toBe('Jesús Mamani')
+    expect(porRol.get('supervisor')?.nombre).toBe('Nilton Lazo')
+  })
+
+  it('entre varios puestos con el mismo rolFuncional gana el más alto del catálogo, no el nodo más arriba', () => {
+    // El Programador está primero en el organigrama (orden 1) pero es el puesto
+    // más bajo de los tres que cumplen 'residente' (orden 6 del catálogo).
+    const { porRol } = resolverOrganigramaProyecto(nodos)
+    expect(porRol.get('residente')?.userId).toBe('u-jm')
+  })
+
+  it('un puesto sin rolFuncional no participa y tampoco se reporta como no reconocido', () => {
+    const { porRol, cargoLabelsNoReconocidos } = resolverOrganigramaProyecto(nodos)
+    expect(porRol.get('cadista')).toBeNull()
+    expect(cargoLabelsNoReconocidos).toHaveLength(0)
+  })
+
+  it('un nodo sin puesto sigue cayendo al regex de cargoLabel', () => {
+    const { porRol } = resolverOrganigramaProyecto([
+      ...nodos,
+      { id: 'n-cad', userId: 'u-ba', cargoLabel: 'Cadista', orden: 7, user: { name: 'Beto Ávila' } },
+    ])
+    expect(porRol.get('cadista')?.nombre).toBe('Beto Ávila')
+  })
+})

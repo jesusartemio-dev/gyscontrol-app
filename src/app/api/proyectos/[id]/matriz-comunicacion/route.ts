@@ -2,18 +2,12 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import Anthropic from '@anthropic-ai/sdk'
-import { buildPromptMatriz, type MatrizFilaIA } from '@/lib/matrizComunicacion/prompt'
-import { getModelForTask } from '@/lib/agente/models'
 import { generarSiglas, calcularNivelesOrgNodos, normalizarTexto, NIVELES_PARTICIPANTES_MATRIZ } from '@/lib/matrizComunicacion/utils'
 import { aplicarReglaResponsableAFilas } from '@/lib/matrizComunicacion/aplicarReglaResponsable'
+import { generarFilasMatriz } from '@/lib/matrizComunicacion/generarFilas'
 import { ROL_CONTACTO_CLIENTE_LABELS } from '@/lib/config/rolesContactoCliente'
 import { resolverOrganigramaProyecto } from '@/lib/cronogramaResponsables/resolverOrganigrama'
 import { registrarCargoLabelsNoReconocidos } from '@/lib/cronogramaResponsables/auditoriaOrganigrama'
-import { trackUsage, trackUsageError } from '@/lib/agente/usageTracker'
-import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 // GET — obtener la matriz del proyecto (con filas)
 export async function GET(
@@ -70,6 +64,9 @@ export async function POST(
             userId: true,
             cargoLabel: true,
             orden: true,
+            // El puesto del catálogo es la clave de la tabla de reglas, y su
+            // rolFuncional el que resuelve quién autoriza cada EDT.
+            puesto: { select: { nombre: true, rolFuncional: true, orden: true } },
             empresaOverride: true,
             telefonoOverride: true,
             cipOverride: true,
@@ -101,8 +98,8 @@ export async function POST(
     const userId = (session.user as { id?: string }).id ?? session.user.email ?? 'unknown'
 
     if (generarConIA) {
-      const iaEnabled = await isIAFeatureEnabled('matrizComunicacion')
-      if (!iaEnabled) return NextResponse.json({ error: 'La generación con IA de Matriz de Comunicaciones está deshabilitada' }, { status: 403 })
+      // Sin bandera de IA: la matriz ya no llama a ningún modelo, así que
+      // apagar la IA no tiene por qué dejar al proyecto sin matriz.
       // Solo participan en la matriz los niveles de gestión/ejecución del organigrama
       // (no la Gerencia General de nivel 1, ni los técnicos de campo del último nivel)
       const niveles = calcularNivelesOrgNodos(proyecto.orgNodos)
@@ -124,10 +121,12 @@ export async function POST(
       // organigrama (ver aplicarReglaResponsableAFilas), sin tocar el resto
       // de la forma de `personal` que ya usa el prompt de la IA.
       const siglaPorUserId = new Map<string, string>()
+      const siglasGys = new Set<string>()
       const personal = orgNodos.map(n => {
         const siglas = generarSiglas(n.user!.name!, usadas)
         usadas.add(siglas)
         siglaPorUserId.set(n.userId!, siglas)
+        siglasGys.add(siglas)
         return {
           siglas,
           nombre: n.user!.name!,
@@ -182,51 +181,41 @@ export async function POST(
       console.log('EDTs enviados al prompt:', edts.map(e => e.nombre))
       console.log('Proyecto codigo:', proyecto.codigo)
 
-      const prompt = buildPromptMatriz({
-        proyecto: { nombre: proyecto.nombre, codigo: proyecto.codigo ?? '' },
-        cliente: proyecto.cliente?.nombre ?? 'Cliente',
-        personal,
-        edts,
-      })
-
-      const modelo = getModelForTask('ssoma-document')
-      const startMs = Date.now()
-      let response: Awaited<ReturnType<typeof anthropic.messages.create>>
-      try {
-        response = await anthropic.messages.create({
-          model: modelo,
-          max_tokens: 4096,
-          messages: [{ role: 'user', content: prompt }],
-        })
-      } catch (err) {
-        trackUsageError({
-          userId, tipo: 'matriz-comunicacion', modelo,
-          duracionMs: Date.now() - startMs,
-          metadata: { proyectoId, errorMessage: String(err instanceof Error ? err.message : err).substring(0, 300) },
-        })
-        throw err
+      // La matriz se arma con la tabla de reglas, no con IA: las filas salen del
+      // catálogo de EDTs, las columnas del organigrama y las celdas de reglas de
+      // negocio fijas. Antes la decidía un modelo guiado por heurísticas de texto
+      // que emparejaban por el nombre del EDT, no por quién hace el trabajo.
+      // Se recorren TODOS los nodos del proyecto, no solo los participantes
+      // deduplicados: una persona puede ocupar varios puestos y cada uno le da
+      // participaciones distintas en la matriz.
+      const puestosPorSigla = new Map<string, string[]>()
+      for (const n of proyecto.orgNodos) {
+        if (!n.userId || !n.puesto?.nombre) continue
+        const sigla = siglaPorUserId.get(n.userId)
+        if (!sigla) continue
+        const actuales = puestosPorSigla.get(sigla) ?? []
+        if (!actuales.includes(n.puesto.nombre)) actuales.push(n.puesto.nombre)
+        puestosPorSigla.set(sigla, actuales)
       }
-      trackUsage({
-        userId, tipo: 'matriz-comunicacion', modelo,
-        tokensInput: response.usage.input_tokens,
-        tokensOutput: response.usage.output_tokens,
-        tokensCacheCreation: (response.usage as unknown as Record<string, number>).cache_creation_input_tokens ?? 0,
-        tokensCacheRead: (response.usage as unknown as Record<string, number>).cache_read_input_tokens ?? 0,
-        duracionMs: Date.now() - startMs,
-        metadata: { proyectoId, edtsTotal: edts.length, personalTotal: personal.length },
-      })
 
-      const raw = response.content[0].type === 'text' ? response.content[0].text : ''
-      const text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
+      const participantes = personal.map(p => ({
+        siglas: p.siglas,
+        puestos: puestosPorSigla.get(p.siglas) ?? [],
+        esCliente: !siglasGys.has(p.siglas),
+      }))
 
-      // IA returns { filas: [...] } or directly [...]
-      const parsed = JSON.parse(text)
-      const filasCrudas: MatrizFilaIA[] = Array.isArray(parsed) ? parsed : (parsed.filas ?? [])
+      const { filas: filasCrudas, edtsSinRegla } = generarFilasMatriz(
+        edts.map(e => ({ nombre: e.nombre, codigo: e.codigo, orden: e.orden })),
+        participantes
+      )
+      if (edtsSinRegla.length > 0) {
+        console.warn('EDTs sin regla en la matriz (filas vacías):', edtsSinRegla.join(', '))
+      }
 
-      // El código "R" (Autoriza) nunca lo decide la IA — se calcula acá desde
-      // la tabla EDT->rol + el organigrama de este proyecto y se fuerza en
-      // la celda correspondiente (ver aplicarReglaResponsableAFilas).
+      // El código "R" (Autoriza) sale de la tabla EDT->rol + el organigrama, y
+      // sube de nivel si el responsable ya es emisor en esa fila.
       const organigramaResuelto = resolverOrganigramaProyecto(orgNodos)
+
       // Se pasan TODOS los nodos (no solo los participantes) porque la cadena de
       // padres puede atravesar un nodo vacante antes de llegar al autorizador.
       const filas = aplicarReglaResponsableAFilas(

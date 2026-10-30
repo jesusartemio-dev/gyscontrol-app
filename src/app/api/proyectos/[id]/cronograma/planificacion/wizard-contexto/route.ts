@@ -76,7 +76,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     // para la autoasignación de responsables integrada en la generación.
     prisma.proyectoOrgNodo.findMany({
       where: { proyectoId },
-      select: { id: true, userId: true, cargoLabel: true, orden: true, user: { select: { name: true } } },
+      select: { id: true, userId: true, cargoLabel: true, orden: true, user: { select: { name: true } }, puesto: { select: { rolFuncional: true, orden: true } } },
     }),
     // Solo existencia — el contenido del TDR nunca se manda acá: es señal
     // débil que solo alimenta el nombrado de zonas/familias en Etapa A y los

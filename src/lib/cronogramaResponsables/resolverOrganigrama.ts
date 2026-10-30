@@ -42,6 +42,15 @@ export interface OrgNodoResoluble {
   cargoLabel: string
   orden: number
   user?: { name: string | null } | null
+  /**
+   * Puesto del catálogo, cuando el nodo ya está mapeado. Manda sobre el regex
+   * de `cargoLabel`: el catálogo dice explícitamente qué rol funcional cumple
+   * cada puesto, mientras que el regex adivina por texto y se rompe con los
+   * renombres. "Supervisor de Proyecto" (antes "Residente") dejó de matchear
+   * /residente/ y caía en 'supervisor', robándole el rol al Supervisor de
+   * Campo y dejando ING/PLA/PLC/HMI/TAB sin responsable.
+   */
+  puesto?: { rolFuncional: string | null; orden?: number } | null
 }
 
 export interface PersonaResuelta {
@@ -62,10 +71,36 @@ export interface ResolucionOrganigrama {
 
 const TODOS_LOS_ROLES: RolResponsable[] = ['gestor', 'residente', 'supervisor', 'ssoma', 'cadista', 'logistica']
 
+const ROLES_VALIDOS = new Set<string>(TODOS_LOS_ROLES)
+
+/**
+ * Rol de un nodo: el `rolFuncional` del puesto si está mapeado, y el regex
+ * sobre `cargoLabel` solo como respaldo para nodos sin puesto.
+ *
+ * Un nodo con puesto pero sin `rolFuncional` (Gerencia General, los técnicos,
+ * Supervisor Andamiero) NO participa en la tabla EDT->rol y tampoco se reporta
+ * como no reconocido: está catalogado, simplemente no responde EDTs. Lo mismo
+ * para un `rolFuncional` que no sea uno de los 6 roles ('comercial').
+ */
+function resolverRolDeNodo(
+  nodo: OrgNodoResoluble,
+  noReconocidos: CargoLabelNoReconocido[]
+): RolResponsable | null {
+  if (nodo.puesto) {
+    const rol = nodo.puesto.rolFuncional
+    return rol && ROLES_VALIDOS.has(rol) ? (rol as RolResponsable) : null
+  }
+
+  const rol = matchRolPorCargo(nodo.cargoLabel)
+  if (!rol) noReconocidos.push({ nodoId: nodo.id, cargoLabel: nodo.cargoLabel })
+  return rol
+}
+
 /**
  * Resuelve, para el organigrama de UN proyecto, qué persona ocupa cada uno
  * de los 6 roles fijos. Nodos sin userId (vacantes) no participan. Si 2+
- * nodos matchean el mismo rol, gana el de menor `orden` (determinista). Un
+ * nodos matchean el mismo rol, gana el puesto más alto del catálogo y, a
+ * igualdad, el nodo de menor `orden` (determinista). Un
  * cargoLabel que no matchea ninguna regla se acumula en
  * cargoLabelsNoReconocidos para auditoría (ver auditoriaOrganigrama.ts) — en
  * ningún caso se inventa ni se asigna al azar.
@@ -77,18 +112,24 @@ export function resolverOrganigramaProyecto(nodos: OrgNodoResoluble[]): Resoluci
   const candidatosPorRol = new Map<RolResponsable, OrgNodoResoluble[]>()
 
   for (const nodo of nodos) {
-    const rol = matchRolPorCargo(nodo.cargoLabel)
-    if (!rol) {
-      cargoLabelsNoReconocidos.push({ nodoId: nodo.id, cargoLabel: nodo.cargoLabel })
-      continue
-    }
+    const rol = resolverRolDeNodo(nodo, cargoLabelsNoReconocidos)
+    if (!rol) continue
     if (!nodo.userId) continue // vacante: el rol existe pero nadie lo ocupa todavía
     if (!candidatosPorRol.has(rol)) candidatosPorRol.set(rol, [])
     candidatosPorRol.get(rol)!.push(nodo)
   }
 
   for (const [rol, candidatos] of candidatosPorRol) {
-    const elegido = [...candidatos].sort((a, b) => a.orden - b.orden)[0]
+    // Varios puestos comparten un mismo rolFuncional — 'residente' lo cumplen
+    // Supervisor de Proyecto, Coordinador de Ingeniería y Programador — así que
+    // desempatar por la posición del nodo en el organigrama le daba la
+    // responsabilidad al Programador cuando este aparecía más arriba. El orden
+    // del catálogo de puestos sí es jerárquico, y manda.
+    const elegido = [...candidatos].sort((a, b) => {
+      const pa = a.puesto?.orden ?? Number.MAX_SAFE_INTEGER
+      const pb = b.puesto?.orden ?? Number.MAX_SAFE_INTEGER
+      return pa !== pb ? pa - pb : a.orden - b.orden
+    })[0]
     porRol.set(rol, {
       userId: elegido.userId!,
       nombre: elegido.user?.name ?? '',

@@ -48,7 +48,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const [orgNodos, edtsCatalogo] = await Promise.all([
     prisma.proyectoOrgNodo.findMany({
       where: { proyectoId },
-      select: { id: true, userId: true, cargoLabel: true, orden: true, user: { select: { name: true } } },
+      select: { id: true, userId: true, cargoLabel: true, orden: true, user: { select: { name: true } }, puesto: { select: { rolFuncional: true, orden: true } } },
     }),
     prisma.edt.findMany({ select: { nombre: true, descripcion: true } }),
   ])

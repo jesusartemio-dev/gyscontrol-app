@@ -1,5 +1,9 @@
 // src/lib/agente/featureFlags.ts
 // Feature flags for AI tools — stored in ConfiguracionGeneral.iaFeatures
+//
+// La Matriz de Comunicaciones ya no figura acá: se arma con tablas de reglas,
+// sin modelo, así que no hay nada que apagar. Las claves viejas que sigan
+// guardadas en la BD se ignoran al parsear.
 
 import { prisma } from '@/lib/prisma'
 
@@ -11,7 +15,6 @@ export interface IAFeatureFlags {
   ocrComprobantes: boolean
   scanCotizacionPDF: boolean
   importCatalogoPDF: boolean
-  matrizComunicacion: boolean
   planTrabajo: boolean
   iperc: boolean
   pets: boolean
@@ -30,7 +33,6 @@ const DEFAULT_FLAGS: IAFeatureFlags = {
   ocrComprobantes: true,
   scanCotizacionPDF: true,
   importCatalogoPDF: true,
-  matrizComunicacion: true,
   planTrabajo: true,
   iperc: true,
   pets: true,
@@ -52,7 +54,6 @@ function parseFlags(raw: unknown): IAFeatureFlags {
     ocrComprobantes: typeof obj.ocrComprobantes === 'boolean' ? obj.ocrComprobantes : DEFAULT_FLAGS.ocrComprobantes,
     scanCotizacionPDF: typeof obj.scanCotizacionPDF === 'boolean' ? obj.scanCotizacionPDF : DEFAULT_FLAGS.scanCotizacionPDF,
     importCatalogoPDF: typeof obj.importCatalogoPDF === 'boolean' ? obj.importCatalogoPDF : DEFAULT_FLAGS.importCatalogoPDF,
-    matrizComunicacion: typeof obj.matrizComunicacion === 'boolean' ? obj.matrizComunicacion : DEFAULT_FLAGS.matrizComunicacion,
     planTrabajo: typeof obj.planTrabajo === 'boolean' ? obj.planTrabajo : DEFAULT_FLAGS.planTrabajo,
     iperc: typeof obj.iperc === 'boolean' ? obj.iperc : DEFAULT_FLAGS.iperc,
     pets: typeof obj.pets === 'boolean' ? obj.pets : DEFAULT_FLAGS.pets,

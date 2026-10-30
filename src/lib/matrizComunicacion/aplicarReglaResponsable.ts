@@ -1,4 +1,4 @@
-import type { MatrizFilaIA } from './prompt'
+import type { MatrizFila } from './tipos'
 import { normalizarTexto } from './utils'
 import { calcularRolResponsable } from '@/lib/cronogramaResponsables/reglasResponsable'
 import type { ResolucionOrganigrama } from '@/lib/cronogramaResponsables/resolverOrganigrama'
@@ -52,23 +52,21 @@ function resolverAutorizador(
 
 /**
  * Fuerza el código "R" (Autoriza) en la celda de la persona resuelta por la
- * tabla EDT->rol + organigrama del proyecto, y quita cualquier "R" que el
- * modelo hubiera puesto en otra celda (no debería, ya que el prompt ya no
- * incluye "R" en su vocabulario — esto es un cinturón de seguridad, no la
- * única defensa). El resto de códigos (D/E/S/V) que decidió la IA queda
- * intacto. La IA nunca decide quién es responsable.
+ * tabla EDT->rol + organigrama del proyecto, y limpia cualquier "R" que venga
+ * en otra celda. El resto de códigos (D/E/S/V) sale de `reglasMatriz.ts` y
+ * queda intacto: la tabla de reglas dice quién participa, esta función quién
+ * autoriza.
  *
  * `edtInfoPorNombre` debe estar indexado por `normalizarTexto(nombre)` (el
- * mismo criterio tolerante a mayúsculas/acentos que usa el resto de este
- * módulo para matchear texto libre de la IA contra EDTs reales).
+ * mismo criterio tolerante a mayúsculas/acentos que usa el resto del módulo).
  */
 export function aplicarReglaResponsableAFilas(
-  filas: MatrizFilaIA[],
+  filas: MatrizFila[],
   edtInfoPorNombre: Map<string, EdtInfoParaRegla>,
   organigramaResuelto: ResolucionOrganigrama['porRol'],
   siglaPorUserId: Map<string, string>,
   nodosOrganigrama: NodoJerarquia[] = []
-): MatrizFilaIA[] {
+): MatrizFila[] {
   const jerarquia = new Map(nodosOrganigrama.map(n => [n.id, n]))
 
   return filas.map(f => {

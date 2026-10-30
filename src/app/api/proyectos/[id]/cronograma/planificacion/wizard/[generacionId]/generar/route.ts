@@ -157,7 +157,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   // responsableId: null + advertencia visible, jamás una adivinanza.
   const orgNodos = await prisma.proyectoOrgNodo.findMany({
     where: { proyectoId: cronograma.proyectoId },
-    select: { id: true, userId: true, cargoLabel: true, orden: true, user: { select: { name: true } } },
+    select: { id: true, userId: true, cargoLabel: true, orden: true, user: { select: { name: true } }, puesto: { select: { rolFuncional: true, orden: true } } },
   })
   const organigramaResuelto = resolverOrganigramaProyecto(orgNodos)
   const asignacionResponsables = asignarResponsablesEstructura(estructura, organigramaResuelto.porRol)
