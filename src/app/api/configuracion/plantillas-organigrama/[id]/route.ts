@@ -18,6 +18,7 @@ export async function GET(_req: Request, { params }: Ctx) {
         nodos: {
           orderBy: [{ parentId: 'asc' }, { orden: 'asc' }],
           include: {
+            puesto: { select: { id: true, nombre: true } },
             recurso: { select: { id: true, nombre: true, tipo: true } },
             user: { select: { id: true, name: true, email: true } },
           },

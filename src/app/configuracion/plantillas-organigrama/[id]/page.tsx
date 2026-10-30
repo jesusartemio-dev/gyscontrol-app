@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -20,6 +19,7 @@ import Link from 'next/link'
 import OrgChart, { OrgNodoCompleto } from '@/components/organigrama/OrgChart'
 
 interface Recurso { id: string; nombre: string; tipo: string }
+interface PuestoItem { id: string; nombre: string }
 interface UsuarioItem { id: string; name: string; email: string }
 interface NodoPlantilla {
   id: string
@@ -27,6 +27,8 @@ interface NodoPlantilla {
   parentId: string | null
   orden: number
   cargoLabel: string
+  puestoId: string | null
+  puesto: PuestoItem | null
   recursoId: string | null
   userId: string | null
   esObligatorio: boolean
@@ -76,24 +78,27 @@ export default function PlantillaEditorPage() {
   const [saving, setSaving] = useState(false)
   // addingChild: null | '__root__' | 'gys:<LABEL>' | <plantillaNodeId>
   const [addingChild, setAddingChild] = useState<string | null>(null)
-  const [newCargoLabel, setNewCargoLabel] = useState('')
+  const [newPuestoId, setNewPuestoId] = useState('')
   const [deleteNodoId, setDeleteNodoId] = useState<string | null>(null)
 
-  const [formLabel, setFormLabel] = useState('')
+  const [formPuestoId, setFormPuestoId] = useState('')
+  const [puestos, setPuestos] = useState<PuestoItem[]>([])
   const [formRecursoId, setFormRecursoId] = useState('')
   const [formUserId, setFormUserId] = useState('')
   const [formObligatorio, setFormObligatorio] = useState(true)
 
   const loadData = useCallback(async () => {
     try {
-      const [pRes, rRes, uRes] = await Promise.all([
+      const [pRes, rRes, uRes, puRes] = await Promise.all([
         fetch(`/api/configuracion/plantillas-organigrama/${plantillaId}`),
         fetch('/api/recurso?activos=true'),
         fetch('/api/admin/usuarios'),
+        fetch('/api/puestos'),
       ])
       if (!pRes.ok) { router.push('/configuracion/plantillas-organigrama'); return }
-      const [p, r, u] = await Promise.all([pRes.json(), rRes.json(), uRes.json()])
+      const [p, r, u, pu] = await Promise.all([pRes.json(), rRes.json(), uRes.json(), puRes.json()])
       setPlantilla(p)
+      setPuestos(Array.isArray(pu) ? pu : [])
       setRecursos(Array.isArray(r) ? r.filter((x: Recurso) => x.tipo === 'individual') : [])
       const rawUsuarios = Array.isArray(u) ? u : (u.users ?? [])
       setUsuarios(rawUsuarios.map((x: any) => ({ id: x.id, name: x.name ?? x.nombre ?? '', email: x.email ?? '' })))
@@ -110,7 +115,7 @@ export default function PlantillaEditorPage() {
 
   useEffect(() => {
     if (selectedNodo) {
-      setFormLabel(selectedNodo.cargoLabel)
+      setFormPuestoId(selectedNodo.puestoId ?? '')
       setFormRecursoId(selectedNodo.recursoId ?? '')
       setFormUserId(selectedNodo.userId ?? '')
       setFormObligatorio(selectedNodo.esObligatorio)
@@ -118,7 +123,7 @@ export default function PlantillaEditorPage() {
   }, [selectedNodoId])
 
   const handleSaveNodo = async () => {
-    if (!selectedNodo || !formLabel.trim()) return
+    if (!selectedNodo || !formPuestoId) return
     setSaving(true)
     try {
       const res = await fetch(
@@ -127,7 +132,7 @@ export default function PlantillaEditorPage() {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            cargoLabel: formLabel.trim(),
+            puestoId: formPuestoId,
             recursoId: formRecursoId || null,
             userId: formUserId || null,
             esObligatorio: formObligatorio,
@@ -182,8 +187,7 @@ export default function PlantillaEditorPage() {
   }
 
   const handleAddNodo = async () => {
-    const label = newCargoLabel.trim()
-    if (!label) { toast.error('Escribe el cargo del nodo'); return }
+    if (!newPuestoId) { toast.error('Elige el puesto del nodo'); return }
     if (!addingChild) return
 
     let parentId: string | null = null
@@ -217,13 +221,13 @@ export default function PlantillaEditorPage() {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cargoLabel: label, parentId, gysParentLabel, orden: nextOrden }),
+          body: JSON.stringify({ puestoId: newPuestoId, parentId, gysParentLabel, orden: nextOrden }),
         }
       )
       if (!res.ok) throw new Error()
       const created = await res.json()
       toast.success('Nodo agregado')
-      setNewCargoLabel('')
+      setNewPuestoId('')
       setAddingChild(null)
       await loadData()
       setSelectedNodoId(created.id)
@@ -305,7 +309,7 @@ export default function PlantillaEditorPage() {
             <button
               className="p-0.5 rounded text-indigo-600 hover:bg-indigo-100"
               title="Agregar hijo"
-              onClick={e => { e.stopPropagation(); setAddingChild(nodo.id); setNewCargoLabel('') }}
+              onClick={e => { e.stopPropagation(); setAddingChild(nodo.id); setNewPuestoId('') }}
             >
               <Plus className="h-3.5 w-3.5" />
             </button>
@@ -321,17 +325,16 @@ export default function PlantillaEditorPage() {
 
         {addingChild === nodo.id && (
           <div className="flex items-center gap-2 py-1" style={{ paddingLeft: `${8 + (level + 1) * 16}px` }}>
-            <Input
-              value={newCargoLabel}
-              onChange={e => setNewCargoLabel(e.target.value)}
-              placeholder="Cargo del nuevo nodo..."
-              className="h-7 text-xs"
-              autoFocus
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleAddNodo()
-                if (e.key === 'Escape') setAddingChild(null)
-              }}
-            />
+            <Select value={newPuestoId} onValueChange={setNewPuestoId}>
+              <SelectTrigger className="h-7 text-xs">
+                <SelectValue placeholder="Elegir puesto..." />
+              </SelectTrigger>
+              <SelectContent>
+                {puestos.map(p => (
+                  <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button size="sm" className="h-7 px-2 text-xs" onClick={handleAddNodo}>
               Agregar
             </Button>
@@ -402,7 +405,7 @@ export default function PlantillaEditorPage() {
                   size="sm"
                   variant="outline"
                   className="h-7 text-xs"
-                  onClick={() => { setAddingChild('__root__'); setNewCargoLabel('') }}
+                  onClick={() => { setAddingChild('__root__'); setNewPuestoId('') }}
                 >
                   <Plus className="h-3.5 w-3.5 mr-1" />
                   Nodo raíz
@@ -413,17 +416,16 @@ export default function PlantillaEditorPage() {
                 {renderNodos(null, 0)}
                 {addingChild === '__root__' && (
                   <div className="flex items-center gap-2 py-1 px-2">
-                    <Input
-                      value={newCargoLabel}
-                      onChange={e => setNewCargoLabel(e.target.value)}
-                      placeholder="Cargo del nuevo nodo..."
-                      className="h-7 text-xs"
-                      autoFocus
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') handleAddNodo()
-                        if (e.key === 'Escape') setAddingChild(null)
-                      }}
-                    />
+                    <Select value={newPuestoId} onValueChange={setNewPuestoId}>
+                      <SelectTrigger className="h-7 text-xs">
+                        <SelectValue placeholder="Elegir puesto..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {puestos.map(p => (
+                          <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Button size="sm" className="h-7 px-2 text-xs" onClick={handleAddNodo}>
                       Agregar
                     </Button>
@@ -450,12 +452,20 @@ export default function PlantillaEditorPage() {
                   </h3>
 
                   <div className="space-y-2">
-                    <Label>Cargo / Título</Label>
-                    <Input
-                      value={formLabel}
-                      onChange={e => setFormLabel(e.target.value)}
-                      placeholder="Ej: Supervisor de Proyecto"
-                    />
+                    <Label>Puesto</Label>
+                    <Select value={formPuestoId} onValueChange={setFormPuestoId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Elegir puesto..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {puestos.map(p => (
+                          <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      El título del nodo sale del puesto, así no pueden quedar desalineados.
+                    </p>
                   </div>
 
                   <div className="space-y-2">

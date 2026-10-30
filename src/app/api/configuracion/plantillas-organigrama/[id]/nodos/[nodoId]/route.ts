@@ -12,12 +12,24 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
     const { nodoId } = await params
     const body = await req.json()
-    const { cargoLabel, parentId, orden, recursoId, esObligatorio, gysParentLabel, userId } = body
+    const { puestoId, parentId, orden, recursoId, esObligatorio, gysParentLabel, userId } = body
+
+    // Cambiar el puesto arrastra la etiqueta: son el mismo dato, no dos campos
+    // que haya que mantener a mano sincronizados.
+    let cargoLabel: string | undefined
+    if (puestoId !== undefined) {
+      const puesto = await prisma.puesto.findUnique({
+        where: { id: puestoId },
+        select: { nombre: true },
+      })
+      if (!puesto) return NextResponse.json({ error: 'Puesto no encontrado' }, { status: 404 })
+      cargoLabel = puesto.nombre
+    }
 
     const updated = await prisma.plantillaOrgNodo.update({
       where: { id: nodoId },
       data: {
-        ...(cargoLabel !== undefined && { cargoLabel: cargoLabel.trim() }),
+        ...(puestoId !== undefined && { puestoId, cargoLabel: cargoLabel! }),
         ...(parentId !== undefined && { parentId: parentId || null }),
         ...(orden !== undefined && { orden }),
         ...(recursoId !== undefined && { recursoId: recursoId || null }),
@@ -26,6 +38,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
         ...(userId !== undefined && { userId: userId || null }),
       },
       include: {
+        puesto: { select: { id: true, nombre: true } },
         recurso: { select: { id: true, nombre: true, tipo: true } },
         user: { select: { id: true, name: true, email: true } },
       },
