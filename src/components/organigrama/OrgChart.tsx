@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useRef, useEffect, useState, useCallback } from 'react'
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react'
 
 export interface OrgNodoCompleto {
@@ -29,6 +29,8 @@ interface OrgChartProps {
   nodos: OrgNodoCompleto[]
   onNodoClick?: (nodo: OrgNodoCompleto) => void
   compact?: boolean
+  /** Solo en pantalla: ramas plegables y hermanos envueltos. La exportación no lo usa. */
+  modoPantalla?: boolean
 }
 
 interface ChartDims {
@@ -54,6 +56,15 @@ interface ChartDims {
 }
 
 export const NORMAL_DIMS: ChartDims = { NODE_W: 160, NODE_H: 120, H_GAP: 5, V_GAP: 22, MAX_COLS: 999, WRAP_FROM_DEPTH: 1, isCompact: false, layoutCompacto: false }
+
+/**
+ * Variante de pantalla. Idéntica a NORMAL_DIMS salvo que los hermanos sin hijos
+ * se envuelven cada 3: con cinco técnicos colgando del mismo supervisor, la fila
+ * única empujaba el ancho del árbol y dejaba las tarjetas ilegibles al alejar.
+ *
+ * NORMAL_DIMS no se toca porque la exportación a PDF la usa tal cual.
+ */
+export const PANTALLA_DIMS: ChartDims = { ...NORMAL_DIMS, MAX_COLS: 3 }
 const COMPACT_DIMS: ChartDims = { NODE_W: 130, NODE_H: 64, H_GAP: 6, V_GAP: 24, MAX_COLS: 999, WRAP_FROM_DEPTH: 0, isCompact: true, layoutCompacto: false }
 /**
  * Espaciado para el export a Word (captura de canvas, no esta vista) — los
@@ -368,7 +379,14 @@ export function elegirDimsDocumento(nodos: OrgNodoCompleto[]): ChartDims {
   return layout.svgWidth / layout.svgHeight < 1.6 ? DOCUMENTO_DIMS_ANCHO : DOCUMENTO_DIMS
 }
 
-function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCompleto) => void }) {
+function NodoCard({ node, onClick, plegado, ocultos, onAlternar }: {
+  node: LayoutNode
+  onClick?: (n: OrgNodoCompleto) => void
+  /** undefined = el nodo no tiene hijos, así que no se dibuja el control. */
+  plegado?: boolean
+  ocultos?: number
+  onAlternar?: (id: string) => void
+}) {
   const { nodo, x, y, dims } = node
   const { NODE_W, NODE_H } = dims
   const isVacante = !nodo.user
@@ -384,7 +402,7 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
       onClick={() => onClick?.(nodo)}
     >
       <div
-        style={{ width: NODE_W, height: NODE_H }}
+        style={{ width: NODE_W, height: NODE_H, position: 'relative' }}
         className={[
           'rounded-lg border-2 shadow-sm cursor-pointer transition-all duration-150 flex flex-col',
           'hover:shadow-md hover:scale-[1.02]',
@@ -393,6 +411,16 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
             : 'bg-white border-gray-200 text-gray-800',
         ].join(' ')}
       >
+        {plegado !== undefined && (
+          <button
+            onClick={e => { e.stopPropagation(); onAlternar?.(nodo.id) }}
+            title={plegado ? `Mostrar ${ocultos} debajo` : 'Plegar esta rama'}
+            style={{ position: 'absolute', right: -8, top: -8 }}
+            className="z-10 h-5 min-w-5 px-1 rounded-full border border-gray-300 bg-white text-[10px] font-bold text-gray-600 shadow-sm hover:bg-gray-50"
+          >
+            {plegado ? `+${ocultos}` : '−'}
+          </button>
+        )}
         <div
           className={[
             isCompact ? 'px-2 pt-1.5 pb-1 rounded-t-md' : 'px-2 pt-2.5 pb-1.5 rounded-t-[10px]',
@@ -453,12 +481,17 @@ function NodoCard({ node, onClick }: { node: LayoutNode; onClick?: (n: OrgNodoCo
   )
 }
 
-function SvgContent({ nodes, edges, svgWidth, svgHeight, onNodoClick }: {
+function SvgContent({ nodes, edges, svgWidth, svgHeight, onNodoClick, colapsados, tieneHijos, ocultosPorNodo, onAlternar }: {
   nodes: LayoutNode[]
   edges: { x1: number; y1: number; x2: number; y2: number; midY: number }[]
   svgWidth: number
   svgHeight: number
   onNodoClick?: (n: OrgNodoCompleto) => void
+  // Solo llegan en modo pantalla; sin ellos la tarjeta no dibuja el control.
+  colapsados?: Set<string>
+  tieneHijos?: (id: string) => boolean
+  ocultosPorNodo?: (id: string) => number
+  onAlternar?: (id: string) => void
 }) {
   return (
     <>
@@ -480,15 +513,66 @@ function SvgContent({ nodes, edges, svgWidth, svgHeight, onNodoClick }: {
         )
       })}
       {nodes.map(n => (
-        <NodoCard key={n.nodo.id} node={n} onClick={onNodoClick} />
+        <NodoCard
+          key={n.nodo.id}
+          node={n}
+          onClick={onNodoClick}
+          plegado={tieneHijos?.(n.nodo.id) ? colapsados?.has(n.nodo.id) ?? false : undefined}
+          ocultos={ocultosPorNodo?.(n.nodo.id)}
+          onAlternar={onAlternar}
+        />
       ))}
     </>
   )
 }
 
-export default function OrgChart({ nodos, onNodoClick, compact }: OrgChartProps) {
-  const dims = compact ? COMPACT_DIMS : NORMAL_DIMS
-  const { nodes, svgWidth, svgHeight, edges } = buildLayout(nodos, dims)
+export default function OrgChart({ nodos, onNodoClick, compact, modoPantalla }: OrgChartProps) {
+  const dims = compact ? COMPACT_DIMS : modoPantalla ? PANTALLA_DIMS : NORMAL_DIMS
+
+  // Ramas plegadas: se ocultan los descendientes, no el nodo que las encabeza.
+  const [colapsados, setColapsados] = useState<Set<string>>(new Set())
+
+  const hijosPorPadre = useMemo(() => {
+    const mapa = new Map<string, string[]>()
+    for (const n of nodos) {
+      if (!n.parentId) continue
+      mapa.set(n.parentId, [...(mapa.get(n.parentId) ?? []), n.id])
+    }
+    return mapa
+  }, [nodos])
+
+  /** Cuántos descendientes esconde un nodo plegado, para anunciarlo en la tarjeta. */
+  const contarDescendientes = useCallback(
+    (id: string): number => {
+      const hijos = hijosPorPadre.get(id) ?? []
+      return hijos.reduce((total: number, h: string) => total + 1 + contarDescendientes(h), 0)
+    },
+    [hijosPorPadre]
+  )
+
+  const nodosVisibles = useMemo(() => {
+    if (colapsados.size === 0) return nodos
+    const ocultos = new Set<string>()
+    const ocultarDesde = (id: string) => {
+      for (const hijo of hijosPorPadre.get(id) ?? []) {
+        ocultos.add(hijo)
+        ocultarDesde(hijo)
+      }
+    }
+    for (const id of colapsados) ocultarDesde(id)
+    return nodos.filter((n) => !ocultos.has(n.id))
+  }, [nodos, colapsados, hijosPorPadre])
+
+  const alternarColapso = useCallback((id: string) => {
+    setColapsados((prev) => {
+      const siguiente = new Set(prev)
+      if (siguiente.has(id)) siguiente.delete(id)
+      else siguiente.add(id)
+      return siguiente
+    })
+  }, [])
+
+  const { nodes, svgWidth, svgHeight, edges } = buildLayout(nodosVisibles, dims)
   const containerRef = useRef<HTMLDivElement>(null)
 
   // ── Compact mode: auto-scale to fit width ────────────────────────────────
@@ -661,7 +745,14 @@ export default function OrgChart({ nodos, onNodoClick, compact }: OrgChartProps)
             transformOrigin: 'top left',
           }}
         >
-          <SvgContent nodes={nodes} edges={edges} svgWidth={svgWidth} svgHeight={svgHeight} onNodoClick={onNodoClick} />
+          <SvgContent
+            nodes={nodes} edges={edges} svgWidth={svgWidth} svgHeight={svgHeight}
+            onNodoClick={onNodoClick}
+            colapsados={modoPantalla ? colapsados : undefined}
+            tieneHijos={modoPantalla ? (id => (hijosPorPadre.get(id)?.length ?? 0) > 0) : undefined}
+            ocultosPorNodo={modoPantalla ? contarDescendientes : undefined}
+            onAlternar={modoPantalla ? alternarColapso : undefined}
+          />
         </svg>
       </div>
     )
@@ -690,7 +781,14 @@ export default function OrgChart({ nodos, onNodoClick, compact }: OrgChartProps)
         onMouseDown={handleSvgMouseDown}
         onClickCapture={handleClickCapture}
       >
-        <SvgContent nodes={nodes} edges={edges} svgWidth={svgWidth} svgHeight={svgHeight} onNodoClick={onNodoClick} />
+        <SvgContent
+            nodes={nodes} edges={edges} svgWidth={svgWidth} svgHeight={svgHeight}
+            onNodoClick={onNodoClick}
+            colapsados={modoPantalla ? colapsados : undefined}
+            tieneHijos={modoPantalla ? (id => (hijosPorPadre.get(id)?.length ?? 0) > 0) : undefined}
+            ocultosPorNodo={modoPantalla ? contarDescendientes : undefined}
+            onAlternar={modoPantalla ? alternarColapso : undefined}
+          />
       </svg>
 
       {/* Zoom controls */}

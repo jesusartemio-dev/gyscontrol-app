@@ -925,7 +925,7 @@ export default function OrganigramaProyectoPage() {
               </div>
               <div className="flex-1 min-h-0 overflow-hidden">
                 {modoVista === 'arbol' ? (
-                  <OrgChart nodos={nodos} onNodoClick={openPanel} />
+                  <OrgChart nodos={nodos} onNodoClick={openPanel} modoPantalla />
                 ) : (
                   <VistasOrganigrama nodos={nodos} modo={modoVista} onNodoClick={openPanel} />
                 )}
