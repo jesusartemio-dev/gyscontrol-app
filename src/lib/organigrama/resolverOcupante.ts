@@ -11,13 +11,16 @@
  * plantillas que todavía no tienen `puestoId`.
  */
 
-/** Roles fijos del proyecto, por el `rolFuncional` del puesto. */
-const CAMPO_POR_ROL_FUNCIONAL: Record<string, 'gestorId' | 'supervisorId' | 'liderId' | 'comercialId'> = {
+/**
+ * Campo del proyecto que ocupa cada rol fijo. Se indexa por `rolFijoProyecto`,
+ * que es exclusivo, y NO por `rolFuncional`: ese lo comparten varios puestos
+ * (Supervisor de Proyecto, Coordinador de Ingeniería y Programador son todos
+ * 'residente'), así que usarlo aquí ponía a la misma persona en los tres nodos.
+ */
+const CAMPO_POR_ROL_FIJO: Record<string, 'gestorId' | 'supervisorId' | 'liderId' | 'comercialId'> = {
   gestor: 'gestorId',
   supervisor: 'supervisorId',
-  // 'residente' es el rol funcional del Supervisor de Proyecto y del Coordinador
-  // de Ingeniería: ambos responden por el trabajo de oficina.
-  residente: 'liderId',
+  lider: 'liderId',
   comercial: 'comercialId',
 }
 
@@ -61,11 +64,11 @@ export class RepartidorPorPuesto {
  * corresponde a un rol fijo y nadie con ese puesto está asignado al proyecto.
  */
 export function resolverOcupantePorPuesto(
-  puesto: { id: string; rolFuncional: string | null },
+  puesto: { id: string; rolFijoProyecto: string | null },
   rolesFijos: RolesFijosProyecto,
   repartidor: RepartidorPorPuesto
 ): string | null {
-  const campo = puesto.rolFuncional ? CAMPO_POR_ROL_FUNCIONAL[puesto.rolFuncional] : undefined
+  const campo = puesto.rolFijoProyecto ? CAMPO_POR_ROL_FIJO[puesto.rolFijoProyecto] : undefined
   if (campo && rolesFijos[campo]) return rolesFijos[campo]
   return repartidor.tomar(puesto.id)
 }

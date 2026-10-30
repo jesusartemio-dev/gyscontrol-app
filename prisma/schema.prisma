@@ -5979,9 +5979,16 @@ enum EstadoEntregaEPPItem {
 model Puesto {
   id     String  @id @default(cuid())
   nombre String  @unique
-  /// gestor | residente | supervisor | ssoma | cadista | logistica | comercial.
-  /// null = el puesto no es responsable de ningún EDT (técnicos, gerencia).
+  /// Qué EDTs responde: gestor | residente | supervisor | ssoma | cadista |
+  /// logistica | comercial. Varios puestos pueden compartirlo (Supervisor de
+  /// Proyecto y Coordinador de Ingeniería son ambos 'residente').
+  /// null = el puesto no responde por ningún EDT (técnicos, gerencia).
   rolFuncional String?
+  /// Qué rol fijo del proyecto lo ocupa: gestor | supervisor | lider | comercial.
+  /// Es EXCLUSIVO — solo un puesto por valor — y por eso no se puede deducir de
+  /// `rolFuncional`: si se usara ese, los tres puestos 'residente' recibirían
+  /// todos la misma persona. null = se llena desde el personal del proyecto.
+  rolFijoProyecto String?
   /// direccion | gestion | ingenieria | campo | seguridad | soporte
   categoria    String?
   /// Solo los de campo entran a la relación de personal que se habilita en planta.

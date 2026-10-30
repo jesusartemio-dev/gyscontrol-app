@@ -130,7 +130,7 @@ export async function POST(req: Request, { params }: Ctx) {
     // asignación deja de depender de adivinar por el texto del cargo.
     const puestos = await prisma.puesto.findMany({
       where: { activo: true },
-      select: { id: true, rolFuncional: true },
+      select: { id: true, rolFijoProyecto: true },
     })
     const puestosPorId = new Map(puestos.map((p) => [p.id, p]))
 

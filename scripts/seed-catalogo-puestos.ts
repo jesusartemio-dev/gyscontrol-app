@@ -17,6 +17,8 @@ const APLICAR = process.argv.includes('--aplicar')
 const CATALOGO: Array<{
   nombre: string
   rolFuncional: string | null
+  /** gestor | supervisor | lider | comercial. Exclusivo: un puesto por valor. */
+  rolFijoProyecto?: string
   categoria: string
   vaACampo: boolean
   /** Variantes vistas en producción que se reapuntan a este puesto. */
@@ -27,14 +29,14 @@ const CATALOGO: Array<{
     alias: ['GERENCIA GENERAL', 'Gerente General'] },
   { nombre: 'Gerencia de Proyectos', rolFuncional: null, categoria: 'direccion', vaACampo: false,
     alias: ['GERENCIA DE PROYECTOS'] },
-  { nombre: 'Comercial', rolFuncional: 'comercial', categoria: 'gestion', vaACampo: false,
+  { nombre: 'Comercial', rolFuncional: 'comercial', rolFijoProyecto: 'comercial', categoria: 'gestion', vaACampo: false,
     alias: ['COMERCIAL'] },
 
   // ── Gestión ────────────────────────────────────────────────────────────
-  { nombre: 'Gestor de Proyectos', rolFuncional: 'gestor', categoria: 'gestion', vaACampo: true,
+  { nombre: 'Gestor de Proyectos', rolFuncional: 'gestor', rolFijoProyecto: 'gestor', categoria: 'gestion', vaACampo: true,
     alias: ['GESTOR DE PROYECTOS', 'Gestor de Proyecto', 'Gestor de Proyectos',
             'Gerente de Proyectos', 'Jefe de Proyectos', 'Lider de Proyectos'] },
-  { nombre: 'Supervisor de Proyecto', rolFuncional: 'residente', categoria: 'gestion', vaACampo: true,
+  { nombre: 'Supervisor de Proyecto', rolFuncional: 'residente', rolFijoProyecto: 'lider', categoria: 'gestion', vaACampo: true,
     alias: ['RESIDENTE'] },
 
   // ── Ingeniería de oficina ──────────────────────────────────────────────
@@ -48,7 +50,7 @@ const CATALOGO: Array<{
     alias: ['CADISTA', 'Cadista'] },
 
   // ── Campo ──────────────────────────────────────────────────────────────
-  { nombre: 'Supervisor de Campo', rolFuncional: 'supervisor', categoria: 'campo', vaACampo: true,
+  { nombre: 'Supervisor de Campo', rolFuncional: 'supervisor', rolFijoProyecto: 'supervisor', categoria: 'campo', vaACampo: true,
     alias: ['SUPERVISOR', 'Supervisor de Construccion', 'Supervisor de Campo'] },
   // Andamiero es un puesto propio, no una variante del de campo. rolFuncional
   // null a propósito: si también fuera 'supervisor' competiría con el de campo
@@ -93,6 +95,7 @@ async function main() {
         data: {
           nombre: p.nombre,
           rolFuncional: p.rolFuncional,
+          rolFijoProyecto: p.rolFijoProyecto ?? null,
           categoria: p.categoria,
           vaACampo: p.vaACampo,
           orden: (i + 1) * 10,
