@@ -73,9 +73,13 @@ function profundidadNodo(nodo: OrgNodoContexto, todos: OrgNodoContexto[]): numbe
 
 /**
  * personalAsignado — directo de ProyectoOrgNodo (nodos con persona real asignada).
- * Desempate cuando una persona ocupa 2+ nodos: gana el nodo de nivel jerárquico
- * más profundo; si empatan, el de `createdAt` más reciente (no existe un campo
- * "fecha de asignación" dedicado en ProyectoOrgNodo — createdAt es el proxy).
+ * Desempate cuando una persona ocupa 2+ nodos: gana Gerencia de Proyectos si
+ * ocupa esa caja, porque es el cargo con el que aprueba (A) todos los EDTs de
+ * la RACI — mostrarla con el cargo menor hacía que en el documento del cliente
+ * alguien rotulado "Supervisor de Proyecto" apareciera aprobando todo. Si no,
+ * gana el nodo de nivel jerárquico más profundo; si empatan, el de `createdAt`
+ * más reciente (no existe un campo "fecha de asignación" dedicado en
+ * ProyectoOrgNodo — createdAt es el proxy).
  */
 export function calcularPersonalAsignado(
   organigrama: OrgNodoContexto[]
@@ -105,6 +109,9 @@ export function calcularPersonalAsignado(
       continue
     }
     const ordenados = [...nodos].sort((a, b) => {
+      const gerA = esGerenciaDeProyectos(a.cargoLabel) ? 1 : 0
+      const gerB = esGerenciaDeProyectos(b.cargoLabel) ? 1 : 0
+      if (gerA !== gerB) return gerB - gerA // Gerencia de Proyectos primero
       const profA = profundidadNodo(a, organigrama)
       const profB = profundidadNodo(b, organigrama)
       if (profA !== profB) return profB - profA // mayor profundidad primero
@@ -112,8 +119,11 @@ export function calcularPersonalAsignado(
     })
     nodosGanadores.push(ordenados[0])
     const nombre = ordenados[0].user!.name ?? ordenados[0].user!.email
+    const criterio = esGerenciaDeProyectos(ordenados[0].cargoLabel)
+      ? 'es quien aprueba la RACI'
+      : 'nivel jerárquico más profundo'
     advertencias.push(
-      `"${nombre}" aparece en ${nodos.length} nodos del organigrama — se usó "${ordenados[0].cargoLabel}" (nivel jerárquico más profundo).`
+      `"${nombre}" aparece en ${nodos.length} nodos del organigrama — se usó "${ordenados[0].cargoLabel}" (${criterio}).`
     )
   }
 

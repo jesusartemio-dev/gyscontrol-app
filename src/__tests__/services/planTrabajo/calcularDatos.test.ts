@@ -1,5 +1,5 @@
-import { calcularHistogramasYCronograma, calcularTotalHH, calcularMatrizRaci } from '@/lib/planTrabajo/calcularDatos'
-import type { CronogramaContexto } from '@/types/planTrabajo'
+import { calcularHistogramasYCronograma, calcularTotalHH, calcularMatrizRaci, calcularPersonalAsignado } from '@/lib/planTrabajo/calcularDatos'
+import type { CronogramaContexto, OrgNodoContexto } from '@/types/planTrabajo'
 
 type PersonaRaciFixture = Parameters<typeof calcularMatrizRaci>[1][number]
 
@@ -713,5 +713,51 @@ describe('hhPorActividadConCmn — detalle de HH por actividad, SOLO EDTs de Con
       expect(data.histogramas.hhPorActividadConCmn).toEqual({ actividades: [], series: [] })
       expect(advertencias.some(a => a.includes('13.3'))).toBe(false)
     })
+  })
+})
+
+
+describe('calcularPersonalAsignado — una persona en varios nodos del organigrama', () => {
+  function nodo(over: Partial<OrgNodoContexto> & { id: string; cargoLabel: string }): OrgNodoContexto {
+    return {
+      parentId: null, orden: 0, esFijoGys: false,
+      empresaOverride: null, telefonoOverride: null, cipOverride: null,
+      createdAt: new Date('2026-01-01'),
+      user: null,
+      ...over,
+    }
+  }
+
+  // Caso real de CJM51: Jesús Mamani ocupa Gerencia de Proyectos y, colgando de
+  // ella, Supervisor de Proyecto. Aparece una sola vez en el Plan, y el cargo
+  // que se muestre tiene que ser aquel con el que aprueba la RACI.
+  const jm = { id: 'u-jm', name: 'JESUS MAMANI', email: 'jm@gys.com', empleado: null }
+  const organigrama = [
+    nodo({ id: 'n-gg', cargoLabel: 'Gerencia General', user: { id: 'u-cs', name: 'Carlos Sosa', email: 'cs@gys.com', empleado: null } }),
+    nodo({ id: 'n-gp', cargoLabel: 'Gerencia de Proyectos', parentId: 'n-gg', user: jm }),
+    nodo({ id: 'n-sp', cargoLabel: 'Supervisor de Proyecto', parentId: 'n-gp', user: jm }),
+    nodo({ id: 'n-sc', cargoLabel: 'Supervisor de Campo', parentId: 'n-gp', user: { id: 'u-nl', name: 'Nilton Lazo', email: 'nl@gys.com', empleado: null } }),
+  ]
+
+  it('gana Gerencia de Proyectos, no el nodo más profundo', () => {
+    const { data } = calcularPersonalAsignado(organigrama)
+    const persona = data.find(p => p.userId === 'u-jm')
+    expect(persona?.cargo).toBe('Gerencia de Proyectos')
+    expect(data.filter(p => p.userId === 'u-jm')).toHaveLength(1)
+  })
+
+  it('la advertencia explica por qué se eligió ese cargo', () => {
+    const { advertencias } = calcularPersonalAsignado(organigrama)
+    expect(advertencias.some(a => a.includes('JESUS MAMANI') && a.includes('es quien aprueba la RACI'))).toBe(true)
+  })
+
+  it('sin Gerencia de Proyectos de por medio sigue ganando el nodo más profundo', () => {
+    const dosOperativos = [
+      nodo({ id: 'n-a', cargoLabel: 'Cadista', user: jm }),
+      nodo({ id: 'n-b', cargoLabel: 'Técnico Operativo', parentId: 'n-a', user: jm }),
+      nodo({ id: 'n-c', cargoLabel: 'Supervisor de Campo', user: { id: 'u-nl', name: 'Nilton Lazo', email: 'nl@gys.com', empleado: null } }),
+    ]
+    const { data } = calcularPersonalAsignado(dosOperativos)
+    expect(data.find(p => p.userId === 'u-jm')?.cargo).toBe('Técnico Operativo')
   })
 })
