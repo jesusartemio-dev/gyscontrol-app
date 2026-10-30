@@ -1228,7 +1228,10 @@ model PersonalProyecto {
   id              String              @id @default(cuid())
   proyectoId      String
   userId          String
+  /// Rol interno heredado (horas, asistencia, seguridad). `puestoId` es el puesto
+  /// real que se le informa al cliente y lo que imprime el organigrama.
   rol             RolPersonalProyecto
+  puestoId        String?
   fechaAsignacion DateTime            @default(now())
   fechaFin        DateTime?
   activo          Boolean             @default(true)
@@ -1238,6 +1241,7 @@ model PersonalProyecto {
 
   proyecto Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
   user     User     @relation(fields: [userId], references: [id])
+  puesto   Puesto?  @relation(fields: [puestoId], references: [id])
 
   @@unique([proyectoId, userId, rol])
   @@index([proyectoId, activo])
@@ -5964,6 +5968,36 @@ enum EstadoEntregaEPPItem {
 
 // ── ORGANIGRAMA ──────────────────────────────────────────────────────────────
 
+/// Catálogo único de puestos operativos de GYS. Nace porque el mismo puesto se
+/// escribía de hasta 6 formas distintas en los organigramas ("GESTOR DE
+/// PROYECTOS", "Gestor de Proyecto", "Jefe de Proyectos", "Lider de Proyectos"…),
+/// lo que obligaba a adivinar por palabras clave.
+///
+/// `nombre` es lo que se imprime y lo que ve el cliente; `rolFuncional` es lo que
+/// lee el motor de responsables por EDT. Separarlos permite renombrar un puesto
+/// para un cliente sin desalinear quién responde por cada EDT.
+model Puesto {
+  id     String  @id @default(cuid())
+  nombre String  @unique
+  /// gestor | residente | supervisor | ssoma | cadista | logistica | comercial.
+  /// null = el puesto no es responsable de ningún EDT (técnicos, gerencia).
+  rolFuncional String?
+  /// direccion | gestion | ingenieria | campo | seguridad | soporte
+  categoria    String?
+  /// Solo los de campo entran a la relación de personal que se habilita en planta.
+  vaACampo     Boolean  @default(false)
+  orden        Int      @default(0)
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  personalProyecto PersonalProyecto[]
+  plantillaNodos   PlantillaOrgNodo[]
+  proyectoNodos    ProyectoOrgNodo[]
+
+  @@map("puesto")
+}
+
 model PlantillaOrganigrama {
   id          String   @id @default(cuid())
   nombre      String
@@ -5983,7 +6017,10 @@ model PlantillaOrgNodo {
   plantillaId    String
   parentId       String?
   orden          Int      @default(0)
+  /// Texto libre heredado. `puestoId` manda cuando está; cargoLabel queda como
+  /// respaldo para las plantillas que aún no se migraron al catálogo.
   cargoLabel     String
+  puestoId       String?
   recursoId      String?
   userId         String?
   esObligatorio  Boolean  @default(true)
@@ -5992,6 +6029,7 @@ model PlantillaOrgNodo {
   updatedAt      DateTime @updatedAt
 
   plantilla PlantillaOrganigrama @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
+  puesto    Puesto?              @relation(fields: [puestoId], references: [id])
   parent    PlantillaOrgNodo?    @relation("PlantillaJerarquia", fields: [parentId], references: [id])
   hijos     PlantillaOrgNodo[]   @relation("PlantillaJerarquia")
   recurso   Recurso?             @relation(fields: [recursoId], references: [id])
@@ -6006,7 +6044,9 @@ model ProyectoOrgNodo {
   proyectoId       String
   parentId         String?
   orden            Int      @default(0)
+  /// Texto libre heredado; `puestoId` manda cuando está presente.
   cargoLabel       String
+  puestoId         String?
   recursoId        String?
   userId           String?
   cipOverride      String?
@@ -6017,6 +6057,7 @@ model ProyectoOrgNodo {
   updatedAt        DateTime @updatedAt
 
   proyecto Proyecto          @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  puesto   Puesto?           @relation(fields: [puestoId], references: [id])
   parent   ProyectoOrgNodo?  @relation("ProyectoOrgJerarquia", fields: [parentId], references: [id])
   hijos    ProyectoOrgNodo[] @relation("ProyectoOrgJerarquia")
   user     User?             @relation(fields: [userId], references: [id])
