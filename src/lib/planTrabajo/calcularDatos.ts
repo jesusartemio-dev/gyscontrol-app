@@ -47,7 +47,7 @@ const RANGOS_CARGO: RegExp[] = [
   /residente/i,
   /supervisor(?!.*segur)/i,
   /ssoma|segur|prevenc/i,
-  /ingenier|coordinador|cadista|dibujant|proyectista/i,
+  /ingenier|coordinador|cadista|dibujant|proyectista|programador/i,
   /comercial|log[ií]stic|almac|administra|compras/i,
   /t[ée]cnico|operario|oficial|ayudante|soldador|electricista|andamier/i,
 ]

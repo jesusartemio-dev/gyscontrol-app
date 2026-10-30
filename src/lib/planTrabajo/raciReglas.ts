@@ -55,6 +55,19 @@ export function esEdtDeLogistica(nombreEdt: string): boolean {
   return /suministro|procura|alquiler/i.test(nombreEdt)
 }
 
+/**
+ * EDT que sale de la oficina técnica (ING "Documentos de Ingeniería", TAB
+ * "Armado de Tableros") — el Coordinador de Ingeniería es R ahí.
+ */
+export function esEdtDeIngenieria(nombreEdt: string): boolean {
+  return /documentos de ingenier|tablero/i.test(nombreEdt)
+}
+
+/** EDT de programación (PLC, HMI/SCADA) — el Programador es R ahí. */
+export function esEdtDeProgramacion(nombreEdt: string): boolean {
+  return /\bplc\b|scada|\bhmi\b|programaci/i.test(nombreEdt)
+}
+
 /** EDT de arranque o cierre del proyecto (GES, CIE) — Comercial queda Informado ahí. */
 export function esEdtDeArranqueOCierre(nombreEdt: string): boolean {
   return /planificaci[oó]n del proyecto|cierre/i.test(nombreEdt)
@@ -70,6 +83,8 @@ export function clasificarEdtRaci(nombreEdt: string, codigoEdt?: string | null) 
     tipoEdt: (['CON', 'CMM', 'COM'].includes(c) ? 'campo' : c ? 'gestion' : clasificarTipoEdt(nombreEdt)) as TipoEdt,
     esEdtDeSeguridad: ['SEG', 'SSO'].includes(c) || esEdtDeSeguridad(nombreEdt),
     esEdtDeDocumentacion: c === 'PLA' || esEdtDeDocumentacion(nombreEdt),
+    esEdtDeIngenieria: ['ING', 'TAB'].includes(c) || esEdtDeIngenieria(nombreEdt),
+    esEdtDeProgramacion: ['PLC', 'HMI'].includes(c) || esEdtDeProgramacion(nombreEdt),
     esEdtDeLogistica: ['PRO', 'SER'].includes(c) || esEdtDeLogistica(nombreEdt),
     esEdtDeArranqueOCierre: ['GES', 'CIE'].includes(c) || esEdtDeArranqueOCierre(nombreEdt),
     esEdtAprobadoPorCliente: c ? EDTS_APROBADOS_POR_CLIENTE.includes(c) : esEdtAprobadoPorCliente(nombreEdt),
@@ -99,6 +114,8 @@ export interface ContextoRolRaci {
   tipoEdt: TipoEdt
   esEdtDeSeguridad: boolean
   esEdtDeDocumentacion: boolean
+  esEdtDeIngenieria?: boolean
+  esEdtDeProgramacion?: boolean
   esEdtDeLogistica?: boolean
   esEdtDeArranqueOCierre?: boolean
   esEdtAprobadoPorCliente?: boolean
@@ -138,6 +155,8 @@ export function prioridadAprobador(cargoLabel: string): number {
  *   Gestor/Supervisor de Proyecto            → C (su R ya sale del cronograma)
  *   Seguridad / SSOMA / SSO / HSEQ / HSE     → R en EDTs de Seguridad, C en los de campo
  *   Residente*                               → R en EDTs de campo (CON/CMM), C en el resto
+ *   Coordinador de Ingeniería                → R en ING/TAB, C en planos, programación y campo
+ *   Programador                              → R en PLC/HMI, C en EDTs de campo
  *   Supervisor* (genérico) / Construcción*   → R en EDTs de campo
  *   Técnico*                                 → R en EDTs de campo
  *   Cadista* / Dibujante* / CAD              → R en EDTs de planos
@@ -155,6 +174,22 @@ export const REGLAS_RACI_CARGO: ReglaRaci[] = [
   { patron: /(gestor|supervisor\s+de\s+proyecto)/i, calcular: () => 'C' },
   { patron: /seguridad|ssoma|sso|hseq|hse/i, calcular: ctx => (ctx.esEdtDeSeguridad ? 'R' : ctx.tipoEdt === 'campo' ? 'C' : '') },
   { patron: /residente/i, calcular: ctx => (ctx.tipoEdt === 'campo' ? 'R' : 'C') },
+  // Coordinador de Ingeniería y Programador son puestos del catálogo que no
+  // matcheaban ninguna regla, así que su columna salía vacía con advertencia.
+  // Los roles replican lo que ya se validó en la Matriz de Comunicaciones: el
+  // Coordinador emite ING y TAB y valida planos y programación; el Programador
+  // emite PLC y HMI y acompaña el comisionamiento.
+  {
+    patron: /coordinador\s+de\s+ingenier/i,
+    calcular: ctx =>
+      ctx.esEdtDeIngenieria ? 'R'
+      : ctx.esEdtDeDocumentacion || ctx.esEdtDeProgramacion || ctx.tipoEdt === 'campo' ? 'C'
+      : '',
+  },
+  {
+    patron: /programador/i,
+    calcular: ctx => (ctx.esEdtDeProgramacion ? 'R' : ctx.tipoEdt === 'campo' ? 'C' : ''),
+  },
   { patron: /(supervisor|construcci[oó]n)/i, calcular: ctx => (ctx.tipoEdt === 'campo' ? 'R' : '') },
   { patron: /t[eé]cnico/i, calcular: ctx => (ctx.tipoEdt === 'campo' ? 'R' : '') },
   { patron: /cadista|dibujante|cad\b/i, calcular: ctx => (ctx.esEdtDeDocumentacion ? 'R' : '') },
