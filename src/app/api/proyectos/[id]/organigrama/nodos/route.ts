@@ -12,16 +12,25 @@ export async function POST(req: Request, { params }: Ctx) {
 
     const { id: proyectoId } = await params
     const body = await req.json()
-    const { cargoLabel, parentId, orden, recursoId, userId } = body
+    const { puestoId, parentId, orden, recursoId, userId } = body
 
-    if (!cargoLabel?.trim()) {
-      return NextResponse.json({ error: 'cargoLabel es requerido' }, { status: 400 })
+    if (!puestoId) {
+      return NextResponse.json({ error: 'puestoId es requerido' }, { status: 400 })
     }
+
+    // La etiqueta sale del catálogo, igual que en las plantillas: si fueran dos
+    // campos editables por separado volverían a desincronizarse.
+    const puesto = await prisma.puesto.findUnique({
+      where: { id: puestoId },
+      select: { nombre: true },
+    })
+    if (!puesto) return NextResponse.json({ error: 'Puesto no encontrado' }, { status: 404 })
 
     const nodo = await prisma.proyectoOrgNodo.create({
       data: {
         proyectoId,
-        cargoLabel: cargoLabel.trim(),
+        puestoId,
+        cargoLabel: puesto.nombre,
         parentId: parentId || null,
         orden: orden ?? 0,
         recursoId: recursoId || null,

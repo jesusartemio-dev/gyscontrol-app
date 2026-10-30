@@ -130,7 +130,7 @@ export async function POST(req: Request, { params }: Ctx) {
     // asignación deja de depender de adivinar por el texto del cargo.
     const puestos = await prisma.puesto.findMany({
       where: { activo: true },
-      select: { id: true, rolFijoProyecto: true },
+      select: { id: true, nombre: true, rolFijoProyecto: true },
     })
     const puestosPorId = new Map(puestos.map((p) => [p.id, p]))
 
@@ -249,6 +249,38 @@ export async function POST(req: Request, { params }: Ctx) {
           plantillaIdMap[pNodo.id] = creado.id
         }
       }
+    }
+
+    // Nadie del equipo puede quedarse fuera: la plantilla trae un número fijo de
+    // casilleros y el equipo real no siempre calza (tres "Técnico Operativo"
+    // asignados contra dos nodos dejaba a uno sin aparecer, sin ningún aviso).
+    // A cada persona sin nodo se le crea uno, colgado junto a los de su mismo
+    // puesto o, si no hay, bajo el ancla del organigrama.
+    const nodosActuales = await prisma.proyectoOrgNodo.findMany({
+      where: { proyectoId },
+      select: { id: true, userId: true, puestoId: true, parentId: true, orden: true },
+    })
+    const yaUbicados = new Set(nodosActuales.map((n) => n.userId).filter(Boolean))
+
+    for (const miembro of equipoDinamico) {
+      if (!miembro.puestoId || yaUbicados.has(miembro.userId)) continue
+
+      const hermano = nodosActuales.find((n) => n.puestoId === miembro.puestoId)
+      const puesto = puestosPorId.get(miembro.puestoId)
+      if (!puesto) continue
+
+      await prisma.proyectoOrgNodo.create({
+        data: {
+          proyectoId,
+          cargoLabel: puesto.nombre,
+          puestoId: miembro.puestoId,
+          parentId: hermano?.parentId ?? anclaId,
+          orden: (hermano?.orden ?? 0) + 1,
+          userId: miembro.userId,
+          esFijoGys: false,
+        },
+      })
+      yaUbicados.add(miembro.userId)
     }
 
     // Devolver el organigrama completo

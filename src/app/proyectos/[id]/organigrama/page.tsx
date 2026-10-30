@@ -71,7 +71,8 @@ export default function OrganigramaProyectoPage() {
 
   // Agregar nodo
   const [addingNodo, setAddingNodo] = useState(false)
-  const [newCargo, setNewCargo] = useState('')
+  const [newPuestoId, setNewPuestoId] = useState('')
+  const [puestos, setPuestos] = useState<Array<{ id: string; nombre: string }>>([])
   const [newParentId, setNewParentId] = useState('')
   const [addSaving, setAddSaving] = useState(false)
 
@@ -88,13 +89,15 @@ export default function OrganigramaProyectoPage() {
 
   useEffect(() => {
     const init = async () => {
-      const [pRes, uRes, projRes, metaRes] = await Promise.all([
+      const [pRes, uRes, projRes, metaRes, puRes] = await Promise.all([
         fetch('/api/configuracion/plantillas-organigrama'),
         fetch('/api/admin/usuarios'),
         fetch(`/api/proyectos/${proyectoId}`),
         fetch(`/api/proyectos/${proyectoId}/documentos-meta/ORGANIGRAMA`),
+        fetch('/api/puestos'),
       ])
       if (pRes.ok) setPlantillas(await pRes.json())
+      if (puRes.ok) setPuestos(await puRes.json())
       if (uRes.ok) {
         const data = await uRes.json()
         setUsuarios(Array.isArray(data) ? data : (data.users ?? []))
@@ -273,8 +276,7 @@ export default function OrganigramaProyectoPage() {
   // ── AGREGAR NODO ───────────────────────────────────────────────────────────
 
   const handleAddNodo = async () => {
-    const label = newCargo.trim()
-    if (!label) { toast.error('Escribe el cargo'); return }
+    if (!newPuestoId) { toast.error('Elige el puesto'); return }
     const parentId = newParentId || null
     const siblings = nodos.filter(n => n.parentId === parentId)
     const nextOrden = siblings.length * 10
@@ -285,13 +287,13 @@ export default function OrganigramaProyectoPage() {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cargoLabel: label, parentId, orden: nextOrden }),
+          body: JSON.stringify({ puestoId: newPuestoId, parentId, orden: nextOrden }),
         }
       )
       if (!res.ok) throw new Error()
       toast.success('Nodo agregado')
       setAddingNodo(false)
-      setNewCargo('')
+      setNewPuestoId('')
       setNewParentId('')
       await loadNodos()
     } catch {
@@ -1188,18 +1190,17 @@ export default function OrganigramaProyectoPage() {
               <h4 className="text-sm font-semibold text-gray-700">Nuevo nodo</h4>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Cargo *</Label>
-                  <Input
-                    value={newCargo}
-                    onChange={e => setNewCargo(e.target.value)}
-                    placeholder="Ej: Técnico Electricista"
-                    className="h-8 text-sm"
-                    autoFocus
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') handleAddNodo()
-                      if (e.key === 'Escape') setAddingNodo(false)
-                    }}
-                  />
+                  <Label className="text-xs text-muted-foreground">Puesto *</Label>
+                  <Select value={newPuestoId} onValueChange={setNewPuestoId}>
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue placeholder="Elegir puesto..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {puestos.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">Nodo padre (opcional)</Label>
@@ -1221,7 +1222,7 @@ export default function OrganigramaProyectoPage() {
                   {addSaving && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
                   Agregar
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => { setAddingNodo(false); setNewCargo(''); setNewParentId('') }}>
+                <Button size="sm" variant="ghost" onClick={() => { setAddingNodo(false); setNewPuestoId(''); setNewParentId('') }}>
                   Cancelar
                 </Button>
               </div>
