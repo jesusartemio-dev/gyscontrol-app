@@ -57,6 +57,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
       include: {
         user: {
           select: { id: true, name: true, email: true, role: true }
+        },
+        puesto: {
+          select: { id: true, nombre: true }
         }
       },
       orderBy: [
@@ -173,6 +176,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         proyectoId,
         userId: validatedData.userId,
         rol: validatedData.rol,
+        puestoId: validatedData.puestoId || null,
         fechaAsignacion: validatedData.fechaAsignacion
           ? new Date(validatedData.fechaAsignacion)
           : new Date(),

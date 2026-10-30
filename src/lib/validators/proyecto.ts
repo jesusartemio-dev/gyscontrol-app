@@ -114,6 +114,9 @@ export const createPersonalProyectoSchema = z.object({
   proyectoId: z.string().min(1, 'Proyecto es requerido'),
   userId: z.string().min(1, 'Usuario es requerido'),
   rol: rolPersonalProyectoSchema,
+  /// Puesto del catálogo: es el nombre que ve el cliente y con el que se arma el
+  /// organigrama. `rol` queda como el rol interno de horas y seguridad.
+  puestoId: z.string().optional(),
   fechaAsignacion: z.string().optional(),
   fechaFin: z.string().optional(),
   activo: z.boolean().default(true),

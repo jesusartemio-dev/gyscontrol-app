@@ -69,6 +69,7 @@ interface PersonalProyecto {
   activo: boolean
   notas?: string
   user: User
+  puesto?: { id: string; nombre: string } | null
 }
 
 interface PersonalData {
@@ -441,7 +442,12 @@ const PersonalTable = memo(function PersonalTable({
                     </span>
                   </TableCell>
                   <TableCell className="py-2">
-                    {getRolBadge(p.rol)}
+                    <div className="flex flex-col gap-0.5">
+                      {p.puesto?.nombre && (
+                        <span className="text-sm font-medium">{p.puesto.nombre}</span>
+                      )}
+                      {getRolBadge(p.rol)}
+                    </div>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground py-2">
                     {formatDate(p.fechaAsignacion)}
@@ -480,6 +486,8 @@ export default function PersonalPage({ params: _params }: PageProps) {
   const [addingPersonal, setAddingPersonal] = useState(false)
   const [selectedUserId, setSelectedUserId] = useState('')
   const [selectedRol, setSelectedRol] = useState('')
+  const [selectedPuestoId, setSelectedPuestoId] = useState('')
+  const [puestos, setPuestos] = useState<Array<{ id: string; nombre: string }>>([])
 
   // Estado para editar roles principales
   const [editingRolFijo, setEditingRolFijo] = useState<string | null>(null)
@@ -498,6 +506,7 @@ export default function PersonalPage({ params: _params }: PageProps) {
     if (proyecto?.id) {
       loadPersonal()
       loadUsuarios()
+      loadPuestos()
       loadContactosCliente()
     }
   }, [proyecto?.id])
@@ -531,6 +540,15 @@ export default function PersonalPage({ params: _params }: PageProps) {
     }
   }
 
+  const loadPuestos = async () => {
+    try {
+      const response = await fetch('/api/puestos')
+      if (response.ok) setPuestos(await response.json())
+    } catch (error) {
+      console.error('Error cargando puestos:', error)
+    }
+  }
+
   const handleAddPersonal = async () => {
     if (!selectedUserId || !selectedRol || !proyecto?.id) return
 
@@ -541,7 +559,8 @@ export default function PersonalPage({ params: _params }: PageProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: selectedUserId,
-          rol: selectedRol
+          rol: selectedRol,
+          puestoId: selectedPuestoId || undefined
         })
       })
 
@@ -554,6 +573,7 @@ export default function PersonalPage({ params: _params }: PageProps) {
       setShowAddModal(false)
       setSelectedUserId('')
       setSelectedRol('')
+      setSelectedPuestoId('')
       loadPersonal()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al asignar personal')
@@ -756,7 +776,26 @@ export default function PersonalPage({ params: _params }: PageProps) {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Rol en el Proyecto</label>
+                <label className="text-sm font-medium">Puesto</label>
+                <Select value={selectedPuestoId} onValueChange={setSelectedPuestoId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar puesto..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {puestos.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Es el puesto que se informa al cliente y con el que se arma el organigrama.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Rol interno</label>
                 <Select value={selectedRol} onValueChange={setSelectedRol}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar rol..." />
@@ -775,6 +814,9 @@ export default function PersonalPage({ params: _params }: PageProps) {
                     })}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Para horas hombre, asistencia y registros de seguridad.
+                </p>
               </div>
 
               <div className="flex justify-end gap-2 pt-4">

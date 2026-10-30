@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { matchCargoConRolProyecto, matchCargoConRolPersonal } from '@/lib/organigrama/nodosGys'
+import { RepartidorPorPuesto, resolverOcupantePorPuesto } from '@/lib/organigrama/resolverOcupante'
 
 interface Ctx { params: Promise<{ id: string }> }
 
@@ -125,6 +126,14 @@ export async function POST(req: Request, { params }: Ctx) {
       include: { nodos: { orderBy: [{ parentId: 'asc' }, { orden: 'asc' }] } },
     })
 
+    // Catálogo de puestos: el nodo y la persona apuntan al mismo id, así que la
+    // asignación deja de depender de adivinar por el texto del cargo.
+    const puestos = await prisma.puesto.findMany({
+      where: { activo: true },
+      select: { id: true, rolFuncional: true },
+    })
+    const puestosPorId = new Map(puestos.map((p) => [p.id, p]))
+
     // Map: cargoLabel → id del nodo creado (para anclar plantilla de proyecto)
     const baseIdMap: Record<string, string> = {}
 
@@ -139,6 +148,7 @@ export async function POST(req: Request, { params }: Ctx) {
           data: {
             proyectoId,
             cargoLabel: pNodo.cargoLabel,
+            puestoId: pNodo.puestoId ?? null,
             parentId,
             orden: pNodo.orden,
             recursoId: pNodo.recursoId ?? null,
@@ -156,9 +166,16 @@ export async function POST(req: Request, { params }: Ctx) {
     // ── Cargar equipo dinámico del proyecto para auto-asignación ─────────────
     const equipoDinamico = await prisma.personalProyecto.findMany({
       where: { proyectoId, activo: true },
-      select: { userId: true, rol: true },
+      select: { userId: true, rol: true, puestoId: true },
       orderBy: { createdAt: 'asc' },
     })
+    const repartidor = new RepartidorPorPuesto(equipoDinamico)
+    const rolesFijos = {
+      gestorId: proyecto.gestorId,
+      supervisorId: proyecto.supervisorId,
+      liderId: proyecto.liderId,
+      comercialId: proyecto.comercialId,
+    }
     // Mapa rol → lista de userIds (en orden de incorporación)
     const rolPersonalMap: Record<string, string[]> = {}
     for (const miembro of equipoDinamico) {
@@ -189,9 +206,15 @@ export async function POST(req: Request, { params }: Ctx) {
             resolvedParentId = plantillaIdMap[pNodo.parentId] ?? anclaId
           }
 
-          // Auto-asignar userId: roles principales primero, luego equipo dinámico por posición
+          // Auto-asignar userId. Con el nodo apuntando al catálogo es una
+          // comparación exacta de puesto; sin él se cae al emparejado por
+          // palabras clave, que es lo que había antes.
           let userId: string | null = pNodo.userId ?? null
-          if (matchCargoConRolProyecto(pNodo.cargoLabel, 'gestor') && proyecto.gestorId) {
+          const puesto = pNodo.puestoId ? puestosPorId.get(pNodo.puestoId) : undefined
+
+          if (puesto) {
+            userId = resolverOcupantePorPuesto(puesto, rolesFijos, repartidor) ?? userId
+          } else if (matchCargoConRolProyecto(pNodo.cargoLabel, 'gestor') && proyecto.gestorId) {
             userId = proyecto.gestorId
           } else if (matchCargoConRolProyecto(pNodo.cargoLabel, 'supervisor') && proyecto.supervisorId) {
             userId = proyecto.supervisorId
@@ -215,6 +238,7 @@ export async function POST(req: Request, { params }: Ctx) {
             data: {
               proyectoId,
               cargoLabel: pNodo.cargoLabel,
+              puestoId: pNodo.puestoId ?? null,
               parentId: resolvedParentId,
               orden: pNodo.orden,
               recursoId: pNodo.recursoId ?? null,
