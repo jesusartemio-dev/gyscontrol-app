@@ -19,6 +19,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import OrgChart, { OrgNodoCompleto } from '@/components/organigrama/OrgChart'
+import VistasOrganigrama, { ModoVista } from '@/components/organigrama/VistasOrganigrama'
 import { DatosDocumentoModal, type DatosDocumentoMeta } from '@/components/documentosOficiales/DatosDocumentoModal'
 
 interface Plantilla { id: string; nombre: string; _count?: { nodos: number } }
@@ -72,6 +73,8 @@ export default function OrganigramaProyectoPage() {
   // Agregar nodo
   const [addingNodo, setAddingNodo] = useState(false)
   const [newPuestoId, setNewPuestoId] = useState('')
+  // Solo afecta la pantalla; la exportación sigue usando el árbol de OrgChart
+  const [modoVista, setModoVista] = useState<ModoVista>('arbol')
   const [puestos, setPuestos] = useState<Array<{ id: string; nombre: string }>>([])
   const [newParentId, setNewParentId] = useState('')
   const [addSaving, setAddSaving] = useState(false)
@@ -896,8 +899,37 @@ export default function OrganigramaProyectoPage() {
         <TabsContent value="vista" className="flex-1 flex min-h-0 m-0">
           <div className="flex flex-1 min-h-0 overflow-hidden">
             {/* Chart area — overflow handled by OrgChart internally (pan & zoom) */}
-            <div className="flex-1 min-w-0 overflow-hidden">
-              <OrgChart nodos={nodos} onNodoClick={openPanel} />
+            <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
+              <div className="flex items-center gap-1 px-3 py-2 border-b bg-white">
+                {([
+                  ['arbol', 'Árbol'],
+                  ['horizontal', 'Horizontal'],
+                  ['areas', 'Por área'],
+                  ['lista', 'Lista'],
+                ] as Array<[ModoVista, string]>).map(([clave, etiqueta]) => (
+                  <button
+                    key={clave}
+                    onClick={() => setModoVista(clave)}
+                    className={`h-7 px-3 rounded-md text-xs font-medium transition-colors ${
+                      modoVista === clave
+                        ? 'bg-indigo-600 text-white'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {etiqueta}
+                  </button>
+                ))}
+                <span className="ml-auto text-[11px] text-muted-foreground">
+                  Solo cambia la vista en pantalla; la exportación no se altera
+                </span>
+              </div>
+              <div className="flex-1 min-h-0 overflow-hidden">
+                {modoVista === 'arbol' ? (
+                  <OrgChart nodos={nodos} onNodoClick={openPanel} />
+                ) : (
+                  <VistasOrganigrama nodos={nodos} modo={modoVista} onNodoClick={openPanel} />
+                )}
+              </div>
             </div>
 
             {/* Panel de edición lateral */}

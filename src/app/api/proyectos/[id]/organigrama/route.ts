@@ -25,6 +25,8 @@ const includeNodo = {
     },
   },
   recurso: { select: { id: true, nombre: true } },
+  // `categoria` agrupa las vistas por área (gestión, ingeniería, campo…)
+  puesto: { select: { id: true, nombre: true, categoria: true } },
 } as const
 
 function resolveNodo(nodo: any) {

@@ -21,6 +21,8 @@ export interface OrgNodoCompleto {
   _telefono: string | null
   _cip: string | null
   _empresa: string
+  /// Solo lo usan las vistas de pantalla para agrupar por área.
+  puesto?: { id: string; nombre: string; categoria: string | null } | null
 }
 
 interface OrgChartProps {
