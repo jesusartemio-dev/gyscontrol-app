@@ -194,7 +194,9 @@ export async function obtenerInformeMensual(
     }),
     prisma.personalProyecto.findMany({
       where: { proyectoId, activo: true },
-      select: { userId: true, rol: true },
+      // El puesto es el nombre real ("Técnico Electrotecnia"); `rol` quedó como
+      // columna heredada que ya nadie lee.
+      select: { userId: true, rol: true, puesto: { select: { nombre: true } } },
     }),
   ])
 
@@ -220,7 +222,10 @@ export async function obtenerInformeMensual(
     }
   }
 
-  const rolMap = new Map(personalProyecto.map((pp) => [pp.userId, pp.rol as string]))
+  // Se informa el puesto; solo se cae al rol heredado si la persona aún no tiene uno.
+  const rolMap = new Map(
+    personalProyecto.map((pp) => [pp.userId, pp.puesto?.nombre ?? (pp.rol as string)])
+  )
 
   const personal: PersonalMes[] = Array.from(personalMap.entries())
     .map(([userId, data]) => ({

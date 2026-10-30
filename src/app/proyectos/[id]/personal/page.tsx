@@ -106,16 +106,6 @@ const rolesContactoClienteConfig: Record<string, { label: string; className: str
   inspector_supervisor:   { label: 'Supervisor', className: 'bg-orange-100 text-orange-700' },
 }
 
-const rolesConfig: Record<string, { icon: any; className: string; label: string }> = {
-  programador: { icon: Code, className: 'bg-purple-100 text-purple-700', label: 'Programador' },
-  cadista: { icon: Pencil, className: 'bg-blue-100 text-blue-700', label: 'Cadista' },
-  ingeniero: { icon: Settings, className: 'bg-green-100 text-green-700', label: 'Ingeniero' },
-  lider: { icon: UserCog, className: 'bg-amber-100 text-amber-700', label: 'Líder' },
-  tecnico: { icon: HardHat, className: 'bg-orange-100 text-orange-700', label: 'Técnico' },
-  coordinador: { icon: Briefcase, className: 'bg-cyan-100 text-cyan-700', label: 'Coordinador' },
-  asistente: { icon: Users, className: 'bg-slate-100 text-slate-700', label: 'Asistente' }
-}
-
 // Las etiquetas siguen la nomenclatura del catálogo de puestos, para que la
 // pantalla, el organigrama y lo que se le informa al cliente digan lo mismo.
 // Las claves son los campos del proyecto (gestorId, supervisorId, liderId…) y no
@@ -284,6 +274,13 @@ const PersonalTable = memo(function PersonalTable({
   const [sortField, setSortField] = useState<string>('fechaAsignacion')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
+  // El filtro ofrece solo los puestos realmente presentes en este proyecto
+  const puestosEnUso = useMemo(
+    () =>
+      [...new Set(personal.map((p) => p.puesto?.nombre).filter((n): n is string => !!n))].sort(),
+    [personal]
+  )
+
   const filteredPersonal = useMemo(() => {
     let result = personal
 
@@ -297,7 +294,7 @@ const PersonalTable = memo(function PersonalTable({
     }
 
     if (filterRol !== 'all') {
-      result = result.filter(p => p.rol === filterRol)
+      result = result.filter(p => p.puesto?.nombre === filterRol)
     }
 
     return result
@@ -341,18 +338,6 @@ const PersonalTable = memo(function PersonalTable({
       : <ArrowDown className="h-3 w-3 ml-1" />
   }
 
-  const getRolBadge = (rol: string) => {
-    const config = rolesConfig[rol] || rolesConfig.asistente
-    const Icon = config.icon
-
-    return (
-      <Badge className={`${config.className} text-xs font-normal`}>
-        <Icon className="h-3 w-3 mr-1" />
-        {config.label}
-      </Badge>
-    )
-  }
-
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: '2-digit' })
   }
@@ -373,12 +358,12 @@ const PersonalTable = memo(function PersonalTable({
 
         <Select value={filterRol} onValueChange={setFilterRol}>
           <SelectTrigger className="w-36 h-9 text-sm">
-            <SelectValue placeholder="Rol" />
+            <SelectValue placeholder="Puesto" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos los roles</SelectItem>
-            {Object.entries(rolesConfig).map(([key, config]) => (
-              <SelectItem key={key} value={key}>{config.label}</SelectItem>
+            <SelectItem value="all">Todos los puestos</SelectItem>
+            {puestosEnUso.map((nombre) => (
+              <SelectItem key={nombre} value={nombre}>{nombre}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -448,12 +433,11 @@ const PersonalTable = memo(function PersonalTable({
                     </span>
                   </TableCell>
                   <TableCell className="py-2">
-                    <div className="flex flex-col gap-0.5">
-                      {p.puesto?.nombre && (
-                        <span className="text-sm font-medium">{p.puesto.nombre}</span>
-                      )}
-                      {getRolBadge(p.rol)}
-                    </div>
+                    {p.puesto?.nombre ? (
+                      <span className="text-sm">{p.puesto.nombre}</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">Sin puesto</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground py-2">
                     {formatDate(p.fechaAsignacion)}
@@ -503,13 +487,11 @@ export default function PersonalPage({ params: _params }: PageProps) {
   const [showAddModal, setShowAddModal] = useState(false)
   const [addingPersonal, setAddingPersonal] = useState(false)
   const [selectedUserId, setSelectedUserId] = useState('')
-  const [selectedRol, setSelectedRol] = useState('')
   const [selectedPuestoId, setSelectedPuestoId] = useState('')
   const [puestos, setPuestos] = useState<Array<{ id: string; nombre: string }>>([])
   // Edición de un miembro ya asignado: evita tener que quitarlo y volver a agregarlo
   const [editandoMiembro, setEditandoMiembro] = useState<PersonalProyecto | null>(null)
   const [editPuestoId, setEditPuestoId] = useState('')
-  const [editRol, setEditRol] = useState('')
   const [guardandoMiembro, setGuardandoMiembro] = useState(false)
 
   // Estado para editar roles principales
@@ -573,7 +555,7 @@ export default function PersonalPage({ params: _params }: PageProps) {
   }
 
   const handleAddPersonal = async () => {
-    if (!selectedUserId || !selectedRol || !proyecto?.id) return
+    if (!selectedUserId || !selectedPuestoId || !proyecto?.id) return
 
     try {
       setAddingPersonal(true)
@@ -582,8 +564,7 @@ export default function PersonalPage({ params: _params }: PageProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: selectedUserId,
-          rol: selectedRol,
-          puestoId: selectedPuestoId || undefined
+          puestoId: selectedPuestoId
         })
       })
 
@@ -595,7 +576,6 @@ export default function PersonalPage({ params: _params }: PageProps) {
       toast.success('Personal asignado')
       setShowAddModal(false)
       setSelectedUserId('')
-      setSelectedRol('')
       setSelectedPuestoId('')
       loadPersonal()
     } catch (error) {
@@ -608,7 +588,6 @@ export default function PersonalPage({ params: _params }: PageProps) {
   const abrirEditarMiembro = (p: PersonalProyecto) => {
     setEditandoMiembro(p)
     setEditPuestoId(p.puesto?.id || '')
-    setEditRol(p.rol)
   }
 
   const guardarMiembro = async () => {
@@ -621,9 +600,7 @@ export default function PersonalPage({ params: _params }: PageProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           personalId: editandoMiembro.id,
-          rol: editRol,
-          // null limpia el puesto; el endpoint distingue null de ausente
-          puestoId: editPuestoId || null
+          puestoId: editPuestoId
         })
       })
 
@@ -854,38 +831,13 @@ export default function PersonalPage({ params: _params }: PageProps) {
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Rol interno</label>
-                <Select value={selectedRol} onValueChange={setSelectedRol}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar rol..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(rolesConfig).map(([key, config]) => {
-                      const Icon = config.icon
-                      return (
-                        <SelectItem key={key} value={key}>
-                          <div className="flex items-center gap-2">
-                            <Icon className="h-4 w-4" />
-                            {config.label}
-                          </div>
-                        </SelectItem>
-                      )
-                    })}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Para horas hombre, asistencia y registros de seguridad.
-                </p>
-              </div>
-
               <div className="flex justify-end gap-2 pt-4">
                 <Button variant="outline" onClick={() => setShowAddModal(false)}>
                   Cancelar
                 </Button>
                 <Button
                   onClick={handleAddPersonal}
-                  disabled={!selectedUserId || !selectedRol || addingPersonal}
+                  disabled={!selectedUserId || !selectedPuestoId || addingPersonal}
                 >
                   {addingPersonal ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -939,33 +891,11 @@ export default function PersonalPage({ params: _params }: PageProps) {
               </p>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Rol interno</label>
-              <Select value={editRol} onValueChange={setEditRol}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar rol..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(rolesConfig).map(([key, config]) => {
-                    const Icon = config.icon
-                    return (
-                      <SelectItem key={key} value={key}>
-                        <div className="flex items-center gap-2">
-                          <Icon className="h-4 w-4" />
-                          {config.label}
-                        </div>
-                      </SelectItem>
-                    )
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setEditandoMiembro(null)}>
                 Cancelar
               </Button>
-              <Button onClick={guardarMiembro} disabled={guardandoMiembro || !editRol}>
+              <Button onClick={guardarMiembro} disabled={guardandoMiembro || !editPuestoId}>
                 {guardandoMiembro ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 ) : (

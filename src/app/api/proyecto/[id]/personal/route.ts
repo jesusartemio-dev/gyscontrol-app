@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { rolInternoDesdePuesto } from '@/lib/organigrama/rolInternoLegado'
 import { createPersonalProyectoSchema, updatePersonalProyectoSchema } from '@/lib/validators/proyecto'
 import { z } from 'zod'
 
@@ -132,12 +133,25 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
     }
 
+    // El puesto define el rol heredado: la columna es NOT NULL pero ya nadie la lee,
+    // así que no tiene sentido pedírsela al usuario.
+    const puesto = await prisma.puesto.findUnique({
+      where: { id: validatedData.puestoId },
+      select: { nombre: true, rolFuncional: true, categoria: true }
+    })
+
+    if (!puesto) {
+      return NextResponse.json({ error: 'Puesto no encontrado' }, { status: 404 })
+    }
+
+    const rol = validatedData.rol ?? rolInternoDesdePuesto(puesto)
+
     // Verificar si ya existe la asignación (mismo usuario, mismo rol, mismo proyecto)
     const existente = await prisma.personalProyecto.findFirst({
       where: {
         proyectoId,
         userId: validatedData.userId,
-        rol: validatedData.rol
+        rol
       }
     })
 
@@ -175,8 +189,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
       data: {
         proyectoId,
         userId: validatedData.userId,
-        rol: validatedData.rol,
-        puestoId: validatedData.puestoId || null,
+        rol,
+        puestoId: validatedData.puestoId,
         fechaAsignacion: validatedData.fechaAsignacion
           ? new Date(validatedData.fechaAsignacion)
           : new Date(),
@@ -241,11 +255,26 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Asignación no encontrada' }, { status: 404 })
     }
 
+    // Al cambiar de puesto se recalcula el rol heredado, para que no quede
+    // apuntando al puesto anterior.
+    let rolDerivado = validatedData.rol
+    if (validatedData.puestoId) {
+      const puesto = await prisma.puesto.findUnique({
+        where: { id: validatedData.puestoId },
+        select: { nombre: true, rolFuncional: true, categoria: true }
+      })
+      if (!puesto) {
+        return NextResponse.json({ error: 'Puesto no encontrado' }, { status: 404 })
+      }
+      rolDerivado = rolInternoDesdePuesto(puesto)
+    }
+
     // Actualizar
     const actualizado = await prisma.personalProyecto.update({
       where: { id: personalId },
       data: {
         ...validatedData,
+        ...(rolDerivado && { rol: rolDerivado }),
         fechaFin: validatedData.fechaFin ? new Date(validatedData.fechaFin) : undefined
       },
       include: {

@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
           proyecto: {
             select: { id: true, codigo: true, nombre: true, estado: true },
           },
+          puesto: { select: { nombre: true } },
         },
       }),
       prisma.saldoAusencia.findFirst({
@@ -55,7 +56,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       userId,
-      proyectosActivos: proyectosActivos.map((p) => ({ ...p.proyecto, rol: p.rol })),
+      // Se informa el puesto; `rol` es la columna heredada y solo sirve de respaldo
+      // mientras queden asignaciones sin puesto.
+      proyectosActivos: proyectosActivos.map((p) => ({
+        ...p.proyecto,
+        rol: p.puesto?.nombre ?? (p.rol as string),
+      })),
       saldoVacaciones: saldoVac,
       proximaAusencia,
     })

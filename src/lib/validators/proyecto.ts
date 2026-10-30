@@ -113,10 +113,10 @@ export const rolPersonalProyectoSchema = z.enum(rolesPersonalProyecto, {
 export const createPersonalProyectoSchema = z.object({
   proyectoId: z.string().min(1, 'Proyecto es requerido'),
   userId: z.string().min(1, 'Usuario es requerido'),
-  rol: rolPersonalProyectoSchema,
-  /// Puesto del catálogo: es el nombre que ve el cliente y con el que se arma el
-  /// organigrama. `rol` queda como el rol interno de horas y seguridad.
-  puestoId: z.string().optional(),
+  /// El puesto manda. `rol` quedó heredado y se deriva del puesto, así que el
+  /// cliente ya no lo envía.
+  rol: rolPersonalProyectoSchema.optional(),
+  puestoId: z.string().min(1, 'Puesto es requerido'),
   fechaAsignacion: z.string().optional(),
   fechaFin: z.string().optional(),
   activo: z.boolean().default(true),
