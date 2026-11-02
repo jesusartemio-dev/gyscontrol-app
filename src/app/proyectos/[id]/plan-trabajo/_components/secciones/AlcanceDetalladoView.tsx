@@ -142,15 +142,39 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
                               {sub.actividadNombre}
                             </span>
                           </div>
-                          {sub.descripcion && (
-                            <p className="text-xs text-gray-500 leading-relaxed">
-                              {sub.descripcion}
-                              {item.tipoDetalle === 'detallado' &&
-                                imagenes.filter(img => img.edtRef === (item.edtRefId ?? '') && !img.tareaRef && (img.subItemRef ?? undefined) === sub.actividadRefId).length === 0 && (
-                                  <HintFotoSugerida value={sub.fotoSugerida ?? ''} />
-                              )}
-                            </p>
-                          )}
+                          {(() => {
+                            // Las imágenes de la actividad van al lado de su descripción,
+                            // igual que en las tareas: al final del bloque quedaban tras
+                            // todas las viñetas y no se leían como parte de la actividad.
+                            const imagenesDeLaActividad = item.tipoDetalle === 'detallado' && sub.actividadRefId
+                              ? imagenes.filter(img => img.edtRef === (item.edtRefId ?? '') && !img.tareaRef && (img.subItemRef ?? undefined) === sub.actividadRefId)
+                              : []
+                            const conImagenes = imagenesDeLaActividad.length > 0
+                            if (!sub.descripcion && !conImagenes) return null
+                            return (
+                              <div className={conImagenes ? 'grid gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]' : ''}>
+                                {sub.descripcion && (
+                                  <p className="text-xs text-gray-500 leading-relaxed min-w-0">
+                                    {sub.descripcion}
+                                    {item.tipoDetalle === 'detallado' && !conImagenes && (
+                                      <HintFotoSugerida value={sub.fotoSugerida ?? ''} />
+                                    )}
+                                  </p>
+                                )}
+                                {conImagenes && (
+                                  <GaleriaSoloLectura
+                                    proyectoId={proyectoId}
+                                    edtRef={item.edtRefId ?? ''}
+                                    subItemRef={sub.actividadRefId}
+                                    nombreDefault={sub.actividadNombre}
+                                    imagenes={imagenes}
+                                    numerosDeFigura={numerosDeFigura}
+                                    compacta
+                                  />
+                                )}
+                              </div>
+                            )
+                          })()}
                           {(sub.tareas ?? []).filter(t => !t.excluida).length > 0 && (
                             <ul className="space-y-2 pl-1">
                               {(sub.tareas ?? []).filter(t => !t.excluida).map((tarea, ti) => {
@@ -188,16 +212,6 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
                                 )
                               })}
                             </ul>
-                          )}
-                          {item.tipoDetalle === 'detallado' && sub.actividadRefId && (
-                            <GaleriaSoloLectura
-                              proyectoId={proyectoId}
-                              edtRef={item.edtRefId ?? ''}
-                              subItemRef={sub.actividadRefId}
-                              nombreDefault={sub.actividadNombre}
-                              imagenes={imagenes}
-                              numerosDeFigura={numerosDeFigura}
-                            />
                           )}
                         </div>
                       ))}

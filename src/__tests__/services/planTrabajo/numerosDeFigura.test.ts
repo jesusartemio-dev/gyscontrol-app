@@ -55,7 +55,7 @@ function edtFixture(): PlanAlcanceDetalladoEdt {
 }
 
 describe('calcularNumerosDeFigura', () => {
-  it('numera en el orden del docx: tareas -> imagenesSubItem -> imagenes de EDT', () => {
+  it('numera en el orden del docx: imagenesSubItem -> tareas -> imagenes de EDT', () => {
     const imagenes: PlanTrabajoImagen[] = [
       imagenFixture({ id: 'img-tarea', tareaRef: 'tarea-1', orden: 0 }),
       imagenFixture({ id: 'img-subitem', subItemRef: 'act-1', orden: 0 }),
@@ -64,8 +64,9 @@ describe('calcularNumerosDeFigura', () => {
 
     const numeros = calcularNumerosDeFigura([edtFixture()], imagenes)
 
-    expect(numeros.get('img-tarea')).toBe(1)
-    expect(numeros.get('img-subitem')).toBe(2)
+    // La imagen de la actividad va junto a su descripción, antes de las tareas.
+    expect(numeros.get('img-subitem')).toBe(1)
+    expect(numeros.get('img-tarea')).toBe(2)
     expect(numeros.get('img-edt')).toBe(3)
   })
 

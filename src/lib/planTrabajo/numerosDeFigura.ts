@@ -3,7 +3,7 @@ import type { PlanTrabajoImagen } from '@prisma/client'
 
 /**
  * Recorre el alcance detallado en el MISMO orden que la plantilla docx
- * renderiza las imágenes (tareas → imagenesSubItem → imagenes de EDT, EDT
+ * renderiza las imágenes (imagenesSubItem → tareas → imagenes de EDT, EDT
  * tras EDT) y asigna un número de figura correlativo global — compartida por
  * `construirDataBag.ts` (export) y `AlcanceDetalladoView.tsx` (preview), así
  * el número que ve el usuario en la app es SIEMPRE el mismo que sale en el
@@ -29,15 +29,17 @@ export function calcularNumerosDeFigura(
   for (const edt of alcanceDetallado) {
     if (!edt.edtRefId) continue
     for (const sub of edt.subItems ?? []) {
-      for (const tarea of (sub.tareas ?? []).filter(t => !t.excluida)) {
-        if (!tarea.tareaRefId) continue
-        for (const img of imagenesDeNodo(edt.edtRefId, undefined, tarea.tareaRefId)) {
+      // La imagen de la actividad va junto a su descripción, antes de las
+      // tareas: así se numera en el orden en que se lee.
+      if (sub.actividadRefId) {
+        for (const img of imagenesDeNodo(edt.edtRefId, sub.actividadRefId, undefined)) {
           n += 1
           numeros.set(img.id, n)
         }
       }
-      if (sub.actividadRefId) {
-        for (const img of imagenesDeNodo(edt.edtRefId, sub.actividadRefId, undefined)) {
+      for (const tarea of (sub.tareas ?? []).filter(t => !t.excluida)) {
+        if (!tarea.tareaRefId) continue
+        for (const img of imagenesDeNodo(edt.edtRefId, undefined, tarea.tareaRefId)) {
           n += 1
           numeros.set(img.id, n)
         }

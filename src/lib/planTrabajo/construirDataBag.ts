@@ -445,10 +445,11 @@ export function construirDataBag({
                 ? construirImagenesDeNodo(n.edtRefId, undefined, t.tareaRefId, t.nombre, imagenesAlcance, imagenesResueltas, numerosDeFigura)
                 : [],
             })),
-            // Plantilla v6 (Bloque 4.2 sesión 2, micro-fix): loop propio
-            // {#imagenesSubItem} DESPUÉS de {/tareas}, para no colisionar con el
-            // {#imagenes} anidado en cada tarea — mismo nivel/filtro que antes
-            // (subItemRef sin tareaRef), solo cambia el nombre del tag.
+            // Loop propio {#imagenesSubItem} (no {#imagenes}) para no colisionar
+            // con el anidado en cada tarea. En la plantilla va junto a la
+            // descripción de la actividad, ANTES de {#tareas}: al final del
+            // bloque quedaba tras todas las viñetas y no se leía como parte de
+            // la actividad. Mismo nivel/filtro: subItemRef sin tareaRef.
             imagenesSubItem: n.edtRefId && s.actividadRefId
               ? construirImagenesDeNodo(n.edtRefId, s.actividadRefId, undefined, s.actividadNombre, imagenesAlcance, imagenesResueltas, numerosDeFigura)
               : [],

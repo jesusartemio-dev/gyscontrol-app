@@ -504,6 +504,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                       <p className="text-xs font-semibold text-indigo-900 uppercase tracking-wide">Actividades</p>
                       {(item.subItems ?? []).map((sub, subIdx) => {
                         const claveGaleriaSub = `subitem:${sub.actividadRefId ?? `${edtIdx}-${subIdx}`}`
+                        const conGaleriaSub = item.tipoDetalle === 'detallado' && Boolean(sub.actividadRefId)
                         const imagenesDelSubItem = imagenes.filter(
                           img => img.edtRef === (item.edtRefId ?? '') && !img.tareaRef && (img.subItemRef ?? undefined) === sub.actividadRefId
                         )
@@ -556,6 +557,11 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                             </Button>
                           </div>
                           <div className="space-y-3 p-3">
+                          {/* Descripción e imágenes lado a lado, igual que en las tareas:
+                              la galería al final del bloque quedaba después de todas las
+                              tareas y no se leía como parte de la actividad. */}
+                          <div className={conGaleriaSub ? 'grid gap-3 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]' : ''}>
+                          <div className="space-y-1 min-w-0">
                           {sub.descripcionEditadaManualmente && (
                             <button
                               type="button"
@@ -567,6 +573,24 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                             </button>
                           )}
                           <Textarea value={sub.descripcion} onChange={e => marcarDescripcionSubItemEditada(edtIdx, subIdx, e.target.value)} rows={3} className="text-sm resize-none bg-white" placeholder="Descripción narrativa de la actividad..." />
+                          </div>
+                          {conGaleriaSub && (
+                            <div className="min-w-0">
+                              <GaleriaImagenesAlcance
+                                compacta
+                                ref={el => { galeriaRefs.current.set(claveGaleriaSub, el) }}
+                                proyectoId={proyectoId}
+                                edtRef={item.edtRefId ?? ''}
+                                subItemRef={sub.actividadRefId!}
+                                nombreDefault={sub.actividadNombre}
+                                textosContexto={[...textosHerramientas, ...(sub.tareas ?? []).map(t => t.texto || t.nombre)]}
+                                imagenes={imagenes}
+                                onChanged={onImagenesChanged}
+                                titulo="Imágenes de la actividad"
+                              />
+                            </div>
+                          )}
+                          </div>
 
                           {(sub.tareas ?? []).length > 0 && (() => {
                             const conIndice = (sub.tareas ?? []).map((tarea, tareaIdx) => ({ tarea, tareaIdx }))
@@ -719,19 +743,6 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                             </Button>
                           )}
 
-                          {item.tipoDetalle === 'detallado' && sub.actividadRefId && (
-                            <GaleriaImagenesAlcance
-                              ref={el => { galeriaRefs.current.set(claveGaleriaSub, el) }}
-                              proyectoId={proyectoId}
-                              edtRef={item.edtRefId ?? ''}
-                              subItemRef={sub.actividadRefId}
-                              nombreDefault={sub.actividadNombre}
-                              textosContexto={[...textosHerramientas, ...(sub.tareas ?? []).map(t => t.texto || t.nombre)]}
-                              imagenes={imagenes}
-                              onChanged={onImagenesChanged}
-                              titulo="Imágenes de la actividad"
-                            />
-                          )}
                           </div>
                         </div>
                         )
