@@ -297,6 +297,7 @@ export async function POST(
                   "orden",
                   "estado",
                   "responsableId",
+                  "origenActividadId",
                   "createdAt",
                   "updatedAt"
                 ) VALUES (
@@ -312,6 +313,7 @@ export async function POST(
                   ${actividadOrigen.orden},
                   ${actividadOrigen.estado}::"EstadoActividad",
                   ${actividadOrigen.responsableId},
+                  ${validatedData.tipo === 'ejecucion' ? actividadOrigen.id : null},
                   NOW(),
                   NOW()
                 )
@@ -345,6 +347,7 @@ export async function POST(
                     "responsableId",
                     "esHito",
                     "fechaLimite",
+                    "origenTareaId",
                     "createdAt",
                     "updatedAt"
                   ) VALUES (
@@ -365,6 +368,7 @@ export async function POST(
                     ${tareaOrigen.responsableId},
                     ${tareaOrigen.esHito ?? false},
                     ${tareaOrigen.fechaLimite ?? null},
+                    ${validatedData.tipo === 'ejecucion' ? tareaOrigen.id : null},
                     NOW(),
                     NOW()
                   )

@@ -42,7 +42,8 @@ import {
   Table2,
   Wrench,
   Sparkles,
-  UserCheck
+  UserCheck,
+  GitPullRequestArrow
 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useToast } from '@/hooks/use-toast'
@@ -62,6 +63,7 @@ import { exportCronogramaToExcel, type RecursoExport } from '@/lib/utils/msProje
 import { generarMspdiProyecto } from '@/lib/utils/msProjectMspdiExport'
 import ImportExcelCronogramaModal from './ImportExcelCronogramaModal'
 import { SincronizarMsProjectModal } from './SincronizarMsProjectModal'
+import { TraerCambiosLineaBaseModal } from './TraerCambiosLineaBaseModal'
 import { CronogramaVarianza } from './CronogramaVarianza'
 import { CronogramaTableView } from './CronogramaTableView'
 import { AsignarRecursoPorEdt } from './AsignarRecursoPorEdt'
@@ -102,6 +104,7 @@ export function ProyectoCronogramaTab({
   const [showGenerarIAModal, setShowGenerarIAModal] = useState(false)
   const [showImportExcelModal, setShowImportExcelModal] = useState(false)
   const [showSincronizarModal, setShowSincronizarModal] = useState(false)
+  const [showTraerLineaBaseModal, setShowTraerLineaBaseModal] = useState(false)
   const [showAsignarRecursoModal, setShowAsignarRecursoModal] = useState(false)
   const [showAutoasignarResponsablesModal, setShowAutoasignarResponsablesModal] = useState(false)
 
@@ -976,6 +979,15 @@ export function ProyectoCronogramaTab({
                       Actualizar desde MS Project (XML o Excel)
                     </DropdownMenuItem>
                   )}
+                  {selectedCronograma?.tipo === 'ejecucion' && tieneBaseline && (
+                    <DropdownMenuItem onSelect={() => {
+                      setDropdownOpen(false)
+                      setTimeout(() => setShowTraerLineaBaseModal(true), 100)
+                    }} disabled={esBloqueado}>
+                      <GitPullRequestArrow className="h-4 w-4 mr-2" />
+                      Traer cambios de la línea base
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                 </>
               )}
@@ -1235,6 +1247,14 @@ export function ProyectoCronogramaTab({
         proyectoId={proyectoId}
         cronogramaId={selectedCronograma?.id}
         cronogramaNombre={selectedCronograma?.nombre}
+        onSuccess={handleRefresh}
+      />
+
+      {/* Traer cambios de la línea base a ejecución: solo agrega/actualiza lo marcado, nunca borra */}
+      <TraerCambiosLineaBaseModal
+        open={showTraerLineaBaseModal}
+        onOpenChange={setShowTraerLineaBaseModal}
+        proyectoId={proyectoId}
         onSuccess={handleRefresh}
       />
 

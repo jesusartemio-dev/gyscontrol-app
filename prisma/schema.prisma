@@ -3495,6 +3495,10 @@ model ProyectoActividad {
   horasReales          Decimal            @default(0) @db.Decimal(10, 2)
   descripcion          String?
   prioridad            PrioridadEdt       @default(media)
+  /// Solo en ejecución: actividad de la línea base de la que salió (ver
+  /// src/lib/cronogramaLineaBase). Sin FK a propósito: si se borra en la línea
+  /// base, el id colgando es justo lo que dice "ya no está en el plan".
+  origenActividadId    String?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime
   proyectoCronograma   ProyectoCronograma @relation(fields: [proyectoCronogramaId], references: [id], onDelete: Cascade)
@@ -3502,6 +3506,7 @@ model ProyectoActividad {
   user                 User?              @relation(fields: [responsableId], references: [id])
   proyectoTarea        ProyectoTarea[]
 
+  @@index([origenActividadId])
   @@index([proyectoEdtId, proyectoCronogramaId])
   @@index([proyectoEdtId, proyectoCronogramaId, orden])
   @@map("proyecto_actividad")
@@ -3846,6 +3851,9 @@ model ProyectoTarea {
   /// Fecha comprometida (Deadline de MS Project). Queda fija aunque el hito se
   /// mueva; si el hito la pasa, se avisa. Hito con fechaLimite = contractual.
   fechaLimite                 DateTime?
+  /// Solo en ejecución: tarea de la línea base de la que salió (ver
+  /// src/lib/cronogramaLineaBase). Sin FK, igual que origenActividadId.
+  origenTareaId               String?
   createdAt                   DateTime                             @default(now())
   updatedAt                   DateTime
   registroHoras               RegistroHoras[]
@@ -3868,6 +3876,7 @@ model ProyectoTarea {
   responsableAsignaciones     ProyectoTareaResponsableAsignacion[]
 
   @@index([creadoPorId])
+  @@index([origenTareaId])
   @@index([recursoId])
   @@index([catalogoServicioId])
   @@index([dependenciaId])
