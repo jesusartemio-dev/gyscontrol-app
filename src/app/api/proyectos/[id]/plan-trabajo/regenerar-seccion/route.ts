@@ -317,12 +317,22 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           const edtsRefIdEnAlcance = edtRefId
             ? new Set([edtRefId])
             : new Set(data.map(e => e.edtRefId).filter((id): id is string => Boolean(id)))
-          const dataFinal = aplicarAlcanceDeRegeneracion(
+          const { data: dataFinal, textosConservadosPorFallback } = aplicarAlcanceDeRegeneracion(
             dataConEstadoManual,
             estructuraAnterior,
             edtsRefIdEnAlcance,
             sobrescribirEditados ?? false
           )
+          // La IA no redactó estos nodos y se conservó el texto que ya había.
+          // Sin este aviso la regeneración parecía exitosa y el usuario solo
+          // notaba el texto viejo al releer el documento.
+          if (textosConservadosPorFallback.length > 0) {
+            const lista = textosConservadosPorFallback.slice(0, 5).join(', ')
+            const resto = textosConservadosPorFallback.length > 5 ? ` y ${textosConservadosPorFallback.length - 5} más` : ''
+            advertencias.push(
+              `La IA no devolvió texto para ${textosConservadosPorFallback.length} elemento(s) (${lista}${resto}); se conservó el texto anterior. Volvé a regenerar si querés reescribirlos.`
+            )
+          }
 
           send('status', { fase: 'validacion', mensaje: 'Validando estructura del resultado...' })
           const { data: validado, error } = validarSeccionIndividual(seccion, { alcanceDetallado: dataFinal })

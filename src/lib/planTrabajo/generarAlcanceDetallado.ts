@@ -124,7 +124,7 @@ export function mergearDescripcionesEnEstructura(
  * sobrescribirlo): una tarea marcada `excluida` sigue excluida, sus
  * `catalogoImagenesRechazadas` se conservan, y el orden relativo del usuario
  * se reaplica. Una tarea nueva en el cronograma (no existía en el estado
- * anterior) se agrega al final, en su orden natural.
+ * anterior) se inserta donde el cronograma la puso, debajo de su vecina.
  * Lo agregado a mano en el editor también sobrevive: las viñetas manuales
  * (`manualId`) y las actividades sin `actividadRefId` vuelven a quedar debajo
  * del elemento que tenían antes, y se respeta el orden de actividades que el
@@ -162,14 +162,25 @@ export function preservarEstadoManualTareas(
         }))
         .map((t, i) => ({ t, i, pos: t.tareaRefId ? ordenAnterior.get(t.tareaRefId) : undefined }))
 
-      conExclusionYPosicion.sort((a, b) => {
-        if (a.pos !== undefined && b.pos !== undefined) return a.pos - b.pos
-        if (a.pos !== undefined) return -1
-        if (b.pos !== undefined) return 1
-        return a.i - b.i // ambas nuevas — mantener el orden natural del cronograma
-      })
+      // Las que ya estaban, en el orden que dejó el usuario.
+      const conocidas = conExclusionYPosicion
+        .filter(x => x.pos !== undefined)
+        .sort((a, b) => a.pos! - b.pos!)
+        .map(({ t }) => t)
 
-      const tareas = reinsertarManuales(conExclusionYPosicion.map(({ t }) => t), anteriores, t => t.tareaRefId ?? t.manualId, t => Boolean(t.manualId))
+      // Una tarea nueva del cronograma entra DONDE el cronograma la puso —
+      // debajo de su vecina anterior — y no al final de la lista: agregarla
+      // al final la separaba de las tareas con las que va en secuencia.
+      const nuevas = new Set(conExclusionYPosicion.filter(x => x.pos === undefined).map(x => x.t))
+      const enOrdenDeCronograma = conExclusionYPosicion.map(({ t }) => t)
+      const conNuevas = reinsertarManuales(
+        conocidas,
+        enOrdenDeCronograma,
+        t => t.tareaRefId ?? t.manualId,
+        t => nuevas.has(t)
+      )
+
+      const tareas = reinsertarManuales(conNuevas, anteriores, t => t.tareaRefId ?? t.manualId, t => Boolean(t.manualId))
       return { ...s, tareas }
     }),
   }))
@@ -230,20 +241,39 @@ function ordenarSubItemsComoAntes(nuevos: PlanAlcanceDetalladoSubItem[], anterio
  *   ANTERIOR se preserva — salvo que `sobrescribirEditados` sea true, en
  *   cuyo caso se usa el texto nuevo y la marca se libera (queda disponible
  *   para que la IA la reescriba en el futuro).
+ * - Un texto nuevo que sea EXACTAMENTE el fallback determinista (la IA no
+ *   devolvió nada para ese nodo) no pisa al anterior si el anterior decía
+ *   algo distinto: una regeneración fallida dejaba el plan peor que antes,
+ *   con la viñeta reducida al nombre de la tarea del cronograma y sin aviso.
+ *   Se cuentan en `textosConservadosPorFallback` para poder advertirlo.
  * Pura y testeable: no decide nada por IA, solo reconcilia dos estructuras.
  * Debe aplicarse DESPUÉS de `preservarEstadoManualTareas` (que ya reconcilió
  * excluida/orden/catalogoImagenesRechazadas por tareaRefId) — esta función
  * no toca esos campos.
  */
+export interface ResultadoAplicarAlcance {
+  data: PlanAlcanceDetalladoEdt[]
+  /** Nodos donde la IA no devolvió texto y se conservó el anterior. */
+  textosConservadosPorFallback: string[]
+}
+
+/** true si `nuevo` es el fallback y `anterior` decía algo distinto que vale la pena conservar. */
+function esFallbackQuePisaTextoBueno(nuevo: string, anterior: string | undefined, fallback: string): boolean {
+  const n = (nuevo ?? '').trim()
+  const a = (anterior ?? '').trim()
+  return n === fallback.trim() && a.length > 0 && a !== n
+}
+
 export function aplicarAlcanceDeRegeneracion(
   estructuraNueva: PlanAlcanceDetalladoEdt[],
   estructuraAnterior: PlanAlcanceDetalladoEdt[],
   edtsRefIdEnAlcance: Set<string>,
   sobrescribirEditados: boolean
-): PlanAlcanceDetalladoEdt[] {
+): ResultadoAplicarAlcance {
   const anterioresPorEdt = new Map(estructuraAnterior.filter(e => e.edtRefId).map(e => [e.edtRefId!, e]))
+  const textosConservadosPorFallback: string[] = []
 
-  return estructuraNueva.map(edt => {
+  const data = estructuraNueva.map(edt => {
     const anteriorEdt = edt.edtRefId ? anterioresPorEdt.get(edt.edtRefId) : undefined
 
     if (!edt.edtRefId || !edtsRefIdEnAlcance.has(edt.edtRefId)) {
@@ -252,35 +282,46 @@ export function aplicarAlcanceDeRegeneracion(
       return anteriorEdt ?? edt
     }
 
-    const usarDescripcionAnteriorEdt = Boolean(anteriorEdt?.descripcionEditadaManualmente) && !sobrescribirEditados
+    const editadoEdt = Boolean(anteriorEdt?.descripcionEditadaManualmente) && !sobrescribirEditados
+    const fallbackPisaEdt = esFallbackQuePisaTextoBueno(edt.descripcion, anteriorEdt?.descripcion, descripcionFallbackEdt(edt.faseNombre, edt.edtNombre))
+    if (fallbackPisaEdt) textosConservadosPorFallback.push(edt.edtNombre)
+    const usarDescripcionAnteriorEdt = editadoEdt || fallbackPisaEdt
     const anterioresPorSubItem = new Map((anteriorEdt?.subItems ?? []).filter(s => s.actividadRefId).map(s => [s.actividadRefId!, s]))
 
     return {
       ...edt,
       descripcion: usarDescripcionAnteriorEdt ? anteriorEdt!.descripcion : edt.descripcion,
-      descripcionEditadaManualmente: usarDescripcionAnteriorEdt,
+      descripcionEditadaManualmente: editadoEdt,
       subItems: (edt.subItems ?? []).map(s => {
         const anteriorSub = s.actividadRefId ? anterioresPorSubItem.get(s.actividadRefId) : undefined
-        const usarDescripcionAnteriorSub = Boolean(anteriorSub?.descripcionEditadaManualmente) && !sobrescribirEditados
+        const editadoSub = Boolean(anteriorSub?.descripcionEditadaManualmente) && !sobrescribirEditados
+        const fallbackPisaSub = esFallbackQuePisaTextoBueno(s.descripcion, anteriorSub?.descripcion, descripcionFallbackSubItem(s.actividadNombre))
+        if (fallbackPisaSub) textosConservadosPorFallback.push(s.actividadNombre)
+        const usarDescripcionAnteriorSub = editadoSub || fallbackPisaSub
         const anterioresPorTarea = new Map((anteriorSub?.tareas ?? []).filter(t => t.tareaRefId).map(t => [t.tareaRefId!, t]))
 
         return {
           ...s,
           descripcion: usarDescripcionAnteriorSub ? anteriorSub!.descripcion : s.descripcion,
-          descripcionEditadaManualmente: usarDescripcionAnteriorSub,
+          descripcionEditadaManualmente: editadoSub,
           tareas: (s.tareas ?? []).map(t => {
             const anteriorTarea = t.tareaRefId ? anterioresPorTarea.get(t.tareaRefId) : undefined
-            const usarTextoAnterior = Boolean(anteriorTarea?.textoEditadoManualmente) && !sobrescribirEditados
+            const editadoTarea = Boolean(anteriorTarea?.textoEditadoManualmente) && !sobrescribirEditados
+            const fallbackPisaTarea = esFallbackQuePisaTextoBueno(t.texto, anteriorTarea?.texto, textoFallbackTarea(t.nombre))
+            if (fallbackPisaTarea) textosConservadosPorFallback.push(t.nombre)
+            const usarTextoAnterior = editadoTarea || fallbackPisaTarea
             return {
               ...t,
               texto: usarTextoAnterior ? anteriorTarea!.texto : t.texto,
-              textoEditadoManualmente: usarTextoAnterior,
+              textoEditadoManualmente: editadoTarea,
             }
           }),
         }
       }),
     }
   })
+
+  return { data, textosConservadosPorFallback }
 }
 
 function extraerTexto(response: Anthropic.Message): string {

@@ -2,6 +2,7 @@ import { calcularEstructuraAlcanceDetallado, esEdtDetallado } from '@/lib/planTr
 import {
   mergearDescripcionesEnEstructura,
   descripcionFallbackSubItem,
+  textoFallbackTarea,
   preservarEstadoManualTareas,
   aplicarAlcanceDeRegeneracion,
 } from '@/lib/planTrabajo/generarAlcanceDetallado'
@@ -520,6 +521,33 @@ describe('tareas por subItem (Bloque 4.2, Tarea 4)', () => {
       expect(subs.map(s => s.numeracion)).toEqual(['11.5.1', '11.5.2', '11.5.3'])
     })
 
+    it('una tarea NUEVA del cronograma entra donde el cronograma la puso, no al final', () => {
+      // Caso real de CJM51: se agregó "Integración en línea al PLC y SCADA" como
+      // segunda tarea de Comisionamiento y el plan la mandaba al final de seis.
+      const conNueva = [edt([
+        { ...sub('a', '11.5.1', [tarea('a-t1'), tarea('a-nueva'), tarea('a-t2')]) },
+        sub('b', '11.5.2'),
+        sub('c', '11.5.3'),
+      ])]
+      const anterior = [edt([sub('a', '11.5.1', [tarea('a-t1'), tarea('a-t2')]), sub('b', '11.5.2'), sub('c', '11.5.3')])]
+
+      const tareas = preservarEstadoManualTareas(conNueva, anterior)[0].subItems![0].tareas!
+      expect(tareas.map(t => t.tareaRefId)).toEqual(['a-t1', 'a-nueva', 'a-t2'])
+    })
+
+    it('el orden que movió el usuario manda sobre el del cronograma para las tareas que ya estaban', () => {
+      const conNueva = [edt([
+        { ...sub('a', '11.5.1', [tarea('a-t1'), tarea('a-nueva'), tarea('a-t2')]) },
+        sub('b', '11.5.2'),
+        sub('c', '11.5.3'),
+      ])]
+      // El usuario había invertido t1 y t2.
+      const anterior = [edt([sub('a', '11.5.1', [tarea('a-t2'), tarea('a-t1')]), sub('b', '11.5.2'), sub('c', '11.5.3')])]
+
+      const tareas = preservarEstadoManualTareas(conNueva, anterior)[0].subItems![0].tareas!
+      expect(tareas.map(t => t.tareaRefId)).toEqual(['a-t2', 'a-t1', 'a-nueva'])
+    })
+
     it('una actividad agregada a mano (sin actividadRefId) sobrevive en su lugar', () => {
       const manual: PlanAlcanceDetalladoSubItem = { numeracion: '11.5.9', actividadNombre: 'Pruebas extra', descripcion: 'x', tareas: [] }
       const anterior = [edt([sub('a', '11.5.1'), manual, sub('b', '11.5.2'), sub('c', '11.5.3')])]
@@ -580,12 +608,60 @@ describe('aplicarAlcanceDeRegeneracion (Bloque 4.2 sesión 5) — regeneración 
     })
   }
 
+  it('(z) un fallback de la IA NO pisa el texto que ya estaba, aunque no sea editado a mano', () => {
+    // Caso real de CJM51: al regenerar Comisionamiento la IA no devolvió nada y
+    // las seis viñetas quedaron reducidas al nombre de la tarea del cronograma.
+    const anterior = estructuraBase.map(edt => edt.edtRefId !== 'edt-con' ? edt : {
+      ...edt,
+      subItems: (edt.subItems ?? []).map(s => ({
+        ...s,
+        descripcion: 'Descripción redactada en la generación anterior.',
+        tareas: (s.tareas ?? []).map(t => ({ ...t, texto: `Viñeta redactada para ${t.nombre}.` })),
+      })),
+    })
+    // La IA falla: cada nodo vuelve con su fallback determinista.
+    const nueva = estructuraBase.map(edt => edt.edtRefId !== 'edt-con' ? edt : {
+      ...edt,
+      subItems: (edt.subItems ?? []).map(s => ({
+        ...s,
+        descripcion: descripcionFallbackSubItem(s.actividadNombre),
+        tareas: (s.tareas ?? []).map(t => ({ ...t, texto: textoFallbackTarea(t.nombre) })),
+      })),
+    })
+
+    const { data, textosConservadosPorFallback } = aplicarAlcanceDeRegeneracion(nueva, anterior, new Set(['edt-con']), false)
+    const con = data.find(e => e.edtRefId === 'edt-con')!
+    const primeraTarea = con.subItems![0].tareas![0]
+
+    expect(primeraTarea.texto).toBe(`Viñeta redactada para ${primeraTarea.nombre}.`)
+    expect(con.subItems![0].descripcion).toBe('Descripción redactada en la generación anterior.')
+    // Conservar no es lo mismo que marcar como editado a mano.
+    expect(primeraTarea.textoEditadoManualmente).toBe(false)
+    expect(textosConservadosPorFallback.length).toBeGreaterThan(0)
+  })
+
+  it('(z2) si no habia texto anterior, el fallback se usa tal cual y no se reporta', () => {
+    const anterior = estructuraBase.map(edt => edt.edtRefId !== 'edt-con' ? edt : {
+      ...edt,
+      subItems: (edt.subItems ?? []).map(s => ({ ...s, tareas: (s.tareas ?? []).map(t => ({ ...t, texto: '' })) })),
+    })
+    const nueva = estructuraBase.map(edt => edt.edtRefId !== 'edt-con' ? edt : {
+      ...edt,
+      subItems: (edt.subItems ?? []).map(s => ({ ...s, tareas: (s.tareas ?? []).map(t => ({ ...t, texto: textoFallbackTarea(t.nombre) })) })),
+    })
+
+    const { data, textosConservadosPorFallback } = aplicarAlcanceDeRegeneracion(nueva, anterior, new Set(['edt-con']), false)
+    const t = data.find(e => e.edtRefId === 'edt-con')!.subItems![0].tareas![0]
+    expect(t.texto).toBe(t.nombre)
+    expect(textosConservadosPorFallback).toEqual([])
+  })
+
   it('(a) un EDT fuera del alcance se restaura TAL CUAL estaba — no el texto de fallback recién calculado', () => {
     const anterior = estructuraAnteriorConEdicionesManuales()
     const nueva = estructuraReciénRegenerada()
     const edtsEnAlcance = new Set(['edt-con']) // solo Construcción está en el alcance de esta regeneración
 
-    const resultado = aplicarAlcanceDeRegeneracion(nueva, anterior, edtsEnAlcance, false)
+    const { data: resultado } = aplicarAlcanceDeRegeneracion(nueva, anterior, edtsEnAlcance, false)
     const plan = resultado.find(e => e.edtNombre === 'Planificación General')!
     const planAnterior = anterior.find(e => e.edtNombre === 'Planificación General')!
 
@@ -599,7 +675,7 @@ describe('aplicarAlcanceDeRegeneracion (Bloque 4.2 sesión 5) — regeneración 
     const nueva = estructuraReciénRegenerada()
     const edtsEnAlcance = new Set(['edt-con'])
 
-    const resultado = aplicarAlcanceDeRegeneracion(nueva, anterior, edtsEnAlcance, false)
+    const { data: resultado } = aplicarAlcanceDeRegeneracion(nueva, anterior, edtsEnAlcance, false)
     const con = resultado.find(e => e.edtNombre === 'Construcción')!
 
     expect(con.descripcion).toBe('Descripción de Construcción editada a mano por el usuario.')
@@ -619,7 +695,7 @@ describe('aplicarAlcanceDeRegeneracion (Bloque 4.2 sesión 5) — regeneración 
     const nueva = estructuraReciénRegenerada()
     const edtsEnAlcance = new Set(['edt-con'])
 
-    const resultado = aplicarAlcanceDeRegeneracion(nueva, anterior, edtsEnAlcance, true)
+    const { data: resultado } = aplicarAlcanceDeRegeneracion(nueva, anterior, edtsEnAlcance, true)
     const con = resultado.find(e => e.edtNombre === 'Construcción')!
 
     expect(con.descripcion).toBe('Descripción NUEVA de Construcción, redactada por la IA.')
@@ -651,7 +727,7 @@ describe('aplicarAlcanceDeRegeneracion (Bloque 4.2 sesión 5) — regeneración 
     // Orden real: primero se reconcilia excluida/orden/rechazos (por tareaRefId),
     // DESPUÉS se aplica el alcance + protección de texto — igual que en la ruta.
     const conEstadoManual = preservarEstadoManualTareas(nueva, anterior)
-    const resultado = aplicarAlcanceDeRegeneracion(conEstadoManual, anterior, edtsEnAlcance, false)
+    const { data: resultado } = aplicarAlcanceDeRegeneracion(conEstadoManual, anterior, edtsEnAlcance, false)
     const con = resultado.find(e => e.edtNombre === 'Construcción')!
 
     expect(con.subItems![0].tareas![0].excluida).toBe(true)
