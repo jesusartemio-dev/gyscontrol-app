@@ -13,7 +13,14 @@ import { z } from 'zod'
 import { logger } from '@/lib/logger'
 import { Role } from '@prisma/client'
 
-// Roles permitidos para ser asignados como responsable en un proyecto
+/**
+ * Roles permitidos para ser asignados como responsable en un proyecto.
+ *
+ * Se busca contra los roles EFECTIVOS (`role` + `rolesExtra`), no solo contra
+ * el principal: quien tiene `role='admin'` y `rolesExtra=['proyectos']`
+ * trabaja en proyectos y quedaba fuera de la lista de responsables, sin manera
+ * de aparecer por más que se relogueara.
+ */
 const ROLES_RESPONSABLE_PROYECTO: Role[] = ['proyectos', 'seguridad', 'coordinador', 'gestor']
 
 const asignarResponsableSchema = z.object({
@@ -262,10 +269,15 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Obtener usuarios con roles permitidos para ser responsable en proyectos
+    // Obtener usuarios con roles permitidos para ser responsable en proyectos.
+    // La condición es la UNIÓN de `role` y `rolesExtra` (ver src/lib/auth/roles.ts):
+    // basta con que cualquiera de los roles del usuario esté permitido.
     const usuariosProyecto = await prisma.user.findMany({
       where: {
-        role: { in: ROLES_RESPONSABLE_PROYECTO }
+        OR: [
+          { role: { in: ROLES_RESPONSABLE_PROYECTO } },
+          { rolesExtra: { hasSome: ROLES_RESPONSABLE_PROYECTO } },
+        ],
       },
       select: {
         id: true,
