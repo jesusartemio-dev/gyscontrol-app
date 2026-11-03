@@ -57,21 +57,49 @@ const ITEMS: ItemAlquiler[] = [
     moneda: 'PEN',
     fuente: 'SW ANDAMIOS GROUP — 9 OC idénticas, mar–oct 2026',
   },
+  // Un cuerpo LAYHER = 2.00 m de altura. Se confirma con la cotización
+  // ALQUILER2026-1780: "2.5 cuerpos" = altura 5.00 m, "2 cuerpos" = 4.00 m.
+  // El código lleva tipo (M/F) + cuerpos + planta porque las tres cosas
+  // cambian el precio y el proveedor cotiza cada combinación por separado.
   {
-    codigo: 'ALQ-AND-LAYHER-MOVIL',
-    descripcion: 'ALQUILER ANDAMIO NORMADO CERTIFICADO (LAYHER) - MOVIL - Ancho 1.57 m x Largo 2.07 m, Altura 4.00 m + 1.00 m de baranda de seguridad',
+    codigo: 'ALQ-AND-LAYHER-M-2C-157X207',
+    descripcion: 'ALQUILER ANDAMIO NORMADO CERTIFICADO (LAYHER) - MOVIL - 2 cuerpos - Ancho 1.57 m x Largo 2.07 m, Altura 4.00 m + 1.00 m de baranda de seguridad',
     marca: 'LAYHER',
     precio: 1166.14,
     moneda: 'PEN',
     fuente: 'GRUPO METALMEC — OC-260710-003, OC-260901-001',
   },
   {
-    codigo: 'ALQ-AND-LAYHER-FIJO',
-    descripcion: 'ALQUILER ANDAMIO NORMADO CERTIFICADO (LAYHER) - FIJO - Ancho 1.09 m x Largo 1.57 m, Altura 2.00 m + 1.00 m de baranda de seguridad',
+    codigo: 'ALQ-AND-LAYHER-F-1C-109X157',
+    descripcion: 'ALQUILER ANDAMIO NORMADO CERTIFICADO (LAYHER) - FIJO - 1 cuerpo - Ancho 1.09 m x Largo 1.57 m, Altura 2.00 m + 1.00 m de baranda de seguridad',
     marca: 'LAYHER',
     precio: 529.43,
     moneda: 'PEN',
     fuente: 'GRUPO METALMEC — OC-260710-003, OC-260901-001',
+  },
+  {
+    codigo: 'ALQ-AND-LAYHER-M-2.5C-207X207',
+    descripcion: 'ALQUILER ANDAMIO NORMADO CERTIFICADO (LAYHER) - MOVIL - 2.5 cuerpos - Ancho 2.07 m x Largo 2.07 m, Altura 5.00 m + 1.00 m de baranda de seguridad',
+    marca: 'LAYHER',
+    precio: 1618.17,
+    moneda: 'PEN',
+    fuente: 'Cotización ALQUILER2026-1780, ítem 1 (precio sin IGV)',
+  },
+  {
+    codigo: 'ALQ-AND-LAYHER-F-2C-207X207',
+    descripcion: 'ALQUILER ANDAMIO NORMADO CERTIFICADO (LAYHER) - FIJO - 2 cuerpos - Ancho 2.07 m x Largo 2.07 m, Altura 4.00 m + 1.00 m de baranda de seguridad',
+    marca: 'LAYHER',
+    precio: 1116.36,
+    moneda: 'PEN',
+    fuente: 'Cotización ALQUILER2026-1780, ítem 2 (precio sin IGV)',
+  },
+  {
+    codigo: 'ALQ-AND-LAYHER-KIT-PIEZAS',
+    descripcion: 'ALQUILER PIEZAS DE ANDAMIO NORMADO CERTIFICADO (LAYHER) - kit: 4 grapa fija SW 22 + 3 ringscaff horizontal 1.09 m galvanizada + 1 escalera para horizontal',
+    marca: 'LAYHER',
+    precio: 47.42,
+    moneda: 'PEN',
+    fuente: 'Cotización ALQUILER2026-1780, ítem 3 (precio sin IGV)',
   },
   {
     codigo: 'ALQ-AND-2C-GARRUCHA',
@@ -107,6 +135,16 @@ const ITEMS: ItemAlquiler[] = [
   },
 ]
 
+/**
+ * Códigos de la primera carga que se renombran al esquema tipo+cuerpos+planta.
+ * Hizo falta cuando entró una segunda configuración LAYHER (2.07 x 2.07) y
+ * "MOVIL" / "FIJO" a secas dejaron de identificar nada.
+ */
+const RENOMBRAR: Record<string, string> = {
+  'ALQ-AND-LAYHER-MOVIL': 'ALQ-AND-LAYHER-M-2C-157X207',
+  'ALQ-AND-LAYHER-FIJO': 'ALQ-AND-LAYHER-F-1C-109X157',
+}
+
 const r2 = (v: number) => Math.round(v * 100) / 100
 
 async function main() {
@@ -135,6 +173,26 @@ async function main() {
 
   const unidad = await prisma.unidad.findFirst({ where: { nombre: UNIDAD } })
   if (!unidad) throw new Error(`No existe la unidad "${UNIDAD}"`)
+
+  // 1b. Renombres pendientes del esquema viejo
+  for (const [viejo, nuevo] of Object.entries(RENOMBRAR)) {
+    const actual = await prisma.catalogoEquipo.findUnique({
+      where: { codigo: viejo },
+      select: { id: true, _count: { select: { cotizacionEquipoItem: true, proyectoEquipoCotizadoItem: true, listaEquipoItem: true } } },
+    })
+    if (!actual) continue
+    const usos = actual._count.cotizacionEquipoItem + actual._count.proyectoEquipoCotizadoItem + actual._count.listaEquipoItem
+    if (usos > 0) {
+      console.log(`  ! ${viejo} tiene ${usos} usos — no se renombra, revisar a mano`)
+      continue
+    }
+    if (DRY) {
+      console.log(`  ~ renombraría ${viejo} → ${nuevo}`)
+    } else {
+      await prisma.catalogoEquipo.update({ where: { id: actual.id }, data: { codigo: nuevo, updatedAt: new Date() } })
+      console.log(`  → ${viejo} renombrado a ${nuevo}`)
+    }
+  }
 
   // 2. Ítems
   console.log('')
