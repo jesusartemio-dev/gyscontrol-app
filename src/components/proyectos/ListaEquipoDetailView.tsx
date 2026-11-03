@@ -32,7 +32,9 @@ import {
   User,
   X,
   ChevronRight,
-  History
+  History,
+  Copy,
+  MessageCircle
 } from 'lucide-react';
 import ListaEquipoItemList from '@/components/equipos/ListaEquipoItemList';
 import ListaEquipoEditModal from '@/components/equipos/ListaEquipoEditModal';
@@ -41,6 +43,7 @@ import ListaEquipoHistorial from '@/components/equipos/ListaEquipoHistorial';
 import ListaEquipoTimeline from '@/components/equipos/ListaEquipoTimeline';
 import PedidoDesdeListaModal from '@/components/equipos/PedidoDesdeListaModal';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
+import { mensajeCompartirLista } from '@/lib/utils/compartirWhatsApp';
 import { createPedidoDesdeListaContextual } from '@/lib/services/pedidoEquipo';
 
 interface ListaEquipoDetailViewProps {
@@ -136,6 +139,36 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
     }
   }, [refreshItems]);
 
+  const buildShareText = useCallback(() => {
+    if (!lista || !proyecto) return '';
+    return mensajeCompartirLista({
+      codigo: lista.codigo,
+      nombre: lista.nombre,
+      proyecto: proyecto.nombre,
+      estado: statusConfig[lista.estado || 'borrador']?.label ?? lista.estado ?? '',
+      extras: lista.fechaNecesaria ? [`Necesario: ${formatDate(lista.fechaNecesaria)}`] : [],
+      items: items.map(i => ({
+        codigo: i.codigo,
+        descripcion: i.descripcion,
+        cantidad: i.cantidad,
+        unidad: i.unidad,
+      })),
+      url: window.location.href,
+    });
+  }, [lista, proyecto, items]);
+
+  const handleCopiar = useCallback(() => {
+    const text = buildShareText();
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => toast.success('Copiado al portapapeles'));
+  }, [buildShareText]);
+
+  const handleCompartirWhatsApp = useCallback(() => {
+    const text = buildShareText();
+    if (!text) return;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  }, [buildShareText]);
+
   const stats = useMemo(() => {
     const totalItems = items.length;
     const completedItems = items.filter(item => item.estado === 'aprobado').length;
@@ -220,6 +253,27 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
 
         {/* Acciones */}
         <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleCopiar}
+            className="h-7 text-xs"
+            title="Copia el detalle listo para pegar en WhatsApp"
+          >
+            <Copy className="h-3 w-3 mr-1" />
+            Copiar
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleCompartirWhatsApp}
+            className="h-7 text-xs text-green-700 border-green-300 hover:bg-green-50"
+          >
+            <MessageCircle className="h-3 w-3 mr-1" />
+            WhatsApp
+          </Button>
+
           <Button
             size="sm"
             variant="outline"

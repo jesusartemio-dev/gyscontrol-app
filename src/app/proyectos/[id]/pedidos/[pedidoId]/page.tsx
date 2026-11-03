@@ -82,6 +82,7 @@ import { AgregarDeListaModal } from '@/components/equipos/AgregarDeListaModal'
 import { useDeleteWithValidation } from '@/hooks/useDeleteWithValidation'
 import { DeleteWithValidationDialog } from '@/components/DeleteWithValidationDialog'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { mensajeCompartirPedido } from '@/lib/utils/compartirWhatsApp'
 import { deletePedidoEquipoItem, reordenarPedidoEquipoItems } from '@/lib/services/pedidoEquipoItem'
 import {
   DndContext,
@@ -388,11 +389,19 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
 
   const buildShareText = useCallback(() => {
     if (!pedido || !proyecto) return ''
-    const url = window.location.href
-    const estado = ESTADO_LABELS[pedido.estado || ''] ?? pedido.estado ?? ''
-    const numItems = localPedidoItems.length
-    const nombre = (pedido as any).nombre ? ` — ${(pedido as any).nombre}` : ''
-    return `📦 *${pedido.codigo}*${nombre}\nProyecto: ${proyecto.nombre}\nEstado: ${estado} | ${numItems} ítem(s)\n🔗 ${url}`
+    return mensajeCompartirPedido({
+      codigo: pedido.codigo,
+      nombre: (pedido as any).nombre,
+      proyecto: proyecto.nombre,
+      estado: ESTADO_LABELS[pedido.estado || ''] ?? pedido.estado ?? '',
+      items: localPedidoItems.map((i: any) => ({
+        codigo: i.codigo,
+        descripcion: i.descripcion,
+        cantidad: i.cantidadPedida,
+        unidad: i.unidad,
+      })),
+      url: window.location.href,
+    })
   }, [pedido, proyecto, localPedidoItems])
 
   const handleCopiarEnlace = useCallback(() => {
