@@ -43,7 +43,7 @@ interface ItemAlquiler {
 const ITEMS: ItemAlquiler[] = [
   {
     codigo: 'ALQ-AND-MULTI-MOVIL',
-    descripcion: 'ALQUILER ANDAMIAJE MULTIDIRECCIONAL MÓVIL - EE',
+    descripcion: 'ALQUILER ANDAMIAJE MULTIDIRECCIONAL MOVIL - EE (torre base; la altura se completa con ALQ-AND-MULTI-PIEZA)',
     marca: 'Sin marca',
     precio: 1066.26,
     moneda: 'PEN',
@@ -51,7 +51,7 @@ const ITEMS: ItemAlquiler[] = [
   },
   {
     codigo: 'ALQ-AND-MULTI-PIEZA',
-    descripcion: 'ALQUILER PIEZA ADICIONAL DE ANDAMIAJE MULTIDIRECCIONAL',
+    descripcion: 'ALQUILER PIEZA ADICIONAL DE ANDAMIAJE MULTIDIRECCIONAL (cuerpo extra sobre ALQ-AND-MULTI-MOVIL)',
     marca: 'Sin marca',
     precio: 106.27,
     moneda: 'PEN',
@@ -59,7 +59,7 @@ const ITEMS: ItemAlquiler[] = [
   },
   {
     codigo: 'ALQ-AND-LAYHER-MOVIL',
-    descripcion: 'ALQUILER ANDAMIO NORMADO CERTIFICADO MÓVIL (LAYHER)',
+    descripcion: 'ALQUILER ANDAMIO NORMADO CERTIFICADO (LAYHER) - MOVIL - Ancho 1.57 m x Largo 2.07 m, Altura 4.00 m + 1.00 m de baranda de seguridad',
     marca: 'LAYHER',
     precio: 1166.14,
     moneda: 'PEN',
@@ -67,7 +67,7 @@ const ITEMS: ItemAlquiler[] = [
   },
   {
     codigo: 'ALQ-AND-LAYHER-FIJO',
-    descripcion: 'ALQUILER ANDAMIO NORMADO CERTIFICADO FIJO (LAYHER)',
+    descripcion: 'ALQUILER ANDAMIO NORMADO CERTIFICADO (LAYHER) - FIJO - Ancho 1.09 m x Largo 1.57 m, Altura 2.00 m + 1.00 m de baranda de seguridad',
     marca: 'LAYHER',
     precio: 529.43,
     moneda: 'PEN',
@@ -75,7 +75,7 @@ const ITEMS: ItemAlquiler[] = [
   },
   {
     codigo: 'ALQ-AND-2C-GARRUCHA',
-    descripcion: 'ALQUILER ANDAMIO 02 CUERPOS 2.5 X 1M - CON GARRUCHA Y FIJO',
+    descripcion: 'ALQUILER DE ANDAMIOS - 02 CUERPOS 2.5 x 1 m - GARRUCHA Y FIJO',
     marca: 'Sin marca',
     precio: 3407.8,
     moneda: 'PEN',
