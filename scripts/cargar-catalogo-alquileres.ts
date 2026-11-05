@@ -36,6 +36,8 @@ interface ItemAlquiler {
   marca: string
   precio: number
   moneda: 'PEN' | 'USD'
+  /** Por defecto UNIDAD ('und'). Los alquileres que se contratan como paquete van en 'glb'. */
+  unidad?: string
   /** De dónde sale el precio — queda en el log, no en la BD. */
   fuente: string
 }
@@ -109,6 +111,18 @@ const ITEMS: ItemAlquiler[] = [
     moneda: 'PEN',
     fuente: 'METAL STYLE — OC-260525-003. Ojo: no es alquiler puro, incluye montaje con andamiero',
   },
+  // Tampoco es alquiler puro: es la torre armada y desarmada por el proveedor.
+  // Va en 'glb' porque se contrata como paquete cerrado (torre + días de alquiler
+  // + montaje), no por unidad de andamio.
+  {
+    codigo: 'ALQ-AND-TORRE-10C-ARMADO',
+    descripcion: 'ALQUILER Y ARMADO DE ANDAMIOS - 01 TORRE DE 10 CUERPOS - INCLUYE TRASLADO, MONTAJE Y DESMONTAJE CON ANDAMIEROS (03 dias de ejecucion), ALQUILER POR 05 DIAS HABILES, EPPs, herramientas, supervisor andamiero, SSOMA y memoria de calculo del proveedor',
+    marca: 'PERI',
+    precio: 18287.69,
+    moneda: 'PEN',
+    unidad: 'glb',
+    fuente: 'Cotización MS26-INDUS-00096 Rev 1 — METAL STYLE S.A.C. RUC 20550897360, 26/10/2026. Total sin IGV S/ 18,287.69 (S/ 15,498.04 + 10% gastos adm + 8% utilidad). Acceso a canaleta eléctrica, GYS-NEXA Cajamarquilla',
+  },
   {
     codigo: 'ALQ-MANLIFT-DIA',
     descripcion: 'ALQUILER PLATAFORMA ARTICULADA (MANLIFT) - POR DÍA',
@@ -171,8 +185,16 @@ async function main() {
     console.log(`Categoría "${CATEGORIA}" creada (${categoria.id})`)
   }
 
-  const unidad = await prisma.unidad.findFirst({ where: { nombre: UNIDAD } })
-  if (!unidad) throw new Error(`No existe la unidad "${UNIDAD}"`)
+  const unidades = new Map<string, string>()
+  const buscarUnidad = async (nombre: string) => {
+    if (!unidades.has(nombre)) {
+      const u = await prisma.unidad.findFirst({ where: { nombre } })
+      if (!u) throw new Error(`No existe la unidad "${nombre}"`)
+      unidades.set(nombre, u.id)
+    }
+    return unidades.get(nombre)!
+  }
+  await buscarUnidad(UNIDAD)
 
   // 1b. Renombres pendientes del esquema viejo
   for (const [viejo, nuevo] of Object.entries(RENOMBRAR)) {
@@ -210,8 +232,9 @@ async function main() {
     const precioInterno = r2(precioLista * FACTOR_COSTO)
     const precioVenta = r2(precioInterno * FACTOR_VENTA)
     const origen = item.moneda === 'PEN' ? `PEN ${item.precio} / ${tipoCambio}` : `USD ${item.precio}`
+    const unidadId = await buscarUnidad(item.unidad ?? UNIDAD)
 
-    console.log(`  ${DRY ? '~' : '+'} ${item.codigo.padEnd(24)} USD ${String(precioLista).padStart(8)} → venta ${String(precioVenta).padStart(8)}   (${origen})`)
+    console.log(`  ${DRY ? '~' : '+'} ${item.codigo.padEnd(26)} ${(item.unidad ?? UNIDAD).padEnd(4)} USD ${String(precioLista).padStart(8)} → venta ${String(precioVenta).padStart(8)}   (${origen})`)
     console.log(`      ${item.descripcion}`)
     console.log(`      fuente: ${item.fuente}`)
 
@@ -223,7 +246,7 @@ async function main() {
           descripcion: item.descripcion,
           marca: item.marca,
           categoriaId: categoria!.id,
-          unidadId: unidad.id,
+          unidadId,
           precioLista,
           precioInterno,
           precioVenta,
