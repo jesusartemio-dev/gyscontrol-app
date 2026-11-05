@@ -6,7 +6,7 @@
 // ===================================================
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { TreeNode, CronogramaTreeState, UseCronogramaTreeReturn, GenerateOptions, NodeType } from '../../../cronograma/types'
+import { TreeNode, CronogramaTreeState, UseCronogramaTreeReturn, NodeType } from '../../../cronograma/types'
 
 /** Filas expandidas de la Jerarquía, por proyecto y cronograma (sobreviven a recargar la página). */
 const claveExpandidos = (proyectoId: string, cronogramaId: string) => `cronograma-expandidos:${proyectoId}:${cronogramaId}`
@@ -126,50 +126,10 @@ export function useProyectoCronogramaTree(proyectoId: string, cronogramaId?: str
     }
   }, [proyectoId, cronogramaId])
 
-  // Generar cronograma automáticamente desde servicios del proyecto
-  const generateFromServices = useCallback(async (options: GenerateOptions = {}) => {
-    setState(prev => ({ ...prev, loadingNodes: new Set(['root']) }))
-
-    try {
-      const requestBody = {
-        generarFases: true,
-        generarEdts: true,
-        generarActividades: true,
-        generarTareas: true,
-        cronogramaId, // ✅ Pasar el cronograma actual
-        ...options
-      }
-
-      console.log('🚀 [HOOK] Generando cronograma con ID:', cronogramaId)
-
-      // ✅ Usar API específica de proyectos
-      const response = await fetch(`/api/proyectos/${proyectoId}/cronograma/generar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Error generando cronograma del proyecto')
-      }
-
-      const data = await response.json()
-
-      // Recargar árbol con nueva estructura, preservando estado de expansión
-      await loadTree([...state.expandedNodes])
-
-      return data.data
-
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Error generando cronograma del proyecto',
-        loadingNodes: new Set()
-      }))
-      throw error
-    }
-  }, [proyectoId, cronogramaId, loadTree])
+  // Aquí estaba generateFromServices, que llamaba a /cronograma/generar desde el
+  // botón de la vista Jerarquía. Se quitó junto con el botón: regeneraba la
+  // estructura desde la cotización borrando las tareas (y con ellas responsables,
+  // hitos, avance y dependencias), sin confirmar ni mirar el bloqueo.
 
   // Toggle expansión de nodo
   const toggleNode = useCallback(async (nodeId: string) => {
@@ -562,7 +522,6 @@ export function useProyectoCronogramaTree(proyectoId: string, cronogramaId?: str
       createNode,
       updateNode,
       deleteNode,
-      generateFromServices,
       selectNode
     }
   }

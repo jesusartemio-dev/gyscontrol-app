@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { textoDependenciaCreada } from '@/components/cronograma/dependenciasTexto'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, TreePine, Plus, Download, List, Filter, Zap, Trash2, Clock, Calculator, Lock } from 'lucide-react'
+import { RefreshCw, TreePine, Plus, Download, List, Filter, Trash2, Clock, Calculator, Lock } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -1077,27 +1077,11 @@ export function ProyectoCronogramaTreeView({
       </CardHeader>
 
       <CardContent>
-        {/* Generación automática - Solo para cronograma de planificación (Línea Base) */}
-        {selectedCronograma?.tipo !== 'comercial' && selectedCronograma?.tipo === 'planificacion' && (
-          <div className="mb-4">
-            <Button
-              size="sm"
-              variant="default"
-              onClick={async () => {
-                try {
-                  await actions.generateFromServices(fechaInicioProyecto ? { fechaInicioProyecto } : undefined)
-                  onRefresh?.()
-                } catch (error) {
-                  console.error('Error generating cronograma:', error)
-                }
-              }}
-              disabled={state.loadingNodes.has('root')}
-            >
-              <Zap className="h-4 w-4 mr-2" />
-              {state.loadingNodes.has('root') ? 'Generando...' : 'Generar Cronograma'}
-            </Button>
-          </div>
-        )}
+        {/* Aquí vivía un botón "Generar Cronograma" que regeneraba la estructura
+            desde la cotización borrando todas las tareas. Se quitó: esta vista es
+            donde se afinan recursos y responsables, y el botón destruía justamente
+            eso — sin confirmación y sin mirar si el cronograma estaba bloqueado.
+            La Línea Base se genera desde Acciones → "Generar con IA (desde catálogo)". */}
 
         {/* Árbol jerárquico */}
         <div className="tree-container border rounded-lg">

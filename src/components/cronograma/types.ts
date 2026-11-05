@@ -134,7 +134,13 @@ export interface UseCronogramaTreeReturn {
     createNode: (parentId: string, type: NodeType, data: any) => Promise<TreeNode>
     updateNode: (nodeId: string, formData: any) => Promise<void>
     deleteNode: (nodeId: string) => Promise<void>
-    generateFromServices: (options?: GenerateOptions) => Promise<any>
+    /**
+     * Opcional porque solo el árbol de cotización la expone. El de proyecto la
+     * dejó de ofrecer: regeneraba la estructura desde la cotización borrando las
+     * tareas (con sus responsables, hitos, avance y dependencias). La Línea Base
+     * de un proyecto se genera con el wizard "Generar con IA (desde catálogo)".
+     */
+    generateFromServices?: (options?: GenerateOptions) => Promise<any>
     selectNode: (nodeId: string) => void
   }
 }

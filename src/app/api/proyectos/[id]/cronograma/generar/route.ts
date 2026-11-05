@@ -11,6 +11,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
 import {
   obtenerCalendarioLaboral,
   obtenerCalendarioLaboralPorId,
@@ -144,6 +145,17 @@ export async function POST(
       return NextResponse.json({ error: 'No tiene permisos para generar cronograma' }, { status: 403 })
     }
 
+    // Sin servicios cotizados no hay nada que generar. Se valida ANTES de tocar
+    // el cronograma: antes la rama sin `cronogramaId` creaba una "Línea Base"
+    // vacía y recién después fallaba, dejando el cronograma huérfano creado.
+    const servicios = proyecto.cotizacion?.cotizacionServicio || []
+
+    if (servicios.length === 0) {
+      return NextResponse.json({
+        error: 'No hay servicios en la cotización del proyecto para generar el cronograma'
+      }, { status: 400 })
+    }
+
     // ✅ Obtener el cronograma especificado o buscar uno existente
     let cronograma = null
 
@@ -156,11 +168,21 @@ export async function POST(
         return NextResponse.json({ error: 'Cronograma no encontrado' }, { status: 404 })
       }
 
-      if (cronograma.tipo === 'comercial') {
+      // Este generador BORRA las tareas de cada actividad para recrearlas desde
+      // la cotización (ver proyectoTarea.deleteMany más abajo), así que solo
+      // puede tocar la Línea Base. En ejecución se llevaría por delante el
+      // avance real, las horas cargadas y los responsables — y como ejecución
+      // nunca se bloquea, el candado no alcanzaba para frenarlo.
+      if (cronograma.tipo !== 'planificacion') {
         return NextResponse.json({
-          error: 'No se puede generar contenido en un cronograma comercial (solo lectura)'
+          error: `Solo se puede generar sobre el cronograma de planificación (Línea Base). Este es de tipo "${cronograma.tipo}".`
         }, { status: 400 })
       }
+
+      // El candado tiene que valer en el API, no solo en la UI: antes el botón
+      // de la vista Jerarquía no miraba `bloqueado` y entraba igual.
+      const validacion = await validarPermisoCronograma(cronograma.id)
+      if (!validacion.ok) return validacion.response
 
       console.log(`✅ [GENERAR] Usando cronograma existente: ${cronograma.nombre} (${cronograma.tipo})`)
     } else {
@@ -181,16 +203,11 @@ export async function POST(
           }
         })
         console.log('✅ [GENERAR] Cronograma Línea Base creado:', cronograma.id)
+      } else {
+        // Recién creado no puede estar bloqueado; uno preexistente sí.
+        const validacion = await validarPermisoCronograma(cronograma.id)
+        if (!validacion.ok) return validacion.response
       }
-    }
-
-    // Obtener servicios de la cotización
-    const servicios = proyecto.cotizacion?.cotizacionServicio || []
-
-    if (servicios.length === 0) {
-      return NextResponse.json({
-        error: 'No hay servicios en la cotización del proyecto para generar el cronograma'
-      }, { status: 400 })
     }
 
     console.log(`📊 [GENERAR] Servicios encontrados: ${servicios.length}`)

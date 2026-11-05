@@ -216,7 +216,7 @@ export function CronogramaTreeView({ cotizacionId, onRefresh, fechaInicioProyect
             variant="default"
             onClick={async () => {
               try {
-                await actions.generateFromServices(fechaInicioProyecto ? { fechaInicioProyecto } : undefined)
+                await actions.generateFromServices?.(fechaInicioProyecto ? { fechaInicioProyecto } : undefined)
                 onRefresh?.()
               } catch (error) {
                 console.error('Error generating cronograma:', error)

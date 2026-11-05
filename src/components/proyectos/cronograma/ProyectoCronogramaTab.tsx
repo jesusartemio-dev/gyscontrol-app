@@ -30,7 +30,6 @@ import {
   Layers,
   ListTree,
   Clock,
-  Wand2,
   FileText,
   Target,
   Play,
@@ -100,7 +99,6 @@ export function ProyectoCronogramaTab({
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [showDeleteCronogramaModal, setShowDeleteCronogramaModal] = useState(false)
   const [showDeleteCronogramaCompletoModal, setShowDeleteCronogramaCompletoModal] = useState(false)
-  const [showGenerarCronogramaModal, setShowGenerarCronogramaModal] = useState(false)
   const [showGenerarIAModal, setShowGenerarIAModal] = useState(false)
   const [showImportExcelModal, setShowImportExcelModal] = useState(false)
   const [showSincronizarModal, setShowSincronizarModal] = useState(false)
@@ -390,50 +388,6 @@ export function ProyectoCronogramaTab({
     }
   }
 
-  const handleGenerarCronograma = async () => {
-    if (!selectedCronograma) {
-      toast({ title: 'Error', description: 'Seleccione un cronograma primero.', variant: 'destructive' })
-      return
-    }
-
-    try {
-      setIsLoading(true)
-      const response = await fetch(`/api/proyectos/${proyectoId}/cronograma/generar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          cronogramaId: selectedCronograma.id,
-          generarFases: true,
-          generarEdts: true,
-          generarActividades: true,
-          generarTareas: true,
-          fechaInicioProyecto: fechaInicio || undefined
-        })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Error generando cronograma')
-      }
-
-      const result = await response.json()
-      setShowGenerarCronogramaModal(false)
-      handleRefresh()
-      toast({
-        title: 'Cronograma generado',
-        description: `Se generaron ${result.data?.totalElements || 0} elementos.`
-      })
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'No se pudo generar.',
-        variant: 'destructive'
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const handleDeleteCronograma = async () => {
     if (!selectedCronograma) return
@@ -936,13 +890,10 @@ export function ProyectoCronogramaTab({
 
               {!esComercial && (
                 <>
-                  <DropdownMenuItem onSelect={() => {
-                    setDropdownOpen(false)
-                    setTimeout(() => setShowGenerarCronogramaModal(true), 100)
-                  }} disabled={esBloqueado}>
-                    <Wand2 className="h-4 w-4 mr-2" />
-                    Generar Cronograma
-                  </DropdownMenuItem>
+                  {/* Se quitó "Generar Cronograma" (regeneraba desde la cotización
+                      borrando las tareas). Se mostraba también en ejecución, que
+                      nunca está bloqueada, así que ahí se llevaba por delante el
+                      avance real. La Línea Base se genera con el wizard de abajo. */}
                   {esPlanificacion && (
                     <DropdownMenuItem
                       onSelect={() => {
@@ -1140,33 +1091,6 @@ export function ProyectoCronogramaTab({
           </Card>
         </CollapsibleContent>
       </Collapsible>
-
-      {/* Modal de generación */}
-      <Dialog open={showGenerarCronogramaModal} onOpenChange={setShowGenerarCronogramaModal}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-green-600">
-              <Wand2 className="h-5 w-5" />
-              Generar Cronograma
-            </DialogTitle>
-            <DialogDescription>
-              Se generará la estructura basada en los servicios del proyecto.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
-            <p className="text-blue-800">Se crearán: Fases, EDTs, Actividades y Tareas desde los servicios cotizados.</p>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowGenerarCronogramaModal(false)} disabled={isLoading}>
-              Cancelar
-            </Button>
-            <Button onClick={handleGenerarCronograma} disabled={isLoading} className="bg-green-600 hover:bg-green-700">
-              {isLoading && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
-              Generar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Modal de confirmación para eliminar */}
       <Dialog open={showDeleteCronogramaModal} onOpenChange={(open) => {
