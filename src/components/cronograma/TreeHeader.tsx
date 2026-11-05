@@ -12,7 +12,7 @@ export function TreeHeader({ showRecursoColumn, showResponsableColumn, showPesoC
 
   return (
     <div
-      className="grid items-center gap-1 px-2 py-1.5 bg-gray-50 border-b text-[10px] font-medium text-gray-500 uppercase tracking-wider"
+      className="sticky top-0 z-20 grid items-center gap-1 px-2 py-1.5 bg-gray-50 border-b shadow-sm text-[10px] font-medium text-gray-500 uppercase tracking-wider"
       style={{ gridTemplateColumns: cols.join(' ') }}
     >
       <div>Nombre</div>
