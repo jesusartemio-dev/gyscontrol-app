@@ -424,7 +424,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
     const c = counts?.cotizacionEquipoItem || 0
     const p = counts?.proyectoEquipoCotizadoItem || 0
     const l = counts?.listaEquipoItem || 0
-    if (c + p + l === 0) return <span className="text-muted-foreground text-xs">—</span>
+    if (c + p + l === 0) return <span className="text-muted-foreground text-[10px]">—</span>
     return (
       <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
         {c > 0 && (
@@ -477,11 +477,11 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
     switch (colKey) {
       case 'codigo':
         return (
-          <div className="min-w-[200px]">
-            <span className="font-mono text-xs font-medium">{eq.codigo}</span>
+          <div className="min-w-[180px]">
+            <span className="font-mono text-[11px] font-medium">{eq.codigo}</span>
             {eq.descripcion && (
               <div className="mt-0.5">
-                <DescripcionExpandible texto={eq.descripcion} className="text-xs text-muted-foreground" />
+                <DescripcionExpandible texto={eq.descripcion} className="text-[10px] text-muted-foreground leading-tight" />
               </div>
             )}
           </div>
@@ -493,14 +493,14 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
             {catDesc ? (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge variant="secondary" className="text-xs font-normal cursor-help">{eq.categoriaEquipo?.nombre || '—'}</Badge>
+                  <Badge variant="secondary" className="text-[10px] font-normal cursor-help px-1.5 py-0">{eq.categoriaEquipo?.nombre || '—'}</Badge>
                 </TooltipTrigger>
                 <TooltipContent side="right" className="max-w-56 text-xs">{catDesc}</TooltipContent>
               </Tooltip>
             ) : (
-              <Badge variant="secondary" className="text-xs font-normal">{eq.categoriaEquipo?.nombre || '—'}</Badge>
+              <Badge variant="secondary" className="text-[10px] font-normal px-1.5 py-0">{eq.categoriaEquipo?.nombre || '—'}</Badge>
             )}
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
               <span>{eq.unidad?.nombre || '—'}</span>
               <span className="text-muted-foreground/40">·</span>
               <span>{eq.marca || '—'}</span>
@@ -511,32 +511,32 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
       case 'uso':
         return renderUsageCell(eq)
       case 'precioLogistica':
-        return <span className="font-mono text-sm text-muted-foreground">{formatCurrency(eq.precioLogistica)}</span>
+        return <span className="font-mono text-xs text-muted-foreground">{formatCurrency(eq.precioLogistica)}</span>
       case 'precioReal':
-        return <span className="font-mono text-sm text-muted-foreground">{formatCurrency(eq.precioReal)}</span>
+        return <span className="font-mono text-xs text-muted-foreground">{formatCurrency(eq.precioReal)}</span>
       case 'precioGerencia':
-        return <span className="font-mono text-sm font-medium text-purple-700">{formatCurrency(eq.precioGerencia)}</span>
+        return <span className="font-mono text-xs font-medium text-purple-700">{formatCurrency(eq.precioGerencia)}</span>
       case 'precioLista':
-        return <span className="text-muted-foreground font-mono text-sm">{formatCurrency(eq.precioLista)}</span>
+        return <span className="text-muted-foreground font-mono text-xs">{formatCurrency(eq.precioLista)}</span>
       case 'factores':
         return (
-          <div className="text-xs text-muted-foreground font-mono text-center">
+          <div className="text-[10px] text-muted-foreground font-mono text-center">
             <span>{(eq.factorCosto ?? 1.00).toFixed(2)}</span>
             <span className="mx-1 text-muted-foreground/40">/</span>
             <span>{(eq.factorVenta ?? 1.15).toFixed(2)}</span>
           </div>
         )
       case 'precioInterno':
-        return <span className="font-mono text-sm text-muted-foreground">{formatCurrency(eq.precioInterno)}</span>
+        return <span className="font-mono text-xs text-muted-foreground">{formatCurrency(eq.precioInterno)}</span>
       case 'precioVenta':
-        return <span className="font-mono text-sm font-medium text-emerald-600">{formatCurrency(eq.precioVenta)}</span>
+        return <span className="font-mono text-xs font-medium text-emerald-600">{formatCurrency(eq.precioVenta)}</span>
       case 'estado': {
         const config = STATUS_CONFIG[eq.estado || ''] || STATUS_CONFIG.pendiente
         const StatusIcon = config.icon
         if (canEdit) {
           return (
             <Select value={eq.estado} onValueChange={(value) => eq.id && handleEditField(eq.id, 'estado', value)}>
-              <SelectTrigger className={`h-7 w-[110px] text-xs border ${config.bg} ${config.color}`}>
+              <SelectTrigger className={`h-6 w-[100px] text-[10px] border ${config.bg} ${config.color}`}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -556,7 +556,7 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
           )
         }
         return (
-          <Badge variant="outline" className={`text-xs border ${config.bg} ${config.color} gap-1`}>
+          <Badge variant="outline" className={`text-[10px] border ${config.bg} ${config.color} gap-1 px-1.5 py-0`}>
             <StatusIcon className="h-3 w-3" />
             {eq.estado}
           </Badge>
@@ -565,9 +565,9 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
       case 'updatedInfo':
         return (
           <div className="space-y-0.5">
-            <span className="text-xs text-muted-foreground whitespace-nowrap">{formatDate(eq.updatedAt)}</span>
+            <span className="text-[10px] text-muted-foreground whitespace-nowrap">{formatDate(eq.updatedAt)}</span>
             {eq.updatedByUser?.name && (
-              <p className="text-[11px] text-muted-foreground/70 whitespace-nowrap">{eq.updatedByUser.name}</p>
+              <p className="text-[9px] text-muted-foreground/70 whitespace-nowrap">{eq.updatedByUser.name}</p>
             )}
           </div>
         )
@@ -950,14 +950,14 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
                   <thead className="sticky top-0 z-10">
                     <tr className="border-b bg-muted/60 backdrop-blur-sm">
                       {visibleColumns.map(col => (
-                        <th key={col.key} className={`py-2.5 px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-pre-line leading-tight ${
+                        <th key={col.key} className={`py-1.5 px-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wider whitespace-pre-line leading-tight ${
                           col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
                         } ${col.key === 'codigo' ? 'min-w-[200px]' : ''}`}>
                           {col.label}
                         </th>
                       ))}
                       {showActionsColumn && (
-                        <th className="w-24 py-2.5 px-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <th className="w-20 py-1.5 px-2 text-right text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                           Acciones
                         </th>
                       )}
@@ -977,14 +977,14 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
                           onClick={() => setExpandedRowId(expandedRowId === (eq.id ?? null) ? null : (eq.id ?? null))}
                         >
                           {visibleColumns.map(col => (
-                            <td key={col.key} className={`py-2.5 px-3 align-top ${
+                            <td key={col.key} className={`py-1.5 px-2 align-top ${
                               col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
                             }`}>
                               {renderCell(eq, col.key)}
                             </td>
                           ))}
                           {showActionsColumn && (
-                            <td className="py-2.5 px-3">
+                            <td className="py-1.5 px-2">
                               <div className="flex justify-end gap-1">
                                 {canEdit && (
                                   <Tooltip><TooltipTrigger asChild>
