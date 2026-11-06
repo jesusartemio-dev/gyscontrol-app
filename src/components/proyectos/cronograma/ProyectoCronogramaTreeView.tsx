@@ -838,15 +838,18 @@ export function ProyectoCronogramaTreeView({
   }
 
   // "Ajustar tareas a sus predecesoras": el ajuste de cada tarea, para todas las
-  // de la actividad de una vez y en cascada (ver dependencias/ajustar-actividad).
+  // de la actividad (o de todo el EDT) de una vez y en cascada (ver dependencias/ajustar-actividad).
   const handleAjustarActividad = async (nodeId: string) => {
     const node = state.nodes.get(nodeId)
-    if (!node || node.type !== 'actividad') return
+    if (!node || (node.type !== 'actividad' && node.type !== 'edt')) return
+    const cuerpo = node.type === 'edt'
+      ? { edtId: nodeId.replace('edt-', '') }
+      : { actividadId: nodeId.replace('actividad-', '') }
     try {
       const r = await fetch(`/api/proyectos/${proyectoId}/cronograma/dependencias/ajustar-actividad`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actividadId: nodeId.replace('actividad-', '') }),
+        body: JSON.stringify(cuerpo),
       })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(j.error || 'No se pudo ajustar')
@@ -955,7 +958,7 @@ export function ProyectoCronogramaTreeView({
                     onGenerarDependencias={!isReadOnly && ['fase', 'edt', 'actividad'].includes(node.type) && !node.data?.isExtrasGroup
                       ? () => setGenerarDeps({ nodeId, nombre: node.nombre })
                       : undefined}
-                    onAjustarActividad={!isReadOnly && node.type === 'actividad' && !node.data?.isExtrasGroup
+                    onAjustarActividad={!isReadOnly && ['actividad', 'edt'].includes(node.type) && !node.data?.isExtrasGroup
                       ? () => handleAjustarActividad(nodeId)
                       : undefined}
                     onProgramarRespecto={

@@ -131,7 +131,7 @@ interface TreeNodeProps {
   onMoverFase?: () => void
   /** Fase, EDT o actividad: deducir dependencias de sus tareas a partir de las fechas. */
   onGenerarDependencias?: () => void
-  /** Solo actividades: ajustar todas sus tareas a sus predecesoras, en cascada. */
+  /** Actividades y EDTs: ajustar todas sus tareas a sus predecesoras, en cascada. */
   onAjustarActividad?: () => void
   onAjustarPosicion?: (posicion: 'inicio_padre' | 'despues_anterior' | 'despues_ultimo') => void
   onProgramarRespecto?: (modo: 'despues_de' | 'en_paralelo') => void
@@ -804,8 +804,8 @@ export function TreeNode({
                 </DropdownMenuItem>
               )}
 
-              {/* Ajuste de cada tarea a sus predecesoras, para toda la actividad en cascada */}
-              {!readOnly && node.type === 'actividad' && onAjustarActividad && (
+              {/* Ajuste de cada tarea a sus predecesoras, para toda la actividad o el EDT en cascada */}
+              {!readOnly && ['actividad', 'edt'].includes(node.type) && onAjustarActividad && (
                 <DropdownMenuItem onClick={() => { setDropdownOpen(false); onAjustarActividad() }}>
                   <Wand2 className="h-4 w-4 mr-2" />
                   Ajustar tareas a sus predecesoras
