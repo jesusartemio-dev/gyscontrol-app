@@ -604,9 +604,13 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
 
     return (
       <div className="border rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* La tabla scrollea por dentro (alto limitado a la pantalla) para que la
+            cabecera quede fija al bajar: con overflow-x-auto el contenedor ya es
+            de scroll, así que un sticky no se pega al scroll de la página. dvh:
+            en el celular descuenta la barra del navegador. */}
+        <div className="overflow-auto max-h-[75vh] supports-[height:100dvh]:max-h-[75dvh] overscroll-contain">
           <table className={`w-full ${textSize}`}>
-            <thead>
+            <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-gray-50 [&_th]:shadow-[inset_0_-1px_0_#e5e7eb]">
               <tr className="bg-gray-50 border-b">
                 <th className="w-10 px-1 text-center font-semibold text-gray-700">#</th>
                 <th className={`${cellPadding} ${columnWidths.codigoDescripcion} text-left font-semibold text-gray-700`}>
