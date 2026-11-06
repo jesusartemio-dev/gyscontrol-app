@@ -120,20 +120,26 @@ export default function ModalReemplazarEquipo({
       const proyectoEquipoItemOriginal =
         item.reemplazaProyectoEquipoCotizadoItemId || item.proyectoEquipoItemId || null
 
-      // Step 1: Handle the current item
-      if (item.origen === 'cotizado') {
-        const tieneCotizaciones = item.cotizaciones && item.cotizaciones.length > 0
-        if (tieneCotizaciones) {
-          await updateListaEquipoItem(item.id, {
-            estado: 'borrador',
-            proyectoEquipoItemId: undefined,
-          })
-        } else {
-          await deleteListaEquipoItem(item.id)
-        }
+      // Step 1: sacar el ítem anterior de la lista.
+      // Antes esto dependía del origen: un 'cotizado' sin cotizaciones se
+      // borraba, pero un 'nuevo' o un 'reemplazo' se quedaba, y la lista
+      // terminaba con dos filas del mismo equipo. El criterio real no es el
+      // origen sino si hay cotizaciones de proveedor que perder.
+      const tieneCotizaciones = (item.cotizaciones?.length ?? 0) > 0
+      if (tieneCotizaciones) {
+        // Se conserva para no borrar el historial de cotizaciones, pero se
+        // desvincula del ítem cotizado: el reemplazo pasa a ser el vigente.
+        await updateListaEquipoItem(item.id, {
+          estado: 'borrador',
+          proyectoEquipoItemId: null,
+        })
       } else {
-        // reemplazo or nuevo — reset to borrador since it's being replaced
-        await updateListaEquipoItem(item.id, { estado: 'borrador' })
+        const eliminado = await deleteListaEquipoItem(item.id)
+        if (!eliminado) {
+          // La API rechaza el borrado si hay pedidos u otra dependencia.
+          await updateListaEquipoItem(item.id, { estado: 'borrador' })
+          toast.warning('El ítem anterior no se pudo eliminar (tiene pedidos u otra dependencia). Quedó en la lista como borrador.')
+        }
       }
 
       // Step 2: Create new replacement item
