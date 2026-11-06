@@ -31,6 +31,7 @@ import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 
 // Icons
 import { ChevronRight, Receipt, Plus, Pencil, Search, Filter, DollarSign, Loader2 } from 'lucide-react'
+import DescripcionExpandible from '@/components/shared/DescripcionExpandible'
 
 // Animations
 import { motion } from 'framer-motion'
@@ -591,8 +592,8 @@ export default function CatalogoGastosPage() {
                     {gastosFiltrados.map((gasto) => (
                       <TableRow key={gasto.id}>
                         <TableCell className="font-mono text-sm">{gasto.codigo}</TableCell>
-                        <TableCell className="max-w-[200px] truncate" title={gasto.descripcion}>
-                          {gasto.descripcion}
+                        <TableCell className="max-w-[280px]">
+                          <DescripcionExpandible texto={gasto.descripcion} lineas={2} umbral={70} />
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">

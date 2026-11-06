@@ -44,6 +44,7 @@ import ModalAgregarItemLibre from './ModalAgregarItemLibre'
 import ModalEditarListaItem from './ModalEditarListaItem'
 import VincularCatalogoModal from '@/components/cotizaciones/VincularCatalogoModal'
 import TipoItemBadge from '@/components/shared/TipoItemBadge'
+import DescripcionExpandible from '@/components/shared/DescripcionExpandible'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -175,18 +176,6 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
   const puedeSeleccionarCotizacion = ['admin', 'gerente', 'gestor', 'coordinador'].includes(rol)
   const { canVerify } = getItemEditPermissions((listaEstado as EstadoListaEquipo) ?? 'borrador')
   const [selectorItem, setSelectorItem] = useState<ListaEquipoItem | null>(null)
-  // Descripciones abiertas a tamaño completo. Las del catálogo de alquileres
-  // pasan de 200 caracteres y en dos líneas se cortan a la mitad.
-  const [descripcionesAbiertas, setDescripcionesAbiertas] = useState<Set<string>>(new Set())
-  const alternarDescripcion = useCallback((itemId: string) => {
-    setDescripcionesAbiertas(prev => {
-      const siguiente = new Set(prev)
-      if (siguiente.has(itemId)) siguiente.delete(itemId)
-      else siguiente.add(itemId)
-      return siguiente
-    })
-  }, [])
-
   const [editComentarioItemId, setEditComentarioItemId] = useState<string | null>(null)
   const [editComentarioValues, setEditComentarioValues] = useState<Record<string, string>>({})
   const [editingItem, setEditingItem] = useState<ListaEquipoItem | null>(null)
@@ -684,34 +673,10 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                            </div>
                            <TipoItemBadge tipoItem={(item as any).tipoItem} catalogoEquipoId={item.catalogoEquipoId} />
                          </div>
-                         {(() => {
-                           // Umbral aproximado de lo que entra en dos líneas a 10px
-                           // en esta columna. Debajo de eso no hay nada que abrir.
-                           const esLarga = (item.descripcion?.length ?? 0) > 95
-                           const abierta = descripcionesAbiertas.has(item.id)
-                           if (!esLarga) {
-                             return (
-                               <div className="text-[10px] text-gray-500 leading-tight">
-                                 {item.descripcion}
-                               </div>
-                             )
-                           }
-                           return (
-                             <button
-                               type="button"
-                               onClick={() => alternarDescripcion(item.id)}
-                               title={abierta ? 'Clic para contraer' : 'Clic para ver la descripción completa'}
-                               className="flex w-full items-start gap-1 text-left hover:text-gray-700"
-                             >
-                               <span className={`flex-1 text-[10px] text-gray-500 leading-tight ${abierta ? '' : 'line-clamp-2'}`}>
-                                 {item.descripcion}
-                               </span>
-                               <ChevronDown
-                                 className={`h-3 w-3 shrink-0 text-gray-400 transition-transform ${abierta ? 'rotate-180' : ''}`}
-                               />
-                             </button>
-                           )
-                         })()}
+                         <DescripcionExpandible
+                           texto={item.descripcion}
+                           className="text-[10px] text-gray-500 leading-tight"
+                         />
                          {item.categoria && item.categoria !== 'SIN-CATEGORIA' && (
                            <span className="inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0 rounded bg-violet-50 text-violet-600 border border-violet-200">
                              <Tag className="h-2 w-2" />{item.categoria}

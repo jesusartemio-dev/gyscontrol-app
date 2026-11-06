@@ -72,6 +72,7 @@ import {
   FolderPlus,
   AlertCircle
 } from 'lucide-react'
+import DescripcionExpandible from '@/components/shared/DescripcionExpandible'
 
 export default function CatalogoExclusionesPage() {
   const router = useRouter()
@@ -434,7 +435,7 @@ export default function CatalogoExclusionesPage() {
                 <TableRow key={excl.id}>
                   <TableCell className="font-mono text-sm">{excl.codigo}</TableCell>
                   <TableCell className="max-w-md">
-                    <p className="line-clamp-2">{excl.descripcion}</p>
+                    <DescripcionExpandible texto={excl.descripcion} umbral={120} />
                   </TableCell>
                   <TableCell>
                     {excl.categoria ? (

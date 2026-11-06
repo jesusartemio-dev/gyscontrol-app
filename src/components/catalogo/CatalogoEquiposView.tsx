@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import Link from 'next/link'
 import { tieneRol } from '@/lib/auth/roles'
 import CatalogoEquipoForm from '@/components/catalogo/CatalogoEquipoForm'
+import DescripcionExpandible from '@/components/shared/DescripcionExpandible'
 import { BotonesImportExport } from '@/components/catalogo/BotonesImportExport'
 import { ModalExportarCatalogo } from '@/components/catalogo/ModalExportarCatalogo'
 import { ModalRevisionImport, type ItemNuevoRevision, type ItemDuplicadoRevision } from '@/components/catalogo/ModalRevisionImport'
@@ -479,7 +480,9 @@ export default function CatalogoEquiposView({ vista }: CatalogoEquiposViewProps)
           <div className="min-w-[200px]">
             <span className="font-mono text-xs font-medium">{eq.codigo}</span>
             {eq.descripcion && (
-              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{eq.descripcion}</p>
+              <div className="mt-0.5">
+                <DescripcionExpandible texto={eq.descripcion} className="text-xs text-muted-foreground" />
+              </div>
             )}
           </div>
         )

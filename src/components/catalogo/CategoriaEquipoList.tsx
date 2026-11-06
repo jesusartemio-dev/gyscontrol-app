@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { Pencil, Trash2, Check, X } from 'lucide-react'
+import DescripcionExpandible from '@/components/shared/DescripcionExpandible'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -171,9 +172,9 @@ export default function CategoriaEquipoList({ data, onUpdate, onDelete, onRefres
                   <div className="min-w-0 flex-1">
                     <h3 className="font-medium text-sm truncate">{cat.nombre}</h3>
                     {cat.descripcion && (
-                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                        {cat.descripcion}
-                      </p>
+                      <div className="mt-0.5">
+                        <DescripcionExpandible texto={cat.descripcion} className="text-xs text-muted-foreground" />
+                      </div>
                     )}
                   </div>
                   <div className="flex gap-0.5">

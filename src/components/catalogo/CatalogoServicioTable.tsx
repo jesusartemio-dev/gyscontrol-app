@@ -52,6 +52,7 @@ import {
   Loader2,
   ChevronDown
 } from 'lucide-react'
+import DescripcionExpandible from '@/components/shared/DescripcionExpandible'
 
 interface Props {
   data: CatalogoServicio[]
@@ -422,8 +423,13 @@ export default function CatalogoServicioTable({ data, onUpdate, onDelete }: Prop
                                 {item.nombre}
                               </div>
                               {item.descripcion && (
-                                <div className="text-xs text-muted-foreground line-clamp-1 mt-0.5" title={item.descripcion}>
-                                  {item.descripcion}
+                                <div className="mt-0.5">
+                                  <DescripcionExpandible
+                                    texto={item.descripcion}
+                                    lineas={1}
+                                    umbral={60}
+                                    className="text-xs text-muted-foreground"
+                                  />
                                 </div>
                               )}
                             </div>

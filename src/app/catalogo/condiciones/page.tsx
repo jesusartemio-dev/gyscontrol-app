@@ -72,6 +72,7 @@ import {
   FolderPlus,
   AlertCircle
 } from 'lucide-react'
+import DescripcionExpandible from '@/components/shared/DescripcionExpandible'
 
 const TIPOS_CONDICION = [
   { value: 'comercial', label: 'Comercial' },
@@ -462,7 +463,7 @@ export default function CatalogoCondicionesPage() {
                 <TableRow key={cond.id}>
                   <TableCell className="font-mono text-sm">{cond.codigo}</TableCell>
                   <TableCell className="max-w-md">
-                    <p className="line-clamp-2">{cond.descripcion}</p>
+                    <DescripcionExpandible texto={cond.descripcion} umbral={120} />
                   </TableCell>
                   <TableCell>
                     {cond.categoria ? (
