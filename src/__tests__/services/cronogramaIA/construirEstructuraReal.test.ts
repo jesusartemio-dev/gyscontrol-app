@@ -1,4 +1,5 @@
-import { construirEstructuraReal, agruparYOrdenarPorEstructura, type EdtCatalogoInfo } from '@/lib/cronogramaIA/construirEstructuraReal'
+import { construirEstructuraReal, agruparYOrdenarPorEstructura, calendarioHoras, type EdtCatalogoInfo } from '@/lib/cronogramaIA/construirEstructuraReal'
+import { desplazarHorasLaborables } from '@/lib/services/cronogramaHoras'
 import type { ActividadPropuesta, TareaPropuesta } from '@/types/cronogramaIA'
 
 function mockCalendario() {
@@ -411,10 +412,10 @@ describe('construirEstructuraReal — GESTION Y CONTROL transversal y PROCURA en
       { edtNombre: 'CTL', actividadNombre: 'Reporte Avance Semanal', tareas: [tarea('r1', 'Elaboración y Envío de Reporte Semanal', 2.5)], origen: 'determinista' },
       { edtNombre: 'CTL', actividadNombre: 'Valorizaciones', tareas: [
         tarea('v1', 'Elaboración y Envío de Valorización', 4.5),
-        { ...tarea('v2', 'Aprobación de Valorización', 0, 1), hitoDiasDespues: 2 },
-        { ...tarea('v3', 'Recepción de Conformidad HES', 0, 2), hitoDiasDespues: 5 },
+        { ...tarea('v2', 'Aprobación de Valorización', 0, 1), hitoDiasDespues: 1 },
+        { ...tarea('v3', 'Recepción de Conformidad HES', 0, 2), hitoDiasDespues: 2 },
       ], origen: 'determinista' },
-      { edtNombre: 'SSO', actividadNombre: 'Habilitación de Personal', tareas: [tarea('h1', 'Solicitud de Validación de OC', 1), tarea('h2', 'Solicitud Ingreso Personal SPOT', 1, 1), tarea('h3', 'Habilitación de Personal Sistema Rainbow', 1, 2)], origen: 'determinista' },
+      { edtNombre: 'SEG', actividadNombre: 'Habilitación de Personal', tareas: [tarea('h1', 'Solicitud de Validación de OC', 1), tarea('h2', 'Solicitud Ingreso Personal SPOT', 1, 1), tarea('h3', 'Habilitación de Personal Sistema Rainbow', 1, 2)], origen: 'determinista' },
       { edtNombre: 'ING', actividadNombre: 'Diseño', tareas: [tarea('t5', 'Diseño', 40)], origen: 'determinista' },
       { edtNombre: 'PRO', actividadNombre: 'Cables', tareas: [tarea('t6', 'Compra', 80)], origen: 'determinista' }, // 10 días
       { edtNombre: 'CON', actividadNombre: 'Obra', tareas: [tarea('t7', 'Montaje', 120)], origen: 'determinista' }, // 15 días: la ventana incluye un día 20
@@ -430,15 +431,20 @@ describe('construirEstructuraReal — GESTION Y CONTROL transversal y PROCURA en
   const edt = (r: ReturnType<typeof construir>, nombre: string) => r.edts.find(e => e.nombre === nombre)!
   const fase = (r: ReturnType<typeof construir>, nombre: string) => r.fases.find(f => f.nombre === nombre)!
 
-  it('reportes semanales: una tarea por viernes de la ventana (fin de GES → fin de Ejecución), numerada', () => {
+  it('reportes semanales: el 1.º el primer viernes; cada uno depende del anterior FC +5d, dentro de la ventana, numerados', () => {
     const r = construir()
     const reportes = r.tareas.filter(t => t.catalogoServicioId === 'r1').sort((a, b) => a.fechaInicio.getTime() - b.fechaInicio.getTime())
     expect(reportes.length).toBeGreaterThanOrEqual(3)
+    expect(reportes[0].fechaInicio.getUTCDay()).toBe(5) // viernes
+    expect(reportes[0].fechaInicio.getUTCHours()).toBe(8)
     reportes.forEach((t, i) => {
       expect(t.nombre).toBe(`Elaboración y Envío de Reporte Semanal ${String(i + 1).padStart(2, '0')}`)
-      expect(t.fechaInicio.getUTCDay()).toBe(5) // viernes
-      expect(t.fechaInicio.getUTCHours()).toBe(8)
       expect(t.horasEstimadas).toBe(2.5)
+      if (i === 0) return
+      const prev = reportes[i - 1]
+      expect(r.dependenciasCiclos).toContainEqual({ tareaOrigenId: prev.id, tareaDependienteId: t.id, tipo: 'finish_to_start', lagMinutos: 5 * 8 * 60 })
+      // Empieza exactamente 5 días hábiles (8 h/día en el calendario de prueba) después del fin del anterior.
+      expect(t.fechaInicio.getTime()).toBe(desplazarHorasLaborables(calendarioHoras(mockCalendario()), prev.fechaFin, 40, 'inicio').getTime())
     })
     // Todas en la misma actividad
     expect(new Set(reportes.map(t => t.proyectoActividadId)).size).toBe(1)
@@ -446,7 +452,7 @@ describe('construirEstructuraReal — GESTION Y CONTROL transversal y PROCURA en
     expect(reportes[reportes.length - 1].fechaInicio.getTime()).toBeLessThanOrEqual(fase(r, 'EJECUCION').fechaFinPlan.getTime())
   })
 
-  it('valorizaciones: una actividad por cada día 20, con Aprobación (+2d) y HES (+5d) como hitos', () => {
+  it('valorizaciones: la 1.ª el primer día 20, con Aprobación (+1d tras la elaboración) y HES (+2d tras la aprobación) como hitos', () => {
     const r = construir()
     expect(r.actividades.find(a => a.nombre === 'Valorizaciones')).toBeUndefined()
     const act = r.actividades.find(a => a.nombre === 'Valorización 01')!
@@ -460,9 +466,28 @@ describe('construirEstructuraReal — GESTION Y CONTROL transversal y PROCURA en
     expect(aprob).toMatchObject({ nombre: 'Aprobación de Valorización 01', esHito: true, horasEstimadas: 0 })
     expect(hes).toMatchObject({ nombre: 'Recepción de Conformidad HES 01', esHito: true, horasEstimadas: 0 })
     expect(aprob.fechaInicio.getTime()).toBe(aprob.fechaFin.getTime())
-    expect(r.dependenciasCiclos).toContainEqual({ tareaOrigenId: elab.id, tareaDependienteId: aprob.id, tipo: 'finish_to_start', lagMinutos: 2 * 8 * 60 })
-    expect(r.dependenciasCiclos).toContainEqual({ tareaOrigenId: elab.id, tareaDependienteId: hes.id, tipo: 'finish_to_start', lagMinutos: 5 * 8 * 60 })
+    expect(r.dependenciasCiclos).toContainEqual({ tareaOrigenId: elab.id, tareaDependienteId: aprob.id, tipo: 'finish_to_start', lagMinutos: 1 * 8 * 60 })
+    expect(r.dependenciasCiclos).toContainEqual({ tareaOrigenId: aprob.id, tareaDependienteId: hes.id, tipo: 'finish_to_start', lagMinutos: 2 * 8 * 60 })
     expect(hes.fechaInicio.getTime()).toBeGreaterThan(aprob.fechaInicio.getTime())
+  })
+
+  it('valorizaciones: la elaboración de cada una depende de la anterior FC +20d', () => {
+    // Ventana larga (CON de 60 días) para que entren al menos 2 valorizaciones.
+    const r = construirEstructuraReal({
+      actividades: [
+        { edtNombre: 'GES', actividadNombre: 'Inicio', tareas: [tarea('t1', 'Kickoff', 24)], origen: 'determinista' },
+        { edtNombre: 'CTL', actividadNombre: 'Valorizaciones', tareas: [tarea('v1', 'Elaboración y Envío de Valorización', 4.5)], origen: 'determinista' },
+        { edtNombre: 'CON', actividadNombre: 'Obra', tareas: [tarea('t7', 'Montaje', 480)], origen: 'determinista' },
+      ],
+      edtsCatalogo: CATALOGO, proyectoId: 'p1', proyectoCronogramaId: 'cron1', fechaInicioProyecto,
+      calendarioLaboral: mockCalendario(), recursoPorServicio: new Map(),
+    })
+    const elab = r.tareas.filter(t => t.catalogoServicioId === 'v1').sort((a, b) => a.fechaInicio.getTime() - b.fechaInicio.getTime())
+    expect(elab.length).toBeGreaterThanOrEqual(2)
+    expect(elab[1].nombre).toBe('Elaboración y Envío de Valorización 02')
+    expect(r.dependenciasCiclos).toContainEqual({ tareaOrigenId: elab[0].id, tareaDependienteId: elab[1].id, tipo: 'finish_to_start', lagMinutos: 20 * 8 * 60 })
+    expect(elab[1].fechaInicio.getTime()).toBe(desplazarHorasLaborables(calendarioHoras(mockCalendario()), elab[0].fechaFin, 160, 'inicio').getTime())
+    expect(r.actividades.find(a => a.nombre === 'Valorización 02')).toBeDefined()
   })
 
   it('Hitos del Cliente: la Parada de Planta (sin fecha) queda como hito al inicio de Ejecución, con aviso', () => {
@@ -477,13 +502,16 @@ describe('construirEstructuraReal — GESTION Y CONTROL transversal y PROCURA en
     expect(r.advertencias.some(a => a.includes('Parada de Planta'))).toBe(true)
   })
 
-  it('SSO: habilitación de personal una sola vez, al inicio de la ventana, en cadena', () => {
+  it('SEG: habilitación de personal una sola vez, en Planificación, después de los documentos de seguridad', () => {
     const r = construir()
     const h = ['h1', 'h2', 'h3'].map(id => r.tareas.filter(t => t.catalogoServicioId === id))
     h.forEach(l => expect(l.length).toBe(1))
     expect(h[0][0].nombre).toBe('Solicitud de Validación de OC') // sin numerar
-    expect(h[1][0].fechaInicio.getTime()).toBe(h[0][0].fechaFin.getTime())
-    expect(fase(r, 'GESTION Y CONTROL').fechaInicioPlan.getTime()).toBe(h[0][0].fechaInicio.getTime())
+    expect(h[0][0].proyectoEdtId).toBe(edt(r, 'Seguridad').id)
+    const iperc = r.tareas.find(t => t.catalogoServicioId === 't2')!
+    expect(h[0][0].fechaInicio.getTime()).toBeGreaterThan(iperc.fechaFin.getTime())
+    expect(h[1][0].fechaInicio.getTime()).toBeGreaterThanOrEqual(h[0][0].fechaFin.getTime())
+    expect(h[2][0].fechaFin.getTime()).toBeLessThanOrEqual(fase(r, 'PLANIFICACION').fechaFinPlan.getTime())
   })
 
   it('PROCURA arranca al terminar toda Planificación y no retrasa a Ejecución', () => {

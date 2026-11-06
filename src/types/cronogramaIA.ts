@@ -78,8 +78,9 @@ export interface TareaPropuesta {
   cantidadSugeridaPorIA?: boolean
   /**
    * Hito ◆ de espera (sin horas) que cae N días hábiles después de la tarea
-   * anterior de su ciclo — ej. Aprobación de Valorización (+2d), Recepción de
-   * Conformidad HES (+5d). Sale de la etiqueta "Hito+Nd" del servicio.
+   * anterior de su ciclo (FC +Nd) — ej. Aprobación de Valorización (+1d tras
+   * la elaboración), Recepción de Conformidad HES (+2d tras la aprobación).
+   * Sale de la etiqueta "Hito+Nd" del servicio.
    */
   hitoDiasDespues?: number
   /**

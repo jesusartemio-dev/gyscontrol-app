@@ -338,7 +338,7 @@ describe('generarActividadesDeterministas — CMM/SEG (una sola Actividad fija)'
     expect(r.actividades[0].tareas).toHaveLength(2)
   })
 
-  it('SEG ignora actividadTag para agrupar — todo cae en "Documentos de Seguridad"', () => {
+  it('SEG: sin servicios de habilitación, todo cae en "Documentos de Seguridad"', () => {
     const servicios = [
       servicio({ id: 's1', nombre: 'IPERC', actividadTag: ['General'] }),
       servicio({ id: 's2', nombre: 'Habilitación HSE', actividadTag: ['Brownfield'], filtroAlcance: 'brownfield' }),
@@ -348,6 +348,23 @@ describe('generarActividadesDeterministas — CMM/SEG (una sola Actividad fija)'
     expect(r.actividades).toHaveLength(1)
     expect(r.actividades[0].actividadNombre).toBe('Documentos de Seguridad')
     expect(r.actividades[0].tareas).toHaveLength(2)
+  })
+
+  it('SEG: los servicios Habilitacion van en "Habilitación de Personal", después de "Documentos de Seguridad"', () => {
+    const servicios = [
+      servicio({ id: 'h1', nombre: 'Solicitud de Validación de OC', actividadTag: ['Habilitacion'] }),
+      servicio({ id: 's1', nombre: 'IPERC', actividadTag: ['General'] }),
+      servicio({ id: 'h2', nombre: 'Solicitud Ingreso Personal SPOT', actividadTag: ['Habilitacion'] }),
+    ]
+    const r = generarActividadesDeterministas([{ nombre: 'SEG', descripcion: 'Seguridad', servicios }], config())
+    expect(r.actividades.map(a => a.actividadNombre)).toEqual(['Documentos de Seguridad', 'Habilitación de Personal'])
+    expect(r.actividades[1].tareas.map(t => t.catalogoServicioId)).toEqual(['h1', 'h2'])
+  })
+
+  it('SSO solo genera el Reporte Semanal de Seguridad', () => {
+    const servicios = [servicio({ id: 'r1', nombre: 'Elaboración y Envío de Reporte Semanal', actividadTag: ['ReporteSeguridad'] })]
+    const r = generarActividadesDeterministas([{ nombre: 'SSO', descripcion: 'Seguimiento de Seguridad', servicios }], config())
+    expect(r.actividades.map(a => a.actividadNombre)).toEqual(['Reporte Semanal de Seguridad'])
   })
 })
 

@@ -113,7 +113,7 @@ export function evaluarAlcance(
   return { incluida: true }
 }
 
-/** Etiqueta "Hito+2d" → 2: hito de espera N días hábiles después de la tarea anterior del ciclo. */
+/** Etiqueta "Hito+2d" → 2: hito de espera N días hábiles después de la tarea anterior del ciclo (sea o no otro hito). */
 export function diasHitoDeEtiquetas(tags: string[] | null | undefined): number | undefined {
   for (const t of tags ?? []) {
     const m = /^hito\+(\d+)d$/i.exec(t.trim())
@@ -248,7 +248,15 @@ export const ACTIVIDAD_HABILITACION = 'Habilitación de Personal'
 export const ACTIVIDAD_REPORTE_SEGURIDAD = 'Reporte Semanal de Seguridad'
 
 /**
- * Semanal: un ciclo cada viernes. Mensual: un ciclo cada día 20 (valorizaciones).
+ * Desfase (días hábiles) entre ciclos: la primera tarea de cada ciclo depende
+ * de la primera del ciclo anterior con FC +Nd (reporte N → N+1 +5d; elaboración
+ * de valorización N → N+1 +20d), como se programa a mano en el cronograma.
+ */
+export const DESFASE_CICLO_DIAS: Record<'semanal' | 'mensual', number> = { semanal: 5, mensual: 20 }
+
+/**
+ * Semanal: el primer ciclo el primer viernes. Mensual: el primero el primer día
+ * 20 (valorizaciones). Los siguientes salen de la cadena (DESFASE_CICLO_DIAS).
  * Las de ACTIVIDAD_POR_CICLO generan una actividad por ciclo ("Valorización 01",
  * "Valorización 02"…) en vez de numerar tareas dentro de una sola actividad.
  */
@@ -271,15 +279,28 @@ function generarCTL(servicios: CatalogoServicioParaWizard[], config: Configuraci
   }, config)
 }
 
-/** SSO (Gestión de Seguridad): habilitación de personal y reportes semanales de seguridad. */
+/** SSO (Gestión de Seguridad): reportes semanales de seguridad. */
 function generarSSO(servicios: CatalogoServicioParaWizard[], config: ConfiguracionWizardPaso1): ActividadPropuesta[] {
-  return agruparPorTag(servicios, 'SSO', { Habilitacion: ACTIVIDAD_HABILITACION, ReporteSeguridad: ACTIVIDAD_REPORTE_SEGURIDAD }, config)
+  return agruparPorTag(servicios, 'SSO', { ReporteSeguridad: ACTIVIDAD_REPORTE_SEGURIDAD }, config)
 }
 
+/**
+ * SEG (Planificación de Seguridad): documentos de seguridad y, después, la
+ * habilitación de personal (tag Habilitacion) — se hace en la planificación,
+ * con los documentos HSE ya aprobados, no durante la obra.
+ */
 function generarSEG(servicios: CatalogoServicioParaWizard[], config: ConfiguracionWizardPaso1): ActividadPropuesta[] {
-  const tareas = servicios.map(s => construirTareaPropuesta(s, config))
-  if (!tieneAlMenosUnaTareaIncluida(tareas)) return []
-  return [{ edtNombre: 'SEG', actividadNombre: 'Documentos de Seguridad', tareas, origen: 'determinista' }]
+  const esHabilitacion = (s: CatalogoServicioParaWizard) => s.actividadTag.includes('Habilitacion')
+  const grupos: [string, CatalogoServicioParaWizard[]][] = [
+    ['Documentos de Seguridad', servicios.filter(s => !esHabilitacion(s))],
+    [ACTIVIDAD_HABILITACION, servicios.filter(esHabilitacion)],
+  ]
+  const actividades: ActividadPropuesta[] = []
+  for (const [actividadNombre, delGrupo] of grupos) {
+    const tareas = delGrupo.map(s => construirTareaPropuesta(s, config))
+    if (tieneAlMenosUnaTareaIncluida(tareas)) actividades.push({ edtNombre: 'SEG', actividadNombre, tareas, origen: 'determinista' })
+  }
+  return actividades
 }
 
 function generarCMM(

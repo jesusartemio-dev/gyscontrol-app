@@ -108,8 +108,9 @@ export function derivarEdtsSoporte(
   const triggersSeg = EDTS_TRIGGER_SEG.filter(n => nombresPresentes.has(n))
   if (triggersSeg.length > 0) {
     agregarSiFalta('SEG', 'regla-derivada', motivoSeg(triggersSeg))
-    // Gestión de Seguridad transversal (habilitación de personal, reportes semanales): mismo disparador que SEG.
-    agregarSiFalta('SSO', 'regla-derivada', `Gestión de seguridad durante el proyecto (habilitación de personal, reportes semanales) por trabajo en campo/taller (${triggersSeg.join(', ')}).`)
+    // Gestión de Seguridad transversal (reportes semanales de seguridad): mismo disparador que SEG.
+    // La habilitación de personal va en SEG (planificación).
+    agregarSiFalta('SSO', 'regla-derivada', `Gestión de seguridad durante el proyecto (reportes semanales de seguridad) por trabajo en campo/taller (${triggersSeg.join(', ')}).`)
   }
 
   const triggersPro = EDTS_TRIGGER_PRO.filter(n => nombresPresentes.has(n))

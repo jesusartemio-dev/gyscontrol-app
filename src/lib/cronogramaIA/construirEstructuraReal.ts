@@ -3,7 +3,7 @@ import { ajustarFechaADiaLaborable, calcularFechaFinConCalendario } from '@/lib/
 import { agruparYOrdenarPorEstructura, type GrupoEdtOrdenado, type InfoOrdenEdt } from './agruparYOrdenarPorEstructura'
 import type { ActividadPropuesta, TareaPropuesta } from '@/types/cronogramaIA'
 import { type CalendarioHoras, desplazarHorasLaborables, horasPorDiaCalendario, siguienteMomentoLaborable, sumarHorasLaborables } from '@/lib/services/cronogramaHoras'
-import { ACTIVIDAD_POR_CICLO, RECURRENCIA_ACTIVIDAD } from './reglasActividades'
+import { ACTIVIDAD_POR_CICLO, DESFASE_CICLO_DIAS, RECURRENCIA_ACTIVIDAD } from './reglasActividades'
 import { ACTIVIDAD_ENTREGA_OBRA, TAREA_SEGUIMIENTO_PROVEEDORES, TAREA_TRASLADO_OBRA } from './entregaEnObraPro'
 
 // Re-exportado por compatibilidad — la implementación real vive en
@@ -429,8 +429,8 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
 
   // Gestión y Control es transversal: va del fin de GES al fin de Ejecución.
   // Sus actividades recurrentes se repiten numeradas en esa ventana (reportes
-  // cada viernes, valorizaciones cada día 20) y las de una sola vez
-  // (habilitación de personal) van al inicio.
+  // cada viernes, valorizaciones cada día 20) y las de una sola vez van al
+  // inicio.
   const dependenciasCiclos: EstructuraReal['dependenciasCiclos'] = []
   const faseGC = fases.find(f => claveFase(f.nombre) === FASE_GESTION_CONTROL)
   if (faseGC) {
@@ -596,10 +596,13 @@ function diasDeCiclo(tipo: 'semanal' | 'mensual', desde: Date, hasta: Date): Dat
 
 /**
  * Programa la fase GESTION Y CONTROL. Cada actividad recurrente (ver
- * RECURRENCIA_ACTIVIDAD) se repite por ciclo con sus tareas en cadena el mismo
- * día, numeradas "01", "02"… (1.ª vez horaBase, siguientes horaRepetido). Las
- * demás actividades (una sola vez) encadenan sus tareas desde el inicio de la
- * ventana. Recalcula fechas de actividades, EDTs y la fase.
+ * RECURRENCIA_ACTIVIDAD) se repite por ciclo con sus tareas en cadena,
+ * numeradas "01", "02"… (1.ª vez horaBase, siguientes horaRepetido). El primer
+ * ciclo cae en el primer viernes / día 20 de la ventana; cada siguiente depende
+ * del anterior (primera tarea → primera tarea, FC +DESFASE_CICLO_DIAS) y sale
+ * de esa cadena, mientras empiece dentro de la ventana. Las demás actividades
+ * (una sola vez) encadenan sus tareas desde el inicio de la ventana. Recalcula
+ * fechas de actividades, EDTs y la fase.
  */
 export function programarGestionYControl(o: {
   cal: CalendarioHoras
@@ -625,10 +628,12 @@ export function programarGestionYControl(o: {
   const hpd = horasPorDiaCalendario(cal)
   /**
    * Encadena tareas desde `desde`: cada una empieza cuando termina la anterior.
-   * Un hito de espera (hitoDiasDespues) cae N días hábiles después de la última
-   * tarea con trabajo, sin horas y sin mover la cadena (FC con ese desfase).
+   * Un hito de espera (hitoDiasDespues) cae N días hábiles después de la tarea
+   * anterior —con trabajo u otro hito— (FC con ese desfase), sin horas: ej.
+   * Elaboración → Aprobación +1d → HES +2d. Devuelve la primera tarea creada.
    */
-  const encadenar = (base: FilaTarea[], desde: Date, horasDe: (t: FilaTarea) => number, sufijo: string, actividadId?: string) => {
+  const encadenar = (base: FilaTarea[], desde: Date, horasDe: (t: FilaTarea) => number, sufijo: string, actividadId?: string): FilaTarea | undefined => {
+    const desdeIdx = nuevas.length
     let cursor = siguienteMomentoLaborable(cal, desde)
     let anterior: FilaTarea | null = null
     for (const t of base) {
@@ -643,9 +648,13 @@ export function programarGestionYControl(o: {
       const dias = o.propuestaPorTareaId.get(t.id)?.hitoDiasDespues
       if (dias !== undefined && anterior) {
         const lagMinutos = Math.round(dias * hpd * 60)
-        const fecha = desplazarHorasLaborables(cal, anterior.fechaFin, lagMinutos / 60, 'fin')
-        nuevas.push({ ...t, id, nombre, proyectoActividadId: actividadId ?? t.proyectoActividadId, fechaInicio: fecha, fechaFin: fecha, horasEstimadas: 0, esHito: true })
+        // Misma regla que el aviso de dependencias (fechasRequeridas): FC con desfase → 'inicio'.
+        const fecha = desplazarHorasLaborables(cal, anterior.fechaFin, lagMinutos / 60, 'inicio')
+        const hito: FilaTarea = { ...t, id, nombre, proyectoActividadId: actividadId ?? t.proyectoActividadId, fechaInicio: fecha, fechaFin: fecha, horasEstimadas: 0, esHito: true }
+        nuevas.push(hito)
         dependencias.push({ tareaOrigenId: anterior.id, tareaDependienteId: id, tipo: 'finish_to_start', lagMinutos })
+        anterior = hito
+        if (fecha > cursor) cursor = siguienteMomentoLaborable(cal, fecha)
         continue
       }
       const horas = Math.max(0, horasDe(t))
@@ -655,6 +664,27 @@ export function programarGestionYControl(o: {
       if (anterior) dependencias.push({ tareaOrigenId: anterior.id, tareaDependienteId: fila.id, tipo: 'finish_to_start', lagMinutos: 0 })
       anterior = fila
       cursor = siguienteMomentoLaborable(cal, fin)
+    }
+    return nuevas[desdeIdx]
+  }
+
+  /**
+   * Ciclos de una actividad recurrente: el 1.º en el primer viernes / día 20 de
+   * la ventana; cada siguiente arranca FC +DESFASE_CICLO_DIAS desde la primera
+   * tarea del anterior (con esa dependencia), mientras empiece dentro de la ventana.
+   * `programarCiclo(k, desde)` crea las tareas del ciclo k y devuelve su primera tarea.
+   */
+  const programarCiclos = (recurrencia: 'semanal' | 'mensual', programarCiclo: (k: number, desde: Date) => FilaTarea | undefined) => {
+    const lagMinutos = Math.round(DESFASE_CICLO_DIAS[recurrencia] * hpd * 60)
+    let desde: Date = diasDeCiclo(recurrencia, inicioVentana, finVentana)[0]
+    let primeraAnterior: FilaTarea | undefined
+    for (let k = 0; k < 1000; k++) {
+      const primera = programarCiclo(k, desde)
+      if (!primera) return
+      if (primeraAnterior) dependencias.push({ tareaOrigenId: primeraAnterior.id, tareaDependienteId: primera.id, tipo: 'finish_to_start', lagMinutos })
+      primeraAnterior = primera
+      desde = desplazarHorasLaborables(cal, primera.fechaFin, lagMinutos / 60, 'inicio')
+      if (desde.getTime() > finVentana.getTime()) return
     }
   }
 
@@ -678,14 +708,15 @@ export function programarGestionYControl(o: {
     const nombreCiclo = ACTIVIDAD_POR_CICLO[act.nombre]
     if (recurrencia && nombreCiclo) {
       // Una actividad por ciclo ("Valorización 01", "Valorización 02"…) en lugar de la original.
-      const dias = diasDeCiclo(recurrencia, inicioVentana, finVentana)
-      const ciclos = dias.map((dia, k) => {
+      const ciclos: FilaActividad[] = []
+      programarCiclos(recurrencia, (k, desde) => {
         const nn = String(k + 1).padStart(2, '0')
         const actCiclo: FilaActividad = { ...act, id: randomUUID(), nombre: `${nombreCiclo} ${nn}`, orden: act.orden + k }
         const desdeIdx = nuevas.length
-        encadenar(base, dia, horasCiclo(k), nn, actCiclo.id)
+        const primera = encadenar(base, desde, horasCiclo(k), nn, actCiclo.id)
         resumirActividad(actCiclo, nuevas.slice(desdeIdx))
-        return actCiclo
+        ciclos.push(actCiclo)
+        return primera
       })
       // Reemplaza la actividad original por las de cada ciclo y corre el orden de las siguientes.
       const idxAll = o.actividades.indexOf(act)
@@ -696,9 +727,7 @@ export function programarGestionYControl(o: {
     }
     const desdeIdx = nuevas.length
     if (recurrencia) {
-      diasDeCiclo(recurrencia, inicioVentana, finVentana).forEach((dia, k) => {
-        encadenar(base, dia, horasCiclo(k), String(k + 1).padStart(2, '0'))
-      })
+      programarCiclos(recurrencia, (k, desde) => encadenar(base, desde, horasCiclo(k), String(k + 1).padStart(2, '0')))
     } else {
       encadenar(base, inicioVentana, t => t.horasEstimadas, '')
     }
