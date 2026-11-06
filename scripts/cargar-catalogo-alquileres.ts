@@ -138,8 +138,11 @@ const ITEMS: ItemAlquiler[] = [
   // presupuesto de la lista como si fuera real.
   {
     codigo: 'ALQ-MANLIFT-ART-60FT-OP-DIA',
-    descripcion: 'ALQUILER PLATAFORMA ELEVADORA BRAZO ARTICULADO 60 FT (ALT. PLATAFORMA 18 M / TRABAJO 20 M, ALCANCE HORIZ. MIN. 11 M, CANASTILLA 230 KG), DIESEL 4X4 - INCLUYE OPERADOR CERTIFICADO, TRASLADO Y CERTIFICADO DE OPERATIVIDAD VIGENTE - POR DIA',
-    marca: 'GENIE Z-62/40 (O EQUIVALENTE: Z-60/37 FE, JLG 600AJ)',
+    // El modelo y los equivalentes van en la descripción: `marca` alimenta el
+    // filtro de marca del catálogo, y metiéndole el modelo queda como una
+    // marca propia en vez de agrupar bajo GENIE.
+    descripcion: 'ALQUILER PLATAFORMA ELEVADORA BRAZO ARTICULADO 60 FT (ALT. PLATAFORMA 18 M / TRABAJO 20 M, ALCANCE HORIZ. MIN. 11 M, CANASTILLA 230 KG), DIESEL 4X4 - INCLUYE OPERADOR CERTIFICADO, TRASLADO Y CERTIFICADO DE OPERATIVIDAD VIGENTE - POR DIA - REF. Z-62/40 O EQUIVALENTE (GENIE Z-60/37 FE, JLG 600AJ)',
+    marca: 'GENIE',
     precio: 0,
     moneda: 'PEN',
     fuente: 'SIN PRECIO — pendiente de cotización. Requerido en CJM50 (3 días)',
