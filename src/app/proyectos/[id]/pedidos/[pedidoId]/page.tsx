@@ -69,6 +69,7 @@ import {
   GripVertical,
   Copy,
   MessageCircle,
+  AlignJustify,
 } from 'lucide-react'
 import Link from 'next/link'
 import type { Proyecto, PedidoEquipo } from '@/types'
@@ -148,6 +149,22 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
   const [showEditModal, setShowEditModal] = useState(false)
   const [showItemDirectoModal, setShowItemDirectoModal] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  // Vista de ítems: 'compacta' (campo: qué es, cuánto pedido/llegó y cuándo; sin
+  // costos ni acciones) o 'completa'. Se recuerda; la primera vez, en celular arranca compacta.
+  const [vistaItems, setVistaItemsState] = useState<'compacta' | 'completa'>('completa')
+  useEffect(() => {
+    try {
+      const guardada = localStorage.getItem('pedidoEquipoItems.vista')
+      if (guardada === 'compacta' || guardada === 'completa') setVistaItemsState(guardada)
+      else if (window.matchMedia('(max-width: 767px)').matches) setVistaItemsState('compacta')
+    } catch {
+      // Sin almacenamiento: se queda en la vista por defecto.
+    }
+  }, [])
+  const setVistaItems = (v: 'compacta' | 'completa') => {
+    setVistaItemsState(v)
+    try { localStorage.setItem('pedidoEquipoItems.vista', v) } catch { /* sin almacenamiento */ }
+  }
   const [rechazarDialog, setRechazarDialog] = useState<{ open: boolean; recepcionId: string | null }>({ open: false, recepcionId: null })
   const [rechazarObservaciones, setRechazarObservaciones] = useState('')
   const [procesandoRecepcion, setProcesandoRecepcion] = useState<string | null>(null)
@@ -974,12 +991,32 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
 
         {/* Items del pedido */}
         <div className="bg-white rounded-lg border">
-          <div className="px-4 py-3 border-b bg-gray-50/50 flex items-center justify-between">
+          <div className="px-4 py-3 border-b bg-gray-50/50 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-blue-600" />
               <span className="text-sm font-medium">Items del Pedido</span>
+              <div className="flex items-center border rounded-md">
+                <Button
+                  variant={vistaItems === 'compacta' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setVistaItems('compacta')}
+                  className="h-6 px-2 rounded-r-none"
+                  title="Compacta (campo): qué es, cuánto pedido/llegó y cuándo"
+                >
+                  <AlignJustify className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant={vistaItems === 'completa' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setVistaItems('completa')}
+                  className="h-6 px-2 rounded-l-none"
+                  title="Completa: con costos y acciones"
+                >
+                  <List className="h-3 w-3" />
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary" className="text-[10px] h-5">
                 {stats.entregados} entregados
               </Badge>
@@ -1019,10 +1056,77 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
             </div>
           </div>
 
-          {pedido.items && pedido.items.length > 0 ? (
-            <div>
+          {pedido.items && pedido.items.length > 0 && vistaItems === 'compacta' ? (
+            /* Vista compacta (campo): qué es, cuánto se pidió / llegó y cuándo llega.
+               Sin costos ni acciones. 4 columnas: entra sin scroll horizontal en el celular. */
+            <div className="overflow-auto max-h-[75vh] supports-[height:100dvh]:max-h-[75dvh] overscroll-contain">
               <table className="w-full text-xs">
-                <thead className="bg-gray-50">
+                <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-gray-50 [&_th]:shadow-[inset_0_-1px_0_#e5e7eb]">
+                  <tr>
+                    <th className="w-7 px-1 py-1.5 text-center font-medium text-gray-400">#</th>
+                    <th className="px-2 py-1.5 text-left font-medium text-gray-600">Ítem</th>
+                    <th className="w-16 px-1 py-1.5 text-center font-medium text-gray-600" title="Pedido / llegó">Cant.</th>
+                    <th className="w-24 px-1 py-1.5 text-center font-medium text-gray-600">Estado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {localPedidoItems.map((item: any, idx: number) => {
+                    const pedida = item.cantidadPedida || 0
+                    const llego = item.cantidadAtendida || 0
+                    const fReal = item.fechaEntregaReal
+                    const fEstimada = item.fechaEntregaEstimada
+                    const atrasada = !fReal && fEstimada && pedido.fechaNecesaria && new Date(fEstimada) > new Date(pedido.fechaNecesaria)
+                    const refPlano = item.listaEquipoItem?.comentarioRevision
+                    return (
+                      <tr key={item.id} className={cn('align-top', idx % 2 === 1 && 'bg-gray-50/40')}>
+                        <td className="px-1 py-1.5 text-center text-[10px] text-gray-400 tabular-nums">{idx + 1}</td>
+                        <td className="px-2 py-1.5 min-w-0">
+                          <p className="text-xs text-gray-900 leading-snug">{item.descripcion}</p>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10px] text-gray-500">
+                            <span className="font-mono">{item.codigo}</span>
+                            {item.marca && item.marca !== 'SIN-MARCA' && <span>· {item.marca}</span>}
+                          </div>
+                          {refPlano && (
+                            <p className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-blue-700" title={refPlano}>{refPlano}</p>
+                          )}
+                          {item.comentarioLogistica && (
+                            <p className="mt-0.5 line-clamp-2 text-[10px] italic leading-tight text-amber-700" title={item.comentarioLogistica}>{item.comentarioLogistica}</p>
+                          )}
+                        </td>
+                        <td className="px-1 py-1.5 text-center whitespace-nowrap">
+                          <div><span className="font-semibold text-gray-900">{pedida}</span> <span className="text-[10px] text-gray-500">{item.unidad}</span></div>
+                          <div className={cn('text-[10px] tabular-nums', llego >= pedida && pedida > 0 ? 'text-green-600' : llego > 0 ? 'text-blue-600' : 'text-gray-400')}>
+                            llegó {llego}
+                          </div>
+                        </td>
+                        <td className="px-1 py-1.5 text-center">
+                          {item.tipoItem === 'servicio' ? (
+                            <Badge className={cn('text-[10px] px-1.5 py-0', item.estadoEntrega === 'entregado' ? 'bg-purple-100 text-purple-700 hover:bg-purple-100 border-purple-200' : 'bg-purple-50 text-purple-600 hover:bg-purple-50 border-purple-200')}>
+                              {item.estadoEntrega === 'entregado' ? 'Ejecutado' : 'Pend. ejecución'}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', getEstadoBadge(item.estado))}>
+                              {item.estado}
+                            </Badge>
+                          )}
+                          {(fReal || fEstimada) && (
+                            <div className={cn('mt-0.5 text-[10px]', fReal ? 'text-green-600' : atrasada ? 'font-medium text-red-600' : 'text-gray-500')}>
+                              {fReal ? `llegó ${formatDate(fReal)}` : `llega ${formatDate(fEstimada)}`}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : pedido.items && pedido.items.length > 0 ? (
+            /* Vista completa: scrollea por dentro para que la cabecera quede fija al bajar
+               (y en el celular la tabla se desplaza de lado sin mover la página). */
+            <div className="overflow-auto max-h-[75vh] supports-[height:100dvh]:max-h-[75dvh] overscroll-contain">
+              <table className="w-full text-xs">
+                <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-gray-50 [&_th]:shadow-[inset_0_-1px_0_#e5e7eb]">
                   <tr className="border-b">
                     <th className="w-5 p-0" />
                     <th className="px-2 py-2 text-center font-medium text-gray-400 w-7">#</th>
@@ -1198,8 +1302,8 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
           {/* Resumen footer */}
           {pedido.items && pedido.items.length > 0 && (
             <div className="px-4 py-3 border-t bg-gray-50">
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <span className="flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-green-500" />
                     <span className="text-muted-foreground">Entregados:</span>
@@ -1216,9 +1320,12 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                     <span className="font-medium">{stats.pendientes}</span>
                   </span>
                 </div>
-                <span className="font-medium text-emerald-600">
-                  Total: {formatCurrency(stats.totalCost)}
-                </span>
+                {/* El costo es de compras: en la vista compacta (campo) no se muestra. */}
+                {vistaItems === 'completa' && (
+                  <span className="font-medium text-emerald-600">
+                    Total: {formatCurrency(stats.totalCost)}
+                  </span>
+                )}
               </div>
             </div>
           )}
