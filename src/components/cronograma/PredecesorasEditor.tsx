@@ -5,7 +5,7 @@
 
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -63,6 +63,8 @@ interface Candidata {
   actividad: string
   /** Fecha de la tarea para ubicarla ("12 oct–14 oct"). */
   fechas: string
+  /** La tarea que se está editando: se muestra (no se puede elegir) para ubicarse. */
+  esActual?: boolean
 }
 
 const fmtDia = (v?: string | Date) => {
@@ -114,19 +116,25 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
   const [ocupado, setOcupado] = useState(false)
   const base = `/api/proyectos/${proyectoId}/cronograma/dependencias`
 
-  // Tareas candidatas, en el orden del cronograma: todas menos esta y las que ya son predecesoras.
+  // Tareas candidatas, en el orden del cronograma: todas menos las que ya son
+  // predecesoras. Esta misma tarea va en su lugar, marcada y sin poder elegirse,
+  // para ubicarse (la predecesora suele estar justo arriba).
   const candidatas = useMemo(() => {
     const ya = new Set(lista.map((d) => d.tareaId))
     const r: Candidata[] = []
     nodes.forEach((n) => {
-      if (n.type !== 'tarea' || n.id === tareaNodeId || ya.has(realId(n.id)) || n.data?.esExtra) return
+      if (n.type !== 'tarea' || ya.has(realId(n.id)) || n.data?.esExtra) return
       const ini = n.data?.fechaInicio ?? n.data?.fechaInicioComercial
       const fin = n.data?.fechaFin ?? n.data?.fechaFinComercial
       const fechas = n.data?.esHito ? `◆ ${fmtDia(ini)}` : `${fmtDia(ini)}–${fmtDia(fin)}`
-      r.push({ nodeId: n.id, nombre: n.nombre, fechas, ...ubicacionDe(nodes, n) })
+      r.push({ nodeId: n.id, nombre: n.nombre, fechas, esActual: n.id === tareaNodeId, ...ubicacionDe(nodes, n) })
     })
     return r
   }, [nodes, tareaNodeId, lista])
+
+  // Al abrir (o cambiar el filtro) la lista se centra en esta tarea.
+  const listaRef = useRef<HTMLDivElement>(null)
+  const actualRef = useRef<HTMLDivElement>(null)
 
   // Filtro en cascada Fase → EDT; la lista se agrupa por Actividad.
   const [filtroFase, setFiltroFase] = useState('todas')
@@ -155,6 +163,20 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
     }
     return [...g]
   }, [candidatas, filtroFase, filtroEdt])
+
+  useEffect(() => {
+    if (!abierto) return
+    // Después de montar el popover (y de que cmdk seleccione el primer ítem).
+    const t = setTimeout(() => {
+      const cont = listaRef.current
+      const item = actualRef.current
+      if (!cont || !item) return
+      const rl = cont.getBoundingClientRect()
+      const ri = item.getBoundingClientRect()
+      cont.scrollTop += ri.top - rl.top - (cont.clientHeight - ri.height) / 2
+    }, 50)
+    return () => clearTimeout(t)
+  }, [abierto, filtroFase, filtroEdt])
 
   const agregar = async (cand: Candidata) => {
     const lag = parsearDesfase(nuevoDesfase, horasPorDia)
@@ -341,11 +363,25 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
             </div>
             <Command className="min-h-0 flex-1" filter={(valor, busqueda) => (valor.toLowerCase().includes(busqueda.toLowerCase()) ? 1 : 0)}>
               <CommandInput placeholder="Buscar tarea o actividad…" className="text-xs" />
-              <CommandList className="max-h-none min-h-0 flex-1 overscroll-contain">
+              <CommandList ref={listaRef} className="max-h-none min-h-0 flex-1 overscroll-contain">
                 <CommandEmpty>No hay tareas que coincidan.</CommandEmpty>
                 {grupos.map(([titulo, tareas]) => (
                   <CommandGroup key={titulo} heading={titulo}>
-                    {tareas.map((c) => (
+                    {tareas.map((c) => c.esActual ? (
+                      <CommandItem
+                        key={c.nodeId}
+                        ref={actualRef}
+                        value={`${c.nombre} ${c.ruta} ${c.nodeId}`}
+                        disabled
+                        className="flex items-center justify-between gap-2 border-l-2 border-blue-500 bg-blue-50 pl-4 data-[disabled=true]:opacity-100"
+                      >
+                        <span className="min-w-0 truncate text-xs font-medium text-blue-800">{c.nombre}</span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <span className="rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-medium text-white">Esta tarea</span>
+                          <span className="text-[10px] text-blue-700">{c.fechas}</span>
+                        </span>
+                      </CommandItem>
+                    ) : (
                       <CommandItem key={c.nodeId} value={`${c.nombre} ${c.ruta} ${c.nodeId}`} onSelect={() => agregar(c)} className="flex items-center justify-between gap-2 pl-4">
                         <span className="min-w-0 truncate text-xs">{c.nombre}</span>
                         <span className="shrink-0 text-[10px] text-muted-foreground">{c.fechas}</span>
