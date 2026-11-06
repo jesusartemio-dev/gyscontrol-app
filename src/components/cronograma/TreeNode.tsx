@@ -6,7 +6,7 @@
 // ===================================================
 
 import React from 'react'
-import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine, ArrowRightLeft, ArrowRightToLine, Columns2, ArrowDown, ArrowRight, ArrowLeft, Layers, Diamond, Link2, Wand2 } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine, ArrowRightLeft, ArrowRightToLine, Columns2, ArrowDown, ArrowRight, ArrowLeft, Layers, Diamond, Link2, Wand2, ListOrdered } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -131,6 +131,8 @@ interface TreeNodeProps {
   onMoverFase?: () => void
   /** Fase, EDT o actividad: deducir dependencias de sus tareas a partir de las fechas. */
   onGenerarDependencias?: () => void
+  /** Solo actividades: dependencias FC entre cada tarea y la siguiente (una tras otra). */
+  onEncadenarActividad?: () => void
   /** Actividades y EDTs: ajustar todas sus tareas a sus predecesoras, en cascada. */
   onAjustarActividad?: () => void
   onAjustarPosicion?: (posicion: 'inicio_padre' | 'despues_anterior' | 'despues_ultimo') => void
@@ -212,6 +214,7 @@ export function TreeNode({
   onMoverEdt,
   onMoverFase,
   onGenerarDependencias,
+  onEncadenarActividad,
   onAjustarActividad,
   onAjustarPosicion,
   onProgramarRespecto,
@@ -801,6 +804,14 @@ export function TreeNode({
                 <DropdownMenuItem onClick={() => { setDropdownOpen(false); onGenerarDependencias() }}>
                   <Link2 className="h-4 w-4 mr-2" />
                   Generar dependencias desde fechas
+                </DropdownMenuItem>
+              )}
+
+              {/* Dependencias FC entre cada tarea de la actividad y la siguiente */}
+              {!readOnly && node.type === 'actividad' && onEncadenarActividad && (
+                <DropdownMenuItem onClick={() => { setDropdownOpen(false); onEncadenarActividad() }}>
+                  <ListOrdered className="h-4 w-4 mr-2" />
+                  Encadenar tareas (una tras otra)
                 </DropdownMenuItem>
               )}
 
