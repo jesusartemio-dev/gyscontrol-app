@@ -13,6 +13,11 @@ import { validarPermisoCronogramaPorActividad } from '@/lib/services/cronogramaP
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { isCronogramaBloqueado, cronogramaBloqueadoResponse } from '@/lib/utils/cronogramaLockCheck'
+import { obtenerCalendarioProyecto } from '@/lib/services/cronogramaDesplazamiento'
+import { siguienteMomentoLaborable, sumarHorasLaborables } from '@/lib/services/cronogramaHoras'
+import { recalcularPadresPostOperacion } from '@/lib/utils/cronogramaRollup'
+import { calcularHorasEstimadas, esServicioObsoleto } from '@/lib/cronogramaIA/reglasActividades'
 
 // ✅ GET /api/proyectos/[id]/cronograma/import-tareas - Obtener servicios disponibles para importar como tareas
 export async function GET(
@@ -119,8 +124,9 @@ export async function GET(
 
     console.log('Servicios encontrados:', servicios.length)
 
-    // ✅ Formatear respuesta para el modal de importación
-    const serviciosFormateados = servicios.map(servicio => ({
+    // ✅ Formatear respuesta para el modal de importación (sin los servicios
+    // reemplazados [Obsoleto], que tampoco usa el generador)
+    const serviciosFormateados = servicios.filter(s => !esServicioObsoleto(s)).map(servicio => ({
       id: servicio.id,
       nombre: servicio.nombre,
       descripcion: servicio.descripcion,
@@ -133,8 +139,8 @@ export async function GET(
       costoHora: servicio.recurso.costoHora,
       orden: servicio.orden,
       nivelDificultad: servicio.nivelDificultad,
-      // Calcular horas totales estimadas
-      horasEstimadas: (servicio.cantidad || 0) * (servicio.horaBase || 0),
+      // Horas como las calcula el generador (las mismas con que se crea la tarea)
+      horasEstimadas: calcularHorasEstimadas(servicio.horaBase, servicio.horaRepetido, servicio.cantidad ?? 1, servicio.nivelDificultad ?? 1),
       // Información adicional para el modal
       metadata: {
         tipo: 'servicio',
@@ -229,32 +235,50 @@ export async function POST(
       )
     }
 
-    // ✅ Obtener los servicios seleccionados
+    if (await isCronogramaBloqueado(actividad.proyectoCronogramaId)) return cronogramaBloqueadoResponse()
+
+    // ✅ Servicios seleccionados, en el orden del catálogo
     const servicios = await prisma.catalogoServicio.findMany({
-      where: {
-        id: { in: selectedIds }
-      },
-      include: {
-        edt: true,
-        recurso: true,
-        unidadServicio: true
-      }
+      where: { id: { in: selectedIds } },
+      orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
     })
 
-    // ✅ Crear tareas para los servicios importados en la actividad
-    const tareasCreadas = []
+    // Tareas ya existentes de la actividad: las importadas van a continuación
+    // (orden y fechas), en cadena por horas con el calendario del proyecto.
+    const existentes = await prisma.proyectoTarea.findMany({
+      where: { proyectoActividadId: cleanActividadId },
+      select: { orden: true, fechaFin: true },
+    })
+    const cal = await obtenerCalendarioProyecto(id)
+    let cursor = existentes.length
+      ? new Date(Math.max(...existentes.map(t => t.fechaFin.getTime())))
+      : actividad.fechaInicioPlan
+    let orden = existentes.length ? Math.max(...existentes.map(t => t.orden)) + 1 : 0
 
+    // Responsable: sale del rol del EDT (regla EDT → rol → organigrama), así que
+    // es el mismo que ya tienen las tareas de este EDT; si no hay, el de la
+    // actividad o el del EDT. Nunca se adivina.
+    const hermana = await prisma.proyectoTarea.findFirst({
+      where: { proyectoEdtId: actividad.proyectoEdt.id, responsableId: { not: null } },
+      select: { responsableId: true },
+    })
+    const responsableId = hermana?.responsableId ?? actividad.responsableId ?? actividad.proyectoEdt.responsableId ?? null
+
+    // ✅ Crear las tareas: enlazadas al servicio (catálogo y recurso), con las
+    // horas del generador (base + repetido × cantidad × dificultad) y como hito ◆
+    // si el servicio lo es (etiquetas Hito, HitosCliente o Hito+Nd).
+    const tareasCreadas: { tarea: { id: string; nombre: string }; servicio: string }[] = []
     for (const servicio of servicios) {
       try {
+        const tags = servicio.actividadTag ?? []
+        const esHito = tags.some(t => /^(hito|hitoscliente|hito\+\d+d)$/i.test(t.trim()))
+        const horasEstimadas = esHito
+          ? 0
+          : calcularHorasEstimadas(servicio.horaBase, servicio.horaRepetido, servicio.cantidad ?? 1, servicio.nivelDificultad ?? 1)
+        // Un hito va justo donde termina la tarea anterior; si es la primera, al inicio de la actividad.
+        const fechaInicio: Date = esHito && existentes.length + tareasCreadas.length > 0 ? cursor : siguienteMomentoLaborable(cal, cursor)
+        const fechaFin: Date = esHito ? fechaInicio : sumarHorasLaborables(cal, fechaInicio, horasEstimadas)
 
-        // Calcular fechas para la tarea (usar fechas de la actividad como base)
-        const fechaInicio = actividad.fechaInicioPlan || new Date()
-        const horasEstimadas = (servicio.cantidad || 0) * (servicio.horaBase || 0)
-        const diasEstimados = Math.ceil(horasEstimadas / 8) // 8 horas por día
-        const fechaFin = new Date(fechaInicio)
-        fechaFin.setDate(fechaFin.getDate() + diasEstimados - 1)
-
-        // Crear tarea dentro de la actividad
         const tarea = await prisma.proyectoTarea.create({
           data: {
             id: crypto.randomUUID(),
@@ -263,86 +287,36 @@ export async function POST(
             proyectoActividadId: cleanActividadId,
             nombre: servicio.nombre,
             descripcion: servicio.descripcion,
-            fechaInicio: fechaInicio,
-            fechaFin: fechaFin,
-            horasEstimadas: horasEstimadas,
+            fechaInicio,
+            fechaFin,
+            horasEstimadas,
+            esHito,
+            catalogoServicioId: servicio.id,
+            recursoId: servicio.recursoId,
+            cantidad: servicio.cantidad ?? null,
+            responsableId,
             estado: 'pendiente',
             prioridad: 'media',
-            orden: servicio.orden || 0,
+            orden: orden++,
             creadoPorId: session?.user?.id || null,
             updatedAt: new Date()
           }
         })
-
-        console.log('Tarea creada:', tarea.nombre)
-
-        tareasCreadas.push({
-          tarea: tarea,
-          servicio: servicio.nombre
-        })
-
+        cursor = fechaFin
+        tareasCreadas.push({ tarea, servicio: servicio.nombre })
       } catch (error) {
         logger.error(`Error creando tarea para servicio: ${servicio.nombre}`, error)
         // Continuar con los demás servicios
       }
     }
 
-    console.log('Importación completada. Creadas:', tareasCreadas.length, 'tareas')
-
-    // ✅ Actualizar horas en la actividad padre
+    // ✅ Fechas y horas hacia arriba (actividad, EDT, fase)
     if (tareasCreadas.length > 0) {
       try {
-        // Calcular total de horas de las tareas recién creadas
-        const totalHorasTareas = tareasCreadas.reduce((total, item) => {
-          return total + Number(item.tarea.horasEstimadas || 0)
-        }, 0)
-
-        // Obtener horas actuales de la actividad
-        const actividadActual = await prisma.proyectoActividad.findUnique({
-          where: { id: cleanActividadId },
-          select: { horasPlan: true }
-        })
-
-        const horasActuales = Number(actividadActual?.horasPlan || 0)
-        const nuevasHorasTotales = horasActuales + totalHorasTareas
-
-        // Actualizar horas de la actividad
-        await prisma.proyectoActividad.update({
-          where: { id: cleanActividadId },
-          data: { horasPlan: nuevasHorasTotales, updatedAt: new Date() }
-        })
-
-        console.log('✅ Horas actualizadas en actividad:', {
-          actividadId: cleanActividadId,
-          horasAnteriores: horasActuales,
-          horasAgregadas: totalHorasTareas,
-          horasTotales: nuevasHorasTotales
-        })
-
-        // ✅ Actualizar horas en el EDT padre
-        const edtActual = await prisma.proyectoEdt.findUnique({
-          where: { id: actividad.proyectoEdt.id },
-          select: { horasPlan: true, proyectoFaseId: true }
-        })
-
-        const horasEdtActuales = Number(edtActual?.horasPlan || 0)
-        const nuevasHorasEdtTotales = horasEdtActuales + totalHorasTareas
-
-        await prisma.proyectoEdt.update({
-          where: { id: actividad.proyectoEdt.id },
-          data: { horasPlan: nuevasHorasEdtTotales, updatedAt: new Date() }
-        })
-
-        console.log('✅ Horas actualizadas en EDT:', {
-          edtId: actividad.proyectoEdt.id,
-          horasAnteriores: horasEdtActuales,
-          horasAgregadas: totalHorasTareas,
-          horasTotales: nuevasHorasEdtTotales
-        })
-
+        await recalcularPadresPostOperacion(id, 'tarea', tareasCreadas[tareasCreadas.length - 1].tarea.id)
       } catch (updateError) {
-        logger.error('❌ Error actualizando horas:', updateError)
-        // No fallar la importación por error en actualización de horas
+        logger.error('❌ Error actualizando padres tras importar tareas:', updateError)
+        // No fallar la importación por error en el rollup
       }
     }
 
