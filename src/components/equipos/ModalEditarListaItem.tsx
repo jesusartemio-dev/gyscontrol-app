@@ -13,27 +13,58 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { updateListaEquipoItem } from '@/lib/services/listaEquipoItem'
+import { getProyectoEquipos } from '@/lib/services/proyectoEquipo'
 import type { ListaEquipoItem } from '@/types'
 
 interface Props {
   isOpen: boolean
   item: ListaEquipoItem
+  /** Necesario para ofrecer los grupos de equipos cotizados del proyecto. */
+  proyectoId: string
   onClose: () => void
   onUpdated?: () => Promise<void>
 }
 
-export default function ModalEditarListaItem({ isOpen, item, onClose, onUpdated }: Props) {
+const SIN_GRUPO = '__SIN_GRUPO__'
+
+export default function ModalEditarListaItem({ isOpen, item, proyectoId, onClose, onUpdated }: Props) {
   const [loading, setLoading] = useState(false)
   const [cantidad, setCantidad] = useState(0)
   const [comentarioRevision, setComentarioRevision] = useState('')
+  const [grupoId, setGrupoId] = useState<string>(SIN_GRUPO)
+  const [grupos, setGrupos] = useState<Array<{ id: string; nombre: string }>>([])
+  const [cargandoGrupos, setCargandoGrupos] = useState(false)
+
+  // Un ítem que reemplaza a uno cotizado hereda el grupo de aquél. Cambiarlo
+  // aquí dejaría el reemplazo apuntando a un grupo y el ítem a otro.
+  const grupoFijadoPorReemplazo = !!item?.proyectoEquipoItemId
 
   useEffect(() => {
     if (isOpen && item) {
       setCantidad(item.cantidad || 0)
       setComentarioRevision(item.comentarioRevision || '')
+      setGrupoId(item.proyectoEquipoId || SIN_GRUPO)
     }
   }, [isOpen, item])
+
+  useEffect(() => {
+    if (!isOpen || grupoFijadoPorReemplazo) return
+    let cancelado = false
+    setCargandoGrupos(true)
+    getProyectoEquipos(proyectoId)
+      .then(data => {
+        if (!cancelado) setGrupos((data || []).map(g => ({ id: g.id, nombre: g.nombre })))
+      })
+      .catch(() => {
+        if (!cancelado) toast.error('No se pudieron cargar los grupos de equipos')
+      })
+      .finally(() => {
+        if (!cancelado) setCargandoGrupos(false)
+      })
+    return () => { cancelado = true }
+  }, [isOpen, proyectoId, grupoFijadoPorReemplazo])
 
   const handleSubmit = async () => {
     if (!cantidad) {
@@ -46,6 +77,10 @@ export default function ModalEditarListaItem({ isOpen, item, onClose, onUpdated 
       await updateListaEquipoItem(item.id, {
         cantidad,
         comentarioRevision: comentarioRevision.trim() || undefined,
+        // Solo se manda si el ítem no arrastra el grupo de un reemplazo.
+        ...(grupoFijadoPorReemplazo
+          ? {}
+          : { proyectoEquipoId: grupoId === SIN_GRUPO ? null : grupoId }),
       })
 
       toast.success('Item actualizado')
@@ -116,6 +151,37 @@ export default function ModalEditarListaItem({ isOpen, item, onClose, onUpdated 
               onChange={(e) => setCantidad(parseFloat(e.target.value) || 0)}
               className="h-8 text-xs"
             />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium mb-1 block">Grupo de equipos cotizados</label>
+            {grupoFijadoPorReemplazo ? (
+              <div className="rounded border bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
+                Lo hereda del ítem cotizado que reemplaza. Para moverlo de grupo, usa <strong>Reemplazar</strong>.
+              </div>
+            ) : (
+              <>
+                <Select value={grupoId} onValueChange={setGrupoId} disabled={cargandoGrupos}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder={cargandoGrupos ? 'Cargando...' : 'Sin grupo'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={SIN_GRUPO}>Sin grupo</SelectItem>
+                    {grupos.map(g => (
+                      <SelectItem key={g.id} value={g.id}>{g.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Contra qué grupo de la cotización se compara el costo de este ítem.
+                </p>
+                {!cargandoGrupos && grupos.length === 0 && (
+                  <p className="text-[11px] text-amber-700 mt-1">
+                    El proyecto no tiene grupos de equipos cotizados.
+                  </p>
+                )}
+              </>
+            )}
           </div>
 
           <div>

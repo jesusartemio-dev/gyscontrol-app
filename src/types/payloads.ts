@@ -620,7 +620,8 @@ export interface ListaEquipoUpdatePayload extends Partial<ListaEquipoPayload> {
 export interface ListaEquipoItemPayload {
   listaId: string
   proyectoEquipoItemId?: string
-  proyectoEquipoId?: string
+  /** null lo desasocia del grupo de equipos cotizados. */
+  proyectoEquipoId?: string | null
   catalogoEquipoId?: string
   reemplazaProyectoEquipoCotizadoItemId?: string // 🆕 Nuevo campo claro
   responsableId?: string // 🆕 Campo para identificar quién registra el item

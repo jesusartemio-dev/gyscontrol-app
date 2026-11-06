@@ -26,8 +26,12 @@ export async function GET(req: NextRequest) {
       where: {
         listaEquipo: { proyectoId },
         proyectoEquipoItemId: null,
-        // Optionally filter by equipment group
-        ...(equipoGrupoId ? { proyectoEquipoId: equipoGrupoId } : {}),
+        // Con grupo: los de ese grupo y también los que no tienen ninguno.
+        // Antes sólo traía los del grupo, y así los ítems sueltos — justo los
+        // que hay que vincular — nunca aparecían en el diálogo.
+        ...(equipoGrupoId
+          ? { OR: [{ proyectoEquipoId: equipoGrupoId }, { proyectoEquipoId: null }] }
+          : {}),
       },
       select: {
         id: true,
@@ -37,6 +41,7 @@ export async function GET(req: NextRequest) {
         unidad: true,
         origen: true,
         estado: true,
+        proyectoEquipoId: true,
         listaEquipo: {
           select: { id: true, codigo: true, nombre: true },
         },

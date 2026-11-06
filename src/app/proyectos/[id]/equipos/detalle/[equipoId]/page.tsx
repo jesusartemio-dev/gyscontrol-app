@@ -961,7 +961,7 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
             </div>
           ) : unlinkedItems.length === 0 ? (
             <div className="text-center py-8 text-sm text-muted-foreground">
-              No hay ítems sin vincular en las listas de este grupo de equipos.
+              No hay ítems sin vincular: ni en las listas de este grupo, ni sueltos en el proyecto.
             </div>
           ) : (
             <ScrollArea className="max-h-[350px]">
@@ -980,6 +980,14 @@ export default function ProjectEquipmentDetailPage({ params }: PageProps) {
                         <Badge variant="secondary" className="text-[9px] px-1 py-0">
                           {li.origen}
                         </Badge>
+                        {!li.proyectoEquipoId && (
+                          <Badge
+                            variant="outline"
+                            className="text-[9px] px-1 py-0 border-amber-300 bg-amber-50 text-amber-700"
+                          >
+                            sin grupo
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-xs text-gray-700 truncate mt-0.5">{li.descripcion}</p>
                       <p className="text-[10px] text-muted-foreground">{li.cantidad} {li.unidad}</p>

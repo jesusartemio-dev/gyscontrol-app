@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
 
     const equipoItem = await prisma.proyectoEquipoCotizadoItem.findUnique({
       where: { id },
-      select: { id: true, listaEquipoSeleccionadoId: true },
+      select: { id: true, listaEquipoSeleccionadoId: true, proyectoEquipoId: true },
     })
     if (!equipoItem) {
       return NextResponse.json({ error: 'Ítem de equipo no encontrado' }, { status: 404 })
@@ -106,6 +106,10 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
         where: { id: listaItemId },
         data: {
           proyectoEquipoItemId: id,
+          // El grupo del ítem cotizado. Sin esto, un ítem de lista que no tenía
+          // grupo queda vinculado pero su costo no suma al costoListas del
+          // grupo, que se agrupa por proyectoEquipoId.
+          proyectoEquipoId: equipoItem.proyectoEquipoId,
           reemplazaProyectoEquipoCotizadoItemId: id,
           origen: 'reemplazo',
         },
