@@ -342,29 +342,17 @@ export default function MarcarPage() {
     await enviarMarcaje(tipoSel)
   }
 
-  // Para remotos que van a oficina: abrir el scanner aunque su modalidad sea remota.
+  // Para remotos y personal de confianza (admin, gestor, coordinador...) que están
+  // en una jornada de campo u oficina: abrir el scanner aunque su modalidad no lo pida.
+  // El QR (de sede o de jornada) es evidencia física y prevalece en el servidor.
+  // No exigimos GPS: el QR de la jornada ya fija la ubicación; el GPS se pide en
+  // paralelo solo como evidencia adicional.
   async function abrirScannerDesdeRemoto(tipo: TipoBotón) {
     setTipoSel(tipo)
-    if (permisoGps === 'denied' && !geo.coords) {
-      setDialogGpsBloqueado(true)
-      return
-    }
-    if (geo.coords) {
-      setScannerOpen(true)
-      setTimeout(() => iniciar(scannerElemId), 100)
-      return
-    }
-    // Misma razón que en onClickTipo: abrir la cámara sin esperar al GPS para no
-    // perder el gesto del usuario en iOS/Safari.
+    // Abrir la cámara sin esperar al GPS para no perder el gesto del usuario en iOS/Safari.
     setScannerOpen(true)
     setTimeout(() => iniciar(scannerElemId), 100)
-    geo.solicitar().then(c => {
-      if (!c) {
-        void detener()
-        setScannerOpen(false)
-        setDialogGpsBloqueado(true)
-      }
-    })
+    if (!geo.coords && permisoGps !== 'denied') void geo.solicitar()
   }
 
   if (status === 'loading') {
@@ -734,18 +722,41 @@ export default function MarcarPage() {
                 </Button>
               )
             })}
-            {modoHoy?.esRemoto && !modoHoy?.esConfianza && (
-              <div className="rounded border border-dashed border-muted-foreground/30 p-3 text-center text-xs text-muted-foreground">
-                <p className="mb-2">¿Hoy viniste a oficina en lugar de trabajar remoto?</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={loading}
-                  onClick={() => abrirScannerDesdeRemoto('ingreso')}
-                >
-                  <QrCode className="mr-2 h-4 w-4" />
-                  Escanear QR de oficina
-                </Button>
+            {modoHoy?.esRemoto && (
+              <div
+                className={`rounded border border-dashed p-3 text-center text-xs ${
+                  jornadasCampo.length > 0
+                    ? 'border-blue-400 bg-blue-50/60 text-blue-900'
+                    : 'border-muted-foreground/30 text-muted-foreground'
+                }`}
+              >
+                <p className="mb-2">
+                  {jornadasCampo.length > 0
+                    ? '¿Estás en la asistencia de campo? Escanea el QR que muestra el supervisor.'
+                    : '¿Hoy estás en oficina o en campo? Escanea el QR de la sede o del supervisor.'}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    disabled={loading}
+                    onClick={() => abrirScannerDesdeRemoto('ingreso')}
+                  >
+                    <QrCode className="mr-2 h-4 w-4" />
+                    Ingreso con QR
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    disabled={loading}
+                    onClick={() => abrirScannerDesdeRemoto('salida')}
+                  >
+                    <QrCode className="mr-2 h-4 w-4" />
+                    Salida con QR
+                  </Button>
+                </div>
               </div>
             )}
             {!modoHoy?.esConfianza && (
@@ -777,7 +788,7 @@ export default function MarcarPage() {
             <CardTitle className="flex items-center justify-between text-base">
               <span className="flex items-center gap-2">
                 <QrCode className="h-4 w-4" />
-                Escanea el QR de tu {tipoSel === 'ingreso' ? 'ubicación o supervisor' : 'ubicación'}
+                Escanea el QR de tu ubicación o supervisor
               </span>
               <Button
                 size="icon"
