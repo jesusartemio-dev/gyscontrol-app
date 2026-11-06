@@ -302,15 +302,24 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
           title="Desfase: +2d (espera), -4h (adelanto). Sin unidad = días"
           className="h-8 w-[4.5rem] text-xs"
         />
-        <Popover open={abierto} onOpenChange={setAbierto}>
+        {/* modal: este editor vive dentro de un Dialog, que bloquea la rueda del mouse
+            fuera de su contenido; el popover se porta al <body>, así que sin su propio
+            bloqueo de scroll la lista no se podía desplazar con la rueda. */}
+        <Popover open={abierto} onOpenChange={setAbierto} modal>
           <PopoverTrigger asChild>
             <Button type="button" variant="outline" size="sm" className="h-8 flex-1 justify-start text-xs" disabled={ocupado}>
               <Plus className="mr-1 h-3.5 w-3.5" /> Agregar predecesora…
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[34rem] p-0" align="end">
+          {/* Alto limitado al espacio libre en pantalla: filtros, buscador y pie siempre
+              visibles; solo la lista de tareas se desplaza. */}
+          <PopoverContent
+            className="flex w-[34rem] max-h-[min(32rem,var(--radix-popover-content-available-height))] flex-col p-0"
+            align="end"
+            collisionPadding={8}
+          >
             {/* Filtro Fase → EDT (select nativo: uno de Radix cerraría el popover al abrirse) */}
-            <div className="flex gap-2 border-b p-2">
+            <div className="flex shrink-0 gap-2 border-b p-2">
               <select
                 value={filtroFase}
                 onChange={(e) => { setFiltroFase(e.target.value); setFiltroEdt('todos') }}
@@ -330,9 +339,9 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
                 {edts.map(([id, nombre]) => <option key={id} value={id}>{nombre}</option>)}
               </select>
             </div>
-            <Command filter={(valor, busqueda) => (valor.toLowerCase().includes(busqueda.toLowerCase()) ? 1 : 0)}>
+            <Command className="min-h-0 flex-1" filter={(valor, busqueda) => (valor.toLowerCase().includes(busqueda.toLowerCase()) ? 1 : 0)}>
               <CommandInput placeholder="Buscar tarea o actividad…" className="text-xs" />
-              <CommandList className="max-h-80">
+              <CommandList className="max-h-none min-h-0 flex-1 overscroll-contain">
                 <CommandEmpty>No hay tareas que coincidan.</CommandEmpty>
                 {grupos.map(([titulo, tareas]) => (
                   <CommandGroup key={titulo} heading={titulo}>
@@ -346,7 +355,7 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
                 ))}
               </CommandList>
             </Command>
-            <div className="flex items-center justify-between border-t px-3 py-1.5 text-[11px] text-muted-foreground">
+            <div className="flex shrink-0 items-center justify-between border-t px-3 py-1.5 text-[11px] text-muted-foreground">
               <span>Puedes elegir varias seguidas ({lista.length} agregada{lista.length === 1 ? '' : 's'})</span>
               <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={() => setAbierto(false)}>
                 Listo
