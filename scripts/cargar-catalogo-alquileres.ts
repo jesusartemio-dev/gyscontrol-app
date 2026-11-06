@@ -131,6 +131,19 @@ const ITEMS: ItemAlquiler[] = [
     moneda: 'PEN',
     fuente: 'INGSERGEL — OC-260408-001 (PEN 350/día). INSTALL WORLD cobró PEN 300 por und en OC-260627-001',
   },
+  // Otra máquina, no la de ALQ-MANLIFT-DIA: aquélla es un 45 ft sin operador.
+  // Precio 0 a propósito — no hay OC ni cotización de un 60 ft con operador
+  // incluido. Lo más cerca es OC-260821-001 (E.K.A. MINING, USD 773.03), que
+  // facturó sólo las HH del operador. Poner un estimado aquí lo arrastraría al
+  // presupuesto de la lista como si fuera real.
+  {
+    codigo: 'ALQ-MANLIFT-ART-60FT-OP-DIA',
+    descripcion: 'ALQUILER PLATAFORMA ELEVADORA BRAZO ARTICULADO 60 FT (ALT. PLATAFORMA 18 M / TRABAJO 20 M, ALCANCE HORIZ. MIN. 11 M, CANASTILLA 230 KG), DIESEL 4X4 - INCLUYE OPERADOR CERTIFICADO, TRASLADO Y CERTIFICADO DE OPERATIVIDAD VIGENTE - POR DIA',
+    marca: 'GENIE Z-62/40 (O EQUIVALENTE: Z-60/37 FE, JLG 600AJ)',
+    precio: 0,
+    moneda: 'PEN',
+    fuente: 'SIN PRECIO — pendiente de cotización. Requerido en CJM50 (3 días)',
+  },
   {
     codigo: 'ALQ-MEGOHMETRO',
     descripcion: 'ALQUILER DE MEGOHMETRO - POR 03 DIAS',

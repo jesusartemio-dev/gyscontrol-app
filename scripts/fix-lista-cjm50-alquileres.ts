@@ -20,20 +20,30 @@ const DRY = process.argv.includes('--dry')
 
 const LISTA_ID = '137142c9-9547-4c81-854a-e56f9fe52779'
 
-/** Se identifica el ítem por su descripción actual, que es lo único estable que tienen. */
-const MAPEO: Array<{ descripcionActual: string; codigoCatalogo: string; cantidad?: number }> = [
+/**
+ * Se identifica el ítem por la descripción que tenía antes de enlazarse, o por
+ * el código que tiene ahora — así el script se puede volver a correr para
+ * cambiar un enlace sin depender de en qué paso quedó la lista.
+ */
+const MAPEO: Array<{
+  identificaPor: string[]
+  codigoCatalogo: string
+  cantidad?: number
+}> = [
   {
-    descripcionActual: 'ALQUILER Y ARMADO DE ANDAMIO MULTICUERPO DE 10 CUERPOS',
+    identificaPor: ['ALQUILER Y ARMADO DE ANDAMIO MULTICUERPO DE 10 CUERPOS', 'ALQ-AND-TORRE-10C-ARMADO'],
     codigoCatalogo: 'ALQ-AND-TORRE-10C-ARMADO',
   },
   {
-    descripcionActual: 'ALQUILER DE ANDAMIO DE 1 CUERPO',
+    identificaPor: ['ALQUILER DE ANDAMIO DE 1 CUERPO', 'ALQ-AND-LAYHER-F-1C-109X157'],
     codigoCatalogo: 'ALQ-AND-LAYHER-F-1C-109X157',
   },
   {
-    descripcionActual: 'ALQUILER DE MANLIFT',
-    codigoCatalogo: 'ALQ-MANLIFT-DIA',
-    cantidad: 3, // el catálogo cobra por día
+    // En CJM50 el manlift tiene que ir con operador: el genérico ALQ-MANLIFT-DIA
+    // es un 45 ft que se alquila pelado.
+    identificaPor: ['ALQUILER DE MANLIFT', 'ALQ-MANLIFT-DIA', 'ALQ-MANLIFT-ART-60FT-OP-DIA'],
+    codigoCatalogo: 'ALQ-MANLIFT-ART-60FT-OP-DIA',
+    cantidad: 3, // se cobra por día
   },
 ]
 
@@ -48,9 +58,11 @@ async function main() {
   console.log(`Lista ${lista.codigo} — ${lista.nombre}\n`)
 
   for (const m of MAPEO) {
-    const item = lista.listaEquipoItem.find(i => i.descripcion === m.descripcionActual)
+    const item = lista.listaEquipoItem.find(
+      i => m.identificaPor.includes(i.descripcion) || m.identificaPor.includes(i.codigo)
+    )
     if (!item) {
-      console.log(`  ! no se encontró el ítem "${m.descripcionActual}" — se salta`)
+      console.log(`  ! no se encontró el ítem de ${m.codigoCatalogo} — se salta`)
       continue
     }
 
