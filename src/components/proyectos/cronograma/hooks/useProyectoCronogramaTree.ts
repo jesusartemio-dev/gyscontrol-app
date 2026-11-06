@@ -164,6 +164,12 @@ export function useProyectoCronogramaTree(proyectoId: string, cronogramaId?: str
     }
   }, [state.nodes, state.expandedNodes])
 
+  // Abrir varias ramas a la vez (sin cerrar ninguna): p. ej. para llegar a una
+  // tarea desde el N° de su sucesora. El árbol llega completo, sus hijos ya están.
+  const expandNodes = useCallback((nodeIds: string[]) => {
+    setState(prev => ({ ...prev, expandedNodes: new Set([...prev.expandedNodes, ...nodeIds]) }))
+  }, [])
+
   // Cargar hijos de un nodo específico
   const loadNodeChildren = useCallback(async (nodeId: string) => {
     setState(prev => ({
@@ -519,6 +525,7 @@ export function useProyectoCronogramaTree(proyectoId: string, cronogramaId?: str
     actions: {
       loadTree,
       toggleNode,
+      expandNodes,
       createNode,
       updateNode,
       deleteNode,

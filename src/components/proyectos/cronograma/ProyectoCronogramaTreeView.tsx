@@ -895,6 +895,29 @@ export function ProyectoCronogramaTreeView({
     }
   }
 
+  // Clic en el N° de una predecesora: abre las ramas hasta esa tarea, la
+  // selecciona y baja hasta ella (con un destello para encontrarla).
+  const handleIrATarea = (nodeId: string) => {
+    const ancestros: string[] = []
+    let p = state.nodes.get(nodeId)?.parentId
+    while (p) {
+      ancestros.push(p)
+      p = state.nodes.get(p)?.parentId
+    }
+    actions.expandNodes(ancestros)
+    actions.selectNode(nodeId)
+    // Después de que se pinten las ramas abiertas.
+    setTimeout(() => {
+      // window.CSS: en este archivo `CSS` es el de dnd-kit.
+      const el = document.querySelector<HTMLElement>(`[data-node-id="${window.CSS.escape(nodeId)}"]`)
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.style.outline = '2px solid #f59e0b'
+      el.style.outlineOffset = '-2px'
+      setTimeout(() => { el.style.outline = ''; el.style.outlineOffset = '' }, 1600)
+    }, 80)
+  }
+
   // "Generar dependencias desde fechas" de una fase, EDT o actividad.
   const [generarDeps, setGenerarDeps] = useState<{ nodeId: string; nombre: string } | null>(null)
 
@@ -1011,6 +1034,8 @@ export function ProyectoCronogramaTreeView({
                     tieneAnterior={!!anteriorDe(nodeId)}
                     onToggleHito={!isReadOnly && node.type === 'tarea' && !node.data?.esExtra ? () => handleToggleHito(nodeId) : undefined}
                     onPredecesoras={!isReadOnly && node.type === 'tarea' && !node.data?.esExtra ? () => setPredecesorasDe(nodeId) : undefined}
+                    showNumeroColumn
+                    onIrATarea={handleIrATarea}
                     onImport={isReadOnly ? undefined : () => handleImportItems(nodeId)}
                     onSelect={() => actions.selectNode(nodeId)}
                     isSelected={isSelected}
@@ -1232,7 +1257,7 @@ export function ProyectoCronogramaTreeView({
             </div>
           ) : (
             <>
-              <TreeHeader showRecursoColumn={showRecursoColumn} showResponsableColumn={showResponsableColumn} showPesoColumn={showPesoColumn} />
+              <TreeHeader showRecursoColumn={showRecursoColumn} showResponsableColumn={showResponsableColumn} showPesoColumn={showPesoColumn} showNumeroColumn />
               <div className="p-2">
                 <DndContext
                   sensors={sensors}

@@ -65,6 +65,8 @@ interface Candidata {
   fechas: string
   /** La tarea que se está editando: se muestra (no se puede elegir) para ubicarse. */
   esActual?: boolean
+  /** N° de fila (columna # del árbol). */
+  numero?: number
 }
 
 const fmtDia = (v?: string | Date) => {
@@ -127,7 +129,7 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
       const ini = n.data?.fechaInicio ?? n.data?.fechaInicioComercial
       const fin = n.data?.fechaFin ?? n.data?.fechaFinComercial
       const fechas = n.data?.esHito ? `◆ ${fmtDia(ini)}` : `${fmtDia(ini)}–${fmtDia(fin)}`
-      r.push({ nodeId: n.id, nombre: n.nombre, fechas, esActual: n.id === tareaNodeId, ...ubicacionDe(nodes, n) })
+      r.push({ nodeId: n.id, nombre: n.nombre, fechas, esActual: n.id === tareaNodeId, numero: n.data?.numero, ...ubicacionDe(nodes, n) })
     })
     return r
   }, [nodes, tareaNodeId, lista])
@@ -362,7 +364,7 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
               </select>
             </div>
             <Command className="min-h-0 flex-1" filter={(valor, busqueda) => (valor.toLowerCase().includes(busqueda.toLowerCase()) ? 1 : 0)}>
-              <CommandInput placeholder="Buscar tarea o actividad…" className="text-xs" />
+              <CommandInput placeholder="Buscar tarea, actividad o N° de fila…" className="text-xs" />
               <CommandList ref={listaRef} className="max-h-none min-h-0 flex-1 overscroll-contain">
                 <CommandEmpty>No hay tareas que coincidan.</CommandEmpty>
                 {grupos.map(([titulo, tareas]) => (
@@ -371,19 +373,25 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
                       <CommandItem
                         key={c.nodeId}
                         ref={actualRef}
-                        value={`${c.nombre} ${c.ruta} ${c.nodeId}`}
+                        value={`${c.numero ?? ''} ${c.nombre} ${c.ruta} ${c.nodeId}`}
                         disabled
                         className="flex items-center justify-between gap-2 border-l-2 border-blue-500 bg-blue-50 pl-4 data-[disabled=true]:opacity-100"
                       >
-                        <span className="min-w-0 truncate text-xs font-medium text-blue-800">{c.nombre}</span>
+                        <span className="min-w-0 truncate text-xs font-medium text-blue-800">
+                          {c.numero != null && <span className="mr-1.5 font-mono text-[10px] text-blue-500">{c.numero}</span>}
+                          {c.nombre}
+                        </span>
                         <span className="flex shrink-0 items-center gap-2">
                           <span className="rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-medium text-white">Esta tarea</span>
                           <span className="text-[10px] text-blue-700">{c.fechas}</span>
                         </span>
                       </CommandItem>
                     ) : (
-                      <CommandItem key={c.nodeId} value={`${c.nombre} ${c.ruta} ${c.nodeId}`} onSelect={() => agregar(c)} className="flex items-center justify-between gap-2 pl-4">
-                        <span className="min-w-0 truncate text-xs">{c.nombre}</span>
+                      <CommandItem key={c.nodeId} value={`${c.numero ?? ''} ${c.nombre} ${c.ruta} ${c.nodeId}`} onSelect={() => agregar(c)} className="flex items-center justify-between gap-2 pl-4">
+                        <span className="min-w-0 truncate text-xs">
+                          {c.numero != null && <span className="mr-1.5 font-mono text-[10px] text-gray-400">{c.numero}</span>}
+                          {c.nombre}
+                        </span>
                         <span className="shrink-0 text-[10px] text-muted-foreground">{c.fechas}</span>
                       </CommandItem>
                     ))}

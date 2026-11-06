@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { TreeNode as TreeNodeType, NodeType } from './types'
 import { TreeNodeProgress } from './TreeNodeProgress'
+import { columnasArbol } from './TreeHeader'
 
 interface RelacionAnterior {
   tipo: 'secuencia' | 'paralelo' | 'solape' | 'hueco' | 'antes'
@@ -63,6 +64,22 @@ interface DependenciaNodo {
   holguraTexto?: string
   /** Con 2+ predecesoras: la más exigente, la que fija la fecha. */
   determina?: boolean
+  /** N° de fila de la otra tarea (columna #) y su id de nodo, para saltar a ella. */
+  numero?: number
+  nodeId?: string
+}
+
+/** "12" (FC sin desfase), "12FC+5d", "12CC": como la columna Predecesoras de MS Project. */
+const etiquetaPredecesora = (d: DependenciaNodo) =>
+  `${d.numero ?? '?'}${d.tipoTexto && d.tipoTexto !== 'FC' ? d.tipoTexto : ''}`
+
+/** Resalta (o deja de resaltar) la fila de un nodo, si está visible en el árbol. */
+function resaltarFila(nodeId: string | undefined, encendido: boolean) {
+  if (!nodeId || typeof document === 'undefined') return
+  document.querySelectorAll<HTMLElement>(`[data-node-id="${CSS.escape(nodeId)}"]`).forEach((el) => {
+    el.style.outline = encendido ? '2px solid #f59e0b' : ''
+    el.style.outlineOffset = encendido ? '-2px' : ''
+  })
 }
 
 /**
@@ -72,7 +89,7 @@ interface DependenciaNodo {
  * Con varias predecesoras, el margen es el de la que determina la fecha: que
  * otra tenga margen no significa que la tarea pueda ir antes.
  */
-function DependenciaFechas({ predecesoras }: { predecesoras: DependenciaNodo[] }) {
+function DependenciaFechas({ predecesoras, onIrATarea }: { predecesoras: DependenciaNodo[]; onIrATarea?: (nodeId: string) => void }) {
   const incumplida = predecesoras.find((d) => (d.horasIncumplidas ?? 0) > 0)
   const determinante = predecesoras.length > 1 ? predecesoras.find((d) => d.determina) : undefined
   const conHolgura = predecesoras.length > 1
@@ -88,6 +105,42 @@ function DependenciaFechas({ predecesoras }: { predecesoras: DependenciaNodo[] }
       : determinante
         ? `Se cumplen todas; la fecha la determina "${determinante.nombre}" (${determinante.tipoTexto ?? 'FC'}).`
         : `Depende de "${principal.nombre}" (${principal.tipoTexto ?? 'FC'}) y se cumple.`
+
+  // Con N° de fila: "12;15FC+5d" como MS Project; cada número resalta su fila al
+  // pasar el mouse y, con clic, abre las ramas y baja hasta ella.
+  if (predecesoras.every((d) => d.numero != null)) {
+    const visibles = predecesoras.slice(0, 3)
+    const resto = predecesoras.length - visibles.length
+    const lista = predecesoras.map((d) => `${etiquetaPredecesora(d)} ← ${d.nombre}${d.ruta ? ` · ${d.ruta}` : ''}`).join('\n')
+    return (
+      <span
+        className={`shrink-0 whitespace-nowrap text-[9px] font-medium ${color}`}
+        title={`${detalle}\n\n${lista}\n\nClic en el número para ir a esa tarea.`}
+      >
+        {visibles.map((d, i) => (
+          <React.Fragment key={`${d.nodeId}-${i}`}>
+            {i > 0 && ';'}
+            <button
+              type="button"
+              className="hover:underline focus:outline-none"
+              onMouseEnter={() => resaltarFila(d.nodeId, true)}
+              onMouseLeave={() => resaltarFila(d.nodeId, false)}
+              onClick={(e) => {
+                e.stopPropagation()
+                resaltarFila(d.nodeId, false)
+                if (d.nodeId) onIrATarea?.(d.nodeId)
+              }}
+            >
+              {etiquetaPredecesora(d)}
+            </button>
+          </React.Fragment>
+        ))}
+        {resto > 0 ? `;+${resto}` : ''}
+        {!incumplida && conHolgura ? ` · +${conHolgura.holguraTexto}` : ''}
+      </span>
+    )
+  }
+
   return (
     <span className={`shrink-0 whitespace-nowrap text-[9px] font-medium ${color}`} title={`${detalle}${predecesoras.length > 1 ? `\nTiene ${predecesoras.length} predecesoras.` : ''}`}>
       {texto}{!incumplida && conHolgura ? ` · +${conHolgura.holguraTexto}` : ''}
@@ -98,7 +151,7 @@ function DependenciaFechas({ predecesoras }: { predecesoras: DependenciaNodo[] }
 /** Texto del tooltip: predecesoras (←) y sucesoras (→) con su ubicación. */
 function textoDependencias(data: { predecesoras?: DependenciaNodo[]; sucesoras?: DependenciaNodo[] }): string {
   const linea = (flecha: string, d: DependenciaNodo) =>
-    `${flecha} ${d.nombre} (${d.tipoTexto ?? 'FC'})${d.ruta ? ` · ${d.ruta}` : ''}${
+    `${flecha} ${d.numero != null ? `#${d.numero} ` : ''}${d.nombre} (${d.tipoTexto ?? 'FC'})${d.ruta ? ` · ${d.ruta}` : ''}${
       d.horasIncumplidas ? '  ⚠ no se cumple' : d.holguraTexto ? `  · va ${d.holguraTexto} después de lo que exige` : ''}`
   const partes: string[] = []
   if (data.predecesoras?.length) partes.push('Predecesoras:', ...data.predecesoras.map((d) => linea('←', d)))
@@ -143,6 +196,10 @@ interface TreeNodeProps {
   onToggleHito?: () => void
   /** Solo tareas: abrir sus predecesoras (de cualquier actividad o fase). */
   onPredecesoras?: () => void
+  /** Columna "#" con el N° de fila (como el ID de MS Project). */
+  showNumeroColumn?: boolean
+  /** Clic en el N° de una predecesora: abrir las ramas y bajar hasta esa tarea. */
+  onIrATarea?: (nodeId: string) => void
   dragListeners?: Record<string, Function>
   dragAttributes?: Record<string, any>
   isDragging?: boolean
@@ -221,6 +278,8 @@ export function TreeNode({
   tieneAnterior,
   onToggleHito,
   onPredecesoras,
+  showNumeroColumn,
+  onIrATarea,
   dragListeners,
   dragAttributes,
   isDragging,
@@ -364,19 +423,19 @@ export function TreeNode({
       // box-shadow para no correr el contenido.
       className={`tree-node group ${isDragging ? 'opacity-40' : ''} ${isSelected || dropdownOpen ? 'bg-blue-200/80 shadow-[inset_4px_0_0_0_#2563eb]' : `${rowIndex != null && rowIndex % 2 === 0 ? 'bg-gray-100' : ''} hover:bg-blue-50`} py-0.5 cursor-pointer transition-colors`}
       onClick={onSelect}
+      data-node-id={node.id}
     >
       <div
         className="grid items-center gap-1"
-        style={{
-          gridTemplateColumns: [
-            '1fr', '80px', '65px', '120px', '55px', '55px', '55px',
-            ...(showPesoColumn ? ['60px', '60px'] : []),
-            ...(showRecursoColumn ? ['100px'] : []),
-            ...(showResponsableColumn ? ['100px'] : []),
-            '28px',
-          ].join(' '),
-        }}
+        style={{ gridTemplateColumns: columnasArbol({ showRecursoColumn, showResponsableColumn, showPesoColumn, showNumeroColumn }) }}
       >
+        {/* Columna 0 (opcional): N° de fila, como el ID de MS Project */}
+        {showNumeroColumn && (
+          <div className="text-right pr-1 text-[10px] font-mono text-gray-400 tabular-nums">
+            {node.data?.numero ?? ''}
+          </div>
+        )}
+
         {/* Columna 1: Nombre con indentación */}
         <div className="flex items-center gap-1 min-w-0" style={{ paddingLeft: `${node.level * 16 + 8}px` }}>
           {/* Drag handle — visible on hover when draggable */}
@@ -527,7 +586,7 @@ export function TreeNode({
         {/* Columna 4: Fechas (+ relación con el elemento de arriba) */}
         <div className="flex items-center justify-center gap-1 text-[11px] text-gray-500 min-w-0">
           {node.type === 'tarea' && node.data?.predecesoras?.length
-            ? <DependenciaFechas predecesoras={node.data.predecesoras} />
+            ? <DependenciaFechas predecesoras={node.data.predecesoras} onIrATarea={onIrATarea} />
             : <RelacionAnteriorIcono relacion={node.data.relacionAnterior} />}
           <span className="truncate">{formatDates()}</span>
         </div>

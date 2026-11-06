@@ -131,6 +131,8 @@ export interface UseCronogramaTreeReturn {
   actions: {
     loadTree: (expandedNodes?: string[]) => Promise<void>
     toggleNode: (nodeId: string) => Promise<void>
+    /** Abre varias ramas a la vez (sin cerrar ninguna). */
+    expandNodes: (nodeIds: string[]) => void
     createNode: (parentId: string, type: NodeType, data: any) => Promise<TreeNode>
     updateNode: (nodeId: string, formData: any) => Promise<void>
     deleteNode: (nodeId: string) => Promise<void>

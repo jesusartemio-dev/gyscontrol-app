@@ -681,6 +681,16 @@ export async function GET(
       children: faseNodes,
     }
 
+    // N° de fila como el ID de MS Project: fases, EDTs, actividades y tareas en
+    // el orden del árbol (sin el proyecto ni el grupo de extras). No se guarda:
+    // cambia si se inserta una fila en medio, igual que en MS Project.
+    let numeroFila = 0
+    const numerar = (nodo: any) => {
+      if (nodo.type !== 'proyecto' && !nodo.data?.isExtrasGroup && nodo.data) nodo.data.numero = ++numeroFila
+      for (const hijo of nodo.children || []) numerar(hijo)
+    }
+    numerar(projectNode)
+
     // Relación de cada EDT/actividad/tarea con el hermano de arriba (→ ∥ ⤚ +Nd),
     // deducida de las fechas con el calendario del proyecto. Solo informativa.
     if (calendarioLaboral) {
@@ -767,9 +777,10 @@ export async function GET(
             ...(incumple > 0 && { incumplidaTexto: formatearDuracion(incumple, hpd) }),
             ...(holgura > 0 && { holguraTexto: formatearDuracion(holgura, hpd) }),
           }
-          const anotacion: Record<string, unknown> = { ...base, tareaId: dep.tareaOrigenId, nombre: pred.nodo.nombre, ruta: pred.ruta }
+          // numero/nodeId de la otra tarea: para mostrar "12FC+5d" y saltar a su fila.
+          const anotacion: Record<string, unknown> = { ...base, tareaId: dep.tareaOrigenId, nombre: pred.nodo.nombre, ruta: pred.ruta, numero: pred.nodo.data?.numero, nodeId: pred.nodo.id }
           ;(suc.nodo.data.predecesoras ??= []).push(anotacion)
-          ;(pred.nodo.data.sucesoras ??= []).push({ ...base, tareaId: dep.tareaDependienteId, nombre: suc.nodo.nombre, ruta: suc.ruta })
+          ;(pred.nodo.data.sucesoras ??= []).push({ ...base, tareaId: dep.tareaDependienteId, nombre: suc.nodo.nombre, ruta: suc.ruta, numero: suc.nodo.data?.numero, nodeId: suc.nodo.id })
           if (incumple > 0) suc.nodo.data.dependenciaIncumplida = true
           if (fp) {
             const l = predsPorSucesora.get(dep.tareaDependienteId) ?? []

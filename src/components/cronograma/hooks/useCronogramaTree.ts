@@ -379,6 +379,12 @@ export function useCronogramaTree(cotizacionId: string, isProyecto: boolean = fa
     setState(prev => ({ ...prev, selectedNodeId: nodeId }))
   }, [])
 
+  // Abrir varias ramas a la vez (sin cerrar ninguna): p. ej. para llegar a una
+  // tarea desde el N° de su sucesora. El árbol llega completo, sus hijos ya están.
+  const expandNodes = useCallback((nodeIds: string[]) => {
+    setState(prev => ({ ...prev, expandedNodes: new Set([...prev.expandedNodes, ...nodeIds]) }))
+  }, [])
+
   // Cargar datos iniciales
   useEffect(() => {
     loadTree()
@@ -389,6 +395,7 @@ export function useCronogramaTree(cotizacionId: string, isProyecto: boolean = fa
     actions: {
       loadTree,
       toggleNode,
+      expandNodes,
       createNode,
       updateNode,
       deleteNode,
