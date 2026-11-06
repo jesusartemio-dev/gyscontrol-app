@@ -30,7 +30,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, RotateCcw, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers, MoreHorizontal, Lock, Zap, GripVertical, Link2 } from 'lucide-react'
+import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, RotateCcw, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers, MoreHorizontal, Lock, Zap, GripVertical, Link2, AlignJustify } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
@@ -105,6 +105,23 @@ const labelOrigen: Record<string, string> = {
   cotizado: 'cotizado',
   nuevo: 'no cotizado',
   reemplazo: 'reemplazo',
+}
+
+type VistaItems = 'list' | 'compact' | 'cards'
+const CLAVE_VISTA = 'listaEquipoItems.vista'
+
+/**
+ * Lo que importa en campo de un ítem: si ya llegó, si está pedido o si falta
+ * pedirlo (con cantidades). Sale de cantidadEntregada / cantidadPedida.
+ */
+function seguimientoCampo(item: { cantidad: number; cantidadPedida?: number | null; cantidadEntregada?: number | null }) {
+  const total = item.cantidad || 0
+  const entregada = item.cantidadEntregada || 0
+  const pedida = item.cantidadPedida || 0
+  if (total > 0 && entregada >= total) return { texto: 'Llegó', detalle: `${entregada}/${total}`, clase: 'bg-green-100 text-green-800 border-green-300' }
+  if (entregada > 0) return { texto: 'Llegó parcial', detalle: `${entregada}/${total}`, clase: 'bg-blue-100 text-blue-800 border-blue-300' }
+  if (pedida > 0) return { texto: 'Pedido', detalle: pedida >= total ? '' : `${pedida}/${total}`, clase: 'bg-amber-100 text-amber-800 border-amber-300' }
+  return { texto: 'Sin pedido', detalle: '', clase: 'bg-gray-100 text-gray-600 border-gray-300' }
 }
 
 // ✅ Utility functions for styling (formatCurrency moved to utils/costoCalculations.ts)
@@ -196,7 +213,23 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
   const [categoriaFiltro, setCategoriaFiltro] = useState('__ALL__')
   const [isLoading, setIsLoading] = useState(false)
 
-  const [viewMode, setViewMode] = useState<'cards' | 'list'>('list') // ✅ Default to list view
+  // Vista: 'list' (completa, para compras), 'compact' (para campo: qué es, cuánto
+  // y si ya llegó; sin costos ni cotizaciones) o 'cards'. Se recuerda en el
+  // navegador; la primera vez, en celular arranca en compacta.
+  const [viewMode, setViewModeState] = useState<VistaItems>('list')
+  useEffect(() => {
+    try {
+      const guardada = localStorage.getItem(CLAVE_VISTA) as VistaItems | null
+      if (guardada === 'list' || guardada === 'compact' || guardada === 'cards') setViewModeState(guardada)
+      else if (window.matchMedia('(max-width: 767px)').matches) setViewModeState('compact')
+    } catch {
+      // Sin almacenamiento: se queda en la vista por defecto.
+    }
+  }, [])
+  const setViewMode = (v: VistaItems) => {
+    setViewModeState(v)
+    try { localStorage.setItem(CLAVE_VISTA, v) } catch { /* sin almacenamiento */ }
+  }
   const [showModalAgregarCatalogo, setShowModalAgregarCatalogo] = useState(false)
   const [showModalAgregarEquipo, setShowModalAgregarEquipo] = useState(false)
   const [showModalImportarExcel, setShowModalImportarExcel] = useState(false)
@@ -526,10 +559,20 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
         {/* View Mode Toggle */}
         <div className="flex items-center border rounded-md">
           <Button
+            variant={viewMode === 'compact' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('compact')}
+            className="h-6 px-2 rounded-r-none"
+            title="Compacta (campo): qué es, cuánto y si ya llegó"
+          >
+            <AlignJustify className="h-3 w-3" />
+          </Button>
+          <Button
             variant={viewMode === 'list' ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => setViewMode('list')}
-            className="h-6 px-2 rounded-r-none"
+            className="h-6 px-2 rounded-none"
+            title="Lista completa (compras): costos, cotizaciones y revisión"
           >
             <List className="h-3 w-3" />
           </Button>
@@ -1025,6 +1068,71 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
     )
   }
 
+  // 🎨 Vista compacta (campo, celular o PC): qué es, cuánto y si ya llegó.
+  // Sin costos, cotizaciones, origen ni acciones: eso es de compras (vista Lista).
+  // Muestra el comentario de revisión, que lleva la referencia al plano
+  // ("ELE0003 Rev C – ítem 28A"). Entra sin scroll horizontal en el celular.
+  const renderCompactView = () => (
+    <div className="border rounded-lg overflow-hidden">
+      <div className="overflow-auto max-h-[75vh] supports-[height:100dvh]:max-h-[75dvh] overscroll-contain">
+        <table className="w-full text-xs">
+          <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-gray-50 [&_th]:shadow-[inset_0_-1px_0_#e5e7eb]">
+            <tr>
+              <th className="w-7 px-1 py-1.5 text-center font-semibold text-gray-700">#</th>
+              <th className="px-2 py-1.5 text-left font-semibold text-gray-700">Ítem</th>
+              <th className="w-16 px-1 py-1.5 text-center font-semibold text-gray-700">Cant.</th>
+              <th className="w-24 px-1 py-1.5 text-center font-semibold text-gray-700">Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredItems.map((item, idx) => {
+              const seg = seguimientoCampo(item)
+              const pedidos = obtenerTodosLosPedidos(item)
+              const marca = item.marca && item.marca !== 'SIN-MARCA' ? item.marca : null
+              return (
+                <tr key={item.id} className={`border-b align-top ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+                  <td className="px-1 py-1.5 text-center text-[10px] text-gray-400 tabular-nums">{idx + 1}</td>
+                  <td className="px-2 py-1.5 min-w-0">
+                    <DescripcionExpandible texto={item.descripcion} className="text-xs text-gray-900 leading-snug" />
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10px] text-gray-500">
+                      <span className="font-mono">{item.codigo}</span>
+                      {marca && <span>· {marca}</span>}
+                    </div>
+                    {item.comentarioRevision && (
+                      <p className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-blue-700" title={item.comentarioRevision}>
+                        {item.comentarioRevision}
+                      </p>
+                    )}
+                  </td>
+                  <td className="px-1 py-1.5 text-center whitespace-nowrap">
+                    <span className="font-semibold text-gray-900">{item.cantidad}</span>{' '}
+                    <span className="text-[10px] text-gray-500">{item.unidad}</span>
+                  </td>
+                  <td className="px-1 py-1.5 text-center">
+                    <span className={`inline-block rounded border px-1.5 py-0.5 text-[10px] font-medium leading-none ${seg.clase}`}>
+                      {seg.texto}
+                    </span>
+                    {seg.detalle && <div className="mt-0.5 text-[10px] text-gray-500 tabular-nums">{seg.detalle}</div>}
+                    {pedidos.map((codigo) => {
+                      const pedidoId = item.pedidos?.find((p) => p.pedido?.codigo === codigo)?.pedido?.id
+                      return pedidoId ? (
+                        <a key={codigo} href={`/proyectos/${proyectoId}/pedidos/${pedidoId}`} className="block truncate font-mono text-[9px] text-blue-600 hover:underline">
+                          {codigo}
+                        </a>
+                      ) : (
+                        <span key={codigo} className="block truncate font-mono text-[9px] text-gray-500">{codigo}</span>
+                      )
+                    })}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+
   const estadoLabels: Record<string, string> = {
     por_revisar: 'Por Revisar',
     por_cotizar: 'Por Cotizar',
@@ -1050,6 +1158,8 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
         renderLoadingSkeleton()
       ) : filteredItems.length === 0 ? (
         renderEmptyState()
+      ) : viewMode === 'compact' ? (
+        renderCompactView()
       ) : viewMode === 'cards' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {filteredItems.map((item) => {
