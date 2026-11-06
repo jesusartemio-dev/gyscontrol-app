@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
-import { AlertTriangle, Link2, Plus, Trash2, Wand2, ArrowRight } from 'lucide-react'
+import { AlertTriangle, Check, Link2, Plus, Trash2, Wand2, ArrowRight } from 'lucide-react'
 import { toast } from 'sonner'
 import type { TreeNode } from './types'
 
@@ -67,6 +67,8 @@ interface Candidata {
   esActual?: boolean
   /** N° de fila (columna # del árbol). */
   numero?: number
+  /** Ya es predecesora: queda en su lugar, marcada y sin poder elegirse otra vez. */
+  yaAgregada?: boolean
 }
 
 const fmtDia = (v?: string | Date) => {
@@ -118,18 +120,22 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
   const [ocupado, setOcupado] = useState(false)
   const base = `/api/proyectos/${proyectoId}/cronograma/dependencias`
 
-  // Tareas candidatas, en el orden del cronograma: todas menos las que ya son
-  // predecesoras. Esta misma tarea va en su lugar, marcada y sin poder elegirse,
-  // para ubicarse (la predecesora suele estar justo arriba).
+  // Tareas candidatas, en el orden del cronograma. Las que ya son predecesoras y
+  // esta misma tarea se quedan en su lugar, marcadas y sin poder elegirse: así
+  // la lista no salta al agregar una (y se ve dónde está esta tarea).
   const candidatas = useMemo(() => {
     const ya = new Set(lista.map((d) => d.tareaId))
     const r: Candidata[] = []
     nodes.forEach((n) => {
-      if (n.type !== 'tarea' || ya.has(realId(n.id)) || n.data?.esExtra) return
+      if (n.type !== 'tarea' || n.data?.esExtra) return
       const ini = n.data?.fechaInicio ?? n.data?.fechaInicioComercial
       const fin = n.data?.fechaFin ?? n.data?.fechaFinComercial
       const fechas = n.data?.esHito ? `◆ ${fmtDia(ini)}` : `${fmtDia(ini)}–${fmtDia(fin)}`
-      r.push({ nodeId: n.id, nombre: n.nombre, fechas, esActual: n.id === tareaNodeId, numero: n.data?.numero, ...ubicacionDe(nodes, n) })
+      r.push({
+        nodeId: n.id, nombre: n.nombre, fechas, numero: n.data?.numero,
+        esActual: n.id === tareaNodeId, yaAgregada: ya.has(realId(n.id)),
+        ...ubicacionDe(nodes, n),
+      })
     })
     return r
   }, [nodes, tareaNodeId, lista])
@@ -193,7 +199,8 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
       const j = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(j.error || 'No se pudo agregar')
       setLista((l) => [...l, { id: j.data.id, tareaId: realId(cand.nodeId), nombre: cand.nombre, ruta: cand.ruta, tipo: nuevoTipo, lagMinutos: lag }])
-      // La lista queda abierta para agregar varias seguidas; la agregada sale de la lista.
+      // La lista queda abierta para agregar varias seguidas; la agregada se queda
+      // en su lugar marcada como "Predecesora" (no salta la lista).
       toast.success(`Predecesora agregada: ${cand.nombre}`)
       onCambio()
     } catch (e) {
@@ -384,6 +391,24 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
                         <span className="flex shrink-0 items-center gap-2">
                           <span className="rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-medium text-white">Esta tarea</span>
                           <span className="text-[10px] text-blue-700">{c.fechas}</span>
+                        </span>
+                      </CommandItem>
+                    ) : c.yaAgregada ? (
+                      <CommandItem
+                        key={c.nodeId}
+                        value={`${c.numero ?? ''} ${c.nombre} ${c.ruta} ${c.nodeId}`}
+                        disabled
+                        className="flex items-center justify-between gap-2 bg-emerald-50 pl-4 data-[disabled=true]:opacity-100"
+                      >
+                        <span className="min-w-0 truncate text-xs text-emerald-800">
+                          {c.numero != null && <span className="mr-1.5 font-mono text-[10px] text-emerald-500">{c.numero}</span>}
+                          {c.nombre}
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <span className="inline-flex items-center gap-0.5 rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                            <Check className="h-2.5 w-2.5" /> Predecesora
+                          </span>
+                          <span className="text-[10px] text-emerald-700">{c.fechas}</span>
                         </span>
                       </CommandItem>
                     ) : (
