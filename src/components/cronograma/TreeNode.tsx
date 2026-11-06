@@ -6,7 +6,7 @@
 // ===================================================
 
 import React from 'react'
-import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine, ArrowRightLeft, ArrowRightToLine, Columns2, ArrowDown, ArrowRight, ArrowLeft, Layers, Diamond, Link2 } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine, ArrowRightLeft, ArrowRightToLine, Columns2, ArrowDown, ArrowRight, ArrowLeft, Layers, Diamond, Link2, Wand2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -131,6 +131,8 @@ interface TreeNodeProps {
   onMoverFase?: () => void
   /** Fase, EDT o actividad: deducir dependencias de sus tareas a partir de las fechas. */
   onGenerarDependencias?: () => void
+  /** Solo actividades: ajustar todas sus tareas a sus predecesoras, en cascada. */
+  onAjustarActividad?: () => void
   onAjustarPosicion?: (posicion: 'inicio_padre' | 'despues_anterior' | 'despues_ultimo') => void
   onProgramarRespecto?: (modo: 'despues_de' | 'en_paralelo') => void
   /** Hay un hermano del mismo tipo justo arriba (habilita "Después del anterior"). */
@@ -210,6 +212,7 @@ export function TreeNode({
   onMoverEdt,
   onMoverFase,
   onGenerarDependencias,
+  onAjustarActividad,
   onAjustarPosicion,
   onProgramarRespecto,
   tieneAnterior,
@@ -798,6 +801,14 @@ export function TreeNode({
                 <DropdownMenuItem onClick={() => { setDropdownOpen(false); onGenerarDependencias() }}>
                   <Link2 className="h-4 w-4 mr-2" />
                   Generar dependencias desde fechas
+                </DropdownMenuItem>
+              )}
+
+              {/* Ajuste de cada tarea a sus predecesoras, para toda la actividad en cascada */}
+              {!readOnly && node.type === 'actividad' && onAjustarActividad && (
+                <DropdownMenuItem onClick={() => { setDropdownOpen(false); onAjustarActividad() }}>
+                  <Wand2 className="h-4 w-4 mr-2" />
+                  Ajustar tareas a sus predecesoras
                 </DropdownMenuItem>
               )}
 

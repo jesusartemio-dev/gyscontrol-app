@@ -837,6 +837,27 @@ export function ProyectoCronogramaTreeView({
     }
   }
 
+  // "Ajustar tareas a sus predecesoras": el ajuste de cada tarea, para todas las
+  // de la actividad de una vez y en cascada (ver dependencias/ajustar-actividad).
+  const handleAjustarActividad = async (nodeId: string) => {
+    const node = state.nodes.get(nodeId)
+    if (!node || node.type !== 'actividad') return
+    try {
+      const r = await fetch(`/api/proyectos/${proyectoId}/cronograma/dependencias/ajustar-actividad`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actividadId: nodeId.replace('actividad-', '') }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j.error || 'No se pudo ajustar')
+      await actions.loadTree([...state.expandedNodes])
+      const n = j.data.tareasAjustadas as number
+      toast.success(n ? `${n} tarea${n === 1 ? '' : 's'} de "${node.nombre}" ajustada${n === 1 ? '' : 's'} a sus predecesoras` : 'Todas las tareas ya cumplen sus predecesoras')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo ajustar')
+    }
+  }
+
   // "Generar dependencias desde fechas" de una fase, EDT o actividad.
   const [generarDeps, setGenerarDeps] = useState<{ nodeId: string; nombre: string } | null>(null)
 
@@ -933,6 +954,9 @@ export function ProyectoCronogramaTreeView({
                     onMoverFase={!isReadOnly && node.type === 'edt' ? () => handleAbrirMoverFase(nodeId) : undefined}
                     onGenerarDependencias={!isReadOnly && ['fase', 'edt', 'actividad'].includes(node.type) && !node.data?.isExtrasGroup
                       ? () => setGenerarDeps({ nodeId, nombre: node.nombre })
+                      : undefined}
+                    onAjustarActividad={!isReadOnly && node.type === 'actividad' && !node.data?.isExtrasGroup
+                      ? () => handleAjustarActividad(nodeId)
                       : undefined}
                     onProgramarRespecto={
                       !isReadOnly && ['edt', 'actividad', 'tarea'].includes(node.type) && !node.data?.isExtrasGroup
