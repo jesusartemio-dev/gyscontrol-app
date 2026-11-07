@@ -56,7 +56,17 @@ import {
   ArrowDown,
   ShoppingCart,
   GripVertical,
+  AlignJustify,
 } from 'lucide-react';
+import { useVistaCompacta, CONTENEDOR_TABLA_SCROLL, CABECERA_FIJA } from '@/hooks/useVistaCompacta';
+
+/** Avance en campo de una lista: cuántos ítems ya llegaron completos y cuántos están pedidos. */
+function avanceLista(items: any[] = []) {
+  const total = items.length;
+  const llegaron = items.filter((i) => (i.cantidad || 0) > 0 && (i.cantidadEntregada || 0) >= i.cantidad).length;
+  const pedidos = items.filter((i) => (i.cantidadPedida || 0) > 0).length;
+  return { total, llegaron, pedidos };
+}
 import Link from 'next/link';
 import { toast } from 'sonner';
 import ModalCrearListaEquipo from '@/components/equipos/ModalCrearListaEquipo';
@@ -142,6 +152,8 @@ const ListasTable = memo(function ListasTable({
   const [sortField, setSortField] = useState<string>('createdAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [localListas, setLocalListas] = useState<any[]>([]);
+  // Compacta (campo): nombre, ítems y cuántos llegaron, fecha necesaria y estado; sin montos ni acciones.
+  const [vista, setVista] = useVistaCompacta('proyectoListas.vista');
 
   useEffect(() => {
     setLocalListas([...listas].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0)));
@@ -285,6 +297,27 @@ const ListasTable = memo(function ListasTable({
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
         </Button>
 
+        <div className="flex items-center border rounded-md">
+          <Button
+            variant={vista === 'compacta' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setVista('compacta')}
+            className="h-7 px-2 rounded-r-none"
+            title="Compacta (campo): ítems, cuántos llegaron, fecha necesaria y estado"
+          >
+            <AlignJustify className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant={vista === 'completa' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setVista('completa')}
+            className="h-7 px-2 rounded-l-none"
+            title="Completa: con montos, cotizaciones y acciones"
+          >
+            <List className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+
         <span className="text-xs text-muted-foreground ml-auto">
           {sortedListas.length} de {listas.length} listas
         </span>
@@ -292,8 +325,59 @@ const ListasTable = memo(function ListasTable({
 
       {/* Tabla */}
       <div className="border rounded-lg overflow-hidden">
-        <Table>
-          <TableHeader>
+        {vista === 'compacta' ? (
+          <div className={CONTENEDOR_TABLA_SCROLL}>
+            <table className="w-full text-xs">
+              <thead className={CABECERA_FIJA}>
+                <tr>
+                  <th className="px-2 py-2 text-left font-medium text-gray-600">Lista</th>
+                  <th className="w-20 px-1 py-2 text-center font-medium text-gray-600">Ítems</th>
+                  <th className="w-24 px-1 py-2 text-center font-medium text-gray-600">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {sortedListas.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-sm text-muted-foreground">
+                      {search || filterEstado !== 'all' ? 'No se encontraron listas' : 'Sin listas de equipos'}
+                    </td>
+                  </tr>
+                ) : sortedListas.map((lista, idx) => {
+                  const av = avanceLista(lista.items);
+                  const vencida = lista.fechaNecesaria && new Date(lista.fechaNecesaria).getTime() < Date.now() && av.llegaron < av.total;
+                  return (
+                    <tr
+                      key={lista.id}
+                      className={`cursor-pointer align-top hover:bg-muted/50 ${idx % 2 === 1 ? 'bg-gray-50/40' : ''}`}
+                      onClick={() => router.push(`/proyectos/${proyectoId}/listas/${lista.id}`)}
+                    >
+                      <td className="px-2 py-2 min-w-0">
+                        <p className="text-xs font-medium text-gray-900 leading-snug">{lista.nombre}</p>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10px] text-gray-500">
+                          <span className="font-mono">{lista.codigo || '-'}</span>
+                          {lista.fechaNecesaria && (
+                            <span className={vencida ? 'font-medium text-red-600' : ''}>· necesaria {formatDate(lista.fechaNecesaria)}</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-1 py-2 text-center whitespace-nowrap">
+                        <div className="font-semibold text-gray-900">{av.total}</div>
+                        {av.total > 0 && (
+                          <div className={`text-[10px] ${av.llegaron === av.total ? 'text-green-600' : av.llegaron > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
+                            {av.llegaron > 0 ? `llegaron ${av.llegaron}` : av.pedidos > 0 ? `${av.pedidos} pedidos` : 'sin pedir'}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-1 py-2 text-center">{getEstadoBadge(lista.estado)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+        <Table wrapperClassName={CONTENEDOR_TABLA_SCROLL}>
+          <TableHeader className={CABECERA_FIJA}>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
               {canDrag && <TableHead className="w-6 p-0" />}
               <TableHead className="w-[25%]">
@@ -542,6 +626,7 @@ const ListasTable = memo(function ListasTable({
             )}
           </TableBody>
         </Table>
+        )}
       </div>
     </div>
   );

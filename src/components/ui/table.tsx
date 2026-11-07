@@ -9,9 +9,12 @@ import { cn } from '@/lib/utils'
 
 const Table = React.forwardRef<
   HTMLTableElement,
-  React.HTMLAttributes<HTMLTableElement>
->(({ className, ...props }, ref) => (
-  <div className="w-full overflow-auto">
+  React.HTMLAttributes<HTMLTableElement> & {
+    /** Clases extra del contenedor con scroll (p. ej. alto máximo para una cabecera fija). */
+    wrapperClassName?: string
+  }
+>(({ className, wrapperClassName, ...props }, ref) => (
+  <div className={cn('w-full overflow-auto', wrapperClassName)}>
     <table
       ref={ref}
       className={cn('w-full caption-bottom text-sm', className)}

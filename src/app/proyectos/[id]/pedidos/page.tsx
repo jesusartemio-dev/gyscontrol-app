@@ -71,7 +71,10 @@ import {
   Send,
   X,
   GripVertical,
+  AlignJustify,
+  List,
 } from 'lucide-react'
+import { useVistaCompacta, CONTENEDOR_TABLA_SCROLL, CABECERA_FIJA } from '@/hooks/useVistaCompacta'
 import Link from 'next/link'
 import PedidoEquipoModalCrear from '@/components/equipos/PedidoEquipoModalCrear'
 import ModalPedidoUrgente from '@/components/logistica/ModalPedidoUrgente'
@@ -150,6 +153,8 @@ const PedidosTable = memo(function PedidosTable({
   const [search, setSearch] = useState('')
   const [filterEstado, setFilterEstado] = useState('all')
   const [localPedidos, setLocalPedidos] = useState<PedidoEquipo[]>([])
+  // Compacta (campo): qué pedido es, ítems, cuándo llega y estado; sin montos ni acciones.
+  const [vista, setVista] = useVistaCompacta('proyectoPedidos.vista')
 
   useEffect(() => {
     setLocalPedidos([...pedidos].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0)))
@@ -318,6 +323,27 @@ const PedidosTable = memo(function PedidosTable({
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
         </Button>
 
+        <div className="flex items-center border rounded-md">
+          <Button
+            variant={vista === 'compacta' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setVista('compacta')}
+            className="h-7 px-2 rounded-r-none"
+            title="Compacta (campo): ítems, cuándo llega y estado"
+          >
+            <AlignJustify className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant={vista === 'completa' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setVista('completa')}
+            className="h-7 px-2 rounded-l-none"
+            title="Completa: con montos, fechas y acciones"
+          >
+            <List className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+
         <span className="text-xs text-muted-foreground ml-auto">
           {sortedPedidos.length} de {pedidos.length} pedidos
         </span>
@@ -325,8 +351,73 @@ const PedidosTable = memo(function PedidosTable({
 
       {/* Tabla */}
       <div className="border rounded-lg overflow-hidden">
-        <Table>
-          <TableHeader>
+        {vista === 'compacta' ? (
+          <div className={CONTENEDOR_TABLA_SCROLL}>
+            <table className="w-full text-xs">
+              <thead className={CABECERA_FIJA}>
+                <tr>
+                  <th className="px-2 py-2 text-left font-medium text-gray-600">Pedido</th>
+                  <th className="w-16 px-1 py-2 text-center font-medium text-gray-600">Ítems</th>
+                  <th className="w-24 px-1 py-2 text-center font-medium text-gray-600">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {sortedPedidos.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-sm text-muted-foreground">
+                      {search || filterEstado !== 'all' ? 'No se encontraron pedidos' : 'Sin pedidos registrados'}
+                    </td>
+                  </tr>
+                ) : sortedPedidos.map((pedido, idx) => {
+                  const p = pedido as any
+                  const items = pedido.items || []
+                  const proveedores = new Set(items.map((i: any) => i.proveedorNombre || i.listaEquipoItem?.proveedor?.nombre).filter(Boolean))
+                  const proveedor = proveedores.size === 0 ? null : proveedores.size === 1 ? [...proveedores][0] : 'Varios proveedores'
+                  const llegaron = items.filter((i: any) => (i.cantidadPedida || 0) > 0 && (i.cantidadAtendida || 0) >= i.cantidadPedida).length
+                  const entregado = pedido.estado === 'entregado'
+                  // Cuándo llega: la real si ya llegó; si no, la estimada (en rojo si pasa la necesaria) o la necesaria.
+                  const fechaLlegada = p.fechaEntregaReal
+                    ? `llegó ${formatDate(p.fechaEntregaReal)}`
+                    : p.fechaEntregaEstimada ? `llega ${formatDate(p.fechaEntregaEstimada)}` : p.fechaNecesaria ? `necesaria ${formatDate(p.fechaNecesaria)}` : null
+                  const tarde = !entregado && !p.fechaEntregaReal && (
+                    (p.fechaEntregaEstimada && p.fechaNecesaria && new Date(p.fechaEntregaEstimada) > new Date(p.fechaNecesaria))
+                    || (p.fechaNecesaria && new Date(p.fechaNecesaria).getTime() < Date.now())
+                  )
+                  return (
+                    <tr
+                      key={pedido.id}
+                      className={`cursor-pointer align-top hover:bg-muted/50 ${idx % 2 === 1 ? 'bg-gray-50/40' : ''}`}
+                      onClick={() => router.push(`/proyectos/${proyectoId}/pedidos/${pedido.id}`)}
+                    >
+                      <td className="px-2 py-2 min-w-0">
+                        <p className="text-xs font-medium text-gray-900 leading-snug">{p.nombre || proveedor || 'Sin proveedor'}</p>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10px] text-gray-500">
+                          <span className="font-mono">{pedido.codigo || '-'}</span>
+                          {p.esUrgente && <Badge variant="destructive" className="text-[9px] h-4 px-1">URGENTE</Badge>}
+                          {p.nombre && proveedor && <span>· {proveedor}</span>}
+                        </div>
+                        {fechaLlegada && (
+                          <p className={`mt-0.5 text-[10px] ${p.fechaEntregaReal ? 'text-green-600' : tarde ? 'font-medium text-red-600' : 'text-gray-600'}`}>
+                            {fechaLlegada}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-1 py-2 text-center whitespace-nowrap">
+                        <div className="font-semibold text-gray-900">{items.length}</div>
+                        {items.length > 0 && llegaron > 0 && (
+                          <div className={`text-[10px] ${llegaron === items.length ? 'text-green-600' : 'text-blue-600'}`}>llegaron {llegaron}</div>
+                        )}
+                      </td>
+                      <td className="px-1 py-2 text-center">{getEstadoBadge(pedido.estado || 'borrador')}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+        <Table wrapperClassName={CONTENEDOR_TABLA_SCROLL}>
+          <TableHeader className={CABECERA_FIJA}>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
               {canDrag && <TableHead className="w-6 p-0" />}
               <TableHead className="w-[120px]">
@@ -574,6 +665,7 @@ const PedidosTable = memo(function PedidosTable({
             )}
           </TableBody>
         </Table>
+        )}
       </div>
 
       <DeleteWithValidationDialog
