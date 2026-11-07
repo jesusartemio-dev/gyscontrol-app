@@ -721,6 +721,13 @@ model ListaEquipo {
   fechaNecesaria             DateTime?
   fechaAnulacion             DateTime?
   motivoAnulacion            String?
+  /// Lista de la que se separó esta (p. ej. CJM50-LST-004B es parte de la 004).
+  /// Siempre apunta a la ORIGINAL: separar una parte cuelga de la original (004C,
+  /// no 004BB). Sin efecto en los ítems: su `origen` (cotizado/nuevo/reemplazo)
+  /// no cambia al moverlos.
+  listaOrigenId              String?
+  listaOrigen                ListaEquipo?                 @relation("ListaDivision", fields: [listaOrigenId], references: [id], onDelete: SetNull)
+  partes                     ListaEquipo[]                @relation("ListaDivision")
   cotizacionProveedorItem    CotizacionProveedorItem[]
   proyecto                   Proyecto                     @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
   user                       User                         @relation(fields: [responsableId], references: [id])
@@ -734,6 +741,7 @@ model ListaEquipo {
   @@index([estado, fechaNecesaria, createdAt(sort: Desc)], map: "idx_lista_estado_necesaria_fecha")
   @@index([proyectoId, estado, createdAt(sort: Desc)], map: "idx_lista_proyecto_estado_fecha")
   @@index([responsableId, estado, fechaAprobacionFinal], map: "idx_lista_responsable_estado_aprobacion")
+  @@index([listaOrigenId])
   @@map("lista_equipo")
 }
 

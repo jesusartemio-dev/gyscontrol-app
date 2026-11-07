@@ -42,6 +42,7 @@ import ListaEstadoFlujoBanner from '@/components/equipos/ListaEstadoFlujoBanner'
 import ListaEquipoHistorial from '@/components/equipos/ListaEquipoHistorial';
 import ListaEquipoTimeline from '@/components/equipos/ListaEquipoTimeline';
 import PedidoDesdeListaModal from '@/components/equipos/PedidoDesdeListaModal';
+import SepararListaModal, { ListaDivisionInfo } from '@/components/equipos/SepararListaModal';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { mensajeCompartirLista } from '@/lib/utils/compartirWhatsApp';
 import { createPedidoDesdeListaContextual } from '@/lib/services/pedidoEquipo';
@@ -118,6 +119,8 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  // Sube al separar ítems: refresca "Dividida en: …".
+  const [versionDivision, setVersionDivision] = useState(0);
 
   const handleListaUpdated = async () => {
     try {
@@ -242,10 +245,29 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
               </>
             )}
           </div>
+
+          {/* Si viene de separar otra lista, o si se separó en partes */}
+          <ListaDivisionInfo listaId={listaId} proyectoId={proyectoId} version={versionDivision} />
         </div>
 
         {/* Acciones */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {lista && (lista.estado === 'borrador' || lista.estado === 'por_revisar') && items.length > 1 && (
+            <SepararListaModal
+              listaId={listaId}
+              proyectoId={proyectoId}
+              listaCodigo={lista.codigo}
+              items={items.map((i) => ({
+                id: i.id, codigo: i.codigo, descripcion: i.descripcion,
+                cantidad: i.cantidad, unidad: i.unidad, verificado: i.verificado,
+              }))}
+              onSeparada={async () => {
+                await refreshItems();
+                setVersionDivision((v) => v + 1);
+              }}
+            />
+          )}
+
           <Button
             size="sm"
             variant="outline"
