@@ -637,10 +637,11 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                           </>
                         ) : (
                           <>
-                            <span className="font-mono bg-muted px-2 py-0.5 rounded border">
+                            <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded border">
                               {proyecto.codigo}
                             </span>
-                            <h1 className="text-lg sm:text-xl font-semibold text-gray-900" title={proyecto.nombre}>
+                            {/* Mismo tamaño que los títulos de las subpáginas (Listas, Pedidos…: text-lg). */}
+                            <h1 className="text-base sm:text-lg font-semibold text-gray-900" title={proyecto.nombre}>
                               {proyecto.nombre}
                             </h1>
                           </>

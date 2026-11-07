@@ -58,6 +58,20 @@ type ViewMode = 'cards' | 'table'
 type FilterStatus = 'all' | ProyectoEstado
 type SortOption = 'status' | 'fechaInicio' | 'nombre' | 'totalCliente'
 
+/** Dos responsables en una celda, uno por línea, con su rol en gris. */
+function ResponsablesCelda({ filas }: { filas: { rol: string; nombre?: string | null }[] }) {
+  return (
+    <div className="space-y-0.5">
+      {filas.map((f) => (
+        <div key={f.rol} className="flex items-baseline gap-1 max-w-[170px]" title={`${f.rol}: ${f.nombre || 'sin asignar'}`}>
+          <span className="shrink-0 text-[9px] text-gray-400">{f.rol}</span>
+          <span className={cn('truncate', f.nombre ? 'text-gray-700' : 'text-gray-300')}>{f.nombre || '—'}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 interface ClienteOption { id: string; nombre: string; codigo: string }
 interface UsuarioOption { id: string; name: string; email: string; role: string }
 
@@ -704,13 +718,13 @@ export default function ProyectosPage() {
                         <UserCog className="h-2.5 w-2.5 text-gray-400 flex-shrink-0" />
                         <span className="truncate">{proyecto.gestor?.name || '—'}</span>
                       </div>
-                      <div className="flex items-center gap-1" title="Supervisor">
-                        <HardHat className="h-2.5 w-2.5 text-gray-400 flex-shrink-0" />
-                        <span className="truncate">{(proyecto as any).supervisor?.name || '—'}</span>
-                      </div>
-                      <div className="flex items-center gap-1" title="Líder">
+                      <div className="flex items-center gap-1" title="Supervisor de Proyecto">
                         <Settings className="h-2.5 w-2.5 text-gray-400 flex-shrink-0" />
                         <span className="truncate">{(proyecto as any).lider?.name || '—'}</span>
+                      </div>
+                      <div className="flex items-center gap-1" title="Supervisor de Campo">
+                        <HardHat className="h-2.5 w-2.5 text-gray-400 flex-shrink-0" />
+                        <span className="truncate">{(proyecto as any).supervisor?.name || '—'}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -758,13 +772,14 @@ export default function ProyectosPage() {
                 <thead className="bg-gray-50 border-b">
                   <tr>
                     <th className="text-left p-2 font-medium w-20">Código</th>
-                    <th className="text-left p-2 font-medium">Nombre</th>
+                    {/* Ancho mínimo: sin él las demás columnas lo apretaban y el nombre se cortaba. */}
+                    <th className="text-left p-2 font-medium min-w-[260px]">Nombre</th>
                     <th className="text-left p-2 font-medium hidden md:table-cell">Cliente</th>
                     <th className="text-left p-2 font-medium hidden lg:table-cell w-28">OC Cliente</th>
-                    <th className="text-left p-2 font-medium hidden lg:table-cell">Comercial</th>
-                    <th className="text-left p-2 font-medium hidden md:table-cell">Gestor</th>
-                    <th className="text-left p-2 font-medium hidden xl:table-cell">Supervisor</th>
-                    <th className="text-left p-2 font-medium hidden xl:table-cell">Líder</th>
+                    {/* Responsables en 2 columnas de 2 líneas (antes 4 columnas). Nombres como en
+                        Personal del proyecto: lider = Sup. Proyecto, supervisor = Sup. Campo. */}
+                    <th className="text-left p-2 font-medium hidden md:table-cell">Comercial / Gestor</th>
+                    <th className="text-left p-2 font-medium hidden xl:table-cell">Sup. Proyecto / Sup. Campo</th>
                     <th className="text-left p-2 font-medium hidden lg:table-cell w-24">Fechas</th>
                     <th className="text-left p-2 font-medium w-20">Estado</th>
                     <th className="text-right p-2 font-medium w-20">Total</th>
@@ -774,7 +789,7 @@ export default function ProyectosPage() {
                 <tbody>
                   {filteredProyectos.length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="text-center py-8 text-gray-500">
+                      <td colSpan={10} className="text-center py-8 text-gray-500">
                         <FolderOpen className="h-10 w-10 mx-auto text-gray-300 mb-2" />
                         <p>No se encontraron proyectos</p>
                       </td>
@@ -789,7 +804,7 @@ export default function ProyectosPage() {
                             onClick={() => router.push(`/proyectos/${proyecto.id}`)}
                             title={proyecto.descripcion && proyecto.descripcion !== proyecto.nombre ? proyecto.descripcion : proyecto.nombre}
                           >
-                            <span className="line-clamp-2">{proyecto.nombre}</span>
+                            <span>{proyecto.nombre}</span>
                             {proyecto.descripcion && proyecto.descripcion !== proyecto.nombre && (
                               <span className="block text-[10px] text-muted-foreground font-normal line-clamp-1 leading-tight">{proyecto.descripcion}</span>
                             )}
@@ -804,17 +819,21 @@ export default function ProyectosPage() {
                             : <span className="text-[10px] text-gray-400">—</span>
                           }
                         </td>
-                        <td className="p-2 text-gray-500 text-[10px] truncate max-w-[120px] hidden lg:table-cell" title={proyecto.comercial?.name ?? undefined}>
-                          {proyecto.comercial?.name || '—'}
+                        <td className="p-2 text-[10px] leading-tight hidden md:table-cell">
+                          <ResponsablesCelda
+                            filas={[
+                              { rol: 'Comercial', nombre: proyecto.comercial?.name },
+                              { rol: 'Gestor', nombre: proyecto.gestor?.name },
+                            ]}
+                          />
                         </td>
-                        <td className="p-2 text-gray-500 text-[10px] truncate max-w-[120px] hidden md:table-cell" title={proyecto.gestor?.name ?? undefined}>
-                          {proyecto.gestor?.name || '—'}
-                        </td>
-                        <td className="p-2 text-gray-500 text-[10px] truncate max-w-[120px] hidden xl:table-cell" title={(proyecto as any).supervisor?.name}>
-                          {(proyecto as any).supervisor?.name || '—'}
-                        </td>
-                        <td className="p-2 text-gray-500 text-[10px] truncate max-w-[120px] hidden xl:table-cell" title={(proyecto as any).lider?.name}>
-                          {(proyecto as any).lider?.name || '—'}
+                        <td className="p-2 text-[10px] leading-tight hidden xl:table-cell">
+                          <ResponsablesCelda
+                            filas={[
+                              { rol: 'Sup. Proyecto', nombre: (proyecto as any).lider?.name },
+                              { rol: 'Sup. Campo', nombre: (proyecto as any).supervisor?.name },
+                            ]}
+                          />
                         </td>
                         <td className="p-2 hidden lg:table-cell">
                           <div className="text-[10px] leading-tight">
