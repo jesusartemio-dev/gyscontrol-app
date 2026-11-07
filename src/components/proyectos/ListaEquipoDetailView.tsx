@@ -205,14 +205,7 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
       {/* Header compacto */}
       <div className="flex items-start justify-between gap-4 pb-3 border-b">
         <div className="space-y-1">
-          {/* Navegación mínima */}
-          <button
-            onClick={() => router.back()}
-            className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="h-3 w-3 mr-1" />
-            Volver
-          </button>
+          {/* Volver: lo pone la ruta del layout del proyecto (sube un nivel, a Listas). */}
 
           {/* Título con icono */}
           <div className="flex items-center gap-2">

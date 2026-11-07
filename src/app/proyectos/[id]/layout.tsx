@@ -489,6 +489,27 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
 
   if (!proyecto) return null
 
+  // "Volver" sube UN nivel: al paso anterior de la ruta (Detalle → Listas) o, si
+  // no hay, al proyecto (Listas → CJM50). Antes la única flecha estaba en
+  // "Proyectos" y sacaba a la lista de todos los proyectos.
+  const pasoAnterior = breadcrumbTrail.length >= 2 ? breadcrumbTrail[breadcrumbTrail.length - 2] : null
+  const padre = pasoAnterior?.href
+    ? { label: pasoAnterior.label, href: pasoAnterior.href }
+    : { label: proyecto.codigo, href: `/proyectos/${id}` }
+  const claseEnlaceRuta = 'p-0 h-auto text-muted-foreground hover:text-blue-700 hover:underline'
+  const botonVolver = (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => router.push(padre.href)}
+      className="h-7 gap-1 px-2 text-xs"
+      title={`Volver a ${padre.label}`}
+    >
+      <ArrowLeft className="h-3.5 w-3.5" />
+      {padre.label}
+    </Button>
+  )
+
   return (
     <ProyectoContext.Provider value={{ proyecto, setProyecto: handleDataUpdate, refreshProyecto, loading, cronogramaStats, costosReales, refreshCostosReales: () => { if (typeof id === 'string') fetchCostosReales(id) } }}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -496,13 +517,14 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
           {/* Breadcrumb - Always visible on sub-pages */}
           {!isHubPage && (isDetailView || needsFullWidth) && (
             <div className="flex items-center gap-2 flex-wrap text-sm mb-4">
+              {botonVolver}
+              <span className="text-muted-foreground/40">|</span>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => router.push('/proyectos')}
-                className="p-0 h-auto text-muted-foreground hover:text-foreground hover:underline"
+                className={claseEnlaceRuta}
               >
-                <ArrowLeft className="h-4 w-4 mr-1" />
                 Proyectos
               </Button>
               <span className="text-muted-foreground">/</span>
@@ -510,7 +532,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                 variant="ghost"
                 size="sm"
                 onClick={() => router.push(`/proyectos/${id}`)}
-                className="p-0 h-auto text-muted-foreground hover:text-foreground hover:underline"
+                className={claseEnlaceRuta}
               >
                 <span className="font-mono">{proyecto.codigo}</span>
                 <span className="mx-1">:</span>
@@ -524,7 +546,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                       variant="ghost"
                       size="sm"
                       onClick={() => router.push(crumb.href!)}
-                      className="p-0 h-auto text-muted-foreground hover:text-foreground hover:underline"
+                      className={claseEnlaceRuta}
                     >
                       {crumb.label}
                     </Button>
@@ -547,13 +569,21 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
               {/* Breadcrumb + Info Principal */}
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-3">
                 <div className="flex items-center gap-2 flex-wrap text-sm">
+                  {/* En una subpágina, volver sube un nivel (al proyecto o al paso anterior);
+                      en el hub del proyecto, el nivel de arriba es la lista de proyectos. */}
+                  {breadcrumbTrail.length > 0 && (
+                    <>
+                      {botonVolver}
+                      <span className="text-muted-foreground/40">|</span>
+                    </>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => router.push('/proyectos')}
-                    className="p-0 h-auto text-muted-foreground hover:text-foreground hover:underline"
+                    className={claseEnlaceRuta}
                   >
-                    <ArrowLeft className="h-4 w-4 mr-1" />
+                    {breadcrumbTrail.length === 0 && <ArrowLeft className="h-4 w-4 mr-1" />}
                     Proyectos
                   </Button>
                   <span className="text-muted-foreground">/</span>
@@ -563,7 +593,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                         variant="ghost"
                         size="sm"
                         onClick={() => router.push(`/proyectos/${id}`)}
-                        className="p-0 h-auto text-muted-foreground hover:text-foreground hover:underline"
+                        className={claseEnlaceRuta}
                       >
                         <span className="font-mono">{proyecto.codigo}</span>
                         <span className="mx-1">:</span>
@@ -577,7 +607,7 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
                               variant="ghost"
                               size="sm"
                               onClick={() => router.push(crumb.href!)}
-                              className="p-0 h-auto text-muted-foreground hover:text-foreground hover:underline"
+                              className={claseEnlaceRuta}
                             >
                               {crumb.label}
                             </Button>

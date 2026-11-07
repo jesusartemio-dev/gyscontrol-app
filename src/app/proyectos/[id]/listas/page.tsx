@@ -58,7 +58,7 @@ import {
   GripVertical,
   AlignJustify,
 } from 'lucide-react';
-import { useVistaCompacta, CONTENEDOR_TABLA_SCROLL, CABECERA_FIJA } from '@/hooks/useVistaCompacta';
+import { useVistaCompacta, CONTENEDOR_TABLA_SCROLL, CABECERA_FIJA, CABECERA_FIJA_PAGINA } from '@/hooks/useVistaCompacta';
 
 /** Avance en campo de una lista: cuántos ítems ya llegaron completos y cuántos están pedidos. */
 function avanceLista(items: any[] = []) {
@@ -324,11 +324,11 @@ const ListasTable = memo(function ListasTable({
       </div>
 
       {/* Tabla */}
-      <div className="border rounded-lg overflow-hidden">
+      <div className="border rounded-lg overflow-clip">
         {vista === 'compacta' ? (
-          <div className={CONTENEDOR_TABLA_SCROLL}>
+          <div>
             <table className="w-full text-xs">
-              <thead className={CABECERA_FIJA}>
+              <thead className={CABECERA_FIJA_PAGINA}>
                 <tr>
                   <th className="px-2 py-2 text-left font-medium text-gray-600">Lista</th>
                   <th className="w-20 px-1 py-2 text-center font-medium text-gray-600">Ítems</th>

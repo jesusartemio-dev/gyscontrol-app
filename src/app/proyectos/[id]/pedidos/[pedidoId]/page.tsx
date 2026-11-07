@@ -77,6 +77,7 @@ import PedidoEquipoHistorial from '@/components/equipos/PedidoEquipoHistorial'
 import PedidoEquipoTimeline from '@/components/equipos/PedidoEquipoTimeline'
 import PedidoEstadoFlujoBanner from '@/components/equipos/PedidoEstadoFlujoBanner'
 import TipoItemBadge from '@/components/shared/TipoItemBadge'
+import { CONTENEDOR_TABLA_SCROLL, CABECERA_FIJA, CABECERA_FIJA_PAGINA } from '@/hooks/useVistaCompacta'
 import PedidoEquipoEditModal from '@/components/equipos/PedidoEquipoEditModal'
 import { PedidoItemDirectoModal } from '@/components/equipos/PedidoItemDirectoModal'
 import { AgregarDeListaModal } from '@/components/equipos/AgregarDeListaModal'
@@ -1059,9 +1060,9 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
           {pedido.items && pedido.items.length > 0 && vistaItems === 'compacta' ? (
             /* Vista compacta (campo): qué es, cuánto se pidió / llegó y cuándo llega.
                Sin costos ni acciones. 4 columnas: entra sin scroll horizontal en el celular. */
-            <div className="overflow-auto max-h-[75vh] supports-[height:100dvh]:max-h-[75dvh] overscroll-contain">
+            <div /* sin scroll interno: baja con la página y la cabecera se pega arriba */>
               <table className="w-full text-xs">
-                <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-gray-50 [&_th]:shadow-[inset_0_-1px_0_#e5e7eb]">
+                <thead className={CABECERA_FIJA_PAGINA}>
                   <tr>
                     <th className="w-7 px-1 py-1.5 text-center font-medium text-gray-400">#</th>
                     <th className="px-2 py-1.5 text-left font-medium text-gray-600">Ítem</th>
@@ -1124,9 +1125,9 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
           ) : pedido.items && pedido.items.length > 0 ? (
             /* Vista completa: scrollea por dentro para que la cabecera quede fija al bajar
                (y en el celular la tabla se desplaza de lado sin mover la página). */
-            <div className="overflow-auto max-h-[75vh] supports-[height:100dvh]:max-h-[75dvh] overscroll-contain">
+            <div className={CONTENEDOR_TABLA_SCROLL}>
               <table className="w-full text-xs">
-                <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-gray-50 [&_th]:shadow-[inset_0_-1px_0_#e5e7eb]">
+                <thead className={CABECERA_FIJA}>
                   <tr className="border-b">
                     <th className="w-5 p-0" />
                     <th className="px-2 py-2 text-center font-medium text-gray-400 w-7">#</th>

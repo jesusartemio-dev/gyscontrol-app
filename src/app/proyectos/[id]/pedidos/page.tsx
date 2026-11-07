@@ -74,7 +74,10 @@ import {
   AlignJustify,
   List,
 } from 'lucide-react'
-import { useVistaCompacta, CONTENEDOR_TABLA_SCROLL, CABECERA_FIJA } from '@/hooks/useVistaCompacta'
+import { useVistaCompacta, CONTENEDOR_TABLA_SCROLL, CABECERA_FIJA, CABECERA_FIJA_PAGINA } from '@/hooks/useVistaCompacta'
+
+/** Nombre a mostrar del pedido: el suyo o, si no tiene, el de la lista de la que salió. */
+const nombrePedido = (p: any): string | null => p?.nombre || p?.lista?.nombre || p?.listaEquipo?.nombre || null
 import Link from 'next/link'
 import PedidoEquipoModalCrear from '@/components/equipos/PedidoEquipoModalCrear'
 import ModalPedidoUrgente from '@/components/logistica/ModalPedidoUrgente'
@@ -350,11 +353,11 @@ const PedidosTable = memo(function PedidosTable({
       </div>
 
       {/* Tabla */}
-      <div className="border rounded-lg overflow-hidden">
+      <div className="border rounded-lg overflow-clip">
         {vista === 'compacta' ? (
-          <div className={CONTENEDOR_TABLA_SCROLL}>
+          <div>
             <table className="w-full text-xs">
-              <thead className={CABECERA_FIJA}>
+              <thead className={CABECERA_FIJA_PAGINA}>
                 <tr>
                   <th className="px-2 py-2 text-left font-medium text-gray-600">Pedido</th>
                   <th className="w-16 px-1 py-2 text-center font-medium text-gray-600">Ítems</th>
@@ -390,11 +393,12 @@ const PedidosTable = memo(function PedidosTable({
                       onClick={() => router.push(`/proyectos/${proyectoId}/pedidos/${pedido.id}`)}
                     >
                       <td className="px-2 py-2 min-w-0">
-                        <p className="text-xs font-medium text-gray-900 leading-snug">{p.nombre || proveedor || 'Sin proveedor'}</p>
+                        {/* Nombre: el del pedido o, si no tiene, el de la lista de la que salió. */}
+                        <p className="text-xs font-medium text-gray-900 leading-snug">{nombrePedido(p) || proveedor || 'Sin proveedor'}</p>
                         <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10px] text-gray-500">
                           <span className="font-mono">{pedido.codigo || '-'}</span>
                           {p.esUrgente && <Badge variant="destructive" className="text-[9px] h-4 px-1">URGENTE</Badge>}
-                          {p.nombre && proveedor && <span>· {proveedor}</span>}
+                          {nombrePedido(p) && proveedor && <span>· {proveedor}</span>}
                         </div>
                         {fechaLlegada && (
                           <p className={`mt-0.5 text-[10px] ${p.fechaEntregaReal ? 'text-green-600' : tarde ? 'font-medium text-red-600' : 'text-gray-600'}`}>
@@ -428,7 +432,8 @@ const PedidosTable = memo(function PedidosTable({
                   Código<SortIcon field="codigo" />
                 </button>
               </TableHead>
-              <TableHead>
+              {/* Sin ancho mínimo, las columnas de ancho fijo la apretaban a "METAL...". */}
+              <TableHead className="min-w-[220px]">
                 <span className="text-xs font-medium">Nombre / Proveedor</span>
               </TableHead>
               <TableHead className="w-[110px] text-xs font-medium">Responsable</TableHead>
@@ -505,10 +510,10 @@ const PedidosTable = memo(function PedidosTable({
                     </TableCell>
                     <TableCell className="py-2">
                       <div>
-                        {(pedido as any).nombre && (
-                          <span className="text-sm font-medium line-clamp-1 block">{(pedido as any).nombre}</span>
+                        {nombrePedido(pedido) && (
+                          <span className="text-sm font-medium line-clamp-2 block" title={nombrePedido(pedido) ?? undefined}>{nombrePedido(pedido)}</span>
                         )}
-                        <span className={`text-xs line-clamp-1 ${(pedido as any).nombre ? 'text-muted-foreground' : `font-medium ${proveedorNames.size === 0 ? 'text-muted-foreground' : ''}`}`}>
+                        <span className={`text-xs line-clamp-1 ${nombrePedido(pedido) ? 'text-muted-foreground' : `font-medium ${proveedorNames.size === 0 ? 'text-muted-foreground' : ''}`}`} title={proveedorLabel}>
                           {proveedorLabel}
                         </span>
                       </div>
@@ -609,10 +614,10 @@ const PedidosTable = memo(function PedidosTable({
                     </TableCell>
                     <TableCell className="py-2">
                       <div>
-                        {(pedido as any).nombre && (
-                          <span className="text-sm font-medium line-clamp-1 block">{(pedido as any).nombre}</span>
+                        {nombrePedido(pedido) && (
+                          <span className="text-sm font-medium line-clamp-2 block" title={nombrePedido(pedido) ?? undefined}>{nombrePedido(pedido)}</span>
                         )}
-                        <span className={`text-xs line-clamp-1 ${(pedido as any).nombre ? 'text-muted-foreground' : `font-medium ${proveedorNames.size === 0 ? 'text-muted-foreground' : ''}`}`}>
+                        <span className={`text-xs line-clamp-1 ${nombrePedido(pedido) ? 'text-muted-foreground' : `font-medium ${proveedorNames.size === 0 ? 'text-muted-foreground' : ''}`}`} title={proveedorLabel}>
                           {proveedorLabel}
                         </span>
                       </div>
@@ -776,14 +781,7 @@ export default function PedidosProyectoPage() {
       {/* Header compacto */}
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
-          {/* Navegación mínima */}
-          <Link
-            href={`/proyectos/${proyectoId}/equipos`}
-            className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="h-3 w-3 mr-1" />
-            Equipos
-          </Link>
+          {/* Volver: lo pone la ruta del layout del proyecto (sube un nivel, al proyecto). */}
 
           {/* Título con icono */}
           <div className="flex items-center gap-2">
