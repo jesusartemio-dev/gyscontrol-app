@@ -42,7 +42,7 @@ import ListaEstadoFlujoBanner from '@/components/equipos/ListaEstadoFlujoBanner'
 import ListaEquipoHistorial from '@/components/equipos/ListaEquipoHistorial';
 import ListaEquipoTimeline from '@/components/equipos/ListaEquipoTimeline';
 import PedidoDesdeListaModal from '@/components/equipos/PedidoDesdeListaModal';
-import SepararListaModal, { ListaDivisionInfo } from '@/components/equipos/SepararListaModal';
+import SepararListaModal, { ListaDivisionInfo, UnirParteButton } from '@/components/equipos/SepararListaModal';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { mensajeCompartirLista } from '@/lib/utils/compartirWhatsApp';
 import { createPedidoDesdeListaContextual } from '@/lib/services/pedidoEquipo';
@@ -252,6 +252,8 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
 
         {/* Acciones */}
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {/* Solo se muestra si esta lista es una parte (004B…); explica si no se puede unir. */}
+          <UnirParteButton key={`unir-${versionDivision}`} listaId={listaId} proyectoId={proyectoId} />
           {lista && (lista.estado === 'borrador' || lista.estado === 'por_revisar') && items.length > 1 && (
             <SepararListaModal
               listaId={listaId}

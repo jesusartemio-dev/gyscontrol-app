@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Scissors, GitBranch, Loader2 } from 'lucide-react'
+import { Scissors, GitBranch, Loader2, Merge } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -60,6 +60,104 @@ export function ListaDivisionInfo({ listaId, proyectoId, version = 0 }: { listaI
         </span>
       )}
     </div>
+  )
+}
+
+interface InfoUnion {
+  esParte: boolean
+  puede: boolean
+  motivos: string[]
+  /** No bloquean: ítems agregados después de separar, posibles duplicados, original en revisión. */
+  avisos: string[]
+  raiz: { id: string; codigo: string; nombre: string } | null
+  parteCodigo: string
+  totalItems: number
+}
+
+/**
+ * "Unir a CJM50-LST-004": deshace una separación. Solo aparece en una parte.
+ * Si no se puede, el diálogo explica todos los motivos (no un botón mudo: en
+ * celular un tooltip no se ve); si se puede, pide confirmación.
+ */
+export function UnirParteButton({ listaId, proyectoId }: { listaId: string; proyectoId: string }) {
+  const router = useRouter()
+  const [info, setInfo] = useState<InfoUnion | null>(null)
+  const [open, setOpen] = useState(false)
+  const [guardando, setGuardando] = useState(false)
+
+  const cargar = () => fetch(`/api/lista-equipo/${listaId}/unir`, { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then(setInfo)
+    .catch(() => setInfo(null))
+  useEffect(() => { cargar() }, [listaId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!info?.esParte || !info.raiz) return null
+
+  const unir = async () => {
+    setGuardando(true)
+    try {
+      const r = await fetch(`/api/lista-equipo/${listaId}/unir`, { method: 'POST' })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j.error || 'No se pudo unir')
+      toast.success(`${j.movidos} ítem(s) devueltos a ${j.raiz.codigo}; ${info.parteCodigo} se eliminó`)
+      router.push(`/proyectos/${proyectoId}/listas/${j.raiz.id}`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo unir')
+      cargar()
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => { cargar(); setOpen(true) }}
+        className={`h-7 text-xs ${info.puede ? '' : 'text-muted-foreground'}`}
+        title={info.puede ? `Devolver los ítems a ${info.raiz.codigo}` : `No se puede unir: ${info.motivos.join(' ')}`}
+      >
+        <Merge className="h-3 w-3 mr-1" />
+        Unir a {info.raiz.codigo}
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{info.puede ? `Unir ${info.parteCodigo} a ${info.raiz.codigo}` : 'No se puede unir'}</DialogTitle>
+            <DialogDescription>
+              {info.puede
+                ? `Se moverán ${info.totalItems} ítem(s) al final de ${info.raiz.codigo} y se eliminará ${info.parteCodigo}. Su historial pasa a ${info.raiz.codigo}.`
+                : `${info.parteCodigo} no se puede unir a ${info.raiz.codigo} por:`}
+            </DialogDescription>
+          </DialogHeader>
+          {!info.puede && (
+            <ul className="list-disc space-y-1 pl-5 text-sm text-red-700">
+              {info.motivos.map((m) => <li key={m}>{m}</li>)}
+            </ul>
+          )}
+          {info.puede && info.avisos?.length > 0 && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+              <p className="mb-1 text-xs font-medium text-amber-800">Antes de confirmar, ten en cuenta:</p>
+              <ul className="list-disc space-y-1 pl-5 text-xs text-amber-800">
+                {info.avisos.map((a) => <li key={a}>{a}</li>)}
+              </ul>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setOpen(false)} disabled={guardando}>
+              {info.puede ? 'Cancelar' : 'Entendido'}
+            </Button>
+            {info.puede && (
+              <Button size="sm" onClick={unir} disabled={guardando}>
+                {guardando && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}
+                Unir y eliminar {info.parteCodigo}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 

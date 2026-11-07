@@ -151,3 +151,128 @@ export async function dividirLista(o: { listaId: string; itemIds: string[]; nomb
   ])
   return nueva
 }
+
+// ---------------------------------------------------------------------------
+// Unir una parte a su lista original (deshacer una separación).
+//
+// Solo si es un error simple: la parte sigue en Borrador, ningún ítem tiene
+// cotizaciones, pedidos ni OC, y la original acepta ítems (Borrador o Por
+// Revisar). Los ítems vuelven al final de la original (mismo orden), su ítem
+// cotizado y su desglose vuelven a la original, el historial de la parte pasa a
+// la original y la parte se elimina (su letra queda libre).
+// ---------------------------------------------------------------------------
+
+const ETIQUETA_ESTADO: Record<string, string> = {
+  borrador: 'Borrador', por_revisar: 'Por Revisar', por_cotizar: 'Por Cotizar',
+  por_aprobar: 'Por Aprobar', aprobada: 'Aprobada', anulada: 'Anulada',
+}
+
+export async function evaluarUnion(parteId: string) {
+  const parte = await prisma.listaEquipo.findUnique({
+    where: { id: parteId },
+    include: {
+      listaOrigen: { select: { id: true, codigo: true, nombre: true, estado: true, proyectoId: true } },
+      listaEquipoItem: {
+        orderBy: { orden: 'asc' },
+        include: {
+          _count: { select: { cotizacionProveedorItems: true, ordenCompraItems: true } },
+          pedidoEquipoItem: { select: { pedidoEquipo: { select: { codigo: true } } } },
+        },
+      },
+    },
+  })
+  if (!parte) return null
+  const raiz = parte.listaOrigen
+  const motivos: string[] = []
+  if (!raiz) {
+    motivos.push('Esta lista no es una parte de otra lista.')
+  } else {
+    if (parte.estado !== 'borrador') {
+      motivos.push(`${parte.codigo} está en ${ETIQUETA_ESTADO[parte.estado] ?? parte.estado}; solo se une desde Borrador.`)
+    }
+    if (raiz.estado === 'anulada') {
+      motivos.push(`${raiz.codigo} está anulada.`)
+    } else if (!ESTADOS_DIVISIBLES.includes(raiz.estado)) {
+      motivos.push(`${raiz.codigo} ya está en ${ETIQUETA_ESTADO[raiz.estado] ?? raiz.estado} y no acepta ítems. Retrocédela a Por Revisar o deja la parte separada.`)
+    }
+  }
+  for (const i of parte.listaEquipoItem) {
+    const pedidos = [...new Set(i.pedidoEquipoItem.map((p) => p.pedidoEquipo?.codigo).filter(Boolean))]
+    if (pedidos.length || (i.cantidadPedida ?? 0) > 0) motivos.push(`${i.codigo} tiene pedido${pedidos.length ? ` (${pedidos.join(', ')})` : ''}.`)
+    if (i._count.ordenCompraItems > 0) motivos.push(`${i.codigo} tiene orden de compra.`)
+    if (i._count.cotizacionProveedorItems > 0 || i.cotizacionSeleccionadaId) motivos.push(`${i.codigo} tiene cotizaciones de proveedor.`)
+  }
+
+  // Avisos (no bloquean): qué cambió desde que se separó, para confirmar sabiendo.
+  const avisos: string[] = []
+  if (raiz) {
+    // Ítems separados: los que registró el evento de creación de la parte.
+    const creacion = await prisma.eventoTrazabilidad.findFirst({
+      where: { listaEquipoId: parte.id, tipo: 'lista_creada' },
+      orderBy: { fechaEvento: 'asc' },
+      select: { metadata: true },
+    })
+    const separados = (creacion?.metadata as { items?: { id: string }[] } | null)?.items
+    if (separados) {
+      const ids = new Set(separados.map((x) => x.id))
+      const nuevos = parte.listaEquipoItem.filter((i) => !ids.has(i.id))
+      if (nuevos.length) {
+        avisos.push(`${nuevos.length} ítem(s) se agregaron a ${parte.codigo} después de separar: ${nuevos.map((i) => i.codigo).join(', ')}. También pasan a ${raiz.codigo}.`)
+      }
+    }
+    // Mismo código en las dos listas: al unir quedarían dos líneas.
+    const enRaiz = await prisma.listaEquipoItem.findMany({ where: { listaId: raiz.id }, select: { codigo: true } })
+    const codigosRaiz = new Set(enRaiz.map((i) => i.codigo.trim().toUpperCase()).filter((c) => c && c !== 'POR DEFINIR'))
+    const repetidos = [...new Set(parte.listaEquipoItem.map((i) => i.codigo).filter((c) => codigosRaiz.has(c.trim().toUpperCase())))]
+    if (repetidos.length) {
+      avisos.push(`Posible duplicado: ${repetidos.join(', ')} ya está en ${raiz.codigo}; quedarían dos líneas.`)
+    }
+    if (raiz.estado === 'por_revisar' && parte.listaEquipoItem.length) {
+      avisos.push(`${raiz.codigo} está en Por Revisar: los ítems llegan sin verificar y hay que verificarlos.`)
+    }
+  }
+  return { parte, raiz, motivos, avisos, puede: motivos.length === 0, totalItems: parte.listaEquipoItem.length }
+}
+
+export async function unirParte(o: { parteId: string; usuarioId: string }) {
+  const ev = await evaluarUnion(o.parteId)
+  if (!ev) throw new ErrorDivision('Lista no encontrada', 404)
+  if (!ev.puede || !ev.raiz) throw new ErrorDivision(`No se puede unir: ${ev.motivos.join(' ')}`)
+  const { parte, raiz } = ev
+  const itemIds = parte.listaEquipoItem.map((i) => i.id)
+  const desgloses = [...new Set(parte.listaEquipoItem.map((i) => i.desgloseDeProyectoEquipoCotizadoItemId).filter((x): x is string => !!x))]
+
+  await prisma.$transaction(async (tx) => {
+    const ultimo = await tx.listaEquipoItem.aggregate({ where: { listaId: raiz.id }, _max: { orden: true } })
+    let orden = (ultimo._max.orden ?? -1) + 1
+    for (const id of itemIds) {
+      await tx.listaEquipoItem.update({ where: { id }, data: { listaId: raiz.id, orden: orden++ } })
+    }
+    // Ítems cotizados que apuntaban a la parte vuelven a la original.
+    await tx.proyectoEquipoCotizadoItem.updateMany({ where: { listaId: parte.id }, data: { listaId: raiz.id } })
+    // Desglose: queda registrado en la original (el de la parte se va con ella).
+    for (const cotizadoId of desgloses) {
+      await tx.desgloseEquipoItem.upsert({
+        where: { proyectoEquipoCotizadoItemId_listaEquipoId: { proyectoEquipoCotizadoItemId: cotizadoId, listaEquipoId: raiz.id } },
+        create: { proyectoEquipoCotizadoItemId: cotizadoId, listaEquipoId: raiz.id },
+        update: {},
+      })
+    }
+    // El historial de la parte no se pierde: pasa a la original.
+    await tx.eventoTrazabilidad.updateMany({ where: { listaEquipoId: parte.id }, data: { listaEquipoId: raiz.id } })
+    await tx.listaEquipo.delete({ where: { id: parte.id } })
+    // Cierra el hueco en el orden de las listas del proyecto.
+    await tx.listaEquipo.updateMany({
+      where: { proyectoId: parte.proyectoId, orden: { gt: parte.orden } },
+      data: { orden: { decrement: 1 } },
+    })
+  })
+
+  const codigos = parte.listaEquipoItem.map((i) => i.codigo).join(', ')
+  await crearEvento(prisma, {
+    listaEquipoId: raiz.id, proyectoId: parte.proyectoId, tipo: 'lista_unida', usuarioId: o.usuarioId,
+    descripcion: `Se unieron ${itemIds.length} ítem(s) de ${parte.codigo} (${parte.nombre}), que se eliminó: ${codigos}`,
+    metadata: { listaParte: parte.codigo, items: parte.listaEquipoItem.map((i) => ({ id: i.id, codigo: i.codigo })) },
+  })
+  return { raiz, movidos: itemIds.length, parteCodigo: parte.codigo }
+}
