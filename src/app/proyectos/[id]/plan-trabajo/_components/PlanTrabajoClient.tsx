@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { Loader2, BookOpen, Plus, Sparkles, X, AlertTriangle, Camera, MoreHorizontal, Calculator, RefreshCw, Settings2, Hand } from 'lucide-react'
+import { Loader2, BookOpen, Plus, Sparkles, X, AlertTriangle, Camera, MoreHorizontal, Calculator, RefreshCw, Settings2, Hand, Trash2 } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,7 +34,7 @@ import { leerEdiciones, contarTextosEditadosAlcance } from '@/lib/planTrabajo/ed
 import { BotonCalcularDatos } from './BotonCalcularDatos'
 import { BotonGenerarIA } from './BotonGenerarIA'
 import { BotonExportarDocx } from './BotonExportarDocx'
-import { BotonEliminarPlan } from './BotonEliminarPlan'
+import { DialogEliminarPlan } from './BotonEliminarPlan'
 import { HistorialGeneraciones } from './HistorialGeneraciones'
 import { SeccionContainer } from './SeccionContainer'
 import { SubirVersionPlan } from './SubirVersionPlan'
@@ -110,6 +110,7 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
   const [editandoSeccion, setEditandoSeccion] = useState<SeccionEditable | null>(null)
   // Alcance Detallado: índice del EDT a editar solo (lápiz de cada EDT); null = todo.
   const [edtEnfocado, setEdtEnfocado] = useState<number | null>(null)
+  const [eliminarAbierto, setEliminarAbierto] = useState(false)
   const [recienCreado, setRecienCreado] = useState(false)
   const [progresoGenerar, setProgresoGenerar] = useState(0)
   const [errorGeneracion, setErrorGeneracion] = useState<{ mensaje: string } | null>(null)
@@ -926,13 +927,18 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
                   <Settings2 size={14} className="mr-2" />
                   Configuración del documento
                 </DropdownMenuItem>
+                {/* Al final y en rojo: suelto en la barra era fácil tocarlo sin querer. */}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                  disabled={generando || !!iaOcupada}
+                  onSelect={() => setTimeout(() => setEliminarAbierto(true), 0)}
+                >
+                  <Trash2 size={14} className="mr-2" />
+                  Eliminar plan…
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <BotonEliminarPlan
-              proyectoId={proyectoId}
-              onEliminado={() => window.location.reload()}
-              disabled={generando || !!iaOcupada}
-            />
           </div>
           {/* Progreso de lo lanzado desde "Más acciones" */}
           {generando && (
@@ -1027,15 +1033,34 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
             </Link>
           </Button>
           <div className="ml-auto">
-            <BotonEliminarPlan
-              proyectoId={proyectoId}
-              onEliminado={() => window.location.reload()}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
               disabled={generando || !!iaOcupada}
-            />
+              onClick={() => setEliminarAbierto(true)}
+            >
+              <Trash2 size={14} className="mr-1.5" />
+              Eliminar plan
+            </Button>
           </div>
         </div>
       </div>
       )}
+
+      <DialogEliminarPlan
+        open={eliminarAbierto}
+        onOpenChange={setEliminarAbierto}
+        proyectoId={proyectoId}
+        codigoProyecto={contexto.proyecto.codigo}
+        resumen={{
+          secciones: Object.values(bloques).filter(Boolean).length,
+          imagenes: plan.imagenes.length,
+          fotosPropias: plan.imagenes.filter((img) => !img.catalogoImagenId).length,
+          editadas: Object.keys(ediciones).length + textosEditadosAlcance,
+        }}
+        onEliminado={() => window.location.reload()}
+      />
 
       {iaOcupada && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-xs text-amber-900 flex items-center gap-2">
