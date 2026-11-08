@@ -6,6 +6,7 @@ import { planTrabajoPatchSchema } from '@/lib/validators/planTrabajo'
 import { calcularCompletitud } from '@/lib/planTrabajo/completitud'
 import { toPrismaJsonNullable } from '@/lib/planTrabajo/prismaJson'
 import { resolverFirmantesIniciales } from '@/lib/planTrabajo/resolverFirmantesIniciales'
+import { marcarEditadas } from '@/lib/planTrabajo/edicionesManuales'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -133,10 +134,16 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     ...scalarData
   } = parsed.data
 
+  // Secciones guardadas a mano desde el editor: quedan marcadas como editadas
+  // (con fecha y autor) para avisar —y respetarlas— antes de regenerar.
+  const seccionesGuardadas = Object.keys(parsed.data).filter((k) => (parsed.data as Record<string, unknown>)[k] !== undefined)
+  const seccionesEditadas = marcarEditadas(existing.seccionesEditadas, seccionesGuardadas, session.user.name || session.user.email || 'usuario')
+
   const updated = await prisma.planTrabajo.update({
     where: { proyectoId },
     data: {
       ...scalarData,
+      seccionesEditadas: toPrismaJsonNullable(seccionesEditadas),
       ...(alcanceDetallado !== undefined && { alcanceDetallado: toPrismaJsonNullable(alcanceDetallado) }),
       ...(eppRequeridos !== undefined && { eppRequeridos: toPrismaJsonNullable(eppRequeridos) }),
       ...(herramientasYEquipos !== undefined && { herramientasYEquipos: toPrismaJsonNullable(herramientasYEquipos) }),

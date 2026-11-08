@@ -6329,6 +6329,13 @@ model PlanTrabajo {
   // Tracking de completitud por sección
   bloquesCompletitud Json?
 
+  /// Secciones editadas a mano desde su última generación/cálculo:
+  /// { [seccion]: { fecha: ISO, por: nombre } }. Se marca al guardar desde el
+  /// editor y se limpia cuando la IA o el cálculo vuelven a escribir la sección.
+  /// Sirve para avisar (y respetar) antes de regenerar. El Alcance Detallado no
+  /// va aquí: marca cada texto editado dentro de su JSON.
+  seccionesEditadas Json?
+
   generaciones       PlanTrabajoGeneracion[]
   imagenes           PlanTrabajoImagen[]
   imagenesPendientes PlanTrabajoImagenPendiente[]

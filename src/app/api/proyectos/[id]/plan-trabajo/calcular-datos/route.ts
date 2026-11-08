@@ -14,7 +14,7 @@ type Ctx = { params: Promise<{ id: string }> }
 // POST /api/proyectos/[id]/plan-trabajo/calcular-datos
 // Etapa 1: calcula y persiste personalAsignado, matrizRaci, histogramas,
 // cronogramaResumen y referencias directamente desde BD — sin IA, instantáneo.
-export async function POST(_req: NextRequest, { params }: Ctx) {
+export async function POST(req: NextRequest, { params }: Ctx) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
@@ -79,17 +79,28 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   try {
     const { data, advertencias } = calcularDatosEtapa1(contexto)
 
-    await guardarSeccionesCalculadas(proyectoId, {
+    // Secciones que NO se recalculan (editadas a mano que el usuario decidió
+    // respetar). Solo si ya tienen contenido: una vacía siempre se calcula.
+    const body = (await req.json().catch(() => ({}))) as { omitir?: unknown }
+    const bloques = (contexto.planTrabajo.bloquesCompletitud ?? {}) as Record<string, boolean>
+    const omitir = new Set(
+      (Array.isArray(body.omitir) ? body.omitir : []).filter((s): s is string => typeof s === 'string' && bloques[s] === true)
+    )
+    const calculadas: Record<string, unknown> = {
       personalAsignado: data.personalAsignado,
       matrizRaci: data.matrizRaci,
       histogramas: data.histogramas,
       cronogramaResumen: data.cronogramaResumen,
       referencias: data.referencias,
-    })
+    }
+    for (const s of omitir) delete calculadas[s]
+
+    await guardarSeccionesCalculadas(proyectoId, calculadas)
 
     return NextResponse.json({
       data: {
-        seccionesCalculadas: SECCIONES_ETAPA_1,
+        seccionesCalculadas: SECCIONES_ETAPA_1.filter((s) => !omitir.has(s)),
+        seccionesRespetadas: [...omitir],
         totalHH: data.totalHH,
         personas: data.personalAsignado.length,
         edtsEnRaci: data.matrizRaci.filas.length,

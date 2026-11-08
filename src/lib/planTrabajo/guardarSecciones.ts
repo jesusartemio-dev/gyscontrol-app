@@ -3,6 +3,7 @@ import { toPrismaJsonNullable } from './prismaJson'
 import { calcularCompletitud } from './completitud'
 import type { PlanTrabajo } from '@prisma/client'
 import type { SeccionRegenerable } from '@/types/planTrabajo'
+import { limpiarEditadas } from './edicionesManuales'
 
 const CAMPOS_JSON = [
   'alcanceDetallado',
@@ -151,8 +152,25 @@ export async function guardarSeccionesCalculadas(
     where: { proyectoId },
     data: {
       bloquesCompletitud: bloques as Parameters<typeof prisma.planTrabajo.update>[0]['data']['bloquesCompletitud'],
+      // Recién calculadas: ya no cuentan como editadas a mano.
+      seccionesEditadas: toPrismaJsonNullable(limpiarEditadas(planActual.seccionesEditadas, Object.keys(jsonUpdate))),
       ...(jsonUpdate as Parameters<typeof prisma.planTrabajo.update>[0]['data']),
     },
+  })
+}
+
+/**
+ * Quita la marca de "editada a mano" de las secciones que la IA acaba de
+ * reescribir. En la generación paralela se llama UNA vez al final (no en cada
+ * guardarSeccionParalela) para no pisar el JSON entre guardados simultáneos.
+ */
+export async function limpiarMarcasEdicion(proyectoId: string, secciones: string[]): Promise<void> {
+  if (!secciones.length) return
+  const plan = await prisma.planTrabajo.findUnique({ where: { proyectoId }, select: { seccionesEditadas: true } })
+  if (!plan) return
+  await prisma.planTrabajo.update({
+    where: { proyectoId },
+    data: { seccionesEditadas: toPrismaJsonNullable(limpiarEditadas(plan.seccionesEditadas, secciones)) },
   })
 }
 
@@ -183,6 +201,8 @@ export async function guardarSeccionIndividual(
       ultimaSeccionRegenerada: seccion,
       fechaGeneracionIA: new Date(),
       bloquesCompletitud: bloques as Parameters<typeof prisma.planTrabajo.update>[0]['data']['bloquesCompletitud'],
+      // Recién regenerada: ya no cuenta como editada a mano.
+      seccionesEditadas: toPrismaJsonNullable(limpiarEditadas(planActual.seccionesEditadas, [seccion])),
       ...(campoUpdate as Parameters<typeof prisma.planTrabajo.update>[0]['data']),
     },
   })

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { RefreshCw, Loader2 } from 'lucide-react'
+import { RefreshCw, Loader2, Hand, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -13,19 +13,32 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import type { SeccionRegenerable } from '@/types/planTrabajo'
 import { esSeccionEtapa1 } from '@/lib/planTrabajo/etapas'
+import { NOMBRE_SECCION, type EdicionManual } from '@/lib/planTrabajo/edicionesManuales'
 
 interface Props {
   seccion: SeccionRegenerable
   isRegenerando: boolean
   iaOcupada?: boolean
   onRegen: (seccion: SeccionRegenerable, instrucciones?: string) => Promise<void>
+  /** Hay contenido que se va a reemplazar. */
+  tieneContenido?: boolean
+  /** Editada a mano desde la última generación (se reemplaza al regenerar). */
+  edicion?: EdicionManual
+  /** Solo Alcance Detallado: textos editados a mano, que se respetan. */
+  textosEditadosAlcance?: number
 }
 
-export function BotonRegenerarSeccion({ seccion, isRegenerando, iaOcupada, onRegen }: Props) {
+const fmtFecha = (iso: string) => {
+  const d = new Date(iso)
+  return isNaN(d.getTime()) ? '' : d.toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+export function BotonRegenerarSeccion({ seccion, isRegenerando, iaOcupada, onRegen, tieneContenido, edicion, textosEditadosAlcance = 0 }: Props) {
   const [open, setOpen] = useState(false)
   const [instrucciones, setInstrucciones] = useState('')
   const [running, setRunning] = useState(false)
   const esEtapa1 = esSeccionEtapa1(seccion)
+  const nombre = NOMBRE_SECCION[seccion]
 
   const handleConfirm = async () => {
     setRunning(true)
@@ -46,7 +59,7 @@ export function BotonRegenerarSeccion({ seccion, isRegenerando, iaOcupada, onReg
         className="h-7 px-2 text-muted-foreground hover:text-indigo-600"
         disabled={isRegenerando || running || iaOcupada}
         onClick={() => setOpen(true)}
-        title={esEtapa1 ? 'Recalcular esta sección (sin IA)' : 'Regenerar esta sección con IA'}
+        title={esEtapa1 ? `Recalcular ${nombre} (sin IA)` : `Regenerar ${nombre} con IA`}
       >
         {isRegenerando
           ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -56,32 +69,42 @@ export function BotonRegenerarSeccion({ seccion, isRegenerando, iaOcupada, onReg
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{esEtapa1 ? 'Recalcular sección' : 'Regenerar sección'}</DialogTitle>
+            <DialogTitle>{esEtapa1 ? 'Recalcular' : 'Regenerar con IA'}: {nombre}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 pt-2">
             <p className="text-sm text-muted-foreground">
-              {esEtapa1 ? (
-                <>
-                  Se recalculará <span className="font-medium text-foreground">&quot;{seccion}&quot;</span> directamente
-                  desde la base de datos (organigrama/cronograma), sin IA. El resto del plan permanece intacto.
-                </>
-              ) : (
-                <>
-                  Se regenerará <span className="font-medium text-foreground">&quot;{seccion}&quot;</span> con IA.
-                  El resto del plan permanece intacto.
-                </>
-              )}
+              {esEtapa1
+                ? <>Se recalcula desde la base de datos (organigrama y cronograma), sin IA. El resto del plan no cambia.</>
+                : <>Se vuelve a redactar con IA. El resto del plan no cambia.</>}
             </p>
-            {seccion === 'alcanceDetallado' && (
-              <div className="flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800">
-                <span>
-                  <strong>Esto reprocesará TODOS los EDTs</strong> (Construcción, Comisionamiento, etc.), incluidas
-                  las descripciones y viñetas ya redactadas. Si solo necesitás actualizar uno, cerrá este diálogo y
-                  usá &quot;Regenerar&quot; a nivel de ese EDT individual desde el editor de Alcance Detallado.
-                  Los textos editados a mano se preservan salvo que los liberes desde el editor antes de regenerar.
-                </span>
+
+            {/* Qué pasa con lo actual: se reemplaza, o se respeta lo editado */}
+            {seccion === 'alcanceDetallado' ? (
+              <div className="space-y-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800">
+                <p>
+                  <strong>Se reprocesan TODOS los EDTs</strong> (Construcción, Comisionamiento, etc.). Si solo necesitás uno,
+                  usá &quot;Regenerar&quot; de ese EDT dentro del editor de Alcance Detallado.
+                </p>
+                <p className="flex items-start gap-1 text-emerald-800">
+                  <Hand size={12} className="mt-0.5 shrink-0" />
+                  {textosEditadosAlcance > 0
+                    ? <span><strong>Se respetan {textosEditadosAlcance} texto(s) editado(s) a mano</strong>, las tareas excluidas y su orden. Para reescribir un texto editado, liberalo antes desde el editor.</span>
+                    : <span>Se conservan las tareas excluidas y su orden.</span>}
+                </p>
               </div>
-            )}
+            ) : edicion ? (
+              <p className="flex items-start gap-1.5 rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-xs text-red-800">
+                <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+                <span>
+                  <strong>Editaste esta sección a mano</strong> el {fmtFecha(edicion.fecha)} ({edicion.por}).
+                  Al {esEtapa1 ? 'recalcular' : 'regenerar'} <strong>se reemplaza lo editado</strong>.
+                  {!esEtapa1 && ' Si querés conservar algo, indicalo en las instrucciones.'}
+                </span>
+              </p>
+            ) : tieneContenido ? (
+              <p className="text-xs text-amber-700">Se reemplaza el contenido actual de esta sección.</p>
+            ) : null}
+
             {!esEtapa1 && (
               <div className="space-y-1.5">
                 <Label className="text-xs">Instrucciones adicionales (opcional)</Label>

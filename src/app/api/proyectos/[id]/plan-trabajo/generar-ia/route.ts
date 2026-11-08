@@ -11,11 +11,11 @@ import { cargarContextoPlanTrabajo } from '@/lib/planTrabajo/cargarContexto'
 import { adquirirLockIA, liberarLockIA } from '@/lib/planTrabajo/mutex'
 import { serializarContextoParaIA, construirBloqueHechosEtapa1 } from '@/lib/planTrabajo/contextoIA'
 import { validarSeccionesPlan } from '@/lib/planTrabajo/validarSecciones'
-import { guardarSeccionParalela, recalcularCompletitud } from '@/lib/planTrabajo/guardarSecciones'
+import { guardarSeccionParalela, recalcularCompletitud, limpiarMarcasEdicion } from '@/lib/planTrabajo/guardarSecciones'
 import { RESUMEN_PROYECTO_PROMPT } from '@/lib/planTrabajo/prompts/resumirProyecto'
 import { parseJsonIA } from '@/lib/planTrabajo/parseJsonIA'
 import { etapa1Completa } from '@/lib/planTrabajo/etapas'
-import { generarAlcanceDetallado, preservarEstadoManualTareas } from '@/lib/planTrabajo/generarAlcanceDetallado'
+import { generarAlcanceDetallado, preservarEstadoManualTareas, aplicarAlcanceDeRegeneracion } from '@/lib/planTrabajo/generarAlcanceDetallado'
 import { obtenerCatalogoImagenesActivo, aplicarSugerenciasImagenesIA } from '@/lib/planTrabajo/aplicarSugerenciasImagenesIA'
 import {
   PLAN_TRABAJO_SYSTEM_INSTRUCCIONES,
@@ -166,6 +166,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const { id: proyectoId } = await params
   const userId = session.user.id
   const signal = req.signal
+  // Secciones que NO se reescriben (p. ej. editadas a mano que el usuario decidió respetar).
+  const body = (await req.json().catch(() => ({}))) as { omitir?: unknown }
+  const omitir = new Set(Array.isArray(body.omitir) ? body.omitir.filter((s): s is string => typeof s === 'string') : [])
 
   const proyectoBase = await prisma.proyecto.findUnique({
     where: { id: proyectoId },
@@ -320,7 +323,16 @@ export async function POST(req: NextRequest, { params }: Ctx) {
             // Preserva tareas excluidas del plan + su orden manual (Bloque 4.2 sesión 3)
             // si ya existía un alcanceDetallado previo (re-generación total sobre un plan existente).
             const estructuraAnterior = (planTrabajo.alcanceDetallado as PlanAlcanceDetalladoEdt[] | null) ?? []
-            const valorConEstadoManual = preservarEstadoManualTareas(valor, estructuraAnterior)
+            const conEstadoTareas = preservarEstadoManualTareas(valor, estructuraAnterior)
+            // Y los textos editados a mano (EDT, actividad, viñeta), igual que al
+            // regenerar solo esta sección: antes la redacción completa los pisaba.
+            const todosLosEdts = new Set(conEstadoTareas.map(e => e.edtRefId).filter((x): x is string => Boolean(x)))
+            const { data: valorConEstadoManual, textosConservadosPorFallback } = aplicarAlcanceDeRegeneracion(
+              conEstadoTareas, estructuraAnterior, todosLosEdts, false
+            )
+            if (textosConservadosPorFallback.length) {
+              advAlcance.push(`La IA no devolvió texto para ${textosConservadosPorFallback.length} elemento(s); se conservó el texto anterior.`)
+            }
 
             const { secciones: seccionValidada, errores: erroresValidacion } = validarSeccionesPlan({ [id]: valorConEstadoManual })
             if (Object.keys(seccionValidada).length > 0) {
@@ -352,13 +364,15 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
         send('status', { fase: 'paralelo', mensaje: 'Redactando secciones del plan...', progreso: 10 })
         await Promise.allSettled([
-          ...SECCIONES_CONFIG.map(config => generarYGuardar(config)),
-          generarYGuardarAlcanceDetallado(),
+          ...SECCIONES_CONFIG.filter(config => !omitir.has(config.id)).map(config => generarYGuardar(config)),
+          ...(omitir.has('alcanceDetallado') ? [] : [generarYGuardarAlcanceDetallado()]),
         ])
 
         // Recalcular bloquesCompletitud una sola vez al final (evita race condition)
         if (seccionesGuardadas.length > 0) {
           await recalcularCompletitud(proyectoId)
+          // Reescritas por la IA: ya no cuentan como editadas a mano.
+          await limpiarMarcasEdicion(proyectoId, seccionesGuardadas)
         }
 
         if (seccionesGuardadas.length === 0 && !signal.aborted) {
