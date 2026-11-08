@@ -4,11 +4,14 @@ import { captionEfectivo } from '@/lib/planTrabajo/imagenCaption'
 import { calcularNumerosDeFigura } from '@/lib/planTrabajo/numerosDeFigura'
 import { ImagenConLightbox } from '@/components/catalogoImagenes/ImagenConLightbox'
 import { HintFotoSugerida } from '@/components/catalogoImagenes/HintFotoSugerida'
+import { Pencil } from 'lucide-react'
 
 interface Props {
   plan: PlanTrabajo
   proyectoId: string
   imagenes: PlanTrabajoImagen[]
+  /** Lápiz de cada EDT: abre el editor solo con ese EDT (índice en el alcance completo). */
+  onEditarEdt?: (idx: number) => void
 }
 
 function isNuevoFormato(item: unknown): item is PlanAlcanceDetalladoEdt {
@@ -76,7 +79,7 @@ function GaleriaSoloLectura({
   )
 }
 
-export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
+export function AlcanceDetalladoView({ plan, proyectoId, imagenes, onEditarEdt }: Props) {
   const raw = plan.alcanceDetallado as unknown[] | null
   if (!raw || raw.length === 0) return null
 
@@ -117,7 +120,18 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes }: Props) {
                     <span className="text-xs font-mono text-muted-foreground shrink-0 mt-0.5">
                       {item.numeracion}
                     </span>
-                    <span className="text-sm font-semibold text-gray-800">{item.edtNombre}</span>
+                    <span className="min-w-0 flex-1 text-sm font-semibold text-gray-800">{item.edtNombre}</span>
+                    {onEditarEdt && (
+                      <button
+                        type="button"
+                        onClick={() => onEditarEdt(items.indexOf(item))}
+                        className="-my-1 flex shrink-0 items-center gap-1 rounded px-1.5 py-1 text-[11px] text-muted-foreground hover:bg-gray-100 hover:text-gray-800"
+                        title={`Editar solo ${item.edtNombre}`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Editar</span>
+                      </button>
+                    )}
                   </div>
                   {item.ubicacion && (
                     <p className="text-xs text-muted-foreground ml-8">📍 {item.ubicacion}</p>

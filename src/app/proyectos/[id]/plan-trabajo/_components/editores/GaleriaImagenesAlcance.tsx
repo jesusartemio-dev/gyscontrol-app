@@ -240,7 +240,7 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
         <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide flex items-center gap-1">
           <ImageIcon size={12} /> {titulo} ({propias.length}/{MAX_IMAGENES})
         </p>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           {compacta && sugeridas.length > 0 && propias.length < MAX_IMAGENES && (
             <Button
               type="button"
@@ -304,7 +304,8 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
       {propias.length === 0 ? (
         compacta ? null : <p className="text-[11px] text-muted-foreground italic">Sin imágenes adjuntas.</p>
       ) : (
-        <div className={`grid gap-2 grid-cols-2 sm:grid-cols-3 ${compacta ? 'xl:grid-cols-2 2xl:grid-cols-3' : '2xl:grid-cols-4'}`}>
+        // En celular una imagen debajo de otra: a dos columnas el pie quedaba ilegible.
+        <div className={`grid gap-2 grid-cols-1 min-[480px]:grid-cols-2 md:grid-cols-3 ${compacta ? 'xl:grid-cols-2 2xl:grid-cols-3' : '2xl:grid-cols-4'}`}>
           {propias.map((img, idx) => {
             const esSugeridaIA = img.origen === 'IA_AUTO'
             return (
@@ -313,7 +314,7 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
                 <ImagenConLightbox
                   src={`/api/proyectos/${proyectoId}/plan-trabajo/alcance-imagenes/${img.id}/contenido`}
                   alt={img.caption ?? img.nombreArchivo}
-                  alturaClase="h-36"
+                  alturaClase="h-52 min-[480px]:h-36"
                   className={esSugeridaIA ? 'opacity-80' : ''}
                 />
                 {esSugeridaIA && (

@@ -108,6 +108,8 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
   const [regenerando, setRegenerando] = useState<SeccionRegenerable | null>(null)
   const [mensajeRegen, setMensajeRegen] = useState('')
   const [editandoSeccion, setEditandoSeccion] = useState<SeccionEditable | null>(null)
+  // Alcance Detallado: índice del EDT a editar solo (lápiz de cada EDT); null = todo.
+  const [edtEnfocado, setEdtEnfocado] = useState<number | null>(null)
   const [recienCreado, setRecienCreado] = useState(false)
   const [progresoGenerar, setProgresoGenerar] = useState(0)
   const [errorGeneracion, setErrorGeneracion] = useState<{ mensaje: string } | null>(null)
@@ -507,6 +509,7 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
           onSave={(v) => handleSaveSeccion('alcanceDetallado', v)}
           onGuardarParcial={(v) => handleSaveSeccion('alcanceDetallado', v, { cerrar: false })}
           onCancel={() => setEditandoSeccion(null)}
+          soloEdt={edtEnfocado ?? undefined}
         />
       )}
       {editandoSeccion === 'eppRequeridos' && (
@@ -628,9 +631,14 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
           onRegen={handleRegen}
           regenerando={regenerando}
           mensajeRegen={mensajeRegen}
-          onEditar={() => setEditandoSeccion('alcanceDetallado')}
+          onEditar={() => { setEdtEnfocado(null); setEditandoSeccion('alcanceDetallado') }}
         >
-          <AlcanceDetalladoView plan={plan} proyectoId={proyectoId} imagenes={plan.imagenes} />
+          <AlcanceDetalladoView
+            plan={plan}
+            proyectoId={proyectoId}
+            imagenes={plan.imagenes}
+            onEditarEdt={(idx) => { setEdtEnfocado(idx); setEditandoSeccion('alcanceDetallado') }}
+          />
         </SeccionContainer>
 
         <SeccionContainer

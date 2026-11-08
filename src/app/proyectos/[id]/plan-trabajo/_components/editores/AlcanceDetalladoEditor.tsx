@@ -30,6 +30,12 @@ interface Props {
   /** Guarda sin cerrar el panel (botón "Guardar actividad"). */
   onGuardarParcial: (v: PlanAlcanceDetalladoEdt[]) => Promise<void>
   onCancel: () => void
+  /**
+   * Índice del EDT a editar solo (lápiz de cada EDT en la vista). Se muestra
+   * únicamente ese EDT y al guardar se reemplaza solo ese sobre lo que esté
+   * guardado en el servidor en ese momento. Sin él, se edita todo el alcance.
+   */
+  soloEdt?: number
 }
 
 const edtVacio = (): PlanAlcanceDetalladoEdt => ({
@@ -73,7 +79,7 @@ function contarEstadoEdt(item: PlanAlcanceDetalladoEdt, imagenes: PlanTrabajoIma
   return { tareas, imagenes: totalImagenes, fotosPendientes, sugeridasIA }
 }
 
-export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos, imagenes, onImagenesChanged, onSave, onGuardarParcial, onCancel }: Props) {
+export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos, imagenes, onImagenesChanged, onSave, onGuardarParcial, onCancel, soloEdt }: Props) {
   const [items, setItems] = useState<PlanAlcanceDetalladoEdt[]>(
     valor.length > 0 ? valor : [edtVacio()]
   )
@@ -82,9 +88,17 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
   // guarda solo esa actividad sobre lo ya guardado) y para saber qué cambió.
   const [guardado, setGuardado] = useState<PlanAlcanceDetalladoEdt[]>(() => (valor.length > 0 ? valor : [edtVacio()]))
   const [guardandoActividad, setGuardandoActividad] = useState<string | null>(null)
+  // EDT enfocado (null = todo el alcance). "Ver todo el alcance" lo suelta.
+  const [foco, setFoco] = useState<number | null>(
+    soloEdt != null && soloEdt >= 0 && soloEdt < items.length ? soloEdt : null
+  )
+  // Acordeón controlado: todo cerrado al abrir el alcance completo (se navega
+  // con el índice); abierto solo el EDT enfocado.
+  const [abiertos, setAbiertos] = useState<string[]>(foco != null ? [String(foco)] : [])
   // Cambios sin guardar: el panel se cerraba al hacer clic afuera o con Esc y
   // se perdía todo lo editado sin aviso (el botón Guardar está al final).
-  const hayCambios = JSON.stringify(items) !== JSON.stringify(guardado)
+  const edtCambiado = (idx: number) => JSON.stringify(items[idx]) !== JSON.stringify(guardado[idx])
+  const hayCambios = foco != null ? edtCambiado(foco) : JSON.stringify(items) !== JSON.stringify(guardado)
   const actividadCambiada = (edtIdx: number, subIdx: number) =>
     JSON.stringify(items[edtIdx]?.subItems?.[subIdx]) !== JSON.stringify(guardado[edtIdx]?.subItems?.[subIdx])
 
@@ -92,6 +106,30 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
   // rechaza una viñeta vacía y el error no dice cuál es).
   const hayTareaManualVacia = (edts: PlanAlcanceDetalladoEdt[]) =>
     edts.some(e => (e.subItems ?? []).some(s => (s.tareas ?? []).some(t => t.manualId && !t.texto.trim())))
+
+  /**
+   * Modo un EDT: pone ese EDT sobre el alcance que está guardado AHORA en el
+   * servidor (no sobre la copia de cuando se abrió el panel), así no se pisa
+   * lo que otra persona haya guardado mientras tanto en otros EDTs.
+   */
+  const fusionarConServidor = async (edt: PlanAlcanceDetalladoEdt, idx: number): Promise<PlanAlcanceDetalladoEdt[]> => {
+    const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/contexto`)
+    if (!res.ok) throw new Error(`no se pudo leer el plan actual (HTTP ${res.status})`)
+    const { data } = await res.json()
+    const actual = ((data?.planTrabajo?.alcanceDetallado ?? []) as PlanAlcanceDetalladoEdt[])
+    const pos = edt.edtRefId
+      ? actual.findIndex(e => e.edtRefId === edt.edtRefId)
+      : (idx < actual.length && !actual[idx].edtRefId ? idx : -1)
+    if (pos < 0) throw new Error('este EDT ya no está en el plan guardado (se quitó o se regeneró el alcance). Recargá la página.')
+    const copia = [...actual]
+    copia[pos] = edt
+    return copia
+  }
+
+  const irAEdt = (idx: number) => {
+    setAbiertos(prev => (prev.includes(String(idx)) ? prev : [...prev, String(idx)]))
+    setTimeout(() => document.getElementById(`alcance-edt-${idx}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
+  }
 
   // Guarda SOLO esta actividad: la copia sobre lo ya guardado y manda todo el
   // alcance (el PATCH es por sección). Si la estructura del EDT cambió
@@ -114,7 +152,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
     }
     setGuardandoActividad(`${edtIdx}-${subIdx}`)
     try {
-      await onGuardarParcial(nuevo)
+      await onGuardarParcial(foco != null ? await fusionarConServidor(nuevo[edtIdx], edtIdx) : nuevo)
       setGuardado(nuevo)
       toast.success(`Actividad guardada${mismaEstructura ? '' : ' (con su EDT)'}`)
     } catch (e) {
@@ -307,12 +345,17 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
     }))
 
   const handleSave = async () => {
-    if (hayTareaManualVacia(items)) {
+    if (hayTareaManualVacia(foco != null ? [items[foco]] : items)) {
       toast.error('Hay una tarea agregada a mano sin texto: escríbela o quítala')
       return
     }
     setSaving(true)
     try {
+      if (foco != null) {
+        await onSave(await fusionarConServidor(items[foco], foco))
+        toast.success(`${items[foco].edtNombre || 'EDT'} guardado`)
+        return
+      }
       await onSave(items)
       toast.success('Alcance Detallado guardado')
     } catch (e) {
@@ -328,27 +371,74 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
       <SheetContent
         side="right"
         // Pantalla completa: con tareas, viñetas e imágenes lado a lado el panel angosto se leía mal.
-        className="w-screen sm:max-w-none overflow-y-auto bg-slate-50"
+        className="w-screen sm:max-w-none overflow-y-auto bg-slate-50 p-3 sm:p-6"
         // Solo se cierra con Cancelar, la X o Esc: un clic afuera (o en el
         // diálogo de biblioteca/subida de imágenes) lo cerraba y se perdía lo editado.
         onInteractOutside={(e) => e.preventDefault()}
       >
         <SheetHeader>
-          <SheetTitle>Editar Alcance Detallado</SheetTitle>
+          <SheetTitle className="flex flex-wrap items-center gap-x-3 gap-y-1 pr-8">
+            {foco != null
+              ? <span>Editar {items[foco].numeracion} {items[foco].edtNombre || '(sin nombre)'}</span>
+              : <span>Editar Alcance Detallado</span>}
+            {foco != null && items.length > 1 && (
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-xs font-normal"
+                title="Ver y editar todos los EDTs (al guardar se guarda todo el alcance)"
+                onClick={() => { setFoco(null); irAEdt(foco) }}
+              >
+                Ver todo el alcance
+              </Button>
+            )}
+          </SheetTitle>
         </SheetHeader>
 
         <div className="mx-auto mt-4 max-w-[1600px] space-y-3">
-          {/* Colapsado por defecto lo 'resumido' (Planificación/Ingeniería/Procura/Cierre);
-              expandido lo 'detallado' (Ejecución) — es donde hay más que revisar (Prioridad 4). */}
+          {/* Índice: con muchos EDTs había que bajar mucho para llegar a uno.
+              Todo arranca cerrado; un chip abre ese EDT y salta a él. */}
+          {foco == null && items.length > 1 && (
+            <div className="sticky -top-3 z-20 -mx-3 border-b bg-slate-50/95 px-3 py-2 backdrop-blur sm:-top-6 sm:-mx-6 sm:px-6">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {items.map((it, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => irAEdt(idx)}
+                    title={it.edtNombre}
+                    className={`max-w-[14rem] truncate rounded-full border px-2 py-0.5 text-[11px] transition-colors hover:border-indigo-400 hover:bg-indigo-50 ${
+                      abiertos.includes(String(idx)) ? 'border-indigo-300 bg-indigo-50 text-indigo-800' : 'bg-white text-gray-700'
+                    }`}
+                  >
+                    <span className="font-mono text-muted-foreground">{it.numeracion || '–'}</span>{' '}
+                    {it.edtNombre || '(sin nombre)'}
+                    {edtCambiado(idx) && <span className="ml-1 text-amber-600" title="Con cambios sin guardar">●</span>}
+                  </button>
+                ))}
+                <span className="ml-auto flex gap-1">
+                  <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={() => setAbiertos(items.map((_, i) => String(i)))}>
+                    Abrir todos
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={() => setAbiertos([])}>
+                    Cerrar todos
+                  </Button>
+                </span>
+              </div>
+            </div>
+          )}
           <Accordion
             type="multiple"
             className="space-y-2"
-            defaultValue={items.map((it, idx) => ({ it, idx })).filter(x => x.it.tipoDetalle === 'detallado').map(x => String(x.idx))}
+            value={abiertos}
+            onValueChange={setAbiertos}
           >
             {items.map((item, edtIdx) => {
+              if (foco != null && edtIdx !== foco) return null
               const estado = contarEstadoEdt(item, imagenes)
               return (
-              <AccordionItem key={edtIdx} value={String(edtIdx)} className="border rounded-lg px-4 bg-white shadow-sm">
+              <AccordionItem key={edtIdx} id={`alcance-edt-${edtIdx}`} value={String(edtIdx)} className="scroll-mt-14 border rounded-lg px-2 sm:px-4 bg-white shadow-sm">
                 <AccordionTrigger className="hover:no-underline py-2">
                   <div className="flex items-center gap-2 text-left min-w-0 flex-1">
                     <span className="text-xs font-mono text-muted-foreground shrink-0">{item.numeracion || '–'}</span>
@@ -556,7 +646,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                               <Trash2 size={12} />
                             </Button>
                           </div>
-                          <div className="space-y-3 p-3">
+                          <div className="space-y-3 p-2 sm:p-3">
                           {/* Descripción e imágenes lado a lado, igual que en las tareas:
                               la galería al final del bloque quedaba después de todas las
                               tareas y no se leía como parte de la actividad. */}
@@ -608,13 +698,15 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                   return (
                                     <div
                                       key={tarea.tareaRefId ?? tarea.manualId ?? tareaIdx}
-                                      className={`rounded-md border p-3 shadow-sm ${tarea.manualId ? 'bg-sky-50 border-dashed border-sky-300' : 'bg-white border-slate-200'} ${conGaleria ? 'grid gap-3 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]' : ''}`}
+                                      className={`rounded-md border p-2 shadow-sm sm:p-3 ${tarea.manualId ? 'bg-sky-50 border-dashed border-sky-300' : 'bg-white border-slate-200'} ${conGaleria ? 'grid gap-3 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]' : ''}`}
                                     >
-                                      <div className="flex items-start gap-2 min-w-0">
+                                      {/* En celular los botones bajan a su propia fila: al lado del
+                                          texto lo dejaban en una columna de una palabra por línea. */}
+                                      <div className="flex flex-wrap items-start gap-2 min-w-0 sm:flex-nowrap">
                                         <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-medium text-gray-600">
                                           {posVisible + 1}
                                         </span>
-                                        <div className="flex-1 min-w-0 space-y-1">
+                                        <div className="min-w-0 flex-1 basis-[calc(100%-1.75rem)] space-y-1 sm:basis-0">
                                           {/* Nombre de la tarea en el cronograma: la viñeta es la redacción para el documento. */}
                                           <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
                                             {tarea.manualId ? (
@@ -650,7 +742,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                             autoFocus={Boolean(tarea.manualId) && !tarea.texto}
                                           />
                                         </div>
-                                        <div className="flex shrink-0 items-center">
+                                        <div className="ml-auto flex shrink-0 items-center">
                                         {item.tipoDetalle === 'detallado' && !tarea.manualId && (
                                           <div className="shrink-0">
                                             <HintFotoSugerida
@@ -754,9 +846,12 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                     <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addSubItem(edtIdx)}>
                       <PlusCircle size={12} className="mr-1" /> Agregar actividad
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-red-500 hover:text-red-600" onClick={() => removeEdt(edtIdx)}>
-                      <Trash2 size={12} className="mr-1" /> Eliminar EDT
-                    </Button>
+                    {/* Quitar un EDT cambia los índices de todo el alcance: solo desde la edición completa. */}
+                    {foco == null && (
+                      <Button variant="ghost" size="sm" className="h-7 text-xs text-red-500 hover:text-red-600" onClick={() => removeEdt(edtIdx)}>
+                        <Trash2 size={12} className="mr-1" /> Eliminar EDT
+                      </Button>
+                    )}
                   </div>
                 </AccordionContent>
               </AccordionItem>
@@ -764,12 +859,14 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
             })}
           </Accordion>
 
-          <Button variant="outline" className="w-full" onClick={addEdt}>
-            <Plus size={14} className="mr-1" /> Agregar EDT
-          </Button>
+          {foco == null && (
+            <Button variant="outline" className="w-full" onClick={addEdt}>
+              <Plus size={14} className="mr-1" /> Agregar EDT
+            </Button>
+          )}
 
           {/* Fija abajo: el panel es largo y el botón quedaba fuera de vista. */}
-          <div className="sticky bottom-0 z-10 -mx-6 -mb-6 flex items-center justify-end gap-2 border-t bg-background px-6 py-3">
+          <div className="sticky bottom-0 z-10 -mx-3 -mb-3 flex items-center justify-end gap-2 border-t bg-background px-3 py-3 sm:-mx-6 sm:-mb-6 sm:px-6">
             {hayCambios && <span className="mr-auto text-xs text-amber-600">Cambios sin guardar</span>}
             <Button variant="outline" onClick={cerrar} disabled={saving}>Cancelar</Button>
             <Button onClick={handleSave} disabled={saving || !hayCambios}>
