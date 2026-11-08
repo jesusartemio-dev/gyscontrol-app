@@ -512,10 +512,10 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
 
   const valorContexto = { proyecto, setProyecto: handleDataUpdate, refreshProyecto, loading, cronogramaStats, costosReales, refreshCostosReales: () => { if (typeof id === 'string') fetchCostosReales(id) } }
 
-  // Plan de Trabajo (oficina y campo): en celular casi sin margen a los costados.
-  // El layout raíz ya deja 16 px y este contenedor sumaba otros 16 por lado:
-  // el texto del plan quedaba en una columna angosta. -mx-2.5 deja ~6 px.
-  const esPlanTrabajo = pathname.includes('/plan-trabajo')
+  // Plan de Trabajo (oficina y campo) y Cronograma: en celular casi sin margen
+  // a los costados. El layout raíz ya deja 16 px y este contenedor sumaba otros
+  // 16 por lado: el texto quedaba en una columna angosta. -mx-2.5 deja ~6 px.
+  const esPlanTrabajo = pathname.includes('/plan-trabajo') || pathname.endsWith('/cronograma')
   const anchoPlan = esPlanTrabajo ? '-mx-2.5 sm:mx-0' : ''
   const paddingContenedor = esPlanTrabajo ? 'px-0 py-2 sm:p-6' : 'p-4 sm:p-6'
 

@@ -219,8 +219,8 @@ export function CronogramaVarianza({ proyectoId, proyectoNombre }: CronogramaVar
       </div>
 
       {/* Filtro y acciones */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">Nivel:</span>
           <Select value={nivelFiltro} onValueChange={(v) => setNivelFiltro(v as any)}>
             <SelectTrigger className="w-[140px] h-8 text-xs">
@@ -252,35 +252,35 @@ export function CronogramaVarianza({ proyectoId, proyectoNombre }: CronogramaVar
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b bg-muted/50">
-                  {nivelFiltro !== 'edt' && <th className="text-left p-2 font-medium">Fase</th>}
-                  {nivelFiltro === 'tarea' && <th className="text-left p-2 font-medium">EDT</th>}
-                  <th className="text-left p-2 font-medium">
+                  {nivelFiltro !== 'edt' && <th className="hidden md:table-cell text-left p-2 font-medium">Fase</th>}
+                  {nivelFiltro === 'tarea' && <th className="hidden md:table-cell text-left p-2 font-medium">EDT</th>}
+                  <th className="sticky left-0 z-[1] bg-muted text-left p-2 font-medium md:static md:bg-transparent">
                     {nivelFiltro === 'edt' ? 'EDT' : nivelFiltro === 'actividad' ? 'Actividad' : 'Tarea'}
                   </th>
-                  <th className="text-center p-2 font-medium">Inicio Plan</th>
-                  <th className="text-center p-2 font-medium">Inicio Real</th>
+                  <th className="hidden md:table-cell text-center p-2 font-medium">Inicio Plan</th>
+                  <th className="hidden md:table-cell text-center p-2 font-medium">Inicio Real</th>
                   <th className="text-center p-2 font-medium">Delta Inicio</th>
                   <th className="text-center p-2 font-medium">Fin Plan</th>
                   <th className="text-center p-2 font-medium">Fin Real</th>
                   <th className="text-center p-2 font-medium">Delta Fin</th>
-                  <th className="text-right p-2 font-medium">H.Plan</th>
-                  <th className="text-right p-2 font-medium">H.Real</th>
+                  <th className="hidden md:table-cell text-right p-2 font-medium">H.Plan</th>
+                  <th className="hidden md:table-cell text-right p-2 font-medium">H.Real</th>
                   <th className="text-right p-2 font-medium">Delta H</th>
                   <th className="text-center p-2 font-medium">% Avance</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredVarianzas.map((v, i) => (
-                  <tr key={i} className={`border-b hover:bg-muted/30 ${getDeltaBg(v.deltaFinDias)}`}>
+                  <tr key={i} className={`border-b hover:bg-muted/30 ${getDeltaBg(v.deltaFinDias) || 'bg-white'}`}>
                     {nivelFiltro !== 'edt' && (
-                      <td className="p-2 text-muted-foreground">{v.faseNombre || '-'}</td>
+                      <td className="hidden md:table-cell p-2 text-muted-foreground">{v.faseNombre || '-'}</td>
                     )}
                     {nivelFiltro === 'tarea' && (
-                      <td className="p-2 text-muted-foreground">{v.edtNombre || '-'}</td>
+                      <td className="hidden md:table-cell p-2 text-muted-foreground">{v.edtNombre || '-'}</td>
                     )}
-                    <td className="p-2 font-medium max-w-[200px] truncate" title={v.nombre}>{v.nombre}</td>
-                    <td className="text-center p-2">{formatDate(v.fechaInicioPlan)}</td>
-                    <td className="text-center p-2">{formatDate(v.fechaInicioReal)}</td>
+                    <td className="sticky left-0 z-[1] bg-inherit p-2 font-medium min-w-[120px] max-w-[150px] break-words md:static md:max-w-[200px] md:truncate" title={v.nombre}>{v.nombre}</td>
+                    <td className="hidden md:table-cell text-center p-2">{formatDate(v.fechaInicioPlan)}</td>
+                    <td className="hidden md:table-cell text-center p-2">{formatDate(v.fechaInicioReal)}</td>
                     <td className={`text-center p-2 font-medium ${getDeltaColor(v.deltaIniciosDias)}`}>
                       <span className="inline-flex items-center gap-0.5">
                         {getDeltaIcon(v.deltaIniciosDias)}
@@ -295,8 +295,8 @@ export function CronogramaVarianza({ proyectoId, proyectoNombre }: CronogramaVar
                         {v.deltaFinDias !== null ? `${v.deltaFinDias > 0 ? '+' : ''}${v.deltaFinDias}d` : '-'}
                       </span>
                     </td>
-                    <td className="text-right p-2">{v.horasPlan > 0 ? v.horasPlan.toFixed(1) : '-'}</td>
-                    <td className="text-right p-2">{v.horasReales > 0 ? v.horasReales.toFixed(1) : '-'}</td>
+                    <td className="hidden md:table-cell text-right p-2">{v.horasPlan > 0 ? v.horasPlan.toFixed(1) : '-'}</td>
+                    <td className="hidden md:table-cell text-right p-2">{v.horasReales > 0 ? v.horasReales.toFixed(1) : '-'}</td>
                     <td className={`text-right p-2 font-medium ${v.deltaHoras > 0 ? 'text-red-600' : v.deltaHoras < 0 ? 'text-green-600' : ''}`}>
                       {v.horasPlan > 0 || v.horasReales > 0
                         ? `${v.deltaHoras > 0 ? '+' : ''}${v.deltaHoras.toFixed(1)}`

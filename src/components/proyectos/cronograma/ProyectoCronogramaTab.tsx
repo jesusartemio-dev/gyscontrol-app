@@ -694,7 +694,8 @@ export function ProyectoCronogramaTab({
   return (
     <div className="space-y-4">
       {/* Header Compacto */}
-      <div className="flex items-center gap-3 pb-3 border-b">
+      {/* flex-wrap: en celular los botones de la derecha quedaban fuera de pantalla. */}
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 pb-3 border-b">
         <Calendar className="h-5 w-5 text-indigo-500" />
         <h2 className="text-lg font-semibold">Cronograma</h2>
 
@@ -709,7 +710,7 @@ export function ProyectoCronogramaTab({
             }
           }}
         >
-          <SelectTrigger className="w-[180px] h-8 text-xs">
+          <SelectTrigger className="w-[150px] sm:w-[180px] h-8 text-xs">
             <SelectValue placeholder="Seleccionar cronograma...">
               {selectedCronograma && (() => {
                 const info = getTipoInfo(selectedCronograma.tipo)
@@ -1216,24 +1217,25 @@ export function ProyectoCronogramaTab({
 
       {/* Tabs de Vistas */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="h-9">
-          <TabsTrigger value="jerarquia" className="text-xs px-3">
-            <TreePine className="h-3.5 w-3.5 mr-1.5" />
-            Jerarquía
+        {/* En celular: ícono + nombre corto en una sola fila (antes "Varianza" quedaba cortada). */}
+        <TabsList className="h-9 max-w-full overflow-x-auto">
+          <TabsTrigger value="jerarquia" className="text-xs px-2 sm:px-3" title="Jerarquía">
+            <TreePine className="h-3.5 w-3.5 sm:mr-1.5" />
+            <span className="ml-1 sm:ml-0">Jerarquía</span>
           </TabsTrigger>
-          <TabsTrigger value="gantt" className="text-xs px-3">
-            <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
-            Gantt
+          <TabsTrigger value="gantt" className="text-xs px-2 sm:px-3" title="Gantt">
+            <BarChart3 className="h-3.5 w-3.5 sm:mr-1.5" />
+            <span className="ml-1 sm:ml-0">Gantt</span>
           </TabsTrigger>
           {/* Gantt Pro deshabilitado - funcionalidad consolidada en Gantt */}
-          <TabsTrigger value="tabla" className="text-xs px-3">
-            <Table2 className="h-3.5 w-3.5 mr-1.5" />
-            Tabla
+          <TabsTrigger value="tabla" className="text-xs px-2 sm:px-3" title="Tabla">
+            <Table2 className="h-3.5 w-3.5 sm:mr-1.5" />
+            <span className="hidden sm:inline">Tabla</span>
           </TabsTrigger>
           {tieneBaseline && tieneEjecucion && (
-            <TabsTrigger value="varianza" className="text-xs px-3">
-              <GitCompare className="h-3.5 w-3.5 mr-1.5" />
-              Varianza
+            <TabsTrigger value="varianza" className="text-xs px-2 sm:px-3" title="Varianza">
+              <GitCompare className="h-3.5 w-3.5 sm:mr-1.5" />
+              <span className="hidden sm:inline">Varianza</span>
             </TabsTrigger>
           )}
         </TabsList>

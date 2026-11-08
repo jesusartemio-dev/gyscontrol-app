@@ -129,11 +129,12 @@ export function PesosFasePanel({ proyectoId, onGuardado }: { proyectoId: string;
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/40 transition-colors"
+        // flex-wrap: en celular "Pesos por fase" se partía en dos líneas y el resto se apretaba.
+        className="w-full flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-2 text-left text-sm hover:bg-muted/40 transition-colors"
       >
-        {open ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-        <Scale className="h-4 w-4 text-indigo-500" />
-        <span className="font-medium">Pesos por fase</span>
+        {open ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+        <Scale className="h-4 w-4 shrink-0 text-indigo-500" />
+        <span className="whitespace-nowrap font-medium">Pesos por fase</span>
         <span className="text-muted-foreground text-xs">
           · Avance global <span className="font-mono font-semibold text-foreground">{avanceGlobal.toFixed(2)}%</span>
           {' · '}suma{' '}

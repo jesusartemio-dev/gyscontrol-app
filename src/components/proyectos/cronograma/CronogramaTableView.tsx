@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Table2 } from 'lucide-react'
+import { useIsMobile } from '@/lib/responsive/breakpoints'
 
 // Register all community modules
 import { ModuleRegistry } from 'ag-grid-community'
@@ -194,6 +195,11 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
     fetchData()
   }, [fetchData, proyectoId, cronogramaId, refreshKey])
 
+  // Celular: sin columna Tipo (el color de la fila ya lo dice) y Nombre fijo a
+  // la izquierda y angosto; el resto se desplaza a los costados. Antes el
+  // nombre pedía 300 px mínimos y se ajustaba todo al ancho: no se leía nada.
+  const esCelular = useIsMobile()
+
   const columnDefs = useMemo<ColDef<FlatRow>[]>(() => [
     {
       field: 'tipo',
@@ -201,13 +207,15 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
       width: 95,
       minWidth: 90,
       editable: false,
+      hide: esCelular,
       valueFormatter: (params: ValueFormatterParams) => TIPO_LABEL[params.value] || params.value,
     },
     {
       field: 'nombre',
       headerName: 'Nombre',
-      flex: 2,
-      minWidth: 300,
+      ...(esCelular
+        ? { pinned: 'left' as const, width: 150, minWidth: 150 }
+        : { flex: 2, minWidth: 300 }),
       editable: true,
       cellRenderer: NombreCellRenderer,
     },
@@ -312,7 +320,7 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
       editable: true,
       hide: true,
     },
-  ], [])
+  ], [esCelular])
 
   const filteredRowData = useMemo(() => {
     if (filtroTipo === 'todos') return rowData
@@ -392,7 +400,8 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
   }, [fetchData])
 
   const onGridReady = useCallback((params: GridReadyEvent) => {
-    params.api.sizeColumnsToFit()
+    // En celular no se encoge todo al ancho de pantalla: se desplaza.
+    if (!window.matchMedia('(max-width: 767px)').matches) params.api.sizeColumnsToFit()
   }, [])
 
   const getRowStyle = useCallback((params: any) => {
@@ -421,7 +430,7 @@ export function CronogramaTableView({ proyectoId, cronogramaId, refreshKey, hora
   return (
     <div>
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-3 py-2 border-b bg-gray-50/50 rounded-t-lg border border-b-0 border-gray-200">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-2 sm:px-3 py-2 border-b bg-gray-50/50 rounded-t-lg border border-b-0 border-gray-200">
         <div className="flex items-center gap-2">
           <Table2 className="h-4 w-4 text-blue-600" />
           <span className="text-sm font-semibold">Tabla</span>

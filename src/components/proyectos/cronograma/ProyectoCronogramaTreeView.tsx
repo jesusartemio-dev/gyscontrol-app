@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { textoDependenciaCreada } from '@/components/cronograma/dependenciasTexto'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, TreePine, Plus, Download, List, Filter, Trash2, Clock, Calculator, Lock } from 'lucide-react'
+import { RefreshCw, TreePine, Plus, Download, List, Filter, Trash2, Clock, Calculator, Lock, Columns3 } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -36,6 +36,7 @@ import { ProgramarActividadModal, type ModoProgramacion } from './ProgramarActiv
 import { CronogramaTreeViewProps, TreeNode as TreeNodeType, NodeType } from '../../cronograma/types'
 import type { EdtImportSelection } from '../../cronograma/ImportEdtModal'
 import { useProyectoCronogramaTree } from './hooks/useProyectoCronogramaTree'
+import { useIsMobile } from '@/lib/responsive/breakpoints'
 import '../../cronograma/CronogramaTreeView.css'
 
 // ── Wrapper sortable para cada fila del árbol ──────────────────────────────
@@ -130,6 +131,21 @@ export function ProyectoCronogramaTreeView({
   const showResponsableColumn = selectedCronograma?.tipo === 'ejecucion' || selectedCronograma?.tipo === 'planificacion'
   // Columna Peso: solo en ejecución (el peso por fase aplica al cronograma vivo)
   const showPesoColumn = selectedCronograma?.tipo === 'ejecucion'
+
+  // Celular: filas de dos líneas (nombre completo + avance/duración/fechas).
+  // "Ver todas las columnas" muestra la tabla completa desplazable con "#" y
+  // Nombre fijos. Se recuerda en este navegador.
+  const esCelular = useIsMobile()
+  const [verColumnas, setVerColumnasState] = useState(false)
+  useEffect(() => {
+    try { setVerColumnasState(localStorage.getItem('cronograma.verColumnas') === '1') } catch { /* sin storage */ }
+  }, [])
+  const setVerColumnas = (v: boolean) => {
+    setVerColumnasState(v)
+    try { localStorage.setItem('cronograma.verColumnas', v ? '1' : '0') } catch { /* sin storage */ }
+  }
+  const compacto = esCelular && !verColumnas
+  const nombreFijo = esCelular && verColumnas
 
   // ── Pesos por fase (para las columnas Peso / Peso Global / Peso Parcial del árbol) ──────
   // Map normNombreFase → { pesoEfectivo (%), horasFase (hh = horasEstimadas×personasEstimadas) }.
@@ -1046,6 +1062,8 @@ export function ProyectoCronogramaTreeView({
                     pesoGlobalHH={pesoPorNodo.get(nodeId)?.pesoGlobal}
                     pesoParcial={pesoPorNodo.get(nodeId)?.pesoParcial}
                     rowIndex={currentRowIndex}
+                    compacto={compacto}
+                    nombreFijo={nombreFijo}
                     dragListeners={dragListeners}
                     dragAttributes={dragAttributes}
                     isDragging={isDragging}
@@ -1094,12 +1112,17 @@ export function ProyectoCronogramaTreeView({
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <TreePine className="h-5 w-5 text-green-600" />
-            <div>
-              <CardTitle>Cronograma Jerárquico del Proyecto</CardTitle>
+      <CardHeader className="p-3 sm:p-6">
+        {/* En celular el título y los botones van en líneas separadas (antes el
+            último botón quedaba fuera de la tarjeta). */}
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div className="flex min-w-0 items-start gap-2 md:items-center">
+            <TreePine className="mt-1 h-5 w-5 shrink-0 text-green-600 md:mt-0" />
+            <div className="min-w-0">
+              <CardTitle className="text-base sm:text-2xl">
+                <span className="sm:hidden">Cronograma jerárquico</span>
+                <span className="hidden sm:inline">Cronograma Jerárquico del Proyecto</span>
+              </CardTitle>
               {selectedCronograma && (
                 <p className="text-sm text-muted-foreground mt-1">
                   Trabajando en: <span className="font-medium text-blue-600">{selectedCronograma.nombre}</span>
@@ -1126,11 +1149,22 @@ export function ProyectoCronogramaTreeView({
                 </p>
               )}
             </div>
-            <Badge variant="secondary">
+            <Badge variant="secondary" className="shrink-0 whitespace-nowrap">
               {state.nodes.size} elementos
             </Badge>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {esCelular && (
+              <Button
+                variant={verColumnas ? 'secondary' : 'outline'}
+                size="sm"
+                onClick={() => setVerColumnas(!verColumnas)}
+                title={verColumnas ? 'Volver a la vista compacta (nombre completo, dos líneas)' : 'Ver la tabla completa, desplazando a los costados'}
+              >
+                <Columns3 className="h-4 w-4 mr-1.5" />
+                {verColumnas ? 'Vista compacta' : 'Ver todas las columnas'}
+              </Button>
+            )}
             {(selectedCronograma?.tipo === 'ejecucion' || selectedCronograma?.tipo === 'planificacion') && (
               <Button
                 variant="outline"
@@ -1138,9 +1172,10 @@ export function ProyectoCronogramaTreeView({
                 onClick={handleRecalcularAvance}
                 disabled={recalculando || state.loadingNodes.has('root')}
                 title="Recalcula el % de avance de fases/EDTs/actividades desde el % de las tareas"
+                aria-label="Recalcular avance"
               >
-                <Calculator className={`h-4 w-4 mr-2 ${recalculando ? 'animate-spin' : ''}`} />
-                {recalculando ? 'Recalculando…' : 'Recalcular avance'}
+                <Calculator className={`h-4 w-4 sm:mr-2 ${recalculando ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{recalculando ? 'Recalculando…' : 'Recalcular avance'}</span>
               </Button>
             )}
             <Button
@@ -1148,15 +1183,18 @@ export function ProyectoCronogramaTreeView({
               size="sm"
               onClick={() => actions.loadTree([...state.expandedNodes])}
               disabled={state.loadingNodes.has('root')}
+              title="Actualizar"
+              aria-label="Actualizar"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${state.loadingNodes.has('root') ? 'animate-spin' : ''}`} />
-              Actualizar
+              <RefreshCw className={`h-4 w-4 sm:mr-2 ${state.loadingNodes.has('root') ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Actualizar</span>
             </Button>
-            <Button variant="outline" size="sm">
+            {/* "Vista Lista" y "Filtros" no tienen acción todavía: fuera en celular. */}
+            <Button variant="outline" size="sm" className="hidden md:inline-flex">
               <List className="h-4 w-4 mr-2" />
               Vista Lista
             </Button>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" className="hidden md:inline-flex">
               <Filter className="h-4 w-4 mr-2" />
               Filtros
             </Button>
@@ -1165,7 +1203,7 @@ export function ProyectoCronogramaTreeView({
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="p-1.5 pt-0 sm:p-6 sm:pt-0">
         {/* Aquí vivía un botón "Generar Cronograma" que regeneraba la estructura
             desde la cotización borrando todas las tareas. Se quitó: esta vista es
             donde se afinan recursos y responsables, y el botón destruía justamente
@@ -1173,7 +1211,7 @@ export function ProyectoCronogramaTreeView({
             La Línea Base se genera desde Acciones → "Generar con IA (desde catálogo)". */}
 
         {/* Árbol jerárquico */}
-        <div className="tree-container border rounded-lg">
+        <div className={`tree-container border rounded-lg ${nombreFijo ? 'overflow-x-auto' : ''}`}>
           {state.rootNodes.length === 0 && !state.loadingNodes.has('root') ? (
             <div className="text-center py-12 text-gray-500">
               {selectedCronograma?.tipo === 'comercial' ? (
@@ -1256,9 +1294,12 @@ export function ProyectoCronogramaTreeView({
               )}
             </div>
           ) : (
-            <>
-              <TreeHeader showRecursoColumn={showRecursoColumn} showResponsableColumn={showResponsableColumn} showPesoColumn={showPesoColumn} showNumeroColumn />
-              <div className="p-2">
+            <div className={nombreFijo ? 'w-max min-w-full' : ''}>
+              {/* Compacta: sin cabecera de columnas (cada fila ya dice qué es cada dato). */}
+              {!compacto && (
+                <TreeHeader showRecursoColumn={showRecursoColumn} showResponsableColumn={showResponsableColumn} showPesoColumn={showPesoColumn} showNumeroColumn nombreFijo={nombreFijo} />
+              )}
+              <div className={compacto ? 'p-1' : 'p-2'}>
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
@@ -1275,7 +1316,7 @@ export function ProyectoCronogramaTreeView({
                   </DragOverlay>
                 </DndContext>
               </div>
-            </>
+            </div>
           )}
         </div>
 

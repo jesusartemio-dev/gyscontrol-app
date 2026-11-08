@@ -42,6 +42,7 @@ import {
   Link2
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useIsMobile } from '@/lib/responsive/breakpoints'
 import { toast as sonnerToast } from 'sonner'
 import { differenceInDays, differenceInCalendarDays, addDays, addMonths, startOfMonth, startOfWeek, format, isSameMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -193,6 +194,7 @@ const fondoFila = (idx: number) => (idx % 2 === 1 ? 'bg-gray-50' : 'bg-white')
 const ANCHO_NOMBRES_DEFECTO = 340
 const ANCHO_NOMBRES_MIN = 220
 const ANCHO_NOMBRES_MAX = 640
+const ANCHO_NOMBRES_CELULAR = 130
 
 export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selectedId, onSelect, refreshKey }: ProyectoGanttViewProps) {
   const [prefsIniciales] = useState(() => leerPrefs(proyectoId))
@@ -216,8 +218,13 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   // Fila bajo el mouse (índice en visibleItems), compartida entre nombres y barras.
   const [filaHover, setFilaHover] = useState<number | null>(null)
   const { fila: ROW_HEIGHT, margenBarra: MARGEN_BARRA, texto: claseTextoNombre } = DENSIDADES[densidad]
+  // Celular: columna de nombres angosta y fija (con 220-340 px tapaba toda la
+  // pantalla y no se veían las barras). El nombre completo sale al tocarlo.
+  // No se arrastra ni se guarda: el ancho de PC se respeta tal cual.
+  const esCelular = useIsMobile()
+  const anchoNom = esCelular ? ANCHO_NOMBRES_CELULAR : anchoNombres
   // Ancho visible para la línea de tiempo (tarjeta menos la columna de nombres).
-  const containerWidth = anchoCard > 0 ? Math.max(0, anchoCard - anchoNombres) : 0
+  const containerWidth = anchoCard > 0 ? Math.max(0, anchoCard - anchoNom) : 0
   const { toast } = useToast()
   const bodyScrollRef = useRef<HTMLDivElement>(null)
   const headerScrollRef = useRef<HTMLDivElement>(null)
@@ -656,8 +663,9 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   return (
     <Card ref={containerRef}>
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-3 py-2 border-b bg-gray-50/50">
-        <div className="flex items-center gap-2">
+      {/* flex-wrap: en celular la barra de herramientas no entraba en una fila. */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-2 sm:px-3 py-2 border-b bg-gray-50/50">
+        <div className="hidden sm:flex items-center gap-2">
           <Calendar className="h-4 w-4 text-blue-600" />
           <span className="text-sm font-semibold">Diagrama de Gantt</span>
           <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
@@ -665,9 +673,9 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
           </Badge>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <Select value={filtroNivel} onValueChange={setFiltroNivel}>
-            <SelectTrigger className="h-7 w-36 text-xs">
+            <SelectTrigger className="h-7 w-32 sm:w-36 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -694,7 +702,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
           </Select>
 
           <Select value={densidad} onValueChange={(v) => setDensidad(v as Densidad)}>
-            <SelectTrigger className="h-7 w-28 text-xs" title="Altura de las filas">
+            <SelectTrigger className="hidden sm:flex h-7 w-28 text-xs" title="Altura de las filas">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -710,8 +718,8 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
             onClick={() => setMostrarDependencias(v => !v)}
             title="Mostrar u ocultar las flechas de dependencias (en rojo las que no se cumplen)"
           >
-            <Link2 className="h-3.5 w-3.5 mr-1" />
-            Dependencias
+            <Link2 className="h-3.5 w-3.5 sm:mr-1" />
+            <span className="hidden sm:inline">Dependencias</span>
           </Button>
 
           <div className="w-px h-4 bg-gray-200" />
@@ -740,8 +748,8 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
             <ChevronsDownUp className="h-3.5 w-3.5" />
           </Button>
           <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={recargar} disabled={recargando} title="Recargar solo el Gantt">
-            <RefreshCw className={`h-3.5 w-3.5 mr-1 ${recargando ? 'animate-spin' : ''}`} />
-            Actualizar
+            <RefreshCw className={`h-3.5 w-3.5 sm:mr-1 ${recargando ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Actualizar</span>
           </Button>
 
           <div className="w-px h-4 bg-gray-200" />
@@ -783,21 +791,43 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
         </DialogContent>
       </Dialog>
 
+      {/* Celular: la columna de nombres es angosta; el elemento tocado se lee
+          completo acá, con sus fechas, avance y duración. */}
+      {esCelular && (() => {
+        const sel = seleccionId ? visibleItems.find(i => i.id === seleccionId) : undefined
+        return (
+          <div className="border-b bg-blue-50/60 px-2 py-1.5 text-xs">
+            {sel ? (
+              <>
+                <p className="font-medium leading-snug text-gray-900">{sel.nombre}</p>
+                <p className="text-[11px] text-gray-600">
+                  {format(sel.fechaInicio, 'dd MMM', { locale: es })} – {format(sel.fechaFin, 'dd MMM yyyy', { locale: es })}
+                  {' · '}{Math.round(sel.porcentajeAvance)}%
+                  {sel.duracionTexto ? ` · ${sel.duracionTexto}` : ''}
+                </p>
+              </>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">Tocá un elemento para ver su nombre completo y sus fechas.</p>
+            )}
+          </div>
+        )
+      })()}
+
       <CardContent className="p-0">
         {/* Cabecera de fechas fija arriba al bajar por la página (como MS Project).
             Va fuera del scroll horizontal (que impediría fijarla) y se desplaza
             en horizontal junto con las barras (ver onScroll del cuerpo). La
             columna de nombres queda fija a la izquierda en ambos. */}
         <div ref={headerScrollRef} className="sticky top-14 md:top-0 z-50 overflow-hidden bg-white">
-          <div style={{ width: anchoNombres + timeline.totalWidth, minWidth: '100%' }}>
+          <div style={{ width: anchoNom + timeline.totalWidth, minWidth: '100%' }}>
           {/* Header row: name col + timeline months */}
           <div className="flex border-b bg-white">
             <div
               className="sticky left-0 z-40 flex-shrink-0 border-r border-gray-200 bg-gray-50 px-2 py-1.5"
-              style={{ width: anchoNombres }}
+              style={{ width: anchoNom }}
             >
               <span className="text-xs font-medium text-gray-600">Elemento</span>
-              {asaRedimension}
+              {!esCelular && asaRedimension}
             </div>
             <div className="flex-shrink-0" style={{ width: timeline.totalWidth }}>
               {/* Nivel superior: meses */}
@@ -839,14 +869,14 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
           ref={bodyScrollRef}
           onScroll={(e) => { if (headerScrollRef.current) headerScrollRef.current.scrollLeft = e.currentTarget.scrollLeft }}
         >
-          <div style={{ width: anchoNombres + timeline.totalWidth, minWidth: '100%' }}>
+          <div style={{ width: anchoNom + timeline.totalWidth, minWidth: '100%' }}>
           <div className="flex">
             {/* Name column (fija a la izquierda; fondos opacos para tapar las barras al pasar debajo) */}
             <div
               className="sticky left-0 z-40 flex-shrink-0 bg-white border-r border-gray-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]"
-              style={{ width: anchoNombres }}
+              style={{ width: anchoNom }}
             >
-              {asaRedimension}
+              {!esCelular && asaRedimension}
               {visibleItems.map((item, rowIdx) => {
                 const colors = TIPO_COLORS[item.tipo] || TIPO_COLORS.tarea
                 return (
@@ -864,7 +894,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                   >
                     <div
                       className="flex items-center gap-1 px-2 w-full min-w-0"
-                      style={{ paddingLeft: item.nivel * 16 + 8 }}
+                      style={{ paddingLeft: esCelular ? item.nivel * 6 + 2 : item.nivel * 16 + 8 }}
                     >
                       {/* Expand toggle */}
                       <div className="w-4 flex-shrink-0">

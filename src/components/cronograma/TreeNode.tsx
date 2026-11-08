@@ -13,7 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { TreeNode as TreeNodeType, NodeType } from './types'
 import { TreeNodeProgress } from './TreeNodeProgress'
-import { columnasArbol } from './TreeHeader'
+import { columnasArbol, celdaFija } from './TreeHeader'
 
 interface RelacionAnterior {
   tipo: 'secuencia' | 'paralelo' | 'solape' | 'hueco' | 'antes'
@@ -204,6 +204,13 @@ interface TreeNodeProps {
   dragAttributes?: Record<string, any>
   isDragging?: boolean
   rowIndex?: number
+  /**
+   * Celular: fila en dos líneas (nombre completo arriba; avance, duración y
+   * fechas abajo). Tipo, work, HH, pesos, recurso y responsable no se muestran.
+   */
+  compacto?: boolean
+  /** Celular con "Ver todas las columnas": "#" y Nombre fijos al desplazar. */
+  nombreFijo?: boolean
 }
 
 // Redondea a 1 decimal y quita el ".0" sobrante — evita mostrar artefactos de
@@ -283,9 +290,27 @@ export function TreeNode({
   dragListeners,
   dragAttributes,
   isDragging,
-  rowIndex
+  rowIndex,
+  compacto = false,
+  nombreFijo = false
 }: TreeNodeProps) {
   const config = NODE_CONFIG[node.type]
+  // Fila compacta (celular): misma estructura de celdas, otro acomodo con
+  // grid-template-areas; las columnas que no entran se ocultan.
+  const area = (a: string): React.CSSProperties | undefined => (compacto ? { gridArea: a } : undefined)
+  const oculta = compacto ? 'hidden' : ''
+  const sangria = compacto ? node.level * 10 : node.level * 16 + 8
+  const fijoNum = celdaFija(nombreFijo, 'numero', !!showNumeroColumn)
+  const fijoNom = celdaFija(nombreFijo, 'nombre', !!showNumeroColumn)
+  const estiloGrid: React.CSSProperties = compacto
+    ? {
+        gridTemplateColumns: `${showNumeroColumn ? '26px ' : ''}auto auto minmax(0,1fr) 28px`,
+        gridTemplateAreas: showNumeroColumn
+          ? '"num nom nom nom acc" ". pro dur fec acc"'
+          : '"nom nom nom acc" "pro dur fec acc"',
+        rowGap: '1px',
+      }
+    : { gridTemplateColumns: columnasArbol({ showRecursoColumn, showResponsableColumn, showPesoColumn, showNumeroColumn, nombreFijo }) }
   const hasChildren = node.metadata.hasChildren
   const isExpanded = node.expanded
   const isLoading = node.loading
@@ -421,23 +446,32 @@ export function TreeNode({
       // la izquierda) para que se vea qué fila se está editando. El hover es
       // más suave para no confundirse con la selección. La barra es un
       // box-shadow para no correr el contenido.
-      className={`tree-node group ${isDragging ? 'opacity-40' : ''} ${isSelected || dropdownOpen ? 'bg-blue-200/80 shadow-[inset_4px_0_0_0_#2563eb]' : `${rowIndex != null && rowIndex % 2 === 0 ? 'bg-gray-100' : ''} hover:bg-blue-50`} py-0.5 cursor-pointer transition-colors`}
+      // Con nombre fijo, las filas sin franja van en blanco: la celda fija hereda
+      // el fondo de la fila y transparente dejaba ver lo que pasa por debajo.
+      // La selección opaca (sin /80) por lo mismo.
+      className={`tree-node group ${isDragging ? 'opacity-40' : ''} ${isSelected || dropdownOpen ? `${nombreFijo ? 'bg-blue-200' : 'bg-blue-200/80'} shadow-[inset_4px_0_0_0_#2563eb]` : `${rowIndex != null && rowIndex % 2 === 0 ? 'bg-gray-100' : nombreFijo ? 'bg-white' : ''} hover:bg-blue-50`} ${compacto ? 'py-1 border-b border-gray-100' : 'py-0.5'} cursor-pointer transition-colors`}
       onClick={onSelect}
       data-node-id={node.id}
     >
       <div
-        className="grid items-center gap-1"
-        style={{ gridTemplateColumns: columnasArbol({ showRecursoColumn, showResponsableColumn, showPesoColumn, showNumeroColumn }) }}
+        className={`grid gap-1 ${compacto ? 'items-start' : 'items-center'}`}
+        style={estiloGrid}
       >
         {/* Columna 0 (opcional): N° de fila, como el ID de MS Project */}
         {showNumeroColumn && (
-          <div className="text-right pr-1 text-[10px] font-mono text-gray-400 tabular-nums">
+          <div
+            className={`text-right pr-1 text-[10px] font-mono text-gray-400 tabular-nums ${compacto ? 'pt-0.5' : ''} ${fijoNum.className}`}
+            style={{ ...fijoNum.style, ...area('num') }}
+          >
             {node.data?.numero ?? ''}
           </div>
         )}
 
         {/* Columna 1: Nombre con indentación */}
-        <div className="flex items-center gap-1 min-w-0" style={{ paddingLeft: `${node.level * 16 + 8}px` }}>
+        <div
+          className={`flex items-center gap-1 min-w-0 ${compacto ? 'flex-wrap' : ''} ${fijoNom.className}`}
+          style={{ ...fijoNom.style, ...area('nom'), paddingLeft: `${sangria}px` }}
+        >
           {/* Drag handle — visible on hover when draggable */}
           {dragListeners && (
             <div
@@ -473,7 +507,7 @@ export function TreeNode({
           <span className="text-xs shrink-0">
             {node.data?.isExtrasGroup ? '✨' : node.data?.esExtra ? '➕' : node.data?.esPropuestaIA ? '🤖' : config.icon}
           </span>
-          <span className={`text-xs font-medium truncate ${node.data?.isExtrasGroup ? 'text-amber-700 italic' : 'text-gray-900'}`}>
+          <span className={`text-xs font-medium ${compacto ? 'min-w-0 break-words whitespace-normal leading-snug' : 'truncate'} ${node.data?.isExtrasGroup ? 'text-amber-700 italic' : 'text-gray-900'}`}>
             {node.nombre}
           </span>
 
@@ -562,7 +596,10 @@ export function TreeNode({
         </div>
 
         {/* Columna 2: Progreso */}
-        <div className="flex justify-center">
+        <div
+          className={`flex ${compacto ? 'justify-start' : 'justify-center'}`}
+          style={compacto ? { ...area('pro'), paddingLeft: `${sangria + 22}px` } : undefined}
+        >
           <TreeNodeProgress
             percentage={node.metadata.progressPercentage}
             status={mapStatusForProgress(node.metadata.status)}
@@ -571,7 +608,7 @@ export function TreeNode({
         </div>
 
         {/* Columna 3: Tipo */}
-        <div className="flex justify-center">
+        <div className={`flex justify-center ${oculta}`}>
           {node.data?.isExtrasGroup ? (
             <Badge variant="outline" className="text-[9px] leading-none px-1 py-0 h-4 shrink-0 bg-amber-50 text-amber-700 border-amber-300">
               Extras
@@ -584,7 +621,10 @@ export function TreeNode({
         </div>
 
         {/* Columna 4: Fechas (+ relación con el elemento de arriba) */}
-        <div className="flex items-center justify-center gap-1 text-[11px] text-gray-500 min-w-0">
+        <div
+          className={`flex items-center gap-1 text-[11px] text-gray-500 min-w-0 ${compacto ? 'justify-start' : 'justify-center'}`}
+          style={area('fec')}
+        >
           {node.type === 'tarea' && node.data?.predecesoras?.length
             ? <DependenciaFechas predecesoras={node.data.predecesoras} onIrATarea={onIrATarea} />
             : <RelacionAnteriorIcono relacion={node.data.relacionAnterior} />}
@@ -592,7 +632,7 @@ export function TreeNode({
         </div>
 
         {/* Columna 5: Duración por horas laborables, como MS Project ("4h", "1.5d", "0d") */}
-        <div className="text-right text-[11px] text-gray-500 font-mono pr-1">
+        <div className="text-right text-[11px] text-gray-500 font-mono pr-1" style={area('dur')}>
           {esHitoTarea ? '0d' : node.data.duracionTexto && node.data.duracionHoras > 0 ? node.data.duracionTexto : node.type === 'tarea' && node.data.duracionTexto ? (
             // Inicio = Fin y no es hito: la duración real es 0 (antes se mostraba
             // "1d" contando días de calendario, y el formulario decía 0d).
@@ -604,32 +644,32 @@ export function TreeNode({
         </div>
 
         {/* Columna 6: Work (horasEstimadas) */}
-        <div className="text-right text-[11px] text-gray-600 font-mono pr-1">
+        <div className={`text-right text-[11px] text-gray-600 font-mono pr-1 ${oculta}`}>
           {totalHours > 0 ? `${formatHoras(totalHours)}h` : ''}
         </div>
 
         {/* Columna 7: HH real (horasEstimadas × personas del recurso — nunca personasEstimadas) */}
-        <div className="text-right text-[11px] text-gray-700 font-mono pr-1" title="Horas-hombre real: Work × personas del recurso asignado">
+        <div className={`text-right text-[11px] text-gray-700 font-mono pr-1 ${oculta}`} title="Horas-hombre real: Work × personas del recurso asignado">
           {totalHorasHombre > 0 ? `${formatHoras(totalHorasHombre)}h` : ''}
         </div>
 
         {/* Columna: Peso Global (hh-hombre, normalizado al proyecto) */}
         {showPesoColumn && (
-          <div className="text-right text-[11px] text-indigo-500 font-mono pr-1">
+          <div className={`text-right text-[11px] text-indigo-500 font-mono pr-1 ${oculta}`}>
             {pesoGlobalHH != null && pesoGlobalHH > 0 ? `${pesoGlobalHH.toFixed(1)}%` : ''}
           </div>
         )}
 
         {/* Columna: Peso Parcial (hh dentro del padre inmediato) */}
         {showPesoColumn && (
-          <div className="text-right text-[11px] text-violet-600 font-mono pr-1">
+          <div className={`text-right text-[11px] text-violet-600 font-mono pr-1 ${oculta}`}>
             {pesoParcial != null && pesoParcial > 0 ? `${pesoParcial.toFixed(1)}%` : ''}
           </div>
         )}
 
         {/* Columna: Recurso */}
         {showRecursoColumn && (
-          <div className="text-center text-[11px] truncate">
+          <div className={`text-center text-[11px] truncate ${oculta}`}>
             {node.type === 'tarea' ? (
               node.data.recursoNombre ? (
                 <span className="text-green-700 bg-green-50 border border-green-200 rounded px-1 py-0 text-[10px] truncate inline-block max-w-full">
@@ -680,7 +720,7 @@ export function TreeNode({
 
         {/* Columna: Responsable */}
         {showResponsableColumn && (
-          <div className="text-center text-[11px] truncate">
+          <div className={`text-center text-[11px] truncate ${oculta}`}>
             {(node.type === 'tarea' || node.type === 'edt' || node.type === 'actividad') && node.data.responsableNombre ? (
               <span className="text-blue-700 bg-blue-50 border border-blue-200 rounded px-1 py-0 text-[10px] truncate inline-block max-w-full">
                 {node.data.responsableNombre}
@@ -728,7 +768,7 @@ export function TreeNode({
         )}
 
         {/* Columna 8: Acciones */}
-        <div className="flex justify-center">
+        <div className={`flex justify-center ${compacto ? 'self-center' : ''}`} style={area('acc')}>
           {node.data?.isExtrasGroup ? (
             // Pseudo-nodo: no se edita ni se borra, solo muestra sus hijos
             <span className="w-5 h-5" />

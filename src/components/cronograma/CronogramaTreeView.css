@@ -102,11 +102,9 @@
 }
 
 /* Responsive */
+/* Sin margen extra por nivel en .tree-children: la sangría ya va dentro del
+   nombre, y sumarla corría las columnas de cada nivel (no quedaban alineadas). */
 @media (max-width: 768px) {
-  .tree-children {
-    @apply ml-2 pl-2;
-  }
-
   .tree-node {
     @apply text-sm;
   }
