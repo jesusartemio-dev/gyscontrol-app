@@ -115,7 +115,7 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes, onEditarEdt }
             </div>
             <div className="space-y-3">
               {grupos[faseNombre].map((item, i) => (
-                <div key={i} className="border rounded-md p-3 space-y-1.5">
+                <div key={i} className="border rounded-md p-2.5 sm:p-3 space-y-1.5">
                   <div className="flex items-start gap-2">
                     <span className="text-xs font-mono text-muted-foreground shrink-0 mt-0.5">
                       {item.numeracion}
@@ -134,18 +134,18 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes, onEditarEdt }
                     )}
                   </div>
                   {item.ubicacion && (
-                    <p className="text-xs text-muted-foreground ml-8">📍 {item.ubicacion}</p>
+                    <p className="text-xs text-muted-foreground sm:ml-8">📍 {item.ubicacion}</p>
                   )}
                   {item.descripcion && (
-                    <p className="text-xs text-gray-600 ml-8 leading-relaxed">{item.descripcion}</p>
+                    <p className="text-xs text-gray-600 sm:ml-8 leading-relaxed">{item.descripcion}</p>
                   )}
                   {item.tipoDetalle === 'detallado' && item.edtRefId && (
-                    <div className="ml-8">
+                    <div className="sm:ml-8">
                       <GaleriaSoloLectura proyectoId={proyectoId} edtRef={item.edtRefId} nombreDefault={item.edtNombre} imagenes={imagenes} numerosDeFigura={numerosDeFigura} />
                     </div>
                   )}
                   {(item.subItems ?? []).length > 0 && (
-                    <div className="ml-8 mt-2 space-y-2 border-l-2 border-indigo-100 pl-3">
+                    <div className="ml-8 mt-2 space-y-2 border-l-2 border-indigo-100 pl-2 sm:pl-3">
                       {(item.subItems ?? []).map((sub, si) => (
                         <div key={si} className="space-y-1">
                           <div className="flex items-baseline gap-1.5">
@@ -246,7 +246,7 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes, onEditarEdt }
       {raw.map((item, i) => {
         if (isNuevoFormato(item)) {
           return (
-            <div key={i} className="border rounded-md p-3 space-y-1.5">
+            <div key={i} className="border rounded-md p-2.5 sm:p-3 space-y-1.5">
               <div className="flex items-start gap-2">
                 <span className="text-xs font-mono text-muted-foreground shrink-0 mt-0.5">
                   {item.numeracion}
@@ -254,14 +254,14 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes, onEditarEdt }
                 <span className="text-sm font-semibold text-gray-800">{item.edtNombre}</span>
               </div>
               {item.descripcion && (
-                <p className="text-xs text-gray-600 ml-8 leading-relaxed">{item.descripcion}</p>
+                <p className="text-xs text-gray-600 sm:ml-8 leading-relaxed">{item.descripcion}</p>
               )}
             </div>
           )
         }
         const legacy = item as PlanAlcanceItem
         return (
-          <div key={i} className="border rounded-md p-3 space-y-1.5">
+          <div key={i} className="border rounded-md p-2.5 sm:p-3 space-y-1.5">
             <div className="flex items-start gap-2">
               <span className="text-xs font-mono text-muted-foreground shrink-0 mt-0.5">
                 {legacy.numero}
@@ -269,7 +269,7 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes, onEditarEdt }
               <span className="text-sm font-semibold text-gray-800">{legacy.nombre}</span>
             </div>
             {legacy.descripcion && (
-              <p className="text-xs text-gray-600 ml-8 leading-relaxed">{legacy.descripcion}</p>
+              <p className="text-xs text-gray-600 sm:ml-8 leading-relaxed">{legacy.descripcion}</p>
             )}
           </div>
         )

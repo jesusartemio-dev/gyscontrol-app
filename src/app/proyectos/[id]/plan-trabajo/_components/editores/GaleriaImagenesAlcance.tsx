@@ -7,11 +7,12 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, Trash2, Upload, ChevronUp, ChevronDown, ImageIcon, LibraryBig, Search, Sparkles, Check } from 'lucide-react'
+import { Loader2, Trash2, Upload, ChevronUp, ChevronDown, ImageIcon, LibraryBig, Search, Sparkles, Check, ClipboardPaste } from 'lucide-react'
 import type { PlanTrabajoImagen, CatalogoImagen } from '@prisma/client'
 import { captionEfectivo } from '@/lib/planTrabajo/imagenCaption'
 import { matchearSugerenciasCatalogoImagen } from '@/lib/catalogoImagenes/matchearSugerencias'
 import { ImagenConLightbox } from '@/components/catalogoImagenes/ImagenConLightbox'
+import { leerImagenesPortapapeles } from '../CopiarPegarTexto'
 
 interface Props {
   proyectoId: string
@@ -116,7 +117,13 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
     img.keywords.some(k => k.toLowerCase().includes(busquedaPicker.toLowerCase()))
   )
 
-  const handleUpload = async (files: FileList | null) => {
+  // Pegar una imagen copiada (de una IA, WhatsApp, una captura…): se sube igual que con "Subir".
+  const pegarImagen = async () => {
+    const archivos = await leerImagenesPortapapeles()
+    if (archivos) await handleUpload(archivos)
+  }
+
+  const handleUpload = async (files: FileList | File[] | null) => {
     if (!files || files.length === 0) return
     if (propias.length + files.length > MAX_IMAGENES) {
       toast.error(`Máximo ${MAX_IMAGENES} imágenes por actividad`)
@@ -272,6 +279,18 @@ export const GaleriaImagenesAlcance = forwardRef<GaleriaImagenesAlcanceHandle, P
           >
             {subiendo ? <Loader2 size={14} className="animate-spin mr-1" /> : <Upload size={14} className="mr-1" />}
             Subir
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs px-2.5"
+            title="Pegar una imagen copiada (de una IA, WhatsApp, captura…)"
+            disabled={subiendo || propias.length >= MAX_IMAGENES}
+            onClick={pegarImagen}
+          >
+            <ClipboardPaste size={14} className="mr-1" />
+            Pegar
           </Button>
         </div>
         <input

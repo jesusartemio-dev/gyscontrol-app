@@ -16,6 +16,7 @@ import { GaleriaImagenesAlcance, type GaleriaImagenesAlcanceHandle } from './Gal
 import { HintFotoSugerida } from '@/components/catalogoImagenes/HintFotoSugerida'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { RegenerarEdtDialog } from './RegenerarEdtDialog'
+import { CopiarPegarTexto } from '../CopiarPegarTexto'
 import type { PlanTrabajoImagen } from '@prisma/client'
 import type { PlanHerramientasYEquipos } from '@/types/planTrabajo'
 
@@ -559,8 +560,8 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                       </select>
                     </div>
                   </div>
-                  <div>
-                    <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <Label className="text-xs">Descripción narrativa</Label>
                       {item.descripcionEditadaManualmente && (
                         <button
@@ -572,6 +573,11 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                           <Lock size={10} /> Editado a mano · <span className="underline">Liberar</span>
                         </button>
                       )}
+                      <CopiarPegarTexto
+                        className="ml-auto"
+                        texto={item.descripcion}
+                        onPegar={(t) => marcarDescripcionEditada(edtIdx, t)}
+                      />
                     </div>
                     <Textarea value={item.descripcion} onChange={e => marcarDescripcionEditada(edtIdx, e.target.value)} rows={4} className="text-sm resize-none" placeholder="Párrafo narrativo de 80-150 palabras describiendo el flujo de trabajo..." />
                   </div>
@@ -652,6 +658,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                               tareas y no se leía como parte de la actividad. */}
                           <div className={conGaleriaSub ? 'grid gap-3 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]' : ''}>
                           <div className="space-y-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           {sub.descripcionEditadaManualmente && (
                             <button
                               type="button"
@@ -662,6 +669,12 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                               <Lock size={10} /> Editado a mano · <span className="underline">Liberar</span>
                             </button>
                           )}
+                          <CopiarPegarTexto
+                            className="ml-auto"
+                            texto={sub.descripcion}
+                            onPegar={(t) => marcarDescripcionSubItemEditada(edtIdx, subIdx, t)}
+                          />
+                          </div>
                           <Textarea value={sub.descripcion} onChange={e => marcarDescripcionSubItemEditada(edtIdx, subIdx, e.target.value)} rows={3} className="text-sm resize-none bg-white" placeholder="Descripción narrativa de la actividad..." />
                           </div>
                           {conGaleriaSub && (
@@ -730,6 +743,14 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                                 <Lock size={10} /> editado
                                               </button>
                                             )}
+                                            <CopiarPegarTexto
+                                              className="ml-auto"
+                                              unaLinea
+                                              texto={tarea.texto || tarea.nombre}
+                                              onPegar={(t) => tarea.manualId
+                                                ? updateTarea(edtIdx, subIdx, tareaIdx, { texto: t, nombre: t })
+                                                : marcarTextoTareaEditado(edtIdx, subIdx, tareaIdx, t)}
+                                            />
                                           </div>
                                           <Textarea
                                             value={tarea.texto}

@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Loader2, ChevronDown, ChevronRight, Camera, AlertCircle, Pencil, Hand } from 'lucide-react'
+import { Loader2, ChevronDown, ChevronRight, Camera, AlertCircle, Pencil, Hand, ClipboardPaste } from 'lucide-react'
+import { toast } from 'sonner'
+import { CopiarPegarTexto, leerTextoPortapapeles, limpiarTextoPegado } from '../CopiarPegarTexto'
 import type { PlanTrabajo, PlanTrabajoImagen } from '@prisma/client'
 import type { PlanTrabajoContexto, PlanAlcanceDetalladoEdt, SeccionRegenerable } from '@/types/planTrabajo'
 import { Button } from '@/components/ui/button'
@@ -141,31 +143,69 @@ export function PlanTrabajoCampoClient({ proyectoId }: Props) {
     .map((item, ei) => ({ item, ei }))
     .filter(({ item }) => item.tipoDetalle === 'detallado' && item.edtRefId)
 
-  /** Aplica un cambio de texto al Alcance Detallado (marcándolo como editado a mano) y lo guarda. */
+  /**
+   * Aplica un cambio de texto al Alcance Detallado (marcándolo como editado a
+   * mano) y lo guarda. El cambio se aplica sobre lo guardado AHORA en el
+   * servidor (buscando el EDT/actividad/tarea por su id), así no se pisa lo
+   * que otra persona haya editado mientras tanto.
+   */
   const guardarAlcance = async (ed: EdicionAlcance, valor: unknown) => {
-    const copia = structuredClone(raw) as PlanAlcanceDetalladoEdt[]
-    const edt = copia[ed.ei]
+    const texto = String(valor)
+    const edtLocal = raw[ed.ei]
+    const subLocal = ed.tipo !== 'edt' ? edtLocal.subItems?.[ed.si] : undefined
+    const tareaLocal = ed.tipo === 'tarea' ? subLocal?.tareas?.[ed.ti] : undefined
+
+    const res = await fetch(`/api/proyectos/${proyectoId}/plan-trabajo/contexto`)
+    if (!res.ok) throw new Error(`No se pudo leer el plan actual (HTTP ${res.status})`)
+    const { data } = await res.json()
+    const actual = structuredClone((data?.planTrabajo?.alcanceDetallado ?? []) as PlanAlcanceDetalladoEdt[])
+    const noEsta = () => new Error('Ese texto ya no está en el plan (alguien regeneró o cambió el alcance). Recargá la página.')
+
+    const edt = actual.find(e => e.edtRefId && e.edtRefId === edtLocal.edtRefId)
+    if (!edt) throw noEsta()
     if (ed.tipo === 'edt') {
-      edt.descripcion = String(valor)
+      edt.descripcion = texto
       edt.descripcionEditadaManualmente = true
     } else {
-      const sub = edt.subItems![ed.si]
+      const sub = subLocal?.actividadRefId
+        ? edt.subItems?.find(s => s.actividadRefId === subLocal.actividadRefId)
+        : edt.subItems?.[ed.si]
+      if (!sub) throw noEsta()
       if (ed.tipo === 'sub') {
-        sub.descripcion = String(valor)
+        sub.descripcion = texto
         sub.descripcionEditadaManualmente = true
       } else {
-        const tarea = sub.tareas![ed.ti]
-        tarea.texto = String(valor)
-        tarea.textoEditadoManualmente = true
+        const tarea = sub.tareas?.find(t =>
+          (tareaLocal?.tareaRefId && t.tareaRefId === tareaLocal.tareaRefId) ||
+          (tareaLocal?.manualId && t.manualId === tareaLocal.manualId))
+        if (!tarea) throw noEsta()
+        tarea.texto = texto
+        if (tarea.manualId) tarea.nombre = texto
+        else tarea.textoEditadoManualmente = true
       }
     }
-    await guardarSeccion('alcanceDetallado', copia)
+    await guardarSeccion('alcanceDetallado', actual)
+  }
+
+  /** Pegar directo (sin diálogo): valida, guarda y avisa. */
+  const pegarEnAlcance = async (ed: EdicionAlcance) => {
+    const t = await leerTextoPortapapeles()
+    if (t == null) return
+    const limpio = limpiarTextoPegado(t, ed.tipo === 'tarea')
+    const r = (ed.tipo === 'tarea' ? interpretarVineta : interpretarDescripcion)(limpio)
+    if (r.error) { toast.error(r.error); return }
+    try {
+      await guardarAlcance(ed, r.valor)
+      toast.success('Pegado y guardado')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo guardar')
+    }
   }
 
   const textoDe = (s: SeccionRegenerable) => seccionATexto(s, (plan as unknown as Record<string, unknown>)[s])
 
   return (
-    <div className="max-w-lg mx-auto px-3 py-4 space-y-3 pb-24">
+    <div className="max-w-2xl mx-auto px-2 sm:px-3 py-4 space-y-3 pb-24">
       <div className="mb-1">
         <h1 className="text-lg font-semibold text-gray-800">Plan de Trabajo — Modo Campo</h1>
         <p className="text-xs text-muted-foreground">
@@ -231,12 +271,15 @@ export function PlanTrabajoCampoClient({ proyectoId }: Props) {
             {abierto && (
               <div className="border-t divide-y">
                 {/* Descripción del EDT */}
-                <TextoEditable
-                  texto={item.descripcion}
-                  editado={item.descripcionEditadaManualmente}
-                  className="px-3 py-2.5 text-[13px] text-gray-700"
-                  onEditar={() => setEditandoAlcance({ tipo: 'edt', ei, titulo: `Descripción de ${item.edtNombre}`, texto: item.descripcion })}
-                />
+                <div className="px-3 py-2.5">
+                  <TextoEditable
+                    texto={item.descripcion}
+                    editado={item.descripcionEditadaManualmente}
+                    className="text-[13px] text-gray-700"
+                    onEditar={() => setEditandoAlcance({ tipo: 'edt', ei, titulo: `Descripción de ${item.edtNombre}`, texto: item.descripcion })}
+                    onPegar={() => pegarEnAlcance({ tipo: 'edt', ei, titulo: '', texto: '' })}
+                  />
+                </div>
                 {(item.subItems ?? []).map((sub, si) => {
                   const tareas = (sub.tareas ?? []).map((t, ti) => ({ t, ti })).filter(({ t }) => !t.excluida)
                   return (
@@ -247,6 +290,7 @@ export function PlanTrabajoCampoClient({ proyectoId }: Props) {
                         editado={sub.descripcionEditadaManualmente}
                         className="text-[12px] text-gray-600"
                         onEditar={() => setEditandoAlcance({ tipo: 'sub', ei, si, titulo: `Descripción de ${sub.actividadNombre}`, texto: sub.descripcion })}
+                        onPegar={() => pegarEnAlcance({ tipo: 'sub', ei, si, titulo: '', texto: '' })}
                       />
                       {tareas.map(({ t: tarea, ti }) => (
                         <div key={tarea.tareaRefId ?? tarea.manualId ?? ti} className="bg-white border rounded-md p-2.5 space-y-2">
@@ -255,6 +299,7 @@ export function PlanTrabajoCampoClient({ proyectoId }: Props) {
                             editado={tarea.textoEditadoManualmente}
                             className="text-sm text-gray-800 leading-snug"
                             onEditar={() => setEditandoAlcance({ tipo: 'tarea', ei, si, ti, titulo: tarea.nombre, texto: tarea.texto || tarea.nombre })}
+                            onPegar={() => pegarEnAlcance({ tipo: 'tarea', ei, si, ti, titulo: '', texto: '' })}
                           />
                           {tarea.tareaRefId && (
                             <CampoFotoTarea
@@ -292,17 +337,42 @@ export function PlanTrabajoCampoClient({ proyectoId }: Props) {
   )
 }
 
-/** Texto del Alcance Detallado con su lápiz para editarlo (y la marca si ya se editó a mano). */
-function TextoEditable({ texto, editado, className, onEditar }: { texto: string; editado?: boolean; className?: string; onEditar: () => void }) {
+/**
+ * Texto del Alcance Detallado con Copiar / Pegar (pegar guarda directo) y el
+ * lápiz para corregirlo a mano. Marca si ya se editó a mano.
+ */
+function TextoEditable({ texto, editado, className, onEditar, onPegar }: {
+  texto: string
+  editado?: boolean
+  className?: string
+  onEditar: () => void
+  onPegar: () => Promise<void>
+}) {
+  const [pegando, setPegando] = useState(false)
   return (
-    <div className="flex items-start gap-2">
-      <p className={`min-w-0 flex-1 whitespace-pre-wrap ${className ?? ''}`}>
+    <div className="space-y-1.5">
+      <p className={`whitespace-pre-wrap ${className ?? ''}`}>
         {texto}
         {editado && <Hand className="ml-1 inline h-3 w-3 text-amber-600" aria-label="Editado a mano" />}
       </p>
-      <Button type="button" variant="ghost" size="sm" className="h-7 w-7 shrink-0 p-0 text-muted-foreground" title="Editar" onClick={onEditar}>
-        <Pencil className="h-3.5 w-3.5" />
-      </Button>
+      <div className="flex items-center justify-end gap-1">
+        <CopiarPegarTexto texto={texto} />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 gap-1 px-2 text-[11px]"
+          title="Reemplazar con lo que tengas copiado y guardar"
+          disabled={pegando}
+          onClick={async () => { setPegando(true); try { await onPegar() } finally { setPegando(false) } }}
+        >
+          {pegando ? <Loader2 className="h-3 w-3 animate-spin" /> : <ClipboardPaste className="h-3 w-3" />}
+          Pegar
+        </Button>
+        <Button type="button" variant="outline" size="sm" className="h-7 w-7 p-0" title="Editar a mano" onClick={onEditar}>
+          <Pencil className="h-3 w-3" />
+        </Button>
+      </div>
     </div>
   )
 }

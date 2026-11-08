@@ -2,7 +2,8 @@
 
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Camera, FolderOpen, Loader2, X } from 'lucide-react'
+import { Camera, ClipboardPaste, FolderOpen, Loader2, X } from 'lucide-react'
+import { leerImagenesPortapapeles } from '../CopiarPegarTexto'
 import type { PlanTrabajoImagen } from '@prisma/client'
 import { ImagenConLightbox } from '@/components/catalogoImagenes/ImagenConLightbox'
 
@@ -38,7 +39,12 @@ export function CampoFotoTarea({ proyectoId, edtRef, tareaRef, nombreDefault, im
 
   const lleno = propias.length >= MAX_IMAGENES
 
-  const handleFiles = async (files: FileList | null) => {
+  const pegarFoto = async () => {
+    const archivos = await leerImagenesPortapapeles()
+    if (archivos) await handleFiles(archivos)
+  }
+
+  const handleFiles = async (files: FileList | File[] | null) => {
     if (!files || files.length === 0) return
     if (propias.length + files.length > MAX_IMAGENES) {
       toast.error(`Máximo ${MAX_IMAGENES} fotos por tarea`)
@@ -140,14 +146,25 @@ export function CampoFotoTarea({ proyectoId, edtRef, tareaRef, nombreDefault, im
       </div>
 
       {!lleno && (
-        <button
-          type="button"
-          onClick={() => inputArchivoRef.current?.click()}
-          disabled={subiendo}
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-muted transition disabled:opacity-50"
-        >
-          <FolderOpen className="h-4 w-4" /> Subir desde galería
-        </button>
+        <div className="flex flex-wrap items-center gap-1">
+          <button
+            type="button"
+            onClick={() => inputArchivoRef.current?.click()}
+            disabled={subiendo}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-muted transition disabled:opacity-50"
+          >
+            <FolderOpen className="h-4 w-4" /> Subir desde galería
+          </button>
+          <button
+            type="button"
+            onClick={pegarFoto}
+            disabled={subiendo}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-muted transition disabled:opacity-50"
+            title="Pegar una imagen copiada (de una IA, WhatsApp, captura…)"
+          >
+            <ClipboardPaste className="h-4 w-4" /> Pegar imagen
+          </button>
+        </div>
       )}
 
       <input

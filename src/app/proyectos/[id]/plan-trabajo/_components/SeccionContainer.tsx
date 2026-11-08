@@ -111,7 +111,7 @@ export function SeccionContainer({
       )}
 
       {/* Content */}
-      <div className="p-4">
+      <div className="p-3 sm:p-4">
         {!completa && !isRegenerando ? (
           <p className="text-xs text-muted-foreground italic">
             {tipo === 'calculado'

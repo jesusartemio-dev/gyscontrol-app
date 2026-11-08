@@ -789,7 +789,9 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
   )
 
   return (
-    <div className="space-y-4 p-4">
+    // En celular sin padding propio: el layout del proyecto ya deja margen y
+    // sumado al de cada tarjeta el texto quedaba en una columna angosta.
+    <div className="space-y-4 py-1 sm:p-4">
       <ConfirmarRegeneracionDialog
         modo={confirmar}
         onClose={() => setConfirmar(null)}
