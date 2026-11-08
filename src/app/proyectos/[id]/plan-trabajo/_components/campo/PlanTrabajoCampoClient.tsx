@@ -1,9 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Loader2, ChevronDown, ChevronRight, Camera, AlertCircle, Pencil, Hand, ClipboardPaste } from 'lucide-react'
-import { toast } from 'sonner'
-import { CopiarPegarTexto, leerTextoPortapapeles, limpiarTextoPegado } from '../CopiarPegarTexto'
+import { Loader2, ChevronDown, ChevronRight, Camera, AlertCircle, Pencil, Hand, Check, Copy } from 'lucide-react'
 import type { PlanTrabajo, PlanTrabajoImagen } from '@prisma/client'
 import type { PlanTrabajoContexto, PlanAlcanceDetalladoEdt, SeccionRegenerable } from '@/types/planTrabajo'
 import { Button } from '@/components/ui/button'
@@ -31,10 +29,16 @@ const AYUDA_EDICION: Partial<Record<SeccionRegenerable, string>> = {
 }
 
 /** Qué se está editando del Alcance Detallado (índices sobre el arreglo completo). */
-type EdicionAlcance =
+type EdicionAlcance = (
   | { tipo: 'edt'; ei: number; titulo: string; texto: string }
   | { tipo: 'sub'; ei: number; si: number; titulo: string; texto: string }
   | { tipo: 'tarea'; ei: number; si: number; ti: number; titulo: string; texto: string }
+) & {
+  /** Identifica el ítem en la vista (marcas "Copiado" / "Guardado"). */
+  clave: string
+  /** Dónde está: "11.5 Tramo 3 › Armado de andamios › Tarea 2 de 6". */
+  ubicacion: string
+}
 
 const interpretarDescripcion = (texto: string): ResultadoTexto<unknown> => {
   const t = texto.trim()
@@ -64,6 +68,13 @@ export function PlanTrabajoCampoClient({ proyectoId }: Props) {
   const [errorAcceso, setErrorAcceso] = useState<string | null>(null)
   const [abiertos, setAbiertos] = useState<Set<number>>(new Set())
   const [editandoAlcance, setEditandoAlcance] = useState<EdicionAlcance | null>(null)
+  // Marcas en la vista: qué ítem se copió por última vez y cuál se acaba de guardar.
+  const [copiadoClave, setCopiadoClave] = useState<string | null>(null)
+  const [guardadoClave, setGuardadoClave] = useState<string | null>(null)
+  const marcarGuardado = (clave: string) => {
+    setGuardadoClave(clave)
+    setTimeout(() => setGuardadoClave((c) => (c === clave ? null : c)), 6000)
+  }
 
   const fetchContexto = useCallback(async () => {
     try {
@@ -187,29 +198,14 @@ export function PlanTrabajoCampoClient({ proyectoId }: Props) {
     await guardarSeccion('alcanceDetallado', actual)
   }
 
-  /** Pegar directo (sin diálogo): valida, guarda y avisa. */
-  const pegarEnAlcance = async (ed: EdicionAlcance) => {
-    const t = await leerTextoPortapapeles()
-    if (t == null) return
-    const limpio = limpiarTextoPegado(t, ed.tipo === 'tarea')
-    const r = (ed.tipo === 'tarea' ? interpretarVineta : interpretarDescripcion)(limpio)
-    if (r.error) { toast.error(r.error); return }
-    try {
-      await guardarAlcance(ed, r.valor)
-      toast.success('Pegado y guardado')
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No se pudo guardar')
-    }
-  }
-
   const textoDe = (s: SeccionRegenerable) => seccionATexto(s, (plan as unknown as Record<string, unknown>)[s])
 
   return (
-    <div className="max-w-2xl mx-auto px-2 sm:px-3 py-4 space-y-3 pb-24">
+    <div className="max-w-3xl mx-auto py-2 sm:px-3 space-y-3 pb-24">
       <div className="mb-1">
         <h1 className="text-lg font-semibold text-gray-800">Plan de Trabajo — Modo Campo</h1>
         <p className="text-xs text-muted-foreground">
-          Copiá una sección, corregila donde te sea cómodo y pegala con el lápiz. Abajo, tocá tu zona y sacá la foto de cada tarea.
+          Tocá &quot;Editar&quot; en cualquier texto: ahí lo copiás, lo mejorás donde quieras, lo pegás y guardás. Abajo, tocá tu zona y sacá la foto de cada tarea.
         </p>
       </div>
 
@@ -275,31 +271,46 @@ export function PlanTrabajoCampoClient({ proyectoId }: Props) {
                   <TextoEditable
                     texto={item.descripcion}
                     editado={item.descripcionEditadaManualmente}
+                    copiado={copiadoClave === `${ei}`}
+                    guardado={guardadoClave === `${ei}`}
                     className="text-[13px] text-gray-700"
-                    onEditar={() => setEditandoAlcance({ tipo: 'edt', ei, titulo: `Descripción de ${item.edtNombre}`, texto: item.descripcion })}
-                    onPegar={() => pegarEnAlcance({ tipo: 'edt', ei, titulo: '', texto: '' })}
+                    onEditar={() => setEditandoAlcance({
+                      tipo: 'edt', ei, clave: `${ei}`,
+                      ubicacion: `${item.numeracion} ${item.edtNombre}`,
+                      titulo: 'Descripción del EDT', texto: item.descripcion,
+                    })}
                   />
                 </div>
                 {(item.subItems ?? []).map((sub, si) => {
                   const tareas = (sub.tareas ?? []).map((t, ti) => ({ t, ti })).filter(({ t }) => !t.excluida)
+                  const ubicSub = `${item.numeracion} ${item.edtNombre} › ${sub.actividadNombre}`
                   return (
                     <div key={si} className="px-3 py-3 space-y-3 bg-gray-50/50">
                       <p className="text-xs font-medium text-indigo-700 uppercase tracking-wide">{sub.actividadNombre}</p>
                       <TextoEditable
                         texto={sub.descripcion}
                         editado={sub.descripcionEditadaManualmente}
+                        copiado={copiadoClave === `${ei}-${si}`}
+                        guardado={guardadoClave === `${ei}-${si}`}
                         className="text-[12px] text-gray-600"
-                        onEditar={() => setEditandoAlcance({ tipo: 'sub', ei, si, titulo: `Descripción de ${sub.actividadNombre}`, texto: sub.descripcion })}
-                        onPegar={() => pegarEnAlcance({ tipo: 'sub', ei, si, titulo: '', texto: '' })}
+                        onEditar={() => setEditandoAlcance({
+                          tipo: 'sub', ei, si, clave: `${ei}-${si}`, ubicacion: ubicSub,
+                          titulo: 'Descripción de la actividad', texto: sub.descripcion,
+                        })}
                       />
-                      {tareas.map(({ t: tarea, ti }) => (
+                      {tareas.map(({ t: tarea, ti }, pos) => (
                         <div key={tarea.tareaRefId ?? tarea.manualId ?? ti} className="bg-white border rounded-md p-2.5 space-y-2">
                           <TextoEditable
                             texto={tarea.texto || tarea.nombre}
                             editado={tarea.textoEditadoManualmente}
+                            copiado={copiadoClave === `${ei}-${si}-${ti}`}
+                            guardado={guardadoClave === `${ei}-${si}-${ti}`}
                             className="text-sm text-gray-800 leading-snug"
-                            onEditar={() => setEditandoAlcance({ tipo: 'tarea', ei, si, ti, titulo: tarea.nombre, texto: tarea.texto || tarea.nombre })}
-                            onPegar={() => pegarEnAlcance({ tipo: 'tarea', ei, si, ti, titulo: '', texto: '' })}
+                            onEditar={() => setEditandoAlcance({
+                              tipo: 'tarea', ei, si, ti, clave: `${ei}-${si}-${ti}`,
+                              ubicacion: `${ubicSub} › Tarea ${pos + 1} de ${tareas.length}`,
+                              titulo: tarea.nombre, texto: tarea.texto || tarea.nombre,
+                            })}
                           />
                           {tarea.tareaRefId && (
                             <CampoFotoTarea
@@ -327,10 +338,16 @@ export function PlanTrabajoCampoClient({ proyectoId }: Props) {
           open
           onOpenChange={(o) => { if (!o) setEditandoAlcance(null) }}
           titulo={editandoAlcance.titulo}
+          ubicacion={editandoAlcance.ubicacion}
           ayuda={editandoAlcance.tipo === 'tarea' ? 'Una viñeta de una línea.' : 'Mínimo 60 caracteres.'}
           textoInicial={editandoAlcance.texto}
+          unaLinea={editandoAlcance.tipo === 'tarea'}
           interpretar={editandoAlcance.tipo === 'tarea' ? interpretarVineta : interpretarDescripcion}
-          onGuardar={(v) => guardarAlcance(editandoAlcance, v)}
+          onCopiado={() => setCopiadoClave(editandoAlcance.clave)}
+          onGuardar={async (v) => {
+            await guardarAlcance(editandoAlcance, v)
+            marcarGuardado(editandoAlcance.clave)
+          }}
         />
       )}
     </div>
@@ -338,39 +355,40 @@ export function PlanTrabajoCampoClient({ proyectoId }: Props) {
 }
 
 /**
- * Texto del Alcance Detallado con Copiar / Pegar (pegar guarda directo) y el
- * lápiz para corregirlo a mano. Marca si ya se editó a mano.
+ * Texto del Alcance Detallado con un solo botón "Editar": Copiar/Pegar viven
+ * dentro del diálogo (se ve qué ítem es y el antes/después antes de guardar).
+ * Marcas: editado a mano, el último copiado y el recién guardado.
  */
-function TextoEditable({ texto, editado, className, onEditar, onPegar }: {
+function TextoEditable({ texto, editado, copiado, guardado, className, onEditar }: {
   texto: string
   editado?: boolean
+  copiado?: boolean
+  guardado?: boolean
   className?: string
   onEditar: () => void
-  onPegar: () => Promise<void>
 }) {
-  const [pegando, setPegando] = useState(false)
   return (
-    <div className="space-y-1.5">
+    <div className={`-mx-1.5 space-y-1.5 rounded-md px-1.5 py-1 transition-colors ${
+      guardado ? 'bg-emerald-50 ring-1 ring-emerald-300' : copiado ? 'bg-sky-50 ring-1 ring-sky-200' : ''
+    }`}>
       <p className={`whitespace-pre-wrap ${className ?? ''}`}>
         {texto}
         {editado && <Hand className="ml-1 inline h-3 w-3 text-amber-600" aria-label="Editado a mano" />}
       </p>
-      <div className="flex items-center justify-end gap-1">
-        <CopiarPegarTexto texto={texto} />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-7 gap-1 px-2 text-[11px]"
-          title="Reemplazar con lo que tengas copiado y guardar"
-          disabled={pegando}
-          onClick={async () => { setPegando(true); try { await onPegar() } finally { setPegando(false) } }}
-        >
-          {pegando ? <Loader2 className="h-3 w-3 animate-spin" /> : <ClipboardPaste className="h-3 w-3" />}
-          Pegar
-        </Button>
-        <Button type="button" variant="outline" size="sm" className="h-7 w-7 p-0" title="Editar a mano" onClick={onEditar}>
+      <div className="flex items-center justify-end gap-2">
+        {guardado && (
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700">
+            <Check className="h-3 w-3" /> Guardado
+          </span>
+        )}
+        {!guardado && copiado && (
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-sky-700">
+            <Copy className="h-3 w-3" /> Copiado
+          </span>
+        )}
+        <Button type="button" variant="outline" size="sm" className="h-7 gap-1 px-2.5 text-[11px]" onClick={onEditar}>
           <Pencil className="h-3 w-3" />
+          Editar
         </Button>
       </div>
     </div>

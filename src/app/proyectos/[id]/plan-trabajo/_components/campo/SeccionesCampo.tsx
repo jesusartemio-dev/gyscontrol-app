@@ -1,40 +1,22 @@
 'use client'
 
-// Secciones del Plan de Trabajo en Modo Campo (celular/tablet): cada una se
-// puede COPIAR al portapapeles (para corregirla en WhatsApp, Notas…) y las de
-// texto se pueden EDITAR pegando el texto corregido. Lo guardado queda como
-// "editado a mano", así una regeneración posterior lo avisa y lo respeta.
+// Secciones del Plan de Trabajo en Modo Campo (celular/tablet). Regla: en la
+// vista solo se COPIA lo que no se edita (tablas calculadas); lo editable
+// tiene un botón "Editar" y Copiar/Pegar viven DENTRO del diálogo, donde se
+// ve qué ítem es y el antes/después antes de guardar (pegar suelto en la
+// vista guardaba al instante y era fácil pegar en el ítem equivocado).
+// Lo guardado queda como "editado a mano": una regeneración lo avisa y lo respeta.
 
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Copy, Pencil, ClipboardPaste, Loader2, Hand } from 'lucide-react'
+import { ChevronDown, ChevronRight, Copy, Pencil, Loader2, Hand } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { ResultadoTexto } from '@/lib/planTrabajo/textoSecciones'
+import { CopiarPegarTexto, copiarTexto } from '../CopiarPegarTexto'
 
-/** Copia al portapapeles; si el navegador no deja (contexto viejo), usa un textarea temporal. */
-export async function copiarTexto(texto: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(texto)
-    return true
-  } catch {
-    try {
-      const ta = document.createElement('textarea')
-      ta.value = texto
-      ta.setAttribute('readonly', '')
-      ta.style.position = 'fixed'
-      ta.style.opacity = '0'
-      document.body.appendChild(ta)
-      ta.select()
-      const ok = document.execCommand('copy')
-      document.body.removeChild(ta)
-      return ok
-    } catch {
-      return false
-    }
-  }
-}
+export { copiarTexto }
 
 export function BotonCopiar({ texto, etiqueta = 'Copiar', compacto }: { texto: string; etiqueta?: string; compacto?: boolean }) {
   return (
@@ -59,20 +41,25 @@ export function BotonCopiar({ texto, etiqueta = 'Copiar', compacto }: { texto: s
 }
 
 /**
- * Editor de texto para campo: arranca con el texto actual, se puede pegar
- * encima (manteniendo presionado el cuadro, o con "Pegar"), muestra cómo se
- * va a leer y guarda.
+ * Editor de texto para campo: muestra dónde estás, arranca con el texto
+ * actual, se copia / se pega encima, muestra el antes y cómo se va a leer, y
+ * guarda y cierra (para ver en la vista que quedó bien).
  */
 export function EditarTextoDialog({
-  open, onOpenChange, titulo, ayuda, textoInicial, interpretar, onGuardar,
+  open, onOpenChange, titulo, ubicacion, ayuda, textoInicial, interpretar, onGuardar, onCopiado, unaLinea,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
   titulo: string
+  /** Dónde está el ítem: "11.5 Tramo 3 › Armado de andamios › Tarea 2 de 6". */
+  ubicacion?: string
   ayuda?: string
   textoInicial: string
   interpretar: (texto: string) => ResultadoTexto<unknown>
   onGuardar: (valor: unknown) => Promise<void>
+  onCopiado?: () => void
+  /** Viñeta de tarea: al pegar queda en una línea. */
+  unaLinea?: boolean
 }) {
   const [texto, setTexto] = useState(textoInicial)
   const [guardando, setGuardando] = useState(false)
@@ -86,17 +73,6 @@ export function EditarTextoDialog({
 
   const resultado = useMemo(() => interpretar(texto), [interpretar, texto])
   const sinCambios = texto.trim() === textoInicial.trim()
-
-  const pegar = async () => {
-    try {
-      const t = await navigator.clipboard.readText()
-      if (!t) { toast.info('El portapapeles está vacío'); return }
-      setTexto(t)
-      toast.success('Texto pegado: revisá la vista previa y guardá')
-    } catch {
-      toast.info('Tu navegador no deja leer el portapapeles: mantené presionado el cuadro y elegí "Pegar".')
-    }
-  }
 
   const guardar = async () => {
     if (!resultado.valor) return
@@ -115,22 +91,34 @@ export function EditarTextoDialog({
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!guardando) onOpenChange(o) }}>
       <DialogContent className="w-[calc(100vw-1.5rem)] max-w-xl p-4">
-        <DialogHeader>
+        <DialogHeader className="space-y-1 text-left">
+          {ubicacion && (
+            <p className="text-[11px] font-medium uppercase tracking-wide text-indigo-700">{ubicacion}</p>
+          )}
           <DialogTitle className="text-base">Editar: {titulo}</DialogTitle>
           {ayuda && <DialogDescription className="text-xs">{ayuda}</DialogDescription>}
         </DialogHeader>
-        <div className="flex justify-end">
-          <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={pegar}>
-            <ClipboardPaste className="mr-1 h-3.5 w-3.5" />
-            Pegar del portapapeles
-          </Button>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] text-muted-foreground">Copiá, mejoralo donde quieras y pegalo acá.</span>
+          <CopiarPegarTexto
+            conEtiqueta
+            texto={texto}
+            unaLinea={unaLinea}
+            onCopiado={onCopiado}
+            onPegar={setTexto}
+          />
         </div>
         <Textarea
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
-          className="h-[45dvh] resize-none font-mono text-[13px] leading-relaxed"
-          autoFocus
+          className="h-[38dvh] resize-none text-[13px] leading-relaxed"
         />
+        {!sinCambios && (
+          <details className="rounded-md border bg-muted/40 px-2 py-1.5 text-xs">
+            <summary className="cursor-pointer select-none font-medium text-muted-foreground">Antes (texto guardado)</summary>
+            <p className="mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap text-gray-600">{textoInicial || '(vacío)'}</p>
+          </details>
+        )}
         <p className={`text-xs ${resultado.error ? 'text-red-600' : 'text-muted-foreground'}`}>
           {resultado.error ?? `Se guardará: ${resultado.resumen}${sinCambios ? ' (sin cambios)' : ''}`}
         </p>
@@ -176,11 +164,14 @@ export function SeccionCampoCard({
           {vacia && <span className="shrink-0 text-[11px] text-muted-foreground">(vacía)</span>}
         </button>
         <div className="flex shrink-0 items-center gap-1.5">
-          <BotonCopiar texto={texto} compacto />
-          {interpretar && onGuardar && (
-            <Button type="button" variant="outline" size="sm" className="h-8 w-8 p-0" title="Editar (pegar texto corregido)" onClick={() => setEditando(true)}>
+          {/* Editable: Copiar/Pegar dentro de "Editar". Solo lectura: copiar acá. */}
+          {interpretar && onGuardar ? (
+            <Button type="button" variant="outline" size="sm" className="h-8 gap-1 px-2.5 text-xs" onClick={() => setEditando(true)}>
               <Pencil className="h-3.5 w-3.5" />
+              Editar
             </Button>
+          ) : (
+            <BotonCopiar texto={texto} compacto />
           )}
         </div>
       </div>
@@ -196,6 +187,7 @@ export function SeccionCampoCard({
           open={editando}
           onOpenChange={setEditando}
           titulo={titulo}
+          ubicacion="Sección del plan"
           ayuda={ayudaEdicion}
           textoInicial={texto}
           interpretar={interpretar}

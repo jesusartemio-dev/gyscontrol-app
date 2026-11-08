@@ -1,13 +1,37 @@
 'use client'
 
-// Copiar / Pegar al lado de cada texto del plan (descripción de EDT, de
-// actividad, viñeta de tarea). Flujo de campo: copiar el texto → mejorarlo en
-// una IA → pegarlo de vuelta acá, ítem por ítem, sin abrir diálogos.
+// Copiar / Pegar de los textos del plan (descripción de EDT, de actividad,
+// viñeta de tarea). Flujo: copiar el texto → mejorarlo en una IA → pegarlo de
+// vuelta. Siempre dentro de una edición (editor de oficina o el diálogo
+// "Editar" de Modo Campo): pegar nunca guarda solo, se ve antes de guardar.
 
-import { ClipboardPaste, Copy } from 'lucide-react'
+import { useState } from 'react'
+import { Check, ClipboardPaste, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { copiarTexto } from './campo/SeccionesCampo'
+
+/** Copia al portapapeles; si el navegador no deja (contexto viejo), usa un textarea temporal. */
+export async function copiarTexto(texto: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(texto)
+    return true
+  } catch {
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = texto
+      ta.setAttribute('readonly', '')
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      const ok = document.execCommand('copy')
+      document.body.removeChild(ta)
+      return ok
+    } catch {
+      return false
+    }
+  }
+}
 
 /** Lee texto del portapapeles; null si el navegador no deja (avisa cómo pegar a mano). */
 export async function leerTextoPortapapeles(): Promise<string | null> {
@@ -82,20 +106,35 @@ export function limpiarTextoPegado(t: string, unaLinea: boolean): string {
 export function CopiarPegarTexto({
   texto,
   onPegar,
+  onCopiado,
   unaLinea = false,
+  conEtiqueta = false,
   className = '',
 }: {
   texto: string
   /** Recibe el texto pegado (ya limpio). Sin él, solo se muestra Copiar. */
   onPegar?: (texto: string) => void
+  /** Avisa que se copió (para marcar en la vista qué ítem se copió). */
+  onCopiado?: () => void
   /** Viñetas de tarea: se pega en una sola línea, sin "- " inicial. */
   unaLinea?: boolean
+  /** Siempre con texto ("Copiar"/"Pegar"); si no, en celular solo íconos. */
+  conEtiqueta?: boolean
   className?: string
 }) {
+  const [copiado, setCopiado] = useState(false)
+  const etiqueta = conEtiqueta ? '' : 'hidden sm:inline'
+
   const copiar = async () => {
     if (!texto.trim()) { toast.info('No hay texto para copiar'); return }
-    if (await copiarTexto(texto)) toast.success('Copiado')
-    else toast.error('No se pudo copiar en este navegador')
+    if (await copiarTexto(texto)) {
+      setCopiado(true)
+      setTimeout(() => setCopiado(false), 2500)
+      onCopiado?.()
+      toast.success('Copiado')
+    } else {
+      toast.error('No se pudo copiar en este navegador')
+    }
   }
   const pegar = async () => {
     const t = await leerTextoPortapapeles()
@@ -103,19 +142,35 @@ export function CopiarPegarTexto({
     const limpio = limpiarTextoPegado(t, unaLinea)
     if (!limpio) return
     onPegar(limpio)
-    toast.success('Pegado — recordá guardar')
+    toast.success('Pegado — revisá y guardá')
   }
 
   return (
     <span className={`inline-flex shrink-0 items-center gap-1 ${className}`}>
-      <Button type="button" variant="outline" size="sm" className="h-7 gap-1 px-2 text-[11px]" title="Copiar este texto" onClick={copiar}>
-        <Copy className="h-3 w-3" />
-        Copiar
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className={`h-7 gap-1 px-2 text-[11px] ${copiado ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : ''}`}
+        title="Copiar este texto"
+        aria-label="Copiar"
+        onClick={copiar}
+      >
+        {copiado ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+        <span className={etiqueta}>{copiado ? 'Copiado' : 'Copiar'}</span>
       </Button>
       {onPegar && (
-        <Button type="button" variant="outline" size="sm" className="h-7 gap-1 px-2 text-[11px]" title="Reemplazar con lo que tengas copiado" onClick={pegar}>
-          <ClipboardPaste className="h-3 w-3" />
-          Pegar
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 gap-1 px-2 text-[11px]"
+          title="Reemplazar con lo que tengas copiado"
+          aria-label="Pegar"
+          onClick={pegar}
+        >
+          <ClipboardPaste className="h-3.5 w-3.5" />
+          <span className={etiqueta}>Pegar</span>
         </Button>
       )}
     </span>

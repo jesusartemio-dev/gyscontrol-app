@@ -510,10 +510,46 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
     </Button>
   )
 
+  const valorContexto = { proyecto, setProyecto: handleDataUpdate, refreshProyecto, loading, cronogramaStats, costosReales, refreshCostosReales: () => { if (typeof id === 'string') fetchCostosReales(id) } }
+
+  // Plan de Trabajo (oficina y campo): en celular casi sin margen a los costados.
+  // El layout raíz ya deja 16 px y este contenedor sumaba otros 16 por lado:
+  // el texto del plan quedaba en una columna angosta. -mx-2.5 deja ~6 px.
+  const esPlanTrabajo = pathname.includes('/plan-trabajo')
+  const anchoPlan = esPlanTrabajo ? '-mx-2.5 sm:mx-0' : ''
+  const paddingContenedor = esPlanTrabajo ? 'px-0 py-2 sm:p-6' : 'p-4 sm:p-6'
+
+  // Modo Campo: vista de trabajo en obra. Sin estados del proyecto, sin
+  // resumen financiero ni sidebar: solo volver al plan y el código.
+  if (pathname.endsWith('/plan-trabajo/campo')) {
+    return (
+      <ProyectoContext.Provider value={valorContexto}>
+        <div className={`min-h-screen ${anchoPlan}`}>
+          <div className="flex items-center gap-2 px-1 pb-1 sm:px-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(`/proyectos/${id}/plan-trabajo`)}
+              className="h-7 gap-1 px-2 text-xs"
+              title="Volver al Plan de Trabajo"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Plan de Trabajo
+            </Button>
+            <span className="min-w-0 truncate text-xs text-muted-foreground" title={proyecto.nombre}>
+              <span className="font-mono font-medium text-gray-700">{proyecto.codigo}</span> · {proyecto.nombre}
+            </span>
+          </div>
+          {children}
+        </div>
+      </ProyectoContext.Provider>
+    )
+  }
+
   return (
-    <ProyectoContext.Provider value={{ proyecto, setProyecto: handleDataUpdate, refreshProyecto, loading, cronogramaStats, costosReales, refreshCostosReales: () => { if (typeof id === 'string') fetchCostosReales(id) } }}>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <div className="container mx-auto p-4 sm:p-6">
+    <ProyectoContext.Provider value={valorContexto}>
+      <div className={`min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 ${anchoPlan}`}>
+        <div className={`container mx-auto ${paddingContenedor}`}>
           {/* Breadcrumb - Always visible on sub-pages */}
           {!isHubPage && (isDetailView || needsFullWidth) && (
             <div className="flex items-center gap-2 flex-wrap text-sm mb-4">
