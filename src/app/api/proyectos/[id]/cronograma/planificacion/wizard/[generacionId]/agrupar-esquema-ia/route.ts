@@ -13,6 +13,7 @@ import { FAMILIA_SOPORTES_FABRICADOS, NOMBRE_FAMILIA_OFICIAL_PRO } from '@/lib/c
 import { EDT_SERVICIOS_ALQUILERES, separarServiciosYAlquileres } from '@/lib/cronogramaIA/separarServiciosAlquileres'
 import { agregarEntregaEnObra } from '@/lib/cronogramaIA/entregaEnObraPro'
 import { aplicarAprobacionCliente } from '@/lib/cronogramaIA/aprobacionClientePro'
+import { agregarGeneralesCon, esServicioGeneral } from '@/lib/cronogramaIA/generalesCon'
 import { normalizarNombreTarea } from '@/lib/cronogramaIA/matchTareaCatalogo'
 import type { ActividadPropuesta, CatalogoServicioParaWizard, ConfiguracionWizardPaso1, EsquemaElegido, NombreConAlias } from '@/types/cronogramaIA'
 import type { ContextoCotizacionParaPrompt, EquipoRealParaPrompt } from '@/lib/cronogramaIA/prompts'
@@ -189,10 +190,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     // un servicio de otro EDT.
     const catalogoCompleto = await prisma.catalogoServicio.findMany({ select: { id: true, nombre: true } })
 
+    // CON: los servicios de "Generales - Movilización / Desmovilización" no se
+    // le dan a la IA (no van en las zonas): se agregan después (generalesCon.ts).
+    const serviciosParaIA = body.edtNombre === 'CON' ? serviciosPermitidos.filter(s => !esServicioGeneral(s)) : serviciosPermitidos
+
     const resultado = await generarAsignacionConEsquema({
       edtNombre: body.edtNombre,
       nombresActividades: body.nombresActividades,
-      serviciosPermitidos,
+      serviciosPermitidos: serviciosParaIA,
       catalogoCompleto,
       alcanceLibre: config.alcanceLibre,
       cotizacion,
@@ -220,6 +225,20 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     })
     resultado.actividades = sugerenciaCantidad.actividades
     resultado.advertencias.push(...sugerenciaCantidad.advertencias)
+
+    // CON: "Generales - Movilización y Obras Preliminares" al inicio y
+    // "Generales - Desmovilización" al final, desde el catálogo.
+    if (body.edtNombre === 'CON') {
+      const proyCon = await prisma.proyecto.findUnique({ where: { id: proyectoId }, select: { cliente: { select: { nombre: true } } } })
+      resultado.actividades = agregarGeneralesCon(resultado.actividades, serviciosPermitidos, {
+        brownfield: config.brownfield,
+        ingenieriaDetalle: config.ingenieriaDetalle,
+        nPets: config.nPets,
+        tableros: config.tableros,
+        plcs: config.plcs,
+        hmiCantidad: config.hmiCantidad,
+      }, proyCon?.cliente?.nombre)
+    }
 
     // PRO = materiales; las familias de alquiler y subcontrato pasan al EDT SER
     // "Servicios y Alquileres" con sus propios pasos (ver separarServiciosAlquileres.ts).

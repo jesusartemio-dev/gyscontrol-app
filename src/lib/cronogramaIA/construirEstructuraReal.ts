@@ -5,6 +5,7 @@ import type { ActividadPropuesta, TareaPropuesta } from '@/types/cronogramaIA'
 import { type CalendarioHoras, desplazarHorasLaborables, horasPorDiaCalendario, siguienteMomentoLaborable, sumarHorasLaborables } from '@/lib/services/cronogramaHoras'
 import { ACTIVIDAD_POR_CICLO, DESFASE_CICLO_DIAS, RECURRENCIA_ACTIVIDAD } from './reglasActividades'
 import { ACTIVIDAD_ENTREGA_OBRA, TAREA_SEGUIMIENTO_PROVEEDORES, TAREA_TRASLADO_OBRA } from './entregaEnObraPro'
+import { esActividadGenerales } from './generalesCon'
 
 // Re-exportado por compatibilidad — la implementación real vive en
 // agruparYOrdenarPorEstructura.ts (sin esta ruta, un import desde acá
@@ -218,7 +219,8 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
   const finPorFase = new Map<string, Date>()
   // Propuesta original de cada tarea (horas por vez para los ciclos de Gestión y Control).
   const propuestaPorTareaId = new Map<string, TareaPropuesta>()
-  // Fin-Comienzo de procura: cadena de cada familia → traslado → hito (ver programarEntregaEnObra).
+  // Fin-Comienzo de procura (cadena de cada familia → traslado → hito, ver
+  // programarEntregaEnObra) y de las actividades "Generales - …" de CON.
   const dependenciasProcura: EstructuraReal['dependenciasCiclos'] = []
 
   for (const faseInfo of fasesAgrupadas) {
@@ -330,15 +332,30 @@ export function construirEstructuraReal(opciones: ConstruirEstructuraOpciones): 
         let horasAcumActividad = 0
         let ordenTarea = 0
         const primeraTareaDeActividad = tareas.length
+        // "Paralelo": la tarea arranca junto con la anterior y depende de la
+        // misma predecesora. En "Generales - …" (CON) se crean las FC.
+        const conDependencias = esActividadGenerales(actividad.actividadNombre)
+        let inicioHorasAnterior = 0
+        let idAnterior: string | null = null
+        let predecesoraAnterior: string | null = null
 
         for (const tarea of actividad.tareas) {
-          // Hito ◆ (p. ej. "Aprobación por NEXA"): 0 días, al terminar la tarea anterior.
+          // Hito ◆ (p. ej. "Emisión de Orden de Compra"): 0 días, al terminar la tarea anterior.
           const horasTareaRedondeadas = tarea.esHito ? 0 : duracionDiasDesdeHoras(tarea.horasEstimadas, horasPorDia) * horasPorDia
           const tareaId = randomUUID()
           propuestaPorTareaId.set(tareaId, tarea)
-          const fechaInicioTarea = calcularFechaFinConCalendario(fechaInicioActividad, horasAcumActividad, calendarioLaboral)
-          horasAcumActividad += horasTareaRedondeadas
-          const fechaFinTarea = tarea.esHito ? fechaInicioTarea : calcularFechaFinConCalendario(fechaInicioActividad, horasAcumActividad, calendarioLaboral)
+          const paralela = !!tarea.paraleloConAnterior && idAnterior !== null
+          const inicioHoras = paralela ? inicioHorasAnterior : horasAcumActividad
+          const fechaInicioTarea = calcularFechaFinConCalendario(fechaInicioActividad, inicioHoras, calendarioLaboral)
+          horasAcumActividad = Math.max(horasAcumActividad, inicioHoras + horasTareaRedondeadas)
+          const fechaFinTarea = tarea.esHito ? fechaInicioTarea : calcularFechaFinConCalendario(fechaInicioActividad, inicioHoras + horasTareaRedondeadas, calendarioLaboral)
+          const predecesora: string | null = paralela ? predecesoraAnterior : idAnterior
+          if (conDependencias && predecesora) {
+            dependenciasProcura.push({ tareaOrigenId: predecesora, tareaDependienteId: tareaId, tipo: 'finish_to_start', lagMinutos: 0 })
+          }
+          inicioHorasAnterior = inicioHoras
+          predecesoraAnterior = predecesora
+          idAnterior = tareaId
 
           tareas.push({
             id: tareaId,

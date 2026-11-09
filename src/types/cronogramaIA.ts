@@ -84,6 +84,13 @@ export interface TareaPropuesta {
    */
   hitoDiasDespues?: number
   /**
+   * Arranca junto con la tarea anterior y depende de la MISMA predecesora que
+   * ella (etiqueta "Paralelo" del servicio) — p. ej. en "Generales -
+   * Movilización": traslado de materiales, de andamios y señalización, los
+   * tres tras la habilitación del acopio.
+   */
+  paraleloConAnterior?: boolean
+  /**
    * Hito del cliente sin fecha conocida al generar (p. ej. "Parada de Planta"):
    * se ubica provisionalmente al inicio de Ejecución para poder colgarle
    * dependencias; el usuario pone la fecha real. Etiqueta "HitosCliente" (la misma que agrupa la actividad "Hitos del Cliente").
