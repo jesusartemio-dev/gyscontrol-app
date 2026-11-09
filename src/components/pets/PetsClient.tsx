@@ -9,7 +9,51 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { petsContenidoSchema } from '@/lib/validators/pets'
 import type { PetsContenido } from '@/lib/validators/pets'
 import { contarEtapasIncompletas } from '@/lib/pets/placeholders'
-import { PetsViewer } from './PetsViewer'
+import { PetsViewer, EtapaVista, PasoVista, type PartePets } from './PetsViewer'
+import { EditarPetsTextoDialog, type ParteTextoPets } from './EditarPetsTextoDialog'
+import {
+  seccionATexto, textoASeccion, procedimientoATexto, textoAProcedimiento,
+  etapaATexto, textoAEtapa, pasoATexto, textoAPaso, type SeccionSimple,
+} from '@/lib/pets/textoPets'
+
+type Etapa = PetsContenido['procedimiento']['etapas'][number]
+type Paso = Etapa['pasos'][number]
+
+const TITULO_SECCION: Record<SeccionSimple, string> = {
+  personal: 'Personal involucrado',
+  epp: 'EPP requerido',
+  recursos: 'Recursos y materiales',
+  restricciones: 'Restricciones generales',
+}
+
+/** Vista previa de una sección simple (lista agrupada). */
+function PetsViewerSeccion({ contenido, seccion }: { contenido: PetsContenido; seccion: SeccionSimple }) {
+  const lista = (titulo: string, items: string[]) => items.length > 0 && (
+    <div key={titulo} className="mb-2">
+      {titulo && <p className="text-[11px] font-semibold uppercase text-gray-500">{titulo}</p>}
+      {items.map((x, i) => <p key={i} className="text-sm">• {x}</p>)}
+    </div>
+  )
+  if (seccion === 'personal') return <>{lista('', contenido.personal.map((p) => p.rol))}</>
+  if (seccion === 'restricciones') return <>{lista('', contenido.restricciones.map((r) => r.texto))}</>
+  if (seccion === 'epp') {
+    return (
+      <>
+        {lista('Básico', contenido.epp.basico.map((e) => e.nombre))}
+        {lista('Bioseguridad', contenido.epp.bioseguridad.map((e) => e.nombre))}
+        {lista('Específico', contenido.epp.especifico.map((e) => e.nombre))}
+        <p className="text-[11px] text-muted-foreground">Referencia MPP: {contenido.epp.mppRef}</p>
+      </>
+    )
+  }
+  return (
+    <>
+      {lista('Equipos', contenido.recursos.equipos.map((e) => e.nombre))}
+      {lista('Herramientas', contenido.recursos.herramientas.map((e) => e.nombre))}
+      {lista('Materiales', contenido.recursos.materiales.map((e) => e.nombre))}
+    </>
+  )
+}
 import { PetsGenerator } from './PetsGenerator'
 import { PetsEditorPanel } from './PetsEditorPanel'
 import { PasoEditorModal } from './PasoEditorModal'
@@ -43,6 +87,7 @@ export function PetsClient({ proyectoId }: Props) {
     pasoIdx: number
   } | null>(null)
   const [agregarPasoEn, setAgregarPasoEn] = useState<number | null>(null)
+  const [parteTexto, setParteTexto] = useState<ParteTextoPets | null>(null)
 
   // Versión revisada (subir + ver) state
   const [subiendoVersion, setSubiendoVersion] = useState(false)
@@ -191,6 +236,96 @@ export function PetsClient({ proyectoId }: Props) {
     }
   }
 
+  // ─── Texto / IA por partes ─────────────────────────────────────────────────
+  // Guarda una parte sobre el contenido MÁS RECIENTE del servidor (no sobre el
+  // de cuando se abrió la página): así no se pisa lo editado en otra parte.
+  const guardarParte = async (aplicar: (c: PetsContenido) => PetsContenido) => {
+    const res = await fetch(`/api/proyectos/${proyectoId}/pets`)
+    const json = await res.json().catch(() => ({}))
+    const fresco = petsContenidoSchema.safeParse(json?.data?.contenido)
+    if (!res.ok || !fresco.success) throw new Error('No se pudo leer el PETS actual: recargá la página')
+    const nuevo = aplicar(fresco.data)
+    const valido = petsContenidoSchema.safeParse(nuevo)
+    if (!valido.success) throw new Error(`Contenido inválido: ${valido.error.issues[0]?.message ?? ''}`)
+    const put = await fetch(`/api/proyectos/${proyectoId}/pets/contenido`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(valido.data),
+    })
+    if (!put.ok) {
+      const e = await put.json().catch(() => ({}))
+      throw new Error(e.error ?? `No se pudo guardar (HTTP ${put.status})`)
+    }
+    setContenido(valido.data)
+  }
+
+  const abrirTexto = (parte: PartePets) => {
+    if (!contenido) return
+    const c = contenido
+    if (parte.tipo === 'seccion') {
+      const s = parte.seccion
+      setParteTexto({
+        titulo: TITULO_SECCION[s],
+        textoInicial: seccionATexto(s, c),
+        interpretar: (t) => textoASeccion(s, t, c),
+        vistaPrevia: (v) => <PetsViewerSeccion contenido={{ ...c, ...(v as Partial<PetsContenido>) }} seccion={s} />,
+        guardar: (v) => guardarParte((f) => ({ ...f, ...(v as Partial<PetsContenido>) })),
+      })
+    } else if (parte.tipo === 'procedimiento') {
+      setParteTexto({
+        titulo: 'Procedimiento completo',
+        textoInicial: procedimientoATexto(c),
+        interpretar: (t) => textoAProcedimiento(t, c),
+        vistaPrevia: (v) => (
+          <div className="space-y-4">
+            {(v as Etapa[]).map((e, i) => (
+              <div key={i}>
+                <p className="mb-2 text-sm font-semibold">Etapa {e.letra ?? String.fromCharCode(65 + i)}: {e.titulo}</p>
+                <EtapaVista etapa={e} />
+              </div>
+            ))}
+          </div>
+        ),
+        guardar: (v) => guardarParte((f) => ({ ...f, procedimiento: { etapas: v as Etapa[] } })),
+      })
+    } else if (parte.tipo === 'etapa') {
+      const i = parte.etapa
+      const e = c.procedimiento.etapas[i]
+      const letra = e.letra ?? String.fromCharCode(65 + i)
+      setParteTexto({
+        titulo: `Etapa ${letra}: ${e.titulo}`,
+        textoInicial: etapaATexto(e, i),
+        interpretar: (t) => textoAEtapa(t, e),
+        vistaPrevia: (v) => <EtapaVista etapa={v as Etapa} />,
+        guardar: (v) => guardarParte((f) => {
+          if (!f.procedimiento.etapas[i]) throw new Error('Esa etapa ya no existe: recargá la página')
+          const etapas = [...f.procedimiento.etapas]
+          etapas[i] = v as Etapa
+          return { ...f, procedimiento: { etapas } }
+        }),
+      })
+    } else {
+      const { etapa: i, paso: j } = parte
+      const e = c.procedimiento.etapas[i]
+      const letra = e.letra ?? String.fromCharCode(65 + i)
+      setParteTexto({
+        titulo: `Etapa ${letra} · Paso ${j + 1}`,
+        textoInicial: pasoATexto(e.pasos[j], j + 1),
+        interpretar: (t) => textoAPaso(t),
+        vistaPrevia: (v) => <PasoVista paso={v as Paso} numero={j + 1} />,
+        guardar: (v) => guardarParte((f) => {
+          const et = f.procedimiento.etapas[i]
+          if (!et?.pasos[j]) throw new Error('Ese paso ya no existe: recargá la página')
+          const pasos = [...et.pasos]
+          pasos[j] = { ...(v as Paso), numero: j + 1 }
+          const etapas = [...f.procedimiento.etapas]
+          etapas[i] = { ...et, pasos }
+          return { ...f, procedimiento: { etapas } }
+        }),
+      })
+    }
+  }
+
   // Loading state
   if (pets === undefined) {
     return (
@@ -280,7 +415,7 @@ export function PetsClient({ proyectoId }: Props) {
       onRegenerarPaso={(etapaIdx, pasoIdx) => regenerarPaso(etapaIdx, pasoIdx, cargarPets)}
     />
   ) : (
-    <PetsViewer contenido={contenido} />
+    <PetsViewer contenido={contenido} onTexto={regenActivo || saving ? undefined : abrirTexto} />
   )
 
   // Has contenido — show viewer or editor + actions
@@ -295,7 +430,8 @@ export function PetsClient({ proyectoId }: Props) {
             </p>
           )}
         </div>
-        <div className="flex gap-2">
+        {/* flex-wrap: en celular los botones se salían de la pantalla. */}
+        <div className="flex flex-wrap gap-2">
           <Button
             variant={modoEdicion ? 'default' : 'outline'}
             size="sm"
@@ -395,6 +531,8 @@ export function PetsClient({ proyectoId }: Props) {
       ) : (
         contenidoEstructuradoPets
       )}
+
+      <EditarPetsTextoDialog parte={parteTexto} onClose={() => setParteTexto(null)} />
 
       {pasoEditando && (
         <PasoEditorModal

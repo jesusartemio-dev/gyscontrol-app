@@ -6,29 +6,105 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
-import { Users, Shield, Wrench, ClipboardList, AlertTriangle } from 'lucide-react'
+import { Users, Shield, Wrench, ClipboardList, AlertTriangle, Sparkles } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import type { PetsContenido } from '@/lib/validators/pets'
+import type { SeccionSimple } from '@/lib/pets/textoPets'
 import { BloqueComoRenderer } from './BloqueComoRenderer'
+
+type Etapa = PetsContenido['procedimiento']['etapas'][number]
+type Paso = Etapa['pasos'][number]
+
+/** Parte del PETS que se edita como texto / IA. */
+export type PartePets =
+  | { tipo: 'seccion'; seccion: SeccionSimple }
+  | { tipo: 'procedimiento' }
+  | { tipo: 'etapa'; etapa: number }
+  | { tipo: 'paso'; etapa: number; paso: number }
 
 interface Props {
   contenido: PetsContenido
+  /** Si viene, cada parte muestra "Texto / IA". */
+  onTexto?: (parte: PartePets) => void
 }
 
-export function PetsViewer({ contenido }: Props) {
+function BotonTexto({ onClick, etiqueta = 'Texto / IA', compacto }: { onClick: () => void; etiqueta?: string; compacto?: boolean }) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className={compacto ? 'h-7 w-7 shrink-0 p-0' : 'h-7 shrink-0 px-2 text-[11px]'}
+      onClick={(e) => { e.stopPropagation(); onClick() }}
+      title="Editar como texto (para trabajarlo con una IA)"
+    >
+      <Sparkles className={`h-3.5 w-3.5 text-indigo-500 ${compacto ? '' : 'mr-1'}`} />
+      {!compacto && etiqueta}
+    </Button>
+  )
+}
+
+/** Un paso (qué / quién / cómo). También es la vista previa del texto pegado. */
+export function PasoVista({ paso, numero, accion }: { paso: Paso; numero: number; accion?: React.ReactNode }) {
+  return (
+    <div className="border-l-2 border-blue-200 pl-2 sm:pl-3">
+      <div className="mb-0.5 flex items-start gap-2">
+        <p className="min-w-0 flex-1 text-sm font-semibold text-gray-800">{numero}. {paso.que}</p>
+        {accion}
+      </div>
+      <p className="mb-2 text-xs text-gray-500">Quién: {paso.quien.map((q) => q.rol).join(', ')}</p>
+      <BloqueComoRenderer bloques={paso.como} />
+    </div>
+  )
+}
+
+export function EtapaVista({ etapa, onTextoPaso }: { etapa: Etapa; onTextoPaso?: (paso: number) => void }) {
+  return (
+    <div className="space-y-4">
+      {etapa.pasos.map((paso, j) => (
+        <PasoVista
+          key={j}
+          paso={paso}
+          numero={j + 1}
+          accion={onTextoPaso && <BotonTexto compacto onClick={() => onTextoPaso(j)} />}
+        />
+      ))}
+    </div>
+  )
+}
+
+function Grupos({ grupos }: { grupos: [string, { nombre: string }[]][] }) {
+  return (
+    <div className="grid grid-cols-1 gap-3 px-1 py-1 sm:grid-cols-3 sm:gap-4 sm:px-2">
+      {grupos.filter(([, items]) => items.length > 0).map(([titulo, items]) => (
+        <div key={titulo}>
+          <p className="mb-1 text-xs font-semibold uppercase text-gray-500">{titulo}</p>
+          {items.map((e, i) => <p key={i} className="text-sm">• {e.nombre}</p>)}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function PetsViewer({ contenido, onTexto }: Props) {
+  const barra = (parte: PartePets, etiqueta?: string) =>
+    onTexto && <div className="flex justify-end pb-1"><BotonTexto onClick={() => onTexto(parte)} etiqueta={etiqueta} /></div>
+
   return (
     <Accordion type="multiple" defaultValue={['procedimiento']}>
       {/* Personal */}
       <AccordionItem value="personal">
         <AccordionTrigger>
-          <span className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-blue-600" />
+          <span className="flex items-center gap-2 text-left">
+            <Users className="h-4 w-4 shrink-0 text-blue-600" />
             Personal involucrado ({contenido.personal.length})
           </span>
         </AccordionTrigger>
         <AccordionContent>
-          <ul className="space-y-1 px-2 py-1">
+          {barra({ tipo: 'seccion', seccion: 'personal' })}
+          <ul className="space-y-1 px-1 py-1 sm:px-2">
             {contenido.personal.map((p, i) => (
-              <li key={i} className="text-sm flex items-center gap-1.5">
+              <li key={i} className="flex items-center gap-1.5 text-sm">
                 <span className="text-blue-500">•</span> {p.rol}
               </li>
             ))}
@@ -39,113 +115,56 @@ export function PetsViewer({ contenido }: Props) {
       {/* EPP */}
       <AccordionItem value="epp">
         <AccordionTrigger>
-          <span className="flex items-center gap-2">
-            <Shield className="h-4 w-4 text-green-600" />
+          <span className="flex items-center gap-2 text-left">
+            <Shield className="h-4 w-4 shrink-0 text-green-600" />
             EPP requerido
           </span>
         </AccordionTrigger>
         <AccordionContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 px-2 py-1">
-            {contenido.epp.basico.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Básico</p>
-                {contenido.epp.basico.map((e, i) => (
-                  <p key={i} className="text-sm">• {e.nombre}</p>
-                ))}
-              </div>
-            )}
-            {contenido.epp.bioseguridad.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Bioseguridad</p>
-                {contenido.epp.bioseguridad.map((e, i) => (
-                  <p key={i} className="text-sm">• {e.nombre}</p>
-                ))}
-              </div>
-            )}
-            {contenido.epp.especifico.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Específico</p>
-                {contenido.epp.especifico.map((e, i) => (
-                  <p key={i} className="text-sm">• {e.nombre}</p>
-                ))}
-              </div>
-            )}
-          </div>
+          {barra({ tipo: 'seccion', seccion: 'epp' })}
+          <Grupos grupos={[['Básico', contenido.epp.basico], ['Bioseguridad', contenido.epp.bioseguridad], ['Específico', contenido.epp.especifico]]} />
         </AccordionContent>
       </AccordionItem>
 
       {/* Recursos */}
-      {(contenido.recursos.equipos.length > 0 ||
-        contenido.recursos.herramientas.length > 0 ||
-        contenido.recursos.materiales.length > 0) && (
-        <AccordionItem value="recursos">
-          <AccordionTrigger>
-            <span className="flex items-center gap-2">
-              <Wrench className="h-4 w-4 text-orange-600" />
-              Recursos y materiales
-            </span>
-          </AccordionTrigger>
-          <AccordionContent>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 px-2 py-1">
-              {contenido.recursos.equipos.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Equipos</p>
-                  {contenido.recursos.equipos.map((e, i) => (
-                    <p key={i} className="text-sm">• {e.nombre}</p>
-                  ))}
-                </div>
-              )}
-              {contenido.recursos.herramientas.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Herramientas</p>
-                  {contenido.recursos.herramientas.map((e, i) => (
-                    <p key={i} className="text-sm">• {e.nombre}</p>
-                  ))}
-                </div>
-              )}
-              {contenido.recursos.materiales.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Materiales</p>
-                  {contenido.recursos.materiales.map((e, i) => (
-                    <p key={i} className="text-sm">• {e.nombre}</p>
-                  ))}
-                </div>
-              )}
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-      )}
+      <AccordionItem value="recursos">
+        <AccordionTrigger>
+          <span className="flex items-center gap-2 text-left">
+            <Wrench className="h-4 w-4 shrink-0 text-orange-600" />
+            Recursos y materiales
+          </span>
+        </AccordionTrigger>
+        <AccordionContent>
+          {barra({ tipo: 'seccion', seccion: 'recursos' })}
+          <Grupos grupos={[['Equipos', contenido.recursos.equipos], ['Herramientas', contenido.recursos.herramientas], ['Materiales', contenido.recursos.materiales]]} />
+        </AccordionContent>
+      </AccordionItem>
 
       {/* Procedimiento */}
       <AccordionItem value="procedimiento">
         <AccordionTrigger>
-          <span className="flex items-center gap-2">
-            <ClipboardList className="h-4 w-4 text-purple-600" />
+          <span className="flex items-center gap-2 text-left">
+            <ClipboardList className="h-4 w-4 shrink-0 text-purple-600" />
             Procedimiento — {contenido.procedimiento.etapas.length} etapas
           </span>
         </AccordionTrigger>
         <AccordionContent>
-          <Accordion type="multiple" className="pl-2">
+          {barra({ tipo: 'procedimiento' }, 'Texto / IA: todo el procedimiento')}
+          <Accordion type="multiple" className="sm:pl-2">
             {contenido.procedimiento.etapas.map((etapa, i) => {
               const letra = etapa.letra ?? String.fromCharCode(65 + i)
               return (
                 <AccordionItem key={i} value={`etapa-${i}`}>
-                  <AccordionTrigger className="text-sm font-semibold">
+                  <AccordionTrigger className="text-left text-sm font-semibold">
                     Etapa {letra}: {etapa.titulo}
                   </AccordionTrigger>
                   <AccordionContent>
-                    <div className="space-y-4 pl-2">
-                      {etapa.pasos.map((paso, j) => (
-                        <div key={j} className="border-l-2 border-blue-200 pl-3">
-                          <p className="text-sm font-semibold text-gray-800 mb-0.5">
-                            {j + 1}. {paso.que}
-                          </p>
-                          <p className="text-xs text-gray-500 mb-2">
-                            Quien: {paso.quien.map((q) => q.rol).join(', ')}
-                          </p>
-                          <BloqueComoRenderer bloques={paso.como} />
-                        </div>
-                      ))}
+                    {barra({ tipo: 'etapa', etapa: i }, `Texto / IA: etapa ${letra}`)}
+                    <div className="sm:pl-2">
+                      <EtapaVista
+                        etapa={etapa}
+                        onTextoPaso={onTexto ? (j) => onTexto({ tipo: 'paso', etapa: i, paso: j }) : undefined}
+                      />
                     </div>
                   </AccordionContent>
                 </AccordionItem>
@@ -158,15 +177,16 @@ export function PetsViewer({ contenido }: Props) {
       {/* Restricciones */}
       <AccordionItem value="restricciones">
         <AccordionTrigger>
-          <span className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-red-600" />
+          <span className="flex items-center gap-2 text-left">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-red-600" />
             Restricciones generales ({contenido.restricciones.length})
           </span>
         </AccordionTrigger>
         <AccordionContent>
-          <ul className="space-y-1 px-2 py-1">
+          {barra({ tipo: 'seccion', seccion: 'restricciones' })}
+          <ul className="space-y-1 px-1 py-1 sm:px-2">
             {contenido.restricciones.map((r, i) => (
-              <li key={i} className="text-sm text-red-700 flex items-start gap-1.5">
+              <li key={i} className="flex items-start gap-1.5 text-sm text-red-700">
                 <span className="flex-shrink-0 font-bold">✗</span>
                 {r.texto}
               </li>
