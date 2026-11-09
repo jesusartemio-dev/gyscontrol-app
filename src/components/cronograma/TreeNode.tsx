@@ -300,12 +300,14 @@ export function TreeNode({
   // ocultan; las dependencias quedan en el menú ⚙.
   const area = (a: string): React.CSSProperties | undefined => (compacto ? { gridArea: a } : undefined)
   const oculta = compacto ? 'hidden' : ''
-  const sangria = compacto ? node.level * 12 : node.level * 16 + 8
+  // Compacta: el proyecto y sus fases arrancan pegados al número (antes la
+  // sangría contaba desde el proyecto y dejaba una franja vacía a la izquierda).
+  const sangria = compacto ? Math.max(0, node.level - 1) * 10 : node.level * 16 + 8
   const fijoNum = celdaFija(nombreFijo, 'numero', !!showNumeroColumn)
   const fijoNom = celdaFija(nombreFijo, 'nombre', !!showNumeroColumn)
   const estiloGrid: React.CSSProperties = compacto
     ? {
-        gridTemplateColumns: `${showNumeroColumn ? '26px ' : ''}minmax(0,1fr) 28px`,
+        gridTemplateColumns: `${showNumeroColumn ? '22px ' : ''}minmax(0,1fr) 28px`,
         gridTemplateAreas: showNumeroColumn ? '"num nom acc" ". met acc"' : '"nom acc" "met acc"',
         rowGap: '1px',
       }
@@ -447,6 +449,30 @@ export function TreeNode({
     return `${String(date.getUTCDate()).padStart(2, '0')} ${months[date.getUTCMonth()]}`
   }
   const esHitoTarea = node.type === 'tarea' && node.data?.esHito === true
+  // Etiqueta de tipo (colores = franjas de la vista compacta). Tareas: null → punto.
+  const etiquetaTipo = (): { texto: string; clase: string; title: string } | null => {
+    const ambar = 'border-amber-300 bg-amber-50 text-amber-700'
+    if (node.data?.isExtrasGroup) return { texto: 'EXT', clase: ambar, title: 'Tareas fuera del plan' }
+    if (node.type === 'tarea') {
+      if (node.data?.esExtra) return { texto: 'EXT', clase: ambar, title: 'Tarea extra (fuera del plan)' }
+      if (node.data?.esPropuestaIA) return { texto: 'IA', clase: 'border-sky-300 bg-sky-50 text-sky-700', title: 'Tarea propuesta por IA' }
+      return null
+    }
+    switch (node.type) {
+      case 'proyecto': return { texto: 'PRY', clase: 'border-indigo-300 bg-indigo-100 text-indigo-800', title: 'Proyecto' }
+      case 'fase': return { texto: 'FAS', clase: 'border-blue-300 bg-blue-100 text-blue-800', title: 'Fase' }
+      case 'edt': return {
+        texto: node.data?.catalogoEdtCodigo || 'EDT',
+        clase: 'border-green-300 bg-green-100 text-green-800',
+        title: node.data?.catalogoEdtCodigo
+          ? `EDT ${node.data.catalogoEdtCodigo}${node.data?.catalogoEdtDescripcion ? ` — ${node.data.catalogoEdtDescripcion}` : ''}`
+          : 'EDT',
+      }
+      case 'actividad': return { texto: 'ACT', clase: 'border-purple-300 bg-purple-100 text-purple-800', title: 'Actividad' }
+      default: return null
+    }
+  }
+
   // Duración en texto plano (la misma regla que la columna DUR, sin avisos).
   const textoDuracion = (): string => {
     if (esHitoTarea) return '0d'
@@ -488,8 +514,9 @@ export function TreeNode({
           className={`flex gap-1 min-w-0 ${compacto ? 'items-start' : 'items-center'} ${fijoNom.className}`}
           style={{ ...fijoNom.style, ...area('nom'), paddingLeft: `${sangria}px` }}
         >
-          {/* Drag handle — visible on hover when draggable */}
-          {dragListeners && (
+          {/* Drag handle — visible on hover when draggable. En celular no hay
+              hover y era un hueco invisible de ~18 px: no se muestra. */}
+          {dragListeners && !compacto && (
             <div
               className="opacity-0 group-hover:opacity-40 hover:!opacity-70 cursor-grab active:cursor-grabbing shrink-0 text-gray-400 touch-none"
               {...dragListeners}
@@ -520,10 +547,26 @@ export function TreeNode({
           </Button>
 
           {/* Node icon and name */}
-          {/* Compacta: la tarea lleva un punto en vez del 🔧 (más liviana que su actividad). */}
-          <span className={`shrink-0 ${compacto ? 'leading-5 text-[11px]' : 'text-xs'} ${compacto && node.type === 'tarea' ? 'text-gray-400' : ''}`}>
-            {node.data?.isExtrasGroup ? '✨' : node.data?.esExtra ? '➕' : node.data?.esPropuestaIA ? '🤖' : compacto && node.type === 'tarea' ? '•' : config.icon}
-          </span>
+          {/* Tipo: etiqueta de 3 letras en los grupos (FAS · código del EDT ·
+              ACT) y punto en las tareas — los íconos 📊🏗️⚡🔧 no decían nada. */}
+          {(() => {
+            const et = etiquetaTipo()
+            if (!et) {
+              return (
+                <span className={`flex h-5 w-3 shrink-0 items-center justify-center ${esHitoTarea ? 'text-[10px] text-amber-600' : 'text-gray-400'}`}>
+                  {esHitoTarea ? '◆' : '•'}
+                </span>
+              )
+            }
+            return (
+              <span
+                className={`${compacto ? 'mt-[3px]' : ''} inline-flex h-[15px] min-w-[26px] shrink-0 items-center justify-center rounded border px-0.5 text-[9px] font-bold leading-none tracking-tight ${et.clase}`}
+                title={et.title}
+              >
+                {et.texto}
+              </span>
+            )
+          })()}
           <span className={compacto
             ? `min-w-0 flex-1 break-words leading-5 ${node.data?.isExtrasGroup ? 'text-xs font-medium text-amber-700 italic' : estiloCompacto.nombre}`
             : `text-xs font-medium truncate ${node.data?.isExtrasGroup ? 'text-amber-700 italic' : 'text-gray-900'}`}
@@ -531,16 +574,6 @@ export function TreeNode({
             {node.nombre}
           </span>
 
-          {/* Código del EDT de catálogo al que está enlazado este EDT */}
-          {!compacto && node.type === 'edt' && node.data?.catalogoEdtCodigo && (
-            <Badge
-              variant="outline"
-              className="text-[10px] leading-none px-1 py-0 h-4 bg-blue-50 text-blue-700 border-blue-200 shrink-0"
-              title={node.data.catalogoEdtDescripcion || undefined}
-            >
-              {node.data.catalogoEdtCodigo}
-            </Badge>
-          )}
 
           {/* Children count inline */}
           {!compacto && hasChildren && (
@@ -619,7 +652,7 @@ export function TreeNode({
         {compacto && (
           <div
             className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px] leading-4 text-gray-500"
-            style={{ ...area('met'), paddingLeft: `${sangria + 26}px` }}
+            style={{ ...area('met'), paddingLeft: `${sangria + 24}px` }}
           >
             <TreeNodeProgress
               percentage={node.metadata.progressPercentage}
