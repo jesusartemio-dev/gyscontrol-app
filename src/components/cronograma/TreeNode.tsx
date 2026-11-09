@@ -295,22 +295,31 @@ export function TreeNode({
   nombreFijo = false
 }: TreeNodeProps) {
   const config = NODE_CONFIG[node.type]
-  // Fila compacta (celular): misma estructura de celdas, otro acomodo con
-  // grid-template-areas; las columnas que no entran se ocultan.
+  // Fila compacta (celular): nombre arriba y, abajo, lo que se confirma en
+  // campo (avance, días, horas, HH, recurso, fechas). Las columnas de PC se
+  // ocultan; las dependencias quedan en el menú ⚙.
   const area = (a: string): React.CSSProperties | undefined => (compacto ? { gridArea: a } : undefined)
   const oculta = compacto ? 'hidden' : ''
-  const sangria = compacto ? node.level * 10 : node.level * 16 + 8
+  const sangria = compacto ? node.level * 12 : node.level * 16 + 8
   const fijoNum = celdaFija(nombreFijo, 'numero', !!showNumeroColumn)
   const fijoNom = celdaFija(nombreFijo, 'nombre', !!showNumeroColumn)
   const estiloGrid: React.CSSProperties = compacto
     ? {
-        gridTemplateColumns: `${showNumeroColumn ? '26px ' : ''}auto auto minmax(0,1fr) 28px`,
-        gridTemplateAreas: showNumeroColumn
-          ? '"num nom nom nom acc" ". pro dur fec acc"'
-          : '"nom nom nom acc" "pro dur fec acc"',
+        gridTemplateColumns: `${showNumeroColumn ? '26px ' : ''}minmax(0,1fr) 28px`,
+        gridTemplateAreas: showNumeroColumn ? '"num nom acc" ". met acc"' : '"nom acc" "met acc"',
         rowGap: '1px',
       }
     : { gridTemplateColumns: columnasArbol({ showRecursoColumn, showResponsableColumn, showPesoColumn, showNumeroColumn, nombreFijo }) }
+  // Compacta: cada nivel se distingue por fondo, franja y tamaño de letra (si
+  // no, una tarea no se leía como parte de su actividad).
+  const ESTILO_COMPACTO: Record<string, { fila: string; nombre: string }> = {
+    proyecto: { fila: 'bg-indigo-50', nombre: 'text-[13px] font-bold text-indigo-950' },
+    fase: { fila: 'bg-blue-50 shadow-[inset_4px_0_0_0_#3b82f6]', nombre: 'text-[13px] font-bold text-blue-950' },
+    edt: { fila: 'bg-green-50/70 shadow-[inset_4px_0_0_0_#22c55e]', nombre: 'text-xs font-semibold text-green-950' },
+    actividad: { fila: 'bg-purple-50/70 shadow-[inset_3px_0_0_0_#a855f7]', nombre: 'text-xs font-semibold text-purple-900' },
+    tarea: { fila: 'bg-white', nombre: 'text-[11px] font-normal text-gray-700' },
+  }
+  const estiloCompacto = ESTILO_COMPACTO[node.type] ?? ESTILO_COMPACTO.tarea
   const hasChildren = node.metadata.hasChildren
   const isExpanded = node.expanded
   const isLoading = node.loading
@@ -438,6 +447,13 @@ export function TreeNode({
     return `${String(date.getUTCDate()).padStart(2, '0')} ${months[date.getUTCMonth()]}`
   }
   const esHitoTarea = node.type === 'tarea' && node.data?.esHito === true
+  // Duración en texto plano (la misma regla que la columna DUR, sin avisos).
+  const textoDuracion = (): string => {
+    if (esHitoTarea) return '0d'
+    if (node.data?.duracionTexto && Number(node.data?.duracionHoras) > 0) return String(node.data.duracionTexto)
+    if (durationDays > 0) return `${durationDays}d`
+    return ''
+  }
   const diasPasadoLimite = Number(node.data?.diasPasadoLimite) || 0
 
   return (
@@ -449,7 +465,7 @@ export function TreeNode({
       // Con nombre fijo, las filas sin franja van en blanco: la celda fija hereda
       // el fondo de la fila y transparente dejaba ver lo que pasa por debajo.
       // La selección opaca (sin /80) por lo mismo.
-      className={`tree-node group ${isDragging ? 'opacity-40' : ''} ${isSelected || dropdownOpen ? `${nombreFijo ? 'bg-blue-200' : 'bg-blue-200/80'} shadow-[inset_4px_0_0_0_#2563eb]` : `${rowIndex != null && rowIndex % 2 === 0 ? 'bg-gray-100' : nombreFijo ? 'bg-white' : ''} hover:bg-blue-50`} ${compacto ? 'py-1 border-b border-gray-100' : 'py-0.5'} cursor-pointer transition-colors`}
+      className={`tree-node group ${isDragging ? 'opacity-40' : ''} ${isSelected || dropdownOpen ? `${nombreFijo ? 'bg-blue-200' : 'bg-blue-200/80'} shadow-[inset_4px_0_0_0_#2563eb]` : compacto ? estiloCompacto.fila : `${rowIndex != null && rowIndex % 2 === 0 ? 'bg-gray-100' : nombreFijo ? 'bg-white' : ''} hover:bg-blue-50`} ${compacto ? 'py-1 border-b border-gray-100' : 'py-0.5'} cursor-pointer transition-colors`}
       onClick={onSelect}
       data-node-id={node.id}
     >
@@ -469,7 +485,7 @@ export function TreeNode({
 
         {/* Columna 1: Nombre con indentación */}
         <div
-          className={`flex items-center gap-1 min-w-0 ${compacto ? 'flex-wrap' : ''} ${fijoNom.className}`}
+          className={`flex gap-1 min-w-0 ${compacto ? 'items-start' : 'items-center'} ${fijoNom.className}`}
           style={{ ...fijoNom.style, ...area('nom'), paddingLeft: `${sangria}px` }}
         >
           {/* Drag handle — visible on hover when draggable */}
@@ -504,15 +520,19 @@ export function TreeNode({
           </Button>
 
           {/* Node icon and name */}
-          <span className="text-xs shrink-0">
-            {node.data?.isExtrasGroup ? '✨' : node.data?.esExtra ? '➕' : node.data?.esPropuestaIA ? '🤖' : config.icon}
+          {/* Compacta: la tarea lleva un punto en vez del 🔧 (más liviana que su actividad). */}
+          <span className={`shrink-0 ${compacto ? 'leading-5 text-[11px]' : 'text-xs'} ${compacto && node.type === 'tarea' ? 'text-gray-400' : ''}`}>
+            {node.data?.isExtrasGroup ? '✨' : node.data?.esExtra ? '➕' : node.data?.esPropuestaIA ? '🤖' : compacto && node.type === 'tarea' ? '•' : config.icon}
           </span>
-          <span className={`text-xs font-medium ${compacto ? 'min-w-0 break-words whitespace-normal leading-snug' : 'truncate'} ${node.data?.isExtrasGroup ? 'text-amber-700 italic' : 'text-gray-900'}`}>
+          <span className={compacto
+            ? `min-w-0 flex-1 break-words leading-5 ${node.data?.isExtrasGroup ? 'text-xs font-medium text-amber-700 italic' : estiloCompacto.nombre}`
+            : `text-xs font-medium truncate ${node.data?.isExtrasGroup ? 'text-amber-700 italic' : 'text-gray-900'}`}
+          >
             {node.nombre}
           </span>
 
           {/* Código del EDT de catálogo al que está enlazado este EDT */}
-          {node.type === 'edt' && node.data?.catalogoEdtCodigo && (
+          {!compacto && node.type === 'edt' && node.data?.catalogoEdtCodigo && (
             <Badge
               variant="outline"
               className="text-[10px] leading-none px-1 py-0 h-4 bg-blue-50 text-blue-700 border-blue-200 shrink-0"
@@ -523,7 +543,7 @@ export function TreeNode({
           )}
 
           {/* Children count inline */}
-          {hasChildren && (
+          {!compacto && hasChildren && (
             <span className="text-[10px] text-gray-400 shrink-0">({node.metadata.totalChildren})</span>
           )}
 
@@ -555,7 +575,7 @@ export function TreeNode({
 
           {/* Dependencias guardadas (como la columna Predecesoras de MS Project).
               Rojo si alguna no se cumple: la tarea va antes de lo que exige. */}
-          {node.type === 'tarea' && (node.data?.predecesoras?.length || node.data?.sucesoras?.length) ? (
+          {!compacto && node.type === 'tarea' && (node.data?.predecesoras?.length || node.data?.sucesoras?.length) ? (
             <span
               className={`inline-flex items-center gap-0.5 text-[10px] leading-none px-1 h-4 rounded border shrink-0 cursor-default ${
                 node.data.dependenciaIncumplida ? 'bg-red-50 text-red-700 border-red-300' : 'bg-white text-gray-500 border-gray-300'
@@ -595,11 +615,44 @@ export function TreeNode({
 
         </div>
 
+        {/* Compacta: segunda línea con lo que se confirma en campo. */}
+        {compacto && (
+          <div
+            className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px] leading-4 text-gray-500"
+            style={{ ...area('met'), paddingLeft: `${sangria + 26}px` }}
+          >
+            <TreeNodeProgress
+              percentage={node.metadata.progressPercentage}
+              status={mapStatusForProgress(node.metadata.status)}
+              size="xs"
+            />
+            {textoDuracion() && <span className="font-mono">{textoDuracion()}</span>}
+            {totalHours > 0 && <span className="font-mono" title="Work: horas de la tarea">{formatHoras(totalHours)} h</span>}
+            {totalHorasHombre > 0 && (
+              <span className="font-mono font-medium text-gray-700" title="Horas-hombre: Work × personas del recurso">{formatHoras(totalHorasHombre)} HH</span>
+            )}
+            {node.type === 'tarea' ? (
+              node.data?.recursoNombre
+                ? <span className="max-w-full truncate rounded border border-green-200 bg-green-50 px-1 text-green-700">👷 {node.data.recursoNombre}</span>
+                : !node.data?.esExtra && <span className="text-red-400">Sin recurso</span>
+            ) : (node.metadata.recursosTotales ?? 0) > 0 ? (
+              <span
+                className={`rounded border px-1 ${
+                  (node.metadata.recursosAsignados ?? 0) >= (node.metadata.recursosTotales ?? 0)
+                    ? 'border-green-200 bg-green-50 text-green-700'
+                    : 'border-amber-200 bg-amber-50 text-amber-700'
+                }`}
+                title="Tareas con recurso asignado"
+              >
+                👷 {node.metadata.recursosAsignados ?? 0}/{node.metadata.recursosTotales}
+              </span>
+            ) : null}
+            <span className="whitespace-nowrap">{formatDates()}</span>
+          </div>
+        )}
+
         {/* Columna 2: Progreso */}
-        <div
-          className={`flex ${compacto ? 'justify-start' : 'justify-center'}`}
-          style={compacto ? { ...area('pro'), paddingLeft: `${sangria + 22}px` } : undefined}
-        >
+        <div className={`flex justify-center ${oculta}`}>
           <TreeNodeProgress
             percentage={node.metadata.progressPercentage}
             status={mapStatusForProgress(node.metadata.status)}
@@ -621,10 +674,7 @@ export function TreeNode({
         </div>
 
         {/* Columna 4: Fechas (+ relación con el elemento de arriba) */}
-        <div
-          className={`flex items-center gap-1 text-[11px] text-gray-500 min-w-0 ${compacto ? 'justify-start' : 'justify-center'}`}
-          style={area('fec')}
-        >
+        <div className={`flex items-center justify-center gap-1 text-[11px] text-gray-500 min-w-0 ${oculta}`}>
           {node.type === 'tarea' && node.data?.predecesoras?.length
             ? <DependenciaFechas predecesoras={node.data.predecesoras} onIrATarea={onIrATarea} />
             : <RelacionAnteriorIcono relacion={node.data.relacionAnterior} />}
@@ -632,7 +682,7 @@ export function TreeNode({
         </div>
 
         {/* Columna 5: Duración por horas laborables, como MS Project ("4h", "1.5d", "0d") */}
-        <div className="text-right text-[11px] text-gray-500 font-mono pr-1" style={area('dur')}>
+        <div className={`text-right text-[11px] text-gray-500 font-mono pr-1 ${oculta}`}>
           {esHitoTarea ? '0d' : node.data.duracionTexto && node.data.duracionHoras > 0 ? node.data.duracionTexto : node.type === 'tarea' && node.data.duracionTexto ? (
             // Inicio = Fin y no es hito: la duración real es 0 (antes se mostraba
             // "1d" contando días de calendario, y el formulario decía 0d).

@@ -39,7 +39,9 @@ import {
   LocateFixed,
   ChevronsUpDown,
   ChevronsDownUp,
-  Link2
+  Link2,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from '@/lib/responsive/breakpoints'
@@ -194,7 +196,8 @@ const fondoFila = (idx: number) => (idx % 2 === 1 ? 'bg-gray-50' : 'bg-white')
 const ANCHO_NOMBRES_DEFECTO = 340
 const ANCHO_NOMBRES_MIN = 220
 const ANCHO_NOMBRES_MAX = 640
-const ANCHO_NOMBRES_CELULAR = 130
+type AnchoCelular = 'ancho' | 'angosto' | 'oculto'
+const ANCHOS_CELULAR: Record<AnchoCelular, number> = { ancho: 190, angosto: 120, oculto: 0 }
 
 export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selectedId, onSelect, refreshKey }: ProyectoGanttViewProps) {
   const [prefsIniciales] = useState(() => leerPrefs(proyectoId))
@@ -222,7 +225,20 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
   // pantalla y no se veían las barras). El nombre completo sale al tocarlo.
   // No se arrastra ni se guarda: el ancho de PC se respeta tal cual.
   const esCelular = useIsMobile()
-  const anchoNom = esCelular ? ANCHO_NOMBRES_CELULAR : anchoNombres
+  // Tres posiciones en celular: ancho (se leen las tareas), angosto, oculto (solo barras).
+  const [anchoCelular, setAnchoCelularState] = useState<AnchoCelular>('ancho')
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem('gantt.anchoCelular')
+      if (v === 'ancho' || v === 'angosto' || v === 'oculto') setAnchoCelularState(v)
+    } catch { /* sin storage */ }
+  }, [])
+  const ciclarAnchoCelular = () => {
+    const siguiente: AnchoCelular = anchoCelular === 'ancho' ? 'angosto' : anchoCelular === 'angosto' ? 'oculto' : 'ancho'
+    setAnchoCelularState(siguiente)
+    try { localStorage.setItem('gantt.anchoCelular', siguiente) } catch { /* sin storage */ }
+  }
+  const anchoNom = esCelular ? ANCHOS_CELULAR[anchoCelular] : anchoNombres
   // Ancho visible para la línea de tiempo (tarjeta menos la columna de nombres).
   const containerWidth = anchoCard > 0 ? Math.max(0, anchoCard - anchoNom) : 0
   const { toast } = useToast()
@@ -674,6 +690,18 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
+          {esCelular && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={ciclarAnchoCelular}
+              title="Ancho de la columna de nombres: ancho → angosto → oculto"
+            >
+              {anchoCelular === 'oculto' ? <PanelLeftOpen className="h-3.5 w-3.5 mr-1" /> : <PanelLeftClose className="h-3.5 w-3.5 mr-1" />}
+              {anchoCelular === 'ancho' ? 'Nombres: ancho' : anchoCelular === 'angosto' ? 'Nombres: angosto' : 'Mostrar nombres'}
+            </Button>
+          )}
           <Select value={filtroNivel} onValueChange={setFiltroNivel}>
             <SelectTrigger className="h-7 w-32 sm:w-36 text-xs">
               <SelectValue />
@@ -823,7 +851,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
           {/* Header row: name col + timeline months */}
           <div className="flex border-b bg-white">
             <div
-              className="sticky left-0 z-40 flex-shrink-0 border-r border-gray-200 bg-gray-50 px-2 py-1.5"
+              className={`sticky left-0 z-40 flex-shrink-0 border-r border-gray-200 bg-gray-50 py-1.5 ${anchoNom === 0 ? 'overflow-hidden border-r-0 px-0' : 'px-2'}`}
               style={{ width: anchoNom }}
             >
               <span className="text-xs font-medium text-gray-600">Elemento</span>
@@ -873,7 +901,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
           <div className="flex">
             {/* Name column (fija a la izquierda; fondos opacos para tapar las barras al pasar debajo) */}
             <div
-              className="sticky left-0 z-40 flex-shrink-0 bg-white border-r border-gray-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)]"
+              className={`sticky left-0 z-40 flex-shrink-0 bg-white border-r border-gray-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.12)] ${anchoNom === 0 ? 'overflow-hidden border-r-0' : ''}`}
               style={{ width: anchoNom }}
             >
               {!esCelular && asaRedimension}
@@ -893,8 +921,8 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                     onMouseLeave={() => setFilaHover(null)}
                   >
                     <div
-                      className="flex items-center gap-1 px-2 w-full min-w-0"
-                      style={{ paddingLeft: esCelular ? item.nivel * 6 + 2 : item.nivel * 16 + 8 }}
+                      className={`flex items-center gap-1 w-full min-w-0 ${esCelular ? 'pr-1' : 'px-2'}`}
+                      style={{ paddingLeft: esCelular ? Math.min(item.nivel, 3) * 5 + 2 : item.nivel * 16 + 8 }}
                     >
                       {/* Expand toggle */}
                       <div className="w-4 flex-shrink-0">
@@ -913,7 +941,7 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
                       <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
                       {/* Hasta 2 líneas; el nombre completo aparece al pasar el mouse */}
                       <span
-                        className={`min-w-0 flex-1 ${claseTextoNombre} line-clamp-2 break-words ${item.nivel === 0 ? 'font-semibold' : item.nivel === 1 ? 'font-medium' : ''}`}
+                        className={`min-w-0 flex-1 ${esCelular ? 'text-[10px] leading-[11px]' : claseTextoNombre} line-clamp-2 break-words ${item.nivel === 0 ? 'font-semibold' : item.nivel === 1 ? 'font-medium' : ''}`}
                         title={item.nombre}
                       >
                         {item.nombre}
