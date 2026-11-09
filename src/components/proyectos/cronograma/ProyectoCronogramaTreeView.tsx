@@ -20,7 +20,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } 
 import { CSS } from '@dnd-kit/utilities'
 import { Badge } from '@/components/ui/badge'
 import { TreeNode } from '../../cronograma/TreeNode'
-import { TreeHeader } from '../../cronograma/TreeHeader'
+import { TreeHeader, anchoMinimoArbol } from '../../cronograma/TreeHeader'
 import { TreeNodeForm } from '../../cronograma/TreeNodeForm'
 import { PredecesorasEditor } from '../../cronograma/PredecesorasEditor'
 import { MoverEdtFaseModal } from './MoverEdtFaseModal'
@@ -1211,7 +1211,10 @@ export function ProyectoCronogramaTreeView({
             La Línea Base se genera desde Acciones → "Generar con IA (desde catálogo)". */}
 
         {/* Árbol jerárquico */}
-        <div className={`tree-container border rounded-lg ${nombreFijo ? 'overflow-x-auto' : ''}`}>
+        {/* Tabla (PC y "Ver todas las columnas"): si no entra en el ancho, se
+            desliza a los costados con # y Nombre fijos — antes las columnas se
+            encimaban sobre el nombre (zonas "borrosas" con el menú abierto). */}
+        <div className={`tree-container border rounded-lg ${compacto ? '' : 'overflow-x-auto'}`}>
           {state.rootNodes.length === 0 && !state.loadingNodes.has('root') ? (
             <div className="text-center py-12 text-gray-500">
               {selectedCronograma?.tipo === 'comercial' ? (
@@ -1294,7 +1297,7 @@ export function ProyectoCronogramaTreeView({
               )}
             </div>
           ) : (
-            <div className={nombreFijo ? 'w-max min-w-full' : ''}>
+            <div style={compacto ? undefined : { minWidth: anchoMinimoArbol({ showRecursoColumn, showResponsableColumn, showPesoColumn, showNumeroColumn: true, nombreFijo }) }}>
               {/* Compacta: sin cabecera de columnas (cada fila ya dice qué es cada dato). */}
               {!compacto && (
                 <TreeHeader showRecursoColumn={showRecursoColumn} showResponsableColumn={showResponsableColumn} showPesoColumn={showPesoColumn} showNumeroColumn nombreFijo={nombreFijo} />

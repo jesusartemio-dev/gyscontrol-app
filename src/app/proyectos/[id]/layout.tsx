@@ -11,7 +11,6 @@ import {
   AlertCircle,
   ArrowLeft,
   PanelRightClose,
-  PanelRightOpen,
   FileText,
   ExternalLink,
   Megaphone,
@@ -871,19 +870,10 @@ export default function ProyectoLayout({ children }: ProyectoLayoutProps) {
               </motion.aside>
             )}
 
-            {!showSidebar && needsFullWidth && (
-              <div className="fixed bottom-4 right-4 z-50">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowSidebar(true)}
-                  className="shadow-lg bg-white hover:bg-gray-50"
-                >
-                  <PanelRightOpen className="h-4 w-4 mr-2" />
-                  Resumen
-                </Button>
-              </div>
-            )}
+            {/* Aquí había un botón flotante "Resumen" (abajo a la derecha) en las
+                páginas de ancho completo: tapaba contenido (p. ej. el menú de las
+                filas del cronograma) y no se usaba. El resumen del proyecto sigue
+                en la página principal del proyecto. */}
           </div>
         </div>
       </div>
