@@ -216,7 +216,7 @@ export function EditorFilaSheet({ open, onClose, proyectoId, fila, onSaved }: Pr
             <h3 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
               Origen
             </h3>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <div>
                 <Label className="text-xs">Proceso *</Label>
                 <Input {...register('proceso')} className="h-8 text-sm mt-0.5" />
@@ -240,7 +240,7 @@ export function EditorFilaSheet({ open, onClose, proyectoId, fila, onSaved }: Pr
             <h3 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
               Puesto y Factor
             </h3>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <div>
                 <Label className="text-xs">Puesto de trabajo *</Label>
                 <Input {...register('puestoTrabajo')} className="h-8 text-sm mt-0.5" />
@@ -302,7 +302,7 @@ export function EditorFilaSheet({ open, onClose, proyectoId, fila, onSaved }: Pr
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <div>
                 <Label className="text-xs">Peligro *</Label>
                 <Input {...register('peligro')} className="h-8 text-sm mt-0.5" />

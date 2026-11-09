@@ -61,7 +61,7 @@ function CeldaConTooltip({ text, className }: { text: string; className?: string
   )
 }
 
-function FactorBadge({ factor }: { factor: string }) {
+export function FactorBadge({ factor }: { factor: string }) {
   const colors: Record<string, string> = {
     'MECÁNICO':      'bg-slate-100 text-slate-700',
     'LOCATIVO':      'bg-purple-100 text-purple-700',
@@ -83,7 +83,7 @@ function FactorBadge({ factor }: { factor: string }) {
   )
 }
 
-function SeveridadBadge({ valor }: { valor: number }) {
+export function SeveridadBadge({ valor }: { valor: number }) {
   const colors: Record<number, string> = {
     1: 'bg-red-600 text-white',
     2: 'bg-red-400 text-white',
@@ -101,7 +101,7 @@ function SeveridadBadge({ valor }: { valor: number }) {
   )
 }
 
-function ProbabilidadBadge({ valor }: { valor: string }) {
+export function ProbabilidadBadge({ valor }: { valor: string }) {
   const colors: Record<string, string> = {
     A: 'bg-red-100 text-red-700 border-red-200',
     B: 'bg-orange-100 text-orange-700 border-orange-200',
@@ -119,7 +119,7 @@ function ProbabilidadBadge({ valor }: { valor: string }) {
   )
 }
 
-function NivelBadge({ severidad, probabilidad }: { severidad: number; probabilidad: string }) {
+export function NivelBadge({ severidad, probabilidad }: { severidad: number; probabilidad: string }) {
   const ev = evaluarRiesgo(severidad, probabilidad)
   if (!ev) return <span className="text-muted-foreground text-xs">—</span>
 
@@ -144,7 +144,7 @@ function NivelBadge({ severidad, probabilidad }: { severidad: number; probabilid
   )
 }
 
-function ControlesCell({ fila }: { fila: IpercFila }) {
+export function ControlesCell({ fila }: { fila: IpercFila }) {
   const controles = [
     { tipo: 'ELI', label: 'Eliminación',    texto: fila.eliminar,              color: 'gray'   },
     { tipo: 'SUS', label: 'Sustitución',    texto: fila.sustituir,             color: 'gray'   },

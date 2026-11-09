@@ -12,6 +12,7 @@ import { PreRequisitosPanelIperc } from './PreRequisitosPanelIperc'
 import { BotonGenerarIaIperc } from './BotonGenerarIaIperc'
 import { SeleccionEdtsModal } from './SeleccionEdtsModal'
 import { TablaFilasIperc } from './TablaFilasIperc'
+import { IpercPorActividad } from './IpercPorActividad'
 import { EditorFilaSheet } from './EditorFilaSheet'
 import { VersionRevisadaIperc } from './VersionRevisadaIperc'
 import { readSSEStreamIperc } from '@/lib/iperc/sse-consumer'
@@ -252,6 +253,11 @@ export default function IpercClient({ proyectoId }: Props) {
     })
   }
 
+  // ─── Guardado desde texto / IA (vuelven todas las filas, ya renumeradas) ───
+  const handleFilasAplicadas = (filas: IpercFila[]) => {
+    setContexto(prev => (prev?.iperc ? { ...prev, iperc: { ...prev.iperc, filas } } : prev))
+  }
+
   // ─── Eliminar IPERC completo ───────────────────────────────────────────────
   const handleEliminarIperc = async () => {
     if (!confirm('¿Eliminar el IPERC completo? Se borrarán todas las filas. Esta acción no se puede deshacer.')) return
@@ -367,14 +373,25 @@ export default function IpercClient({ proyectoId }: Props) {
         </div>
       )}
 
-      {/* Tabla */}
-      <TablaFilasIperc
-        filas={iperc.filas}
-        onEdit={handleEditarFila}
-        onDelete={handleEliminarFila}
-        onGenerar={handleAbrirModal}
-        onAgregar={handleAgregarFila}
-      />
+      {/* Filas por actividad (tabla en PC, tarjetas en celular) con "Texto / IA"
+          por actividad, por fila o todo. Sin filas: el estado vacío de siempre. */}
+      {iperc.filas.length === 0 ? (
+        <TablaFilasIperc
+          filas={iperc.filas}
+          onEdit={handleEditarFila}
+          onDelete={handleEliminarFila}
+          onGenerar={handleAbrirModal}
+          onAgregar={handleAgregarFila}
+        />
+      ) : (
+        <IpercPorActividad
+          proyectoId={proyectoId}
+          filas={iperc.filas}
+          onEdit={handleEditarFila}
+          onDelete={handleEliminarFila}
+          onAplicado={handleFilasAplicadas}
+        />
+      )}
 
       {/* Resumen post-generación */}
       {cobertura && (
