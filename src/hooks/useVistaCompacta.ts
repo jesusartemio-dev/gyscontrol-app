@@ -36,10 +36,12 @@ export function useVistaCompacta(clave: string): [Vista, (v: Vista) => void] {
  *   overscroll-contain: al llegar al final de la tabla la página sigue bajando.
  *
  * - Tablas COMPACTAS (entran sin scroll lateral): sin scroll interno; bajan con
- *   la página y la cabecera se pega arriba del <main>. En celular, debajo de la
- *   barra fija (MobileNav, h-14). El recuadro usa overflow-clip, no
+ *   la página y la cabecera se pega arriba del <main>. top-0 también en
+ *   celular: el <main> es el que hace scroll y ya tiene pt-14 por la barra fija
+ *   (MobileNav); el sticky respeta ese padding, así que con top-14 quedaba
+ *   56 px más abajo de la barra. El recuadro usa overflow-clip, no
  *   overflow-hidden: hidden crearía un contenedor de scroll y rompería el sticky.
  */
 export const CONTENEDOR_TABLA_SCROLL = 'overflow-auto max-h-[calc(100dvh-5rem)] md:max-h-[calc(100dvh-2rem)]'
 export const CABECERA_FIJA = '[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-gray-50 [&_th]:shadow-[inset_0_-1px_0_#e5e7eb]'
-export const CABECERA_FIJA_PAGINA = '[&_th]:sticky [&_th]:top-14 md:[&_th]:top-0 [&_th]:z-20 [&_th]:bg-gray-50 [&_th]:shadow-[inset_0_-1px_0_#e5e7eb]'
+export const CABECERA_FIJA_PAGINA = '[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-gray-50 [&_th]:shadow-[inset_0_-1px_0_#e5e7eb]'

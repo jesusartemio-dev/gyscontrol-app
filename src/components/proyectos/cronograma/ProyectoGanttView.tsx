@@ -846,7 +846,10 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
             Va fuera del scroll horizontal (que impediría fijarla) y se desplaza
             en horizontal junto con las barras (ver onScroll del cuerpo). La
             columna de nombres queda fija a la izquierda en ambos. */}
-        <div ref={headerScrollRef} className="sticky top-14 md:top-0 z-50 overflow-hidden bg-white">
+        {/* top-0 también en celular: el <main> (que es el que hace scroll) ya
+            tiene pt-14 por la barra fija y el sticky respeta ese padding; con
+            top-14 quedaba 56 px más abajo y se veían filas por encima. */}
+        <div ref={headerScrollRef} className="sticky top-0 z-50 overflow-hidden bg-white">
           <div style={{ width: anchoNom + timeline.totalWidth, minWidth: '100%' }}>
           {/* Header row: name col + timeline months */}
           <div className="flex border-b bg-white">
