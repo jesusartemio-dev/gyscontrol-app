@@ -39,11 +39,11 @@ describe('sugerirDependencias', () => {
     )
   })
 
-  it('sugiere la Entrega en Obra (PRO) antes de Preparación y Traslado de Materiales (CON), no la recepción', () => {
+  it('sugiere la Entrega en Obra (PRO) antes de GEN - Traslado de Materiales a Planta (CON), no la recepción', () => {
     const r = sugerirDependencias([
       { id: 'a', nombreCatalogo: 'Recepción en Almacén GYS', edtNombre: 'PRO', actividadNombre: 'Cables' },
       { id: 't', nombreCatalogo: 'Traslado y Entrega en Sitio', edtNombre: 'PRO', actividadNombre: 'Seguimiento y Entrega en Obra' },
-      { id: 'b', nombreCatalogo: 'Preparación y Traslado de Materiales', edtNombre: 'CON', actividadNombre: 'Zona Elevador' },
+      { id: 'b', nombreCatalogo: 'Traslado de Materiales desde Almacén GYS a Planta', edtNombre: 'CON', actividadNombre: 'Generales - Movilización y Obras Preliminares' },
     ])
     expect(r.sugerencias).toEqual([{ tareaOrigenId: 't', tareaDependienteId: 'b', tipo: 'finish_to_start' }])
   })

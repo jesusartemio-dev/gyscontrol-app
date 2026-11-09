@@ -10,7 +10,7 @@
  *   - "Paralelo": arranca junto con la tarea anterior y depende de la misma
  *     predecesora (en la tabla del usuario: 4, 5 y 6 dependen de la 3).
  *   - "Andamios": solo si alguna zona tiene "Armado de Andamios".
- *   - "{CLIENTE}" en el nombre se reemplaza por el cliente ("… con NEXA").
+ *   - "el Cliente" en el nombre se reemplaza por el cliente ("… con NEXA").
  * La IA nunca recibe estos servicios (no los mete en las zonas): ver agrupar-esquema-ia.
  */
 import type { ActividadPropuesta, CatalogoServicioParaWizard, ConfiguracionWizardPaso1, TareaPropuesta } from '@/types/cronogramaIA'
@@ -30,10 +30,15 @@ const tieneTag = (s: Pick<CatalogoServicioParaWizard, 'actividadTag'>, tag: stri
 export const esServicioGeneral = (s: Pick<CatalogoServicioParaWizard, 'actividadTag'>) =>
   tieneTag(s, 'Movilizacion') || tieneTag(s, 'Desmovilizacion')
 
-/** "Replanteo con {CLIENTE}" → "Replanteo con NEXA" (primera palabra del cliente). */
+/**
+ * "Replanteo con el Cliente" → "Replanteo con NEXA" (primera palabra del
+ * cliente). En el catálogo (y en cotizaciones) se lee "el Cliente"; en el
+ * cronograma, el nombre real. También acepta la marca "{CLIENTE}".
+ */
 export function nombreConCliente(nombre: string, nombreCliente?: string | null): string {
   const corto = (nombreCliente ?? '').trim().split(/\s+/)[0]
-  return nombre.replace(/\{CLIENTE\}/gi, corto ? corto.toUpperCase() : 'el Cliente')
+  const cliente = corto ? corto.toUpperCase() : 'el Cliente'
+  return nombre.replace(/\{CLIENTE\}/gi, cliente).replace(/\bel Cliente\b/g, cliente)
 }
 
 export function agregarGeneralesCon(

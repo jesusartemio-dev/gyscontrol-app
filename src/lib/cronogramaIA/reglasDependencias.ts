@@ -48,8 +48,10 @@ const REGLAS: ReglaDependencia[] = [
   { origen: { edtNombre: 'CON', nombreCatalogo: 'Armado de Andamios' }, dependiente: { edtNombre: 'CON', nombreCatalogo: 'Desmontaje de Andamios' } },
   { origen: { edtNombre: 'CMM', nombreCatalogo: 'Energización de Tableros' }, dependiente: { edtNombre: 'CMM', nombreCatalogo: 'Comisionamiento en Frío' } },
   { origen: { edtNombre: 'CMM', nombreCatalogo: 'Comisionamiento en Frío' }, dependiente: { edtNombre: 'CMM', nombreCatalogo: 'Comisionamiento en Caliente' } },
-  // Los materiales llegan a obra con el traslado de "Seguimiento y Entrega en Obra" (ver entregaEnObraPro.ts).
-  { origen: { edtNombre: 'PRO', nombreCatalogo: 'Traslado y Entrega en Sitio' }, dependiente: { edtNombre: 'CON', nombreCatalogo: 'Preparación y Traslado de Materiales' } },
+  // Los materiales llegan a obra con el traslado de "Seguimiento y Entrega en Obra" (ver entregaEnObraPro.ts)
+  // y de ahí a planta con "GEN - Traslado de Materiales…" de "Generales - Movilización" (generalesCon.ts).
+  // Antes: "Preparación y Traslado de Materiales" en cada zona (obsoleto desde CJM52).
+  { origen: { edtNombre: 'PRO', nombreCatalogo: 'Traslado y Entrega en Sitio' }, dependiente: { edtNombre: 'CON', nombreCatalogo: 'Traslado de Materiales desde Almacén GYS a Planta' } },
   {
     origen: { edtNombre: 'PLA', nombreCatalogo: 'Planos Típicos de Montaje' },
     dependiente: { edtNombre: 'PRO', nombreCatalogo: 'Cotización y Evaluación Técnica', actividadNombre: FAMILIA_SOPORTES_FABRICADOS },

@@ -9,7 +9,7 @@ const servicio = (id: string, nombre: string, horaBase: number, orden: number, a
 // Las tablas del usuario (CJM52).
 const SERVICIOS = [
   servicio('m1', 'Movilización de Personal, Equipos y Herramientas a Planta', 4, 100, ['Movilizacion']),
-  servicio('m2', 'Reconocimiento de Zonas de Trabajo y Replanteo con {CLIENTE}', 4, 101, ['Movilizacion']),
+  servicio('m2', 'Reconocimiento de Zonas de Trabajo y Replanteo con el Cliente', 4, 101, ['Movilizacion']),
   servicio('m3', 'Habilitación de Zona de Acopio y Almacén Temporal en Planta', 4, 102, ['Movilizacion']),
   servicio('m4', 'Traslado de Materiales desde Almacén GYS a Planta', 4, 103, ['Movilizacion']),
   servicio('m5', 'Recepción y Traslado de Andamios a Planta', 3, 104, ['Movilizacion', 'Paralelo', 'Andamios']),
@@ -17,7 +17,6 @@ const SERVICIOS = [
   servicio('d1', 'Devolución de Andamios', 3, 110, ['Desmovilizacion', 'Andamios']),
   servicio('d2', 'Retiro de Sobrantes, Residuos y Almacén Temporal', 4, 111, ['Desmovilizacion']),
   servicio('d3', 'Desmovilización de Personal, Equipos y Herramientas', 4, 112, ['Desmovilizacion']),
-  servicio('d4', 'Liberación General de Áreas con {CLIENTE} (acta)', 2, 113, ['Desmovilizacion']),
   servicio('z1', 'Tendido de Cables', 1, 10, ['General']),
 ]
 const CONFIG = { brownfield: false, ingenieriaDetalle: false, nPets: 0, tableros: [], plcs: [], hmiCantidad: 0 } as unknown as Parameters<typeof agregarGeneralesCon>[2]
@@ -43,7 +42,7 @@ describe('agregarGeneralesCon', () => {
     expect(r[0].tareas.map(t => !!t.paraleloConAnterior)).toEqual([false, false, false, false, true, true])
     expect(r[3].tareas.map(t => t.nombre)).toEqual([
       'GEN - Devolución de Andamios', 'GEN - Retiro de Sobrantes, Residuos y Almacén Temporal',
-      'GEN - Desmovilización de Personal, Equipos y Herramientas', 'GEN - Liberación General de Áreas con NEXA (acta)',
+      'GEN - Desmovilización de Personal, Equipos y Herramientas',
     ])
   })
 
@@ -93,8 +92,8 @@ describe('construirEstructuraReal — Generales con tareas en paralelo', () => {
     expect(pares.has(`${t('Movilización de Personal, Equipos y Herramientas a Planta').id}>${t('Reconocimiento de Zonas de Trabajo y Replanteo con NEXA').id}`)).toBe(true)
   })
 
-  it('desmovilización encadenada 1→2→3→4 y después de la última zona', () => {
-    const d = ['Devolución de Andamios', 'Retiro de Sobrantes, Residuos y Almacén Temporal', 'Desmovilización de Personal, Equipos y Herramientas', 'Liberación General de Áreas con NEXA (acta)'].map(t)
+  it('desmovilización encadenada 1→2→3 y después de la última zona', () => {
+    const d = ['Devolución de Andamios', 'Retiro de Sobrantes, Residuos y Almacén Temporal', 'Desmovilización de Personal, Equipos y Herramientas'].map(t)
     for (let i = 1; i < d.length; i++) expect(pares.has(`${d[i - 1].id}>${d[i].id}`)).toBe(true)
     const finZona = r.actividades.find(a => a.nombre === 'Zona A')!.fechaFinPlan
     expect(d[0].fechaInicio.getTime()).toBeGreaterThan(finZona.getTime())
