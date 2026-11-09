@@ -20,6 +20,12 @@ export type MppPatchInput = z.infer<typeof mppPatchSchema>
 export const mppItemPatchSchema = z.object({
   // asignaciones: { [puesto: string]: boolean }
   asignaciones: z.record(z.string(), z.boolean()).optional(),
+  observaciones: z.string().nullable().optional(),
+})
+
+// Lote: lo pegado desde texto / IA (varios EPP a la vez, todo o nada).
+export const mppItemsLoteSchema = z.object({
+  cambios: z.array(mppItemPatchSchema.extend({ id: z.string().min(1) })).min(1),
 })
 
 export type MppItemPatchInput = z.infer<typeof mppItemPatchSchema>

@@ -2,8 +2,11 @@
 
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Check } from 'lucide-react'
+import { Check, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { useIsMobile } from '@/lib/responsive/breakpoints'
+import { EditarMppTextoDialog } from './EditarMppTextoDialog'
 
 interface MppEppCatalogo {
   id: string
@@ -53,6 +56,9 @@ const PARTES_CUERPO = [
 export function TablaAsignacionesMpp({ proyectoId, items, puestos, disabled, onItemsChange }: Props) {
   const [filtroParte, setFiltroParte] = useState('Todos')
   const [loadingCell, setLoadingCell] = useState<string | null>(null)
+  // Celular: tarjetas por EPP con los puestos como chips (la matriz no entraba).
+  const esCelular = useIsMobile()
+  const [textoAbierto, setTextoAbierto] = useState(false)
 
   const itemsFiltrados = useMemo(() => {
     if (filtroParte === 'Todos') return items
@@ -110,12 +116,80 @@ export function TablaAsignacionesMpp({ proyectoId, items, puestos, disabled, onI
         ))}
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        {itemsFiltrados.length} EPPs{filtroParte !== 'Todos' ? ` · ${filtroParte}` : ''}
-        {' · '}{puestos.length} puestos
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">
+          {itemsFiltrados.length} EPPs{filtroParte !== 'Todos' ? ` · ${filtroParte}` : ''}
+          {' · '}{puestos.length} puestos
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 px-2 text-xs"
+          disabled={disabled || itemsFiltrados.length === 0}
+          onClick={() => setTextoAbierto(true)}
+          title="Los EPP de este filtro como texto, para revisarlos con una IA"
+        >
+          <Sparkles className="mr-1 h-3.5 w-3.5 text-indigo-500" />
+          Texto / IA{filtroParte !== 'Todos' ? `: ${filtroParte}` : ': todos'}
+        </Button>
+      </div>
 
-      {/* Tabla */}
+      <EditarMppTextoDialog
+        open={textoAbierto}
+        onOpenChange={setTextoAbierto}
+        proyectoId={proyectoId}
+        titulo={filtroParte === 'Todos' ? 'Todos los EPP' : filtroParte}
+        itemsParte={itemsFiltrados}
+        todosLosItems={items}
+        puestos={puestos}
+        onAplicado={onItemsChange}
+      />
+
+      {esCelular ? (
+        <div className="space-y-2">
+          {itemsFiltrados.map((item) => {
+            const epp = item.mppEppCatalogo
+            const usan = puestos.filter((p) => item.asignaciones[p]).length
+            return (
+              <div key={item.id} className="rounded-lg border bg-white p-2.5">
+                <div className="mb-1.5 flex items-start gap-2">
+                  <p className="min-w-0 flex-1 text-[13px] font-medium leading-snug text-gray-900">{epp.nombre}</p>
+                  <span className="shrink-0 rounded bg-cyan-50 px-1.5 py-0.5 text-[10px] font-medium text-cyan-700">{epp.parteCuerpo}</span>
+                </div>
+                <p className="mb-1.5 text-[10px] text-muted-foreground">
+                  {usan} de {puestos.length} puestos{epp.durabilidad ? ` · ${epp.durabilidad}` : ''}
+                  {item.observaciones ? ` · ${item.observaciones}` : ''}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {puestos.map((puesto) => {
+                    const checked = Boolean(item.asignaciones[puesto])
+                    const isLoading = loadingCell === `${item.id}-${puesto}`
+                    return (
+                      <button
+                        key={puesto}
+                        type="button"
+                        onClick={() => handleToggle(item, puesto)}
+                        disabled={disabled || !!loadingCell}
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] transition-colors',
+                          checked ? 'border-cyan-500 bg-cyan-500 text-white' : 'border-gray-300 bg-white text-gray-600',
+                          disabled || loadingCell ? 'opacity-60' : '',
+                        )}
+                      >
+                        {isLoading
+                          ? <span className="inline-block h-2.5 w-2.5 animate-spin rounded-full border border-current border-t-transparent" />
+                          : checked && <Check className="h-3 w-3" />}
+                        {puesto}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+      /* Tabla */
       <div className="overflow-x-auto border rounded-lg">
         <table className="text-xs border-collapse" style={{ minWidth: 300 + puestos.length * 44 }}>
           <thead>
@@ -171,6 +245,9 @@ export function TablaAsignacionesMpp({ proyectoId, items, puestos, disabled, onI
                     {epp.durabilidad && (
                       <div className="text-[9px] text-muted-foreground mt-0.5">{epp.durabilidad}</div>
                     )}
+                    {item.observaciones && (
+                      <div className="mt-0.5 line-clamp-2 text-[9px] text-cyan-700" title={item.observaciones}>{item.observaciones}</div>
+                    )}
                   </td>
                   {/* Parte del cuerpo */}
                   <td className="border-b border-r px-2 py-1.5">
@@ -216,6 +293,7 @@ export function TablaAsignacionesMpp({ proyectoId, items, puestos, disabled, onI
           </tbody>
         </table>
       </div>
+      )}
     </div>
   )
 }
