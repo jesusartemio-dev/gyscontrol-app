@@ -14,7 +14,8 @@ export const TAREA_TRASLADO_OBRA = 'Entrega en Obra'
 export const HORAS_SEGUIMIENTO_PROVEEDORES = 8
 
 const SERVICIO_TRASLADO = 'Traslado y Entrega en Sitio'
-const SERVICIO_EXPEDITING = 'Seguimiento de Compra (Expediting)'
+// Antes "Seguimiento de Compra (Expediting)": desde CJM52 es uno de los 5 pasos estándar (aprobacionClientePro.ts).
+const SERVICIO_EXPEDITING = 'Plazo de Entrega del Proveedor'
 /** Las tareas de PRO llevan el prefijo "{alias} - ": se reconocen por el final del nombre. */
 const esServicio = (t: TareaPropuesta, servicio: string) => t.nombre === servicio || t.nombre.endsWith(` - ${servicio}`)
 

@@ -1,4 +1,4 @@
-import { aplicarAprobacionCliente, familiaRequiereAprobacion, nombreHitoAprobacion } from '@/lib/cronogramaIA/aprobacionClientePro'
+import { aplicarAprobacionCliente, nombreHitoAprobacion } from '@/lib/cronogramaIA/aprobacionClientePro'
 import { construirEstructuraReal, type EdtCatalogoInfo } from '@/lib/cronogramaIA/construirEstructuraReal'
 import type { ActividadPropuesta, CatalogoServicioParaWizard, TareaPropuesta } from '@/types/cronogramaIA'
 
@@ -6,56 +6,65 @@ const servicio = (id: string, nombre: string, horaBase: number, orden: number, a
   id, nombre, descripcion: '', edtNombre: 'PRO', actividadTag, filtroAlcance: 'general', notaCantidad: null,
   horaBase, horaRepetido: 0, cantidad: 1, nivelDificultad: 1, orden, unidadNombre: 'Global', recursoNombre: 'Gestor',
 })
+// Catálogo PRO desde CJM52: los 5 pasos estándar (+ los viejos, marcados obsoletos).
 const SERVICIOS = [
-  servicio('sol', 'Solicitud de Cotización', 2, 0),
-  servicio('rec', 'Recepción de Cotizaciones', 1, 1),
-  servicio('eva', 'Evaluación Técnica', 2, 2),
-  servicio('apr', 'Aprobación del Cliente', 0, 3, ['Hito']),
-  servicio('oc', 'Emisión de Orden de Compra', 1, 4),
+  servicio('cot', 'Cotización y Evaluación Técnica', 5, 0),
+  servicio('apr', 'Aprobación Ficha Técnica', 0, 3),
+  servicio('oc', 'Emisión de Orden de Compra', 0, 4, ['Hito']),
+  servicio('pla', 'Plazo de Entrega del Proveedor', 2, 5),
+  servicio('rec', 'Recepción e Inspección en Almacén GYS', 2, 6),
+  servicio('tra', 'Traslado y Entrega en Sitio', 5, 7),
 ]
 const CONFIG = { brownfield: false, ingenieriaDetalle: false, nPets: 0, tableros: [], plcs: [], hmiCantidad: 0 } as unknown as Parameters<typeof aplicarAprobacionCliente>[2]
 
 function tarea(id: string, nombre: string, horas: number): TareaPropuesta {
   return { catalogoServicioId: id, nombre, cantidad: 1, nivelDificultad: 1, horaBase: horas, horaRepetido: 0, horasEstimadas: horas, incluida: true, orden: 0 }
 }
+/** Como la arma la IA a veces: con servicios viejos y sin algunos pasos. */
 const familia = (alias: string, nombre: string, extra: TareaPropuesta[] = []): ActividadPropuesta => ({
   edtNombre: 'PRO', actividadNombre: nombre, origen: 'ia',
   tareas: [tarea('sol', `${alias} - Solicitud de Cotización`, 2), ...extra, tarea('oc', `${alias} - Emisión de Orden de Compra`, 1)],
 })
+const PASOS = (alias: string) => [
+  `${alias} - Cotización y Evaluación Técnica`, `${alias} - Aprobación Ficha Técnica por NEXA`, `${alias} - Emisión de Orden de Compra`,
+  `${alias} - Plazo de Entrega del Proveedor`, `${alias} - Recepción e Inspección en Almacén GYS`,
+]
 
-describe('familiaRequiereAprobacion', () => {
-  it('cables, equipos e instrumentos sí; materiales estándar no', () => {
-    for (const n of ['Cables', 'Cables de Fuerza y Control', 'Cable de Instrumentación', 'Equipos Eléctricos', 'Instrumentos', 'Equipos de Control', 'Tableros', 'Instrumentos – Válvulas Automáticas', 'Equipos Eléctricos – Schneider'])
-      expect(familiaRequiereAprobacion(n)).toBe(true)
-    for (const n of ['Tuberías y Canalización', 'Bandejas y Soportería', 'Materiales de Tablero', 'Comunicación'])
-      expect(familiaRequiereAprobacion(n)).toBe(false)
-  })
-})
-
-describe('aplicarAprobacionCliente', () => {
-  it('inserta Recepción → Evaluación → ◆ Aprobación por NEXA tras la cotización, solo donde corresponde', () => {
-    // La IA puso la evaluación en Bandejas (material estándar): se quita de ahí.
+describe('aplicarAprobacionCliente — 5 pasos estándar en TODAS las familias', () => {
+  it('materiales y equipos quedan con los mismos 5 pasos, en orden; lo viejo se descarta y lo demás va detrás', () => {
     const r = aplicarAprobacionCliente(
-      [familia('Bandejas', 'Bandejas y Soportería', [tarea('eva', 'Bandejas - Evaluación Técnica', 2)]), familia('Instrum', 'Instrumentos')],
+      [
+        familia('Bandejas', 'Bandejas y Soportería', [tarea('eva', 'Bandejas - Evaluación Técnica', 2), tarea('exp', 'Bandejas - Seguimiento de Compra (Expediting)', 2)]),
+        familia('Instrum', 'Instrumentos', [tarea('tra', 'Instrum - Traslado y Entrega en Sitio', 5)]),
+      ],
       SERVICIOS, CONFIG, 'NEXA RESOURCES CAJAMARQUILLA S.A.',
     )
-    expect(r[0].tareas.map(t => t.nombre)).toEqual(['Bandejas - Solicitud de Cotización', 'Bandejas - Emisión de Orden de Compra'])
-    expect(r[1].tareas.map(t => t.nombre)).toEqual([
-      'Instrum - Solicitud de Cotización', 'Instrum - Recepción de Cotizaciones', 'Instrum - Evaluación Técnica',
-      'Instrum - Aprobación por NEXA', 'Instrum - Emisión de Orden de Compra',
-    ])
-    const hito = r[1].tareas[3]
-    expect(hito.esHito).toBe(true)
-    expect(hito.horasEstimadas).toBe(0)
+    expect(r[0].tareas.map(t => t.nombre)).toEqual(PASOS('Bandejas'))
+    expect(r[1].tareas.map(t => t.nombre)).toEqual([...PASOS('Instrum'), 'Instrum - Traslado y Entrega en Sitio'])
+    const [cot, apr, oc] = r[1].tareas
+    expect(cot.horasEstimadas).toBe(5)
+    expect(apr.esHito).toBeFalsy() // 1 día de espera, sin horas
+    expect(apr.horasEstimadas).toBe(0)
+    expect(oc.esHito).toBe(true)
+    expect(oc.horasEstimadas).toBe(0)
   })
 
-  it('sin esos servicios en el catálogo no cambia nada', () => {
+  it('no toca "Seguimiento y Entrega en Obra" ni otros EDT', () => {
+    const otras: ActividadPropuesta[] = [
+      { edtNombre: 'PRO', actividadNombre: 'Seguimiento y Entrega en Obra', origen: 'determinista', tareas: [tarea('tra', 'Entrega en Obra', 5)] },
+      { edtNombre: 'SER', actividadNombre: 'Andamios', origen: 'ia', tareas: [tarea('x', 'Solicitud de Cotización', 2)] },
+    ]
+    expect(aplicarAprobacionCliente(otras, SERVICIOS, CONFIG, 'NEXA')).toEqual(otras)
+  })
+
+  it('sin los 5 servicios en el catálogo no cambia nada', () => {
     const acts = [familia('Instrum', 'Instrumentos')]
-    expect(aplicarAprobacionCliente(acts, SERVICIOS.slice(0, 1), CONFIG, 'NEXA')).toBe(acts)
+    expect(aplicarAprobacionCliente(acts, SERVICIOS.slice(0, 2), CONFIG, 'NEXA')).toBe(acts)
   })
 
-  it('nombre del hito sin cliente', () => {
-    expect(nombreHitoAprobacion(null)).toBe('Aprobación del Cliente')
+  it('nombre de la aprobación con y sin cliente', () => {
+    expect(nombreHitoAprobacion('NEXA RESOURCES')).toBe('Aprobación Ficha Técnica por NEXA')
+    expect(nombreHitoAprobacion(null)).toBe('Aprobación Ficha Técnica')
   })
 })
 
@@ -94,8 +103,8 @@ describe('construirEstructuraReal — alquiler de andamios anclado a la obra', (
   })
 })
 
-describe('construirEstructuraReal — hito de catálogo', () => {
-  it('el hito dura 0 días y cae al terminar la tarea anterior', () => {
+describe('construirEstructuraReal — 5 pasos de PRO', () => {
+  it('aprobación de 1 día sin horas y ◆ OC al terminarla', () => {
     const EDTS: Map<string, EdtCatalogoInfo> = new Map([
       ['PRO', { id: 'edt-pro', nombre: 'PRO', descripcionEdt: 'Suministro de Equipos', faseNombre: 'PROCURA', faseOrden: 3, edtOrden: 0 }],
     ])
@@ -106,10 +115,13 @@ describe('construirEstructuraReal — hito de catálogo', () => {
       fechaInicioProyecto: new Date('2026-10-22T00:00:00Z'), calendarioLaboral: cal, recursoPorServicio: new Map(),
     })
     const t = (n: string) => r.tareas.find(x => x.nombre === `Instrum - ${n}`)!
-    const hito = t('Aprobación por NEXA')
-    expect(hito.esHito).toBe(true)
-    expect(hito.fechaInicio.getTime()).toBe(hito.fechaFin.getTime())
-    expect(hito.fechaInicio.getTime()).toBe(t('Evaluación Técnica').fechaFin.getTime())
-    expect(t('Emisión de Orden de Compra').fechaInicio.getTime()).toBeGreaterThanOrEqual(hito.fechaFin.getTime())
+    const apr = t('Aprobación Ficha Técnica por NEXA')
+    expect(apr.esHito).toBeFalsy()
+    expect(apr.fechaFin.getTime()).toBeGreaterThan(apr.fechaInicio.getTime()) // ocupa su día
+    const oc = t('Emisión de Orden de Compra')
+    expect(oc.esHito).toBe(true)
+    expect(oc.fechaInicio.getTime()).toBe(oc.fechaFin.getTime())
+    expect(oc.fechaInicio.getTime()).toBe(apr.fechaFin.getTime())
+    expect(t('Plazo de Entrega del Proveedor').fechaInicio.getTime()).toBeGreaterThanOrEqual(oc.fechaFin.getTime())
   })
 })

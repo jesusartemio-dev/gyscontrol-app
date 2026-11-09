@@ -39,7 +39,7 @@ export const NOMBRE_FAMILIA_OFICIAL_PRO = new Set(FAMILIAS_OFICIALES_PRO.map(f =
 export const FAMILIA_SOPORTES_FABRICADOS = 'Soportes Fabricados'
 
 const NOMBRE_GRUPO: Record<FamiliaOficialPro['grupo'], string> = {
-  materiales: 'MATERIALES (Cotización → OC → Expediting → Recepción GYS → Traslado)',
+  materiales: 'MATERIALES (Cotización y Evaluación Técnica → Aprobación Ficha Técnica → OC → Plazo de Entrega → Recepción e Inspección GYS → Traslado)',
   alquileres: 'ALQUILERES (Cotización → OC → Coordinación de Alquiler)',
   subcontratos: 'SUBCONTRATOS (Cotización → OC)',
 }

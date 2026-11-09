@@ -255,7 +255,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
           hmiCantidad: config.hmiCantidad,
         }, aliasPorNombre)
       }
-      // Equipos e instrumentos: Recepción de Cotizaciones → Evaluación Técnica → ◆ Aprobación por {cliente} antes de la OC.
+      // Cada familia con los 5 pasos estándar: Cotización y Evaluación Técnica → Aprobación Ficha Técnica por {cliente} → ◆ OC → Plazo de Entrega → Recepción e Inspección.
       const proyectoCliente = await prisma.proyecto.findUnique({ where: { id: proyectoId }, select: { cliente: { select: { nombre: true } } } })
       resultado.actividades = aplicarAprobacionCliente(resultado.actividades, serviciosPermitidos, {
         brownfield: config.brownfield,

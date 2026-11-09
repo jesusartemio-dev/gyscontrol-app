@@ -61,22 +61,22 @@ describe('sugerirDependencias', () => {
     it('con PLA en el plan, sugiere la dependencia', () => {
       const r = sugerirDependencias([
         { id: 'pla-1', nombreCatalogo: 'Planos Típicos de Montaje', edtNombre: 'PLA', actividadNombre: 'Disciplina Eléctrica' },
-        { id: 'pro-1', nombreCatalogo: 'Solicitud de Cotización', edtNombre: 'PRO', actividadNombre: FAMILIA_SOPORTES_FABRICADOS },
+        { id: 'pro-1', nombreCatalogo: 'Cotización y Evaluación Técnica', edtNombre: 'PRO', actividadNombre: FAMILIA_SOPORTES_FABRICADOS },
       ])
       expect(r.sugerencias).toEqual([{ tareaOrigenId: 'pla-1', tareaDependienteId: 'pro-1', tipo: 'finish_to_start' }])
       expect(r.advertencias).toHaveLength(0)
     })
 
     it('sin PLA en el plan, no sugiere la dependencia y emite advertencia', () => {
-      const r = sugerirDependencias([{ id: 'pro-1', nombreCatalogo: 'Solicitud de Cotización', edtNombre: 'PRO', actividadNombre: FAMILIA_SOPORTES_FABRICADOS }])
+      const r = sugerirDependencias([{ id: 'pro-1', nombreCatalogo: 'Cotización y Evaluación Técnica', edtNombre: 'PRO', actividadNombre: FAMILIA_SOPORTES_FABRICADOS }])
       expect(r.sugerencias).toHaveLength(0)
       expect(r.advertencias).toEqual(['Soportes Fabricados requiere planos previos — verifica quién los elabora.'])
     })
 
-    it('una "Solicitud de Cotización" de OTRA familia de PRO no dispara la regla (scoping por actividadNombre)', () => {
+    it('una "Cotización y Evaluación Técnica" de OTRA familia de PRO no dispara la regla (scoping por actividadNombre)', () => {
       const r = sugerirDependencias([
         { id: 'pla-1', nombreCatalogo: 'Planos Típicos de Montaje', edtNombre: 'PLA', actividadNombre: 'Disciplina Eléctrica' },
-        { id: 'pro-1', nombreCatalogo: 'Solicitud de Cotización', edtNombre: 'PRO', actividadNombre: 'Cables' },
+        { id: 'pro-1', nombreCatalogo: 'Cotización y Evaluación Técnica', edtNombre: 'PRO', actividadNombre: 'Cables' },
       ])
       expect(r.sugerencias).toHaveLength(0)
       expect(r.advertencias).toHaveLength(0)

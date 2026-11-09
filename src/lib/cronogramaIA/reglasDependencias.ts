@@ -52,7 +52,7 @@ const REGLAS: ReglaDependencia[] = [
   { origen: { edtNombre: 'PRO', nombreCatalogo: 'Traslado y Entrega en Sitio' }, dependiente: { edtNombre: 'CON', nombreCatalogo: 'Preparación y Traslado de Materiales' } },
   {
     origen: { edtNombre: 'PLA', nombreCatalogo: 'Planos Típicos de Montaje' },
-    dependiente: { edtNombre: 'PRO', nombreCatalogo: 'Solicitud de Cotización', actividadNombre: FAMILIA_SOPORTES_FABRICADOS },
+    dependiente: { edtNombre: 'PRO', nombreCatalogo: 'Cotización y Evaluación Técnica', actividadNombre: FAMILIA_SOPORTES_FABRICADOS },
     advertenciaSiFaltaOrigen: 'Soportes Fabricados requiere planos previos — verifica quién los elabora.',
   },
 ]

@@ -11,10 +11,10 @@ const familia = (alias: string, nombre: string): ActividadPropuesta => ({
   actividadNombre: nombre,
   origen: 'ia',
   tareas: [
-    tarea('cot', `${alias} - Solicitud de Cotización`, 2, 0),
+    tarea('cot', `${alias} - Cotización y Evaluación Técnica`, 2, 0),
     tarea('oc', `${alias} - Emisión de Orden de Compra`, 1, 1),
-    tarea('exp', `${alias} - Seguimiento de Compra (Expediting)`, 2, 2),
-    tarea('rec', `${alias} - Recepción en Almacén GYS`, 2, 3),
+    tarea('exp', `${alias} - Plazo de Entrega del Proveedor`, 2, 2),
+    tarea('rec', `${alias} - Recepción e Inspección en Almacén GYS`, 2, 3),
     tarea('tras', `${alias} - Traslado y Entrega en Sitio`, 5, 4),
   ],
 })
@@ -75,7 +75,7 @@ describe('construirEstructuraReal — PRO en paralelo con entrega en obra', () =
 
   const construir = () => {
     const corta = familia('Cables', 'Cables')
-    const larga: ActividadPropuesta = { ...familia('Tablero', 'Tablero'), tareas: familia('Tablero', 'Tablero').tareas.map(t => (t.nombre.includes('Expediting') ? { ...t, horasEstimadas: 40 } : t)) }
+    const larga: ActividadPropuesta = { ...familia('Tablero', 'Tablero'), tareas: familia('Tablero', 'Tablero').tareas.map(t => (t.nombre.includes('Plazo de Entrega') ? { ...t, horasEstimadas: 40 } : t)) }
     return construirEstructuraReal({
       actividades: agregarEntregaEnObra([corta, larga]),
       edtsCatalogo: EDTS,
@@ -96,7 +96,7 @@ describe('construirEstructuraReal — PRO en paralelo con entrega en obra', () =
   it('la entrega en obra va después de la última recepción, sin hito aparte', () => {
     const r = construir()
     const porNombre = (n: string) => r.tareas.find(t => t.nombre === n)!
-    const recepcionTablero = porNombre('Tablero - Recepción en Almacén GYS')
+    const recepcionTablero = porNombre('Tablero - Recepción e Inspección en Almacén GYS')
     const entrega = porNombre('Entrega en Obra')
     const seguimiento = porNombre('Seguimiento a Proveedores')
     expect(entrega.fechaInicio.getTime()).toBeGreaterThanOrEqual(recepcionTablero.fechaFin.getTime())
@@ -112,8 +112,8 @@ describe('construirEstructuraReal — PRO en paralelo con entrega en obra', () =
     const r = construir()
     const id = (n: string) => r.tareas.find(t => t.nombre === n)!.id
     const pares = new Set(r.dependenciasCiclos.map(d => `${d.tareaOrigenId}>${d.tareaDependienteId}`))
-    expect(pares.has(`${id('Cables - Solicitud de Cotización')}>${id('Cables - Emisión de Orden de Compra')}`)).toBe(true)
-    expect(pares.has(`${id('Cables - Recepción en Almacén GYS')}>${id('Entrega en Obra')}`)).toBe(true)
-    expect(pares.has(`${id('Tablero - Recepción en Almacén GYS')}>${id('Entrega en Obra')}`)).toBe(true)
+    expect(pares.has(`${id('Cables - Cotización y Evaluación Técnica')}>${id('Cables - Emisión de Orden de Compra')}`)).toBe(true)
+    expect(pares.has(`${id('Cables - Recepción e Inspección en Almacén GYS')}>${id('Entrega en Obra')}`)).toBe(true)
+    expect(pares.has(`${id('Tablero - Recepción e Inspección en Almacén GYS')}>${id('Entrega en Obra')}`)).toBe(true)
   })
 })
