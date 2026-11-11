@@ -98,6 +98,10 @@ export async function leerImagenesPortapapeles(): Promise<File[] | null> {
 /** Limpia lo que suele traer una respuesta de IA: comillas envolventes, viñeta inicial, espacios. */
 export function limpiarTextoPegado(t: string, unaLinea: boolean): string {
   let s = t.replace(/\r\n/g, '\n').trim()
+  // Si se copió la respuesta entera de la IA (bloque ``` + nota), queda solo el bloque.
+  const bloque = s.match(/```[^\n]*\n([\s\S]*?)```/)
+  if (bloque) s = bloque[1].trim()
+  else s = s.replace(/^```[^\n]*\n?|```$/g, '').trim()
   s = s.replace(/^["“”«]+|["“”»]+$/g, '').trim()
   if (unaLinea) s = s.replace(/^\s*(?:[-•*·]|\d+[.)])\s+/, '').replace(/\s+/g, ' ').trim()
   return s

@@ -163,6 +163,9 @@ export function construirTextoParaIa({
   L.push('- Puedes incorporar aspectos técnicos pertinentes del TDR y del alcance contractual que ya conoces de este proyecto.')
   L.push('- Distingue siempre las actividades programadas (las del cronograma de arriba) de las obligaciones generales del proyecto (normas, requisitos del cliente, condiciones del contrato).')
   L.push('- No agregues actividades, entregables, plazos, recursos ni compromisos que no estén en el cronograma o en el contrato: el texto no debe generar obligaciones adicionales para GYS.')
-  L.push(`- Español técnico y formal, sin títulos${objetivo.tipo === 'tarea' ? '' : ' ni viñetas'}. Responde únicamente con ${objetivo.tipo === 'tarea' ? 'esa línea' : 'el párrafo'}, para pegarlo tal cual.`)
+  L.push(`- Español técnico y formal, sin títulos${objetivo.tipo === 'tarea' ? '' : ' ni viñetas'}.`)
+  L.push('FORMATO DE LA RESPUESTA:')
+  L.push(`1. ${objetivo.tipo === 'tarea' ? 'La línea final' : 'El párrafo final'}, solo, dentro de un bloque de código (entre \`\`\`), para copiarlo y pegarlo tal cual.`)
+  L.push('2. Debajo, fuera del bloque, una nota breve para revisar: qué tomaste del TDR o del contrato, qué cambiaste respecto al texto actual, qué dejaste fuera a propósito y por qué, y si algo conviene verificar antes de enviarlo al cliente.')
   return L.join('\n')
 }
