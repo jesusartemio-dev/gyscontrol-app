@@ -504,13 +504,21 @@ export function ProyectoGanttView({ proyectoId, cronogramaId, onItemClick, selec
     const projectMinDate = new Date(Math.min(...allDates.map(d => d.getTime())))
     const projectMaxDate = new Date(Math.max(...allDates.map(d => d.getTime())))
     const minDate = startOfMonth(projectMinDate)
-    const maxDate = startOfMonth(addMonths(projectMaxDate, 1))
+    let maxDate = startOfMonth(addMonths(projectMaxDate, 1))
 
     // El rango define cuántos días entran en el ancho visible; "Completo" = todo el proyecto.
-    const totalDays = differenceInDays(maxDate, minDate) || 1
-    const diasEnPantalla = timeRangeMonths === 0 ? totalDays : timeRangeMonths * 30.44
+    const diasProyecto = differenceInDays(maxDate, minDate) || 1
+    const diasEnPantalla = timeRangeMonths === 0 ? diasProyecto : timeRangeMonths * 30.44
     const baseDayWidth = containerWidth > 0 ? containerWidth / diasEnPantalla : 8
     const dayWidth = Math.max(2, baseDayWidth * zoomLevel)
+    // Si el proyecto es más corto que lo que entra en pantalla (p. ej. "6 meses"
+    // con un proyecto de 3, o con poco zoom), el calendario sigue de mes en mes
+    // hasta llenar el ancho: antes se cortaba y a la derecha quedaba vacío.
+    const diasVisibles = containerWidth > 0 ? containerWidth / dayWidth : diasEnPantalla
+    for (let i = 0; i < 60 && differenceInDays(maxDate, minDate) < diasVisibles; i++) {
+      maxDate = startOfMonth(addMonths(maxDate, 1))
+    }
+    const totalDays = differenceInDays(maxDate, minDate) || 1
     const totalWidth = totalDays * dayWidth
 
     // Generate month columns
