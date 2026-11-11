@@ -399,6 +399,16 @@ export default function MarcarPage() {
             const marcajes = marcajesPorJornada[j.id] || []
             const expandida = expandidaId === j.id
             const cargando = cargandoMarcajes === j.id
+            // Personas distintas, no marcajes: cada persona deja ingreso y
+            // salida, así que contar filas decía "4 personas han marcado"
+            // cuando era una sola persona en dos días.
+            const personas = new Set(marcajes.map(m => m.userId)).size
+            // Una sesión abierta sigue listándose hasta 36 h, así que la de
+            // ayer convive con la de hoy. Sin avisarlo, el trabajador lee los
+            // marcajes de ayer creyendo que son los suyos de hoy.
+            const fechaJornada = j.fecha ? new Date(j.fecha).toISOString().slice(0, 10) : null
+            const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date())
+            const esDeOtroDia = !!fechaJornada && fechaJornada !== hoyLima
             return (
               <div
                 key={j.id}
@@ -424,6 +434,14 @@ export default function MarcarPage() {
                           title={j.proyecto.nombre}
                         >
                           {j.proyecto.codigo}
+                        </span>
+                      )}
+                      {esDeOtroDia && (
+                        <span
+                          className="rounded bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white"
+                          title="Esta asistencia quedó abierta de un día anterior. Los marcajes que veas aquí son de ese día."
+                        >
+                          DE OTRO DÍA
                         </span>
                       )}
                     </p>
@@ -454,7 +472,8 @@ export default function MarcarPage() {
                     >
                       <Users className="h-3.5 w-3.5" />
                       {j.id in marcajesPorJornada
-                        ? `${marcajes.length} ${marcajes.length === 1 ? 'persona ha marcado' : 'personas han marcado'}`
+                        ? `${personas} ${personas === 1 ? 'persona ha marcado' : 'personas han marcado'}` +
+                          ` · ${marcajes.length} ${marcajes.length === 1 ? 'marcaje' : 'marcajes'}`
                         : 'Ver quién ha marcado'}
                       {expandida ? (
                         <ChevronUp className="h-3.5 w-3.5" />

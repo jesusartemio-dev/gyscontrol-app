@@ -262,6 +262,24 @@ export default function AsistenciaCampoPage() {
       setJornada(jornadaRes)
       cargarHistorial()
       toast.success('Asistencia de campo activa. Comparte el QR con tu equipo.')
+
+      // Otra asistencia abierta hoy en la misma sede. No es error — dos
+      // proyectos a la vez en la misma planta es normal — pero si nadie lo
+      // dice, el personal escanea el QR que le toque y la asistencia del día
+      // queda repartida entre dos sesiones.
+      const otras = (j.otrasActivas ?? []) as Array<{
+        supervisor: string; proyectoCodigo: string | null; marcajes: number
+      }>
+      if (otras.length > 0) {
+        const detalle = otras
+          .map(o => `${o.supervisor}${o.proyectoCodigo ? ` (${o.proyectoCodigo})` : ' (sin proyecto)'}`)
+          .join(', ')
+        toast.warning(
+          `Ya hay ${otras.length === 1 ? 'otra asistencia abierta' : `${otras.length} asistencias abiertas`} hoy en esta sede: ${detalle}. ` +
+          'Ponte de acuerdo sobre cuál QR usa cada cuadrilla.',
+          { duration: 12000 },
+        )
+      }
     } finally {
       setLoading(false)
     }

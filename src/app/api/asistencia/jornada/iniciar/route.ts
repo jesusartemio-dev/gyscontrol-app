@@ -95,7 +95,10 @@ export async function POST(req: Request) {
         include: { proyecto: { select: { id: true, codigo: true, nombre: true } } },
       })
     }
-    return NextResponse.json(jornada)
+    return NextResponse.json({
+      ...jornada,
+      otrasActivas: await otrasActivasEnLaSede(jornada.id, body.ubicacionId, fecha),
+    })
   }
 
   // Crear nueva jornada, opcionalmente con RegistroHorasCampo
@@ -149,5 +152,31 @@ export async function POST(req: Request) {
     })
   })
 
-  return NextResponse.json(jornada)
+  return NextResponse.json({ ...jornada, otrasActivas: await otrasActivasEnLaSede(jornada.id, body.ubicacionId, fecha) })
+}
+
+/**
+ * Otras sesiones de asistencia activas hoy en la misma sede, de otro supervisor.
+ *
+ * No se bloquean: en NEXA han convivido dos proyectos distintos el mismo día y
+ * cada uno con su jornada es correcto. Pero cuando una se abre sin proyecto al
+ * lado de otra que sí lo tiene, la gente termina marcando en la equivocada, así
+ * que el supervisor merece verlo antes de repartir el QR.
+ */
+async function otrasActivasEnLaSede(jornadaId: string, ubicacionId: string, fecha: Date) {
+  const otras = await prisma.jornadaAsistencia.findMany({
+    where: { ubicacionId, fecha, activa: true, id: { not: jornadaId } },
+    select: {
+      id: true,
+      supervisor: { select: { name: true } },
+      proyecto: { select: { codigo: true } },
+      _count: { select: { asistencias: true } },
+    },
+  })
+  return otras.map(o => ({
+    id: o.id,
+    supervisor: o.supervisor?.name ?? '—',
+    proyectoCodigo: o.proyecto?.codigo ?? null,
+    marcajes: o._count.asistencias,
+  }))
 }
