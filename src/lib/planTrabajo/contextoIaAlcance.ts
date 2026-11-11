@@ -175,9 +175,11 @@ export function construirTextoParaIa({
   L.push('- Si ves mejoras que no son de redacción (algo que falta o sobra en el cronograma, horas o fechas inconsistentes, riesgos de alcance, algo que pide el TDR y no está programado), no las metas en el texto: propónlas en la nota.')
   L.push(`- Español técnico y formal, sin títulos${objetivo.tipo === 'tarea' ? '' : ' ni viñetas'}.`)
   L.push('FORMATO DE LA RESPUESTA:')
-  L.push(`1. ${objetivo.tipo === 'tarea' ? 'La línea final' : 'El texto final'} como texto normal (sin bloque de código, sin negritas ni otro formato), ` +
+  L.push(`1. ${objetivo.tipo === 'tarea' ? 'La línea final' : 'El texto final'} como texto normal (sin negritas ni otro formato),` +
     `${objetivo.tipo === 'tarea' ? '' : 'cada párrafo en una sola línea, sin saltos de línea dentro del párrafo, '}` +
-    `entre una línea ${MARCA_INICIO} y una línea ${MARCA_FIN}.`)
-  L.push(`2. Debajo de ${MARCA_FIN}, una nota para revisar: qué cambiaste y por qué, qué tomaste del TDR o del contrato, qué dejaste fuera a propósito, las mejoras que propones fuera del texto (cronograma, alcance, riesgos) y qué conviene verificar antes de enviarlo al cliente.`)
+    `entre una línea ${MARCA_INICIO} y una línea ${MARCA_FIN} (para leerlo).`)
+  L.push('2. Justo debajo, el mismo texto exacto dentro de un bloque de código (``` … ```), sin las marcas ni nada más, ' +
+    `${objetivo.tipo === 'tarea' ? '' : 'cada párrafo en una sola línea, '}para copiarlo con un clic.`)
+  L.push('3. Después, fuera del bloque, una nota para revisar: qué cambiaste y por qué, qué tomaste del TDR o del contrato, qué dejaste fuera a propósito, las mejoras que propones fuera del texto (cronograma, alcance, riesgos) y qué conviene verificar antes de enviarlo al cliente.')
   return L.join('\n')
 }
