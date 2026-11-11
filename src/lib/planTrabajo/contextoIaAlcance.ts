@@ -98,13 +98,9 @@ export function construirTextoParaIa({
   const sub = objetivo.tipo !== 'edt' ? item.subItems?.[objetivo.si] : undefined
   const tareaPlan = objetivo.tipo === 'tarea' ? sub?.tareas?.[objetivo.ti] : undefined
 
-  L.push('Contexto para redactar una parte del PLAN DE TRABAJO de un proyecto (documento que se entrega al cliente).')
-  L.push('')
-  if (p) {
-    L.push(`PROYECTO: ${p.codigo} – ${p.nombre}`)
-    if (p.cliente?.nombre) L.push(`CLIENTE: ${p.cliente.nombre}`)
-    if (p.descripcion) L.push(`DESCRIPCIÓN DEL PROYECTO: ${p.descripcion}`)
-  }
+  // El chat donde se pega ya conoce el proyecto (TDR, contrato, cliente):
+  // solo se nombra el código para ubicarse, sin repetir sus datos.
+  L.push(`PLAN DE TRABAJO${p ? ` ${p.codigo}` : ''} — texto a redactar`)
   L.push(`FASE: ${enCron?.fase.nombre ?? item.faseNombre}`)
   const r = enCron ? resumenEdt(enCron.edt) : null
   const codigo = enCron?.edt.codigoEdt || item.edtCodigo
@@ -152,17 +148,21 @@ export function construirTextoParaIa({
   // Lo que se pide
   L.push('')
   if (objetivo.tipo === 'edt') {
-    L.push(`PIDO: redacta solo la descripción narrativa del EDT "${item.edtNombre}" ` +
-      (item.tipoDetalle === 'detallado' ? '(80-150 palabras, flujo de trabajo)' : '(1 a 3 oraciones)') +
-      ', en español técnico y formal, sin viñetas ni títulos. Responde únicamente con el párrafo, para pegarlo tal cual.')
+    L.push(`PIDO: redacta la descripción narrativa del EDT "${item.edtNombre}". ` +
+      (item.tipoDetalle === 'detallado'
+        ? 'Nivel detallado: 80-150 palabras describiendo el flujo de trabajo.'
+        : 'Mantén el nivel resumido: un párrafo breve (2 a 4 oraciones).'))
   } else if (objetivo.tipo === 'actividad') {
-    L.push(`PIDO: redacta solo la descripción narrativa de la actividad "${sub?.actividadNombre ?? ''}" ` +
-      '(40-100 palabras), en español técnico y formal, sin repetir la descripción del EDT, sin viñetas ni títulos. ' +
-      'Responde únicamente con el párrafo, para pegarlo tal cual.')
+    L.push(`PIDO: redacta la descripción narrativa de la actividad "${sub?.actividadNombre ?? ''}" ` +
+      '(40-100 palabras), sin repetir la descripción del EDT.')
   } else {
-    L.push(`PIDO: redacta solo la viñeta de la tarea "${tareaPlan?.nombre ?? ''}": una sola línea (máx. 25 palabras), ` +
-      'en español técnico, empezando con un verbo en infinitivo o sustantivo de acción, sin guion ni numeración. ' +
-      'Responde únicamente con esa línea.')
+    L.push(`PIDO: redacta la viñeta de la tarea "${tareaPlan?.nombre ?? ''}": una sola línea (máx. 25 palabras), ` +
+      'empezando con un verbo en infinitivo o sustantivo de acción, sin guion ni numeración.')
   }
+  L.push('CRITERIOS:')
+  L.push('- Puedes incorporar aspectos técnicos pertinentes del TDR y del alcance contractual que ya conoces de este proyecto.')
+  L.push('- Distingue siempre las actividades programadas (las del cronograma de arriba) de las obligaciones generales del proyecto (normas, requisitos del cliente, condiciones del contrato).')
+  L.push('- No agregues actividades, entregables, plazos, recursos ni compromisos que no estén en el cronograma o en el contrato: el texto no debe generar obligaciones adicionales para GYS.')
+  L.push(`- Español técnico y formal, sin títulos${objetivo.tipo === 'tarea' ? '' : ' ni viñetas'}. Responde únicamente con ${objetivo.tipo === 'tarea' ? 'esa línea' : 'el párrafo'}, para pegarlo tal cual.`)
   return L.join('\n')
 }
