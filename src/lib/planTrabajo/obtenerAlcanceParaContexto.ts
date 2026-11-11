@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getFileContent } from '@/lib/services/googleDrive'
 import { extraerAlcanceDeDocx } from '@/lib/planTrabajo/extraerAlcanceDeDocx'
 import type { PlanAlcanceDetalladoEdt } from '@/types/planTrabajo'
+import { vinetaComoTexto } from '@/lib/planTrabajo/vinetaTarea'
 
 function serializarAlcanceEstructurado(edts: PlanAlcanceDetalladoEdt[]): string {
   const lineas: string[] = []
@@ -13,7 +14,7 @@ function serializarAlcanceEstructurado(edts: PlanAlcanceDetalladoEdt[]): string 
       if (sub.descripcion) lineas.push(sub.descripcion)
       for (const tarea of sub.tareas ?? []) {
         if (tarea.excluida) continue
-        lineas.push(`- ${tarea.texto || tarea.nombre}`)
+        lineas.push(`- ${vinetaComoTexto(tarea)}`)
       }
     }
   }

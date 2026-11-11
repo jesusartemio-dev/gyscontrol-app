@@ -1,4 +1,5 @@
 import type { CronogramaContexto, PlanAlcanceDetalladoEdt, PlanTrabajoContexto } from '@/types/planTrabajo'
+import { tituloTarea, vinetaComoTexto } from '@/lib/planTrabajo/vinetaTarea'
 
 /**
  * "Copiar para IA" del Alcance Detallado: arma un bloque de texto con todo el
@@ -145,7 +146,7 @@ export function construirTextoParaIa({
   for (const s of item.subItems ?? []) {
     L.push(`- Actividad ${s.numeracion} ${s.actividadNombre}: ${s.descripcion?.trim() || '(vacío)'}`)
     for (const t of (s.tareas ?? []).filter(t => !t.excluida)) {
-      L.push(`    · ${t.texto?.trim() || t.nombre}`)
+      L.push(`    · ${vinetaComoTexto(t)}`)
     }
   }
 
@@ -155,7 +156,7 @@ export function construirTextoParaIa({
     ? `la descripción narrativa del EDT "${item.edtNombre}"`
     : objetivo.tipo === 'actividad'
       ? `la descripción narrativa de la actividad "${sub?.actividadNombre ?? ''}"`
-      : `la viñeta de la tarea "${tareaPlan?.nombre ?? ''}"`
+      : `la descripción de la tarea "${tituloTarea(tareaPlan?.nombre ?? '')}"`
   L.push(`PIDO: mejora ${queMejorar}. Estamos mejorando el plan parte por parte.`)
   L.push('Analiza toda la información que ya tienes de este proyecto (TDR, alcance contractual, propuesta, lo conversado antes) ' +
     'junto con el cronograma y el texto actual de arriba, y propón la mejor versión. Tienes libertad para reescribirlo por completo, ' +
@@ -168,7 +169,8 @@ export function construirTextoParaIa({
   } else if (objetivo.tipo === 'actividad') {
     L.push('- Orientativo 40-100 palabras; no repitas la descripción del EDT.')
   } else {
-    L.push('- Una sola línea (máx. 25 palabras), empezando con un verbo en infinitivo o sustantivo de acción, sin guion ni numeración.')
+    L.push(`- En el plan sale como "${tituloTarea(tareaPlan?.nombre ?? '')}: <tu descripción>", con el título en negrita: ` +
+      'no repitas el título ni lo pongas; escribe solo lo que se hace (cómo, con qué, criterio), en una sola línea (máx. 30 palabras), sin guion ni numeración.')
   }
   L.push('- Distingue siempre las actividades programadas (las del cronograma) de las obligaciones generales del proyecto (normas, requisitos del cliente, condiciones del contrato).')
   L.push('- El texto no debe generar compromisos adicionales para GYS: nada de actividades, entregables, plazos o recursos que no estén en el cronograma o en el contrato.')

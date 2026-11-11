@@ -17,6 +17,7 @@ import type {
   PlanPersonal, PlanRaci, PlanHistogramas, PlanCronograma, PlanReferencia, PlanAlcanceDetalladoEdt,
   SeccionRegenerable,
 } from '@/types/planTrabajo'
+import { vinetaComoTexto } from './vinetaTarea'
 
 /** Secciones que se pueden editar pegando texto. */
 export const SECCIONES_EDITABLES_TEXTO: readonly SeccionRegenerable[] = [
@@ -95,7 +96,7 @@ export function edtATexto(edt: PlanAlcanceDetalladoEdt): string {
   const lineas = [`${edt.numeracion} ${edt.edtNombre}${edt.ubicacion ? ` (${edt.ubicacion})` : ''}`, edt.descripcion]
   for (const s of edt.subItems ?? []) {
     lineas.push('', `${s.numeracion} ${s.actividadNombre}`, s.descripcion)
-    for (const t of (s.tareas ?? []).filter((t) => !t.excluida)) lineas.push(`- ${t.texto || t.nombre}`)
+    for (const t of (s.tareas ?? []).filter((t) => !t.excluida)) lineas.push(`- ${vinetaComoTexto(t)}`)
   }
   return lineas.filter((l, i, a) => !(l === '' && a[i - 1] === '')).join('\n').trim()
 }

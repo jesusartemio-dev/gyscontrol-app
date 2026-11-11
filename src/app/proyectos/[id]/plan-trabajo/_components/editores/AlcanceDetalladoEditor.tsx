@@ -778,7 +778,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                               : marcarTextoTareaEditado(edtIdx, subIdx, tareaIdx, e.target.value)}
                                             rows={2}
                                             className="text-sm leading-relaxed resize-none min-h-0 py-1.5"
-                                            placeholder={tarea.manualId ? 'Ej: Pase de piso con pasamuro y transición' : tarea.nombre}
+                                            placeholder={tarea.manualId ? 'Ej: Pase de piso con pasamuro y transición' : 'Descripción de lo que se hace (opcional) — el título de la tarea sale en negrita delante'}
                                             autoFocus={Boolean(tarea.manualId) && !tarea.texto}
                                           />
                                         </div>

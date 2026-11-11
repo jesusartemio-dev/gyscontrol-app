@@ -23,6 +23,7 @@ import { IMAGEN_PLACEHOLDER, type ImagenResueltaTag } from './exportDocx'
 import { captionEfectivo } from './imagenCaption'
 import { normalizarTexto } from '@/lib/utils/normalizarTexto'
 import { calcularNumerosDeFigura } from './numerosDeFigura'
+import { partesVineta } from './vinetaTarea'
 
 type ProyectoConCliente = Proyecto & { cliente: Cliente | null }
 
@@ -439,12 +440,19 @@ export function construirDataBag({
             // Las tareas `excluida` (borrado lógico del plan, Bloque 4.2 sesión 3)
             // se filtran ANTES de mapear — no exportan viñeta, imágenes ni consumen
             // numeración de figura; nunca tocan el cronograma real del proyecto.
-            tareas: (s.tareas ?? []).filter(t => !t.excluida).map(t => ({
-              texto: t.texto || t.nombre,
+            // Viñeta = {titulo} en negrita + {texto} (plantilla: dos runs en el
+            // mismo párrafo). Antes era solo `texto || nombre` y el título se
+            // perdía al escribir una descripción.
+            tareas: (s.tareas ?? []).filter(t => !t.excluida).map(t => {
+              const { titulo, descripcion } = partesVineta(t)
+              return {
+              titulo: titulo && descripcion ? `${titulo}: ` : titulo,
+              texto: descripcion,
               imagenes: n.edtRefId && t.tareaRefId
                 ? construirImagenesDeNodo(n.edtRefId, undefined, t.tareaRefId, t.nombre, imagenesAlcance, imagenesResueltas, numerosDeFigura)
                 : [],
-            })),
+              }
+            }),
             // Loop propio {#imagenesSubItem} (no {#imagenes}) para no colisionar
             // con el anidado en cada tarea. En la plantilla va junto a la
             // descripción de la actividad, ANTES de {#tareas}: al final del

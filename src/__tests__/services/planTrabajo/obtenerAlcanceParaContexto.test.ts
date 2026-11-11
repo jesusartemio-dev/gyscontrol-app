@@ -84,7 +84,8 @@ describe('obtenerAlcanceParaContexto', () => {
 
     expect(resultado).toContain('Descripción del EDT.')
     expect(resultado).toContain('Descripción de la actividad.')
-    expect(resultado).toContain('- Armar andamio certificado.')
+    // Viñeta con el título de la tarea delante (no se pierde al tener descripción).
+    expect(resultado).toContain('- tarea-1: Armar andamio certificado.')
     expect(resultado).not.toContain('Tarea excluida.')
     expect(mockGetFileContent).not.toHaveBeenCalled()
   })

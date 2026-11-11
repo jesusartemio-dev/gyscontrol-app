@@ -169,7 +169,7 @@ describe('construirDataBag — alcanceDetallado.subItems', () => {
     // El fixture de la tarea 0 del subItem[0] trae fotoSugerida (ver arriba).
     const primeraTarea = con.subItems[0].tareas[0] as Record<string, unknown>
     expect(primeraTarea).not.toHaveProperty('fotoSugerida')
-    expect(Object.keys(primeraTarea)).toEqual(['texto', 'imagenes'])
+    expect(Object.keys(primeraTarea)).toEqual(['titulo', 'texto', 'imagenes'])
   })
 })
 

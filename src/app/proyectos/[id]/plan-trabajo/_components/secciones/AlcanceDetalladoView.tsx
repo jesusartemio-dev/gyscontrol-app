@@ -5,6 +5,7 @@ import { calcularNumerosDeFigura } from '@/lib/planTrabajo/numerosDeFigura'
 import { ImagenConLightbox } from '@/components/catalogoImagenes/ImagenConLightbox'
 import { HintFotoSugerida } from '@/components/catalogoImagenes/HintFotoSugerida'
 import { Pencil } from 'lucide-react'
+import { VinetaTarea } from '../VinetaTarea'
 
 interface Props {
   plan: PlanTrabajo
@@ -205,7 +206,7 @@ export function AlcanceDetalladoView({ plan, proyectoId, imagenes, onEditarEdt }
                                     <span className="shrink-0 select-none text-gray-400">•</span>
                                     <div className={`min-w-0 flex-1 ${conImagenes ? 'grid gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]' : ''}`}>
                                       <div>
-                                        {tarea.texto || tarea.nombre}
+                                        <VinetaTarea tarea={tarea} />
                                         {item.tipoDetalle === 'detallado' && !conImagenes && (
                                           <HintFotoSugerida value={tarea.fotoSugerida ?? ''} />
                                         )}

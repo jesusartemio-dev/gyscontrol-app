@@ -11,6 +11,7 @@ import { seccionATexto, textoASeccion, edtATexto, SECCIONES_EDITABLES_TEXTO, typ
 import { NOMBRE_SECCION, leerEdiciones } from '@/lib/planTrabajo/edicionesManuales'
 import { construirTextoParaIa } from '@/lib/planTrabajo/contextoIaAlcance'
 import { DelCronogramaPanel } from '../CopiarParaIA'
+import { VinetaTarea } from '../VinetaTarea'
 
 interface Props {
   proyectoId: string
@@ -304,6 +305,7 @@ export function PlanTrabajoCampoClient({ proyectoId }: Props) {
                         <div key={tarea.tareaRefId ?? tarea.manualId ?? ti} className="bg-white border rounded-md p-2.5 space-y-2">
                           <TextoEditable
                             texto={tarea.texto || tarea.nombre}
+                            contenido={<VinetaTarea tarea={tarea} />}
                             editado={tarea.textoEditadoManualmente}
                             copiado={copiadoClave === `${ei}-${si}-${ti}`}
                             guardado={guardadoClave === `${ei}-${si}-${ti}`}
@@ -374,8 +376,10 @@ export function PlanTrabajoCampoClient({ proyectoId }: Props) {
  * dentro del diálogo (se ve qué ítem es y el antes/después antes de guardar).
  * Marcas: editado a mano, el último copiado y el recién guardado.
  */
-function TextoEditable({ texto, editado, copiado, guardado, className, onEditar }: {
+function TextoEditable({ texto, contenido, editado, copiado, guardado, className, onEditar }: {
   texto: string
+  /** Lo que se muestra, si no es el texto tal cual (viñeta con título en negrita). */
+  contenido?: React.ReactNode
   editado?: boolean
   copiado?: boolean
   guardado?: boolean
@@ -387,7 +391,7 @@ function TextoEditable({ texto, editado, copiado, guardado, className, onEditar 
       guardado ? 'bg-emerald-50 ring-1 ring-emerald-300' : copiado ? 'bg-sky-50 ring-1 ring-sky-200' : ''
     }`}>
       <p className={`whitespace-pre-wrap ${className ?? ''}`}>
-        {texto}
+        {contenido ?? texto}
         {editado && <Hand className="ml-1 inline h-3 w-3 text-amber-600" aria-label="Editado a mano" />}
       </p>
       <div className="flex items-center justify-end gap-2">
