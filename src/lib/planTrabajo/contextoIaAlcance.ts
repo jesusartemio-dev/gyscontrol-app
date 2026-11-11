@@ -151,27 +151,33 @@ export function construirTextoParaIa({
 
   // Lo que se pide
   L.push('')
-  if (objetivo.tipo === 'edt') {
-    L.push(`PIDO: redacta la descripción narrativa del EDT "${item.edtNombre}". ` +
-      (item.tipoDetalle === 'detallado'
-        ? 'Nivel detallado: 80-150 palabras describiendo el flujo de trabajo.'
-        : 'Mantén el nivel resumido: un párrafo breve (2 a 4 oraciones).'))
-  } else if (objetivo.tipo === 'actividad') {
-    L.push(`PIDO: redacta la descripción narrativa de la actividad "${sub?.actividadNombre ?? ''}" ` +
-      '(40-100 palabras), sin repetir la descripción del EDT.')
-  } else {
-    L.push(`PIDO: redacta la viñeta de la tarea "${tareaPlan?.nombre ?? ''}": una sola línea (máx. 25 palabras), ` +
-      'empezando con un verbo en infinitivo o sustantivo de acción, sin guion ni numeración.')
-  }
+  const queMejorar = objetivo.tipo === 'edt'
+    ? `la descripción narrativa del EDT "${item.edtNombre}"`
+    : objetivo.tipo === 'actividad'
+      ? `la descripción narrativa de la actividad "${sub?.actividadNombre ?? ''}"`
+      : `la viñeta de la tarea "${tareaPlan?.nombre ?? ''}"`
+  L.push(`PIDO: mejora ${queMejorar}. Estamos mejorando el plan parte por parte.`)
+  L.push('Analiza toda la información que ya tienes de este proyecto (TDR, alcance contractual, propuesta, lo conversado antes) ' +
+    'junto con el cronograma y el texto actual de arriba, y propón la mejor versión. Tienes libertad para reescribirlo por completo, ' +
+    'reorganizarlo, incorporar aspectos técnicos pertinentes o quitar lo que sobre o no aporte.')
   L.push('CRITERIOS:')
-  L.push('- Puedes incorporar aspectos técnicos pertinentes del TDR y del alcance contractual que ya conoces de este proyecto.')
-  L.push('- Distingue siempre las actividades programadas (las del cronograma de arriba) de las obligaciones generales del proyecto (normas, requisitos del cliente, condiciones del contrato).')
-  L.push('- No agregues actividades, entregables, plazos, recursos ni compromisos que no estén en el cronograma o en el contrato: el texto no debe generar obligaciones adicionales para GYS.')
+  if (objetivo.tipo === 'edt') {
+    L.push(item.tipoDetalle === 'detallado'
+      ? '- Nivel detallado: el flujo de trabajo del EDT (orientativo, 80-150 palabras).'
+      : '- Nivel resumido: un párrafo breve (orientativo, 2 a 5 oraciones); el detalle va en el cronograma.')
+  } else if (objetivo.tipo === 'actividad') {
+    L.push('- Orientativo 40-100 palabras; no repitas la descripción del EDT.')
+  } else {
+    L.push('- Una sola línea (máx. 25 palabras), empezando con un verbo en infinitivo o sustantivo de acción, sin guion ni numeración.')
+  }
+  L.push('- Distingue siempre las actividades programadas (las del cronograma) de las obligaciones generales del proyecto (normas, requisitos del cliente, condiciones del contrato).')
+  L.push('- El texto no debe generar compromisos adicionales para GYS: nada de actividades, entregables, plazos o recursos que no estén en el cronograma o en el contrato.')
+  L.push('- Si ves mejoras que no son de redacción (algo que falta o sobra en el cronograma, horas o fechas inconsistentes, riesgos de alcance, algo que pide el TDR y no está programado), no las metas en el texto: propónlas en la nota.')
   L.push(`- Español técnico y formal, sin títulos${objetivo.tipo === 'tarea' ? '' : ' ni viñetas'}.`)
   L.push('FORMATO DE LA RESPUESTA:')
   L.push(`1. ${objetivo.tipo === 'tarea' ? 'La línea final' : 'El texto final'} como texto normal (sin bloque de código, sin negritas ni otro formato), ` +
     `${objetivo.tipo === 'tarea' ? '' : 'cada párrafo en una sola línea, sin saltos de línea dentro del párrafo, '}` +
     `entre una línea ${MARCA_INICIO} y una línea ${MARCA_FIN}.`)
-  L.push(`2. Debajo de ${MARCA_FIN}, una nota breve para revisar: qué tomaste del TDR o del contrato, qué cambiaste respecto al texto actual, qué dejaste fuera a propósito y por qué, y si algo conviene verificar antes de enviarlo al cliente.`)
+  L.push(`2. Debajo de ${MARCA_FIN}, una nota para revisar: qué cambiaste y por qué, qué tomaste del TDR o del contrato, qué dejaste fuera a propósito, las mejoras que propones fuera del texto (cronograma, alcance, riesgos) y qué conviene verificar antes de enviarlo al cliente.`)
   return L.join('\n')
 }
