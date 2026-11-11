@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { ResultadoTexto } from '@/lib/planTrabajo/textoSecciones'
 import { CopiarPegarTexto, copiarTexto } from '../CopiarPegarTexto'
+import { BotonCopiarParaIA } from '../CopiarParaIA'
 
 export { copiarTexto }
 
@@ -47,7 +48,12 @@ export function BotonCopiar({ texto, etiqueta = 'Copiar', compacto }: { texto: s
  */
 export function EditarTextoDialog({
   open, onOpenChange, titulo, ubicacion, ayuda, textoInicial, interpretar, onGuardar, onCopiado, unaLinea,
+  textoParaIA, arriba,
 }: {
+  /** "Copiar para IA": arma el texto con contexto a partir de lo que se está escribiendo. */
+  textoParaIA?: (textoActual: string) => string
+  /** Bloque bajo el título (p. ej. "Del cronograma"). */
+  arriba?: React.ReactNode
   open: boolean
   onOpenChange: (o: boolean) => void
   titulo: string
@@ -98,8 +104,11 @@ export function EditarTextoDialog({
           <DialogTitle className="text-base">Editar: {titulo}</DialogTitle>
           {ayuda && <DialogDescription className="text-xs">{ayuda}</DialogDescription>}
         </DialogHeader>
+        {arriba}
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] text-muted-foreground">Copiá, mejoralo donde quieras y pegalo acá.</span>
+          <span className="inline-flex items-center gap-1">
+          {textoParaIA && <BotonCopiarParaIA obtenerTexto={() => textoParaIA(texto)} />}
           <CopiarPegarTexto
             conEtiqueta
             texto={texto}
@@ -107,6 +116,7 @@ export function EditarTextoDialog({
             onCopiado={onCopiado}
             onPegar={setTexto}
           />
+          </span>
         </div>
         <Textarea
           value={texto}

@@ -17,8 +17,10 @@ import { HintFotoSugerida } from '@/components/catalogoImagenes/HintFotoSugerida
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { RegenerarEdtDialog } from './RegenerarEdtDialog'
 import { CopiarPegarTexto } from '../CopiarPegarTexto'
+import { BotonCopiarParaIA, DelCronogramaPanel } from '../CopiarParaIA'
+import { construirTextoParaIa } from '@/lib/planTrabajo/contextoIaAlcance'
 import type { PlanTrabajoImagen } from '@prisma/client'
-import type { PlanHerramientasYEquipos } from '@/types/planTrabajo'
+import type { PlanHerramientasYEquipos, PlanTrabajoContexto } from '@/types/planTrabajo'
 
 interface Props {
   proyectoId: string
@@ -37,6 +39,8 @@ interface Props {
    * guardado en el servidor en ese momento. Sin él, se edita todo el alcance.
    */
   soloEdt?: number
+  /** Contexto del plan: de aquí sale "Del cronograma" y "Copiar para IA". */
+  contexto?: PlanTrabajoContexto | null
 }
 
 const edtVacio = (): PlanAlcanceDetalladoEdt => ({
@@ -80,7 +84,7 @@ function contarEstadoEdt(item: PlanAlcanceDetalladoEdt, imagenes: PlanTrabajoIma
   return { tareas, imagenes: totalImagenes, fotosPendientes, sugeridasIA }
 }
 
-export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos, imagenes, onImagenesChanged, onSave, onGuardarParcial, onCancel, soloEdt }: Props) {
+export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos, imagenes, onImagenesChanged, onSave, onGuardarParcial, onCancel, soloEdt, contexto }: Props) {
   const [items, setItems] = useState<PlanAlcanceDetalladoEdt[]>(
     valor.length > 0 ? valor : [edtVacio()]
   )
@@ -507,6 +511,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                       </div>
                     </>
                   )}
+                  {item.edtRefId && <DelCronogramaPanel contexto={contexto} edtRefId={item.edtRefId} />}
                   {item.edtRefId && estado.sugeridasIA > 0 && (
                     <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
                       <Sparkles size={12} className="shrink-0" />
@@ -573,8 +578,11 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                           <Lock size={10} /> Editado a mano · <span className="underline">Liberar</span>
                         </button>
                       )}
-                      <CopiarPegarTexto
+                      <BotonCopiarParaIA
                         className="ml-auto"
+                        obtenerTexto={() => construirTextoParaIa({ contexto, item: items[edtIdx], objetivo: { tipo: 'edt' } })}
+                      />
+                      <CopiarPegarTexto
                         texto={item.descripcion}
                         onPegar={(t) => marcarDescripcionEditada(edtIdx, t)}
                       />
@@ -669,8 +677,11 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                               <Lock size={10} /> Editado a mano · <span className="underline">Liberar</span>
                             </button>
                           )}
-                          <CopiarPegarTexto
+                          <BotonCopiarParaIA
                             className="ml-auto"
+                            obtenerTexto={() => construirTextoParaIa({ contexto, item: items[edtIdx], objetivo: { tipo: 'actividad', si: subIdx } })}
+                          />
+                          <CopiarPegarTexto
                             texto={sub.descripcion}
                             onPegar={(t) => marcarDescripcionSubItemEditada(edtIdx, subIdx, t)}
                           />
@@ -743,8 +754,11 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                                 <Lock size={10} /> editado
                                               </button>
                                             )}
-                                            <CopiarPegarTexto
+                                            <BotonCopiarParaIA
                                               className="ml-auto"
+                                              obtenerTexto={() => construirTextoParaIa({ contexto, item: items[edtIdx], objetivo: { tipo: 'tarea', si: subIdx, ti: tareaIdx } })}
+                                            />
+                                            <CopiarPegarTexto
                                               unaLinea
                                               texto={tarea.texto || tarea.nombre}
                                               onPegar={(t) => tarea.manualId

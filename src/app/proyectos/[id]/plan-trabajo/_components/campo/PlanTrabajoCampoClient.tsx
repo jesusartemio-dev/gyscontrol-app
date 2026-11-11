@@ -9,6 +9,8 @@ import { CampoFotoTarea } from './CampoFotoTarea'
 import { SeccionCampoCard, BotonCopiar, EditarTextoDialog } from './SeccionesCampo'
 import { seccionATexto, textoASeccion, edtATexto, SECCIONES_EDITABLES_TEXTO, type ResultadoTexto } from '@/lib/planTrabajo/textoSecciones'
 import { NOMBRE_SECCION, leerEdiciones } from '@/lib/planTrabajo/edicionesManuales'
+import { construirTextoParaIa } from '@/lib/planTrabajo/contextoIaAlcance'
+import { DelCronogramaPanel } from '../CopiarParaIA'
 
 interface Props {
   proyectoId: string
@@ -344,6 +346,19 @@ export function PlanTrabajoCampoClient({ proyectoId }: Props) {
           unaLinea={editandoAlcance.tipo === 'tarea'}
           interpretar={editandoAlcance.tipo === 'tarea' ? interpretarVineta : interpretarDescripcion}
           onCopiado={() => setCopiadoClave(editandoAlcance.clave)}
+          arriba={<DelCronogramaPanel contexto={contexto} edtRefId={raw[editandoAlcance.ei]?.edtRefId} />}
+          textoParaIA={(textoActual) => {
+            // El EDT tal como está guardado, con el texto que se está editando ahora.
+            const e = editandoAlcance
+            const item = structuredClone(raw[e.ei])
+            if (e.tipo === 'edt') item.descripcion = textoActual
+            else if (e.tipo === 'sub' && item.subItems?.[e.si]) item.subItems[e.si].descripcion = textoActual
+            else if (e.tipo === 'tarea' && item.subItems?.[e.si]?.tareas?.[e.ti]) item.subItems[e.si].tareas![e.ti].texto = textoActual
+            return construirTextoParaIa({
+              contexto, item,
+              objetivo: e.tipo === 'edt' ? { tipo: 'edt' } : e.tipo === 'sub' ? { tipo: 'actividad', si: e.si } : { tipo: 'tarea', si: e.si, ti: e.ti },
+            })
+          }}
           onGuardar={async (v) => {
             await guardarAlcance(editandoAlcance, v)
             marcarGuardado(editandoAlcance.clave)

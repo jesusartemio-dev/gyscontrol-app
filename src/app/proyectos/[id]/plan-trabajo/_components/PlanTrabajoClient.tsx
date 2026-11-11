@@ -511,6 +511,7 @@ export function PlanTrabajoClient({ proyectoId }: Props) {
           onGuardarParcial={(v) => handleSaveSeccion('alcanceDetallado', v, { cerrar: false })}
           onCancel={() => setEditandoSeccion(null)}
           soloEdt={edtEnfocado ?? undefined}
+          contexto={contexto}
         />
       )}
       {editandoSeccion === 'eppRequeridos' && (
