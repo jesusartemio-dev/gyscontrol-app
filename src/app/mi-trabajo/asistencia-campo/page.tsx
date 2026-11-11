@@ -112,6 +112,7 @@ export default function AsistenciaCampoPage() {
   // Personal con ingreso y sin salida al intentar cerrar: el supervisor pone
   // la hora a la que se fue cada uno en vez de dejar el ingreso huérfano.
   const [dialogSalidas, setDialogSalidas] = useState(false)
+  const [cerrandoId, setCerrandoId] = useState<string | null>(null)
   const [pendientesSalida, setPendientesSalida] = useState<PendienteSalida[]>([])
   const [horasSalida, setHorasSalida] = useState<Record<string, string>>({})
   const [dialogTransferir, setDialogTransferir] = useState(false)
@@ -375,12 +376,22 @@ export default function AsistenciaCampoPage() {
     }
   }
 
-  async function cerrarJornada(salidas?: Array<{ userId: string; hora: string }>) {
-    if (!jornada) return
+  /**
+   * Cierra una asistencia por id, no solo la que está en pantalla: las de más
+   * de 36 h ya no salen arriba con el QR, pero sí en el historial, y el dueño
+   * es quien sabe a qué hora se fue su gente.
+   */
+  async function cerrarJornada(
+    salidas?: Array<{ userId: string; hora: string }>,
+    sesionId?: string,
+  ) {
+    const id = sesionId ?? cerrandoId ?? jornada?.id
+    if (!id) return
     if (!salidas && !confirm('¿Cerrar asistencia de campo? Los trabajadores ya no podrán marcar con este QR.')) return
+    setCerrandoId(id)
     setLoading(true)
     try {
-      const r = await fetch(`/api/asistencia/jornada/${jornada.id}/cerrar`, {
+      const r = await fetch(`/api/asistencia/jornada/${id}/cerrar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(salidas ? { salidas } : {}),
@@ -405,9 +416,13 @@ export default function AsistenciaCampoPage() {
 
       setDialogSalidas(false)
       setPendientesSalida([])
-      setJornada(null)
-      setQrImg('')
-      setAsistencias([])
+      setCerrandoId(null)
+      // Solo limpiar el QR si lo que se cerró es la sesión en pantalla.
+      if (id === jornada?.id) {
+        setJornada(null)
+        setQrImg('')
+        setAsistencias([])
+      }
       cargarHistorial()
       toast.success(
         data.salidasCreadas > 0
@@ -791,17 +806,32 @@ export default function AsistenciaCampoPage() {
                         : <span>cerrada</span>}
                     </p>
                   </div>
-                  {(esAdmin || h.activa) && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() => setEliminarObjetivo(h)}
-                      title={h.activa ? 'Eliminar asistencia activa' : 'Eliminar asistencia'}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
+                  <div className="flex shrink-0 items-center gap-1">
+                    {h.activa && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                        onClick={() => cerrarJornada(undefined, h.id)}
+                        disabled={loading}
+                        title="Cerrar esta asistencia. Si falta gente por marcar salida, te pedirá la hora."
+                      >
+                        <StopCircle className="mr-1 h-4 w-4" />
+                        Cerrar
+                      </Button>
+                    )}
+                    {(esAdmin || h.activa) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => setEliminarObjetivo(h)}
+                        title={h.activa ? 'Eliminar asistencia activa' : 'Eliminar asistencia'}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
@@ -939,6 +969,7 @@ export default function AsistenciaCampoPage() {
                 onClick={() =>
                   cerrarJornada(
                     pendientesSalida.map(p => ({ userId: p.userId, hora: horasSalida[p.userId] })),
+                    cerrandoId ?? undefined,
                   )
                 }
                 disabled={loading || pendientesSalida.some(p => !horasSalida[p.userId])}

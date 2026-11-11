@@ -2,7 +2,13 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { tieneRol } from '@/lib/auth/roles'
 import { calcularFechaEsperada } from '@/lib/services/asistencia'
+
+// Los mismos que ven la pestaña "Sesiones" de /rrhh/asistencia. Hace falta
+// porque hay sesiones abiertas de supervisores que ya no están en obra, y
+// hasta ahora la única salida era eliminarlas con todos sus marcajes.
+const ROLES_ADMIN = ['admin', 'gerente', 'administracion']
 
 interface SalidaManual {
   userId: string
@@ -41,7 +47,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     },
   })
   if (!jornada) return NextResponse.json({ message: 'No encontrada' }, { status: 404 })
-  if (jornada.supervisorId !== session.user.id) {
+  if (jornada.supervisorId !== session.user.id && !tieneRol(session, ROLES_ADMIN)) {
     return NextResponse.json({ message: 'No autorizado' }, { status: 403 })
   }
 

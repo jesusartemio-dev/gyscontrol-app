@@ -16,7 +16,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import { Loader2, FileSpreadsheet, Trash2, Search, ArrowUp, ArrowDown, MapPin, Smartphone, MapPinOff, Moon, Home, Briefcase, AlertTriangle } from 'lucide-react'
+import { Loader2, FileSpreadsheet, Trash2, Search, ArrowUp, ArrowDown, MapPin, Smartphone, MapPinOff, Moon, Home, Briefcase, AlertTriangle, StopCircle } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 import { formatearTardanza } from '@/lib/utils/formatTardanza'
@@ -142,11 +142,20 @@ export default function AsistenciaRRHH() {
   const [personasOcultas, setPersonasOcultas] = useState<Set<string>>(new Set())
 
   // Sesiones de asistencia (JornadaAsistencia) — para que el admin las gestione/elimine.
-  type SesionItem = { id: string; fecha: string; activa: boolean; creador: string; ubicacion: string; proyectoCodigo: string | null; marcajes: number }
+  type SesionItem = { id: string; fecha: string; activa: boolean; creador: string; ubicacion: string; proyectoCodigo: string | null; marcajes: number; salidasPendientes: number }
   const [sesiones, setSesiones] = useState<SesionItem[]>([])
   const [sesionesLoading, setSesionesLoading] = useState(false)
   const [eliminarSesion, setEliminarSesion] = useState<SesionItem | null>(null)
   const [eliminandoSesion, setEliminandoSesion] = useState(false)
+  // Las sesiones que quedaron abiertas van de abril a hoy, asi que buscarlas
+  // por rango de fechas obliga a ir ampliandolo a mano. Este filtro lo ignora.
+  const [soloAbiertas, setSoloAbiertas] = useState(false)
+  const [cerrandoSesion, setCerrandoSesion] = useState<string | null>(null)
+  // Personal con ingreso y sin salida al intentar cerrar: se pide la hora.
+  type PendienteSalida = { userId: string; nombre: string; horaIngreso: string }
+  const [sesionACerrar, setSesionACerrar] = useState<SesionItem | null>(null)
+  const [pendientesSalida, setPendientesSalida] = useState<PendienteSalida[]>([])
+  const [horasSalida, setHorasSalida] = useState<Record<string, string>>({})
 
   const [filaAEliminar, setFilaAEliminar] = useState<Fila | null>(null)
   const [eliminando, setEliminando] = useState(false)
@@ -185,11 +194,12 @@ export default function AsistenciaRRHH() {
     setLoading(false)
   }
 
-  async function cargarSesiones(ov: { desde?: string; hasta?: string } = {}) {
+  async function cargarSesiones(ov: { desde?: string; hasta?: string; soloAbiertas?: boolean } = {}) {
     setSesionesLoading(true)
     const d = ov.desde ?? desde
     const h = ov.hasta ?? hasta
-    const params = new URLSearchParams({ desde: d, hasta: h })
+    const abiertas = ov.soloAbiertas ?? soloAbiertas
+    const params = new URLSearchParams(abiertas ? { soloAbiertas: '1' } : { desde: d, hasta: h })
     try {
       const r = await fetch(`/api/asistencia/jornada/todas?${params}`)
       const j = await r.json()
@@ -198,6 +208,47 @@ export default function AsistenciaRRHH() {
       setSesiones([])
     } finally {
       setSesionesLoading(false)
+    }
+  }
+
+  async function cerrarSesion(sesion: SesionItem, salidas?: Array<{ userId: string; hora: string }>) {
+    setCerrandoSesion(sesion.id)
+    try {
+      const r = await fetch(`/api/asistencia/jornada/${sesion.id}/cerrar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(salidas ? { salidas } : {}),
+      })
+      const data = await r.json().catch(() => ({}))
+
+      // Queda gente con ingreso y sin salida: hay que indicar a que hora se fue.
+      if (r.status === 409 && Array.isArray(data.pendientes)) {
+        setSesionACerrar(sesion)
+        setPendientesSalida(data.pendientes)
+        setHorasSalida(
+          Object.fromEntries(
+            data.pendientes.map((x: PendienteSalida) => [x.userId, data.horaSugerida || '']),
+          ),
+        )
+        return
+      }
+      if (!r.ok) {
+        toast.error(data.message || 'No se pudo cerrar la asistencia')
+        return
+      }
+
+      toast.success(
+        data.salidasCreadas > 0
+          ? `Asistencia cerrada · ${data.salidasCreadas} salida(s) registradas`
+          : 'Asistencia cerrada',
+      )
+      setSesionACerrar(null)
+      setPendientesSalida([])
+      cargarSesiones()
+    } catch {
+      toast.error('No se pudo cerrar la asistencia')
+    } finally {
+      setCerrandoSesion(null)
     }
   }
 
@@ -784,9 +835,24 @@ export default function AsistenciaRRHH() {
           </span>
         )}
         {vista === 'sesiones' && (
-          <span className="text-xs text-muted-foreground">
-            Asistencias de campo (sesiones de QR) abiertas en el rango{esAdmin ? ' · puedes eliminarlas' : ''}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => { const v = !soloAbiertas; setSoloAbiertas(v); cargarSesiones({ soloAbiertas: v }) }}
+              className={`rounded-md border px-3 py-1.5 text-xs transition-colors ${
+                soloAbiertas
+                  ? 'border-emerald-300 bg-emerald-100 text-emerald-800'
+                  : 'bg-background text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              {soloAbiertas ? '✓ Solo abiertas' : 'Solo abiertas'}
+            </button>
+            <span className="text-xs text-muted-foreground">
+              {soloAbiertas
+                ? 'Todas las sesiones de QR sin cerrar, de cualquier fecha'
+                : 'Sesiones de QR del rango de fechas'}
+              {esAdmin ? ' · puedes cerrarlas o eliminarlas' : ''}
+            </span>
+          </div>
         )}
       </div>
 
@@ -984,7 +1050,9 @@ export default function AsistenciaRRHH() {
           </div>
         ) : sesiones.length === 0 ? (
           <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-            Sin asistencias de campo en el período seleccionado.
+            {soloAbiertas
+              ? 'No hay sesiones de asistencia abiertas.'
+              : 'Sin asistencias de campo en el período seleccionado.'}
           </div>
         ) : (
           <Card>
@@ -1021,16 +1089,39 @@ export default function AsistenciaRRHH() {
                         {s.activa
                           ? <Badge variant="outline" className="bg-emerald-100 text-emerald-700">activa</Badge>
                           : <Badge variant="outline" className="text-muted-foreground">cerrada</Badge>}
+                        {s.activa && s.salidasPendientes > 0 && (
+                          <div
+                            className="mt-0.5 text-[10px] font-medium text-amber-700"
+                            title="Personas con ingreso y sin salida. Al cerrar se te pedira la hora a la que se fueron."
+                          >
+                            {s.salidasPendientes} sin salida
+                          </div>
+                        )}
                       </TableCell>
                       {esAdmin && (
                         <TableCell className="text-right">
-                          <button
-                            onClick={() => setEliminarSesion(s)}
-                            title="Eliminar asistencia"
-                            className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-3 w-3" /> Eliminar
-                          </button>
+                          <div className="flex items-center justify-end gap-1">
+                            {s.activa && (
+                              <button
+                                onClick={() => cerrarSesion(s)}
+                                disabled={cerrandoSesion === s.id}
+                                title="Cerrar la sesion: el QR deja de aceptar marcajes"
+                                className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                              >
+                                {cerrandoSesion === s.id
+                                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                                  : <StopCircle className="h-3 w-3" />}
+                                Cerrar
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setEliminarSesion(s)}
+                              title="Eliminar asistencia"
+                              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3 w-3" /> Eliminar
+                            </button>
+                          </div>
                         </TableCell>
                       )}
                     </TableRow>
@@ -1041,6 +1132,59 @@ export default function AsistenciaRRHH() {
           </Card>
         )
       )}
+
+      {/* Salidas pendientes al cerrar una sesion */}
+      <Dialog open={!!sesionACerrar} onOpenChange={v => { if (!v) { setSesionACerrar(null); setPendientesSalida([]) } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Falta registrar salidas</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              En la asistencia de <span className="font-medium">{sesionACerrar?.ubicacion}</span>
+              {sesionACerrar?.proyectoCodigo ? ` (${sesionACerrar.proyectoCodigo})` : ''} del{' '}
+              {sesionACerrar && new Date(sesionACerrar.fecha).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' })}
+              {' '}hay personal que marco ingreso y no salida. Indica a que hora se fue cada uno;
+              quedara registrado como salida manual a tu nombre.
+            </p>
+            <div className="max-h-[320px] space-y-2 overflow-y-auto">
+              {pendientesSalida.map(x => (
+                <div key={x.userId} className="flex items-center justify-between gap-3 rounded-md border p-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{x.nombre}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Ingreso{' '}
+                      {new Date(x.horaIngreso).toLocaleTimeString('es-PE', {
+                        hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
+                      })}
+                    </p>
+                  </div>
+                  <Input
+                    type="time"
+                    className="w-32"
+                    value={horasSalida[x.userId] ?? ''}
+                    onChange={e => setHorasSalida(prev => ({ ...prev, [x.userId]: e.target.value }))}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setSesionACerrar(null); setPendientesSalida([]) }}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => sesionACerrar && cerrarSesion(
+                  sesionACerrar,
+                  pendientesSalida.map(x => ({ userId: x.userId, hora: horasSalida[x.userId] })),
+                )}
+                disabled={!!cerrandoSesion || pendientesSalida.some(x => !horasSalida[x.userId])}
+              >
+                Registrar salidas y cerrar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirmar eliminación de sesión de asistencia */}
       <Dialog open={!!eliminarSesion} onOpenChange={v => !v && setEliminarSesion(null)}>

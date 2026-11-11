@@ -21,9 +21,14 @@ export async function GET(req: Request) {
   const url = new URL(req.url)
   const desde = url.searchParams.get('desde')
   const hasta = url.searchParams.get('hasta')
+  // Las sesiones que quedaron abiertas van de abril a hoy: buscarlas por rango
+  // obliga a ir ampliando fechas a mano. Con soloAbiertas se ignora el rango.
+  const soloAbiertas = url.searchParams.get('soloAbiertas') === '1'
 
-  const where: { fecha?: { gte?: Date; lte?: Date } } = {}
-  if (desde || hasta) {
+  const where: { fecha?: { gte?: Date; lte?: Date }; activa?: boolean } = {}
+  if (soloAbiertas) {
+    where.activa = true
+  } else if (desde || hasta) {
     where.fecha = {}
     if (desde) where.fecha.gte = new Date(`${desde}T00:00:00.000Z`)
     if (hasta) where.fecha.lte = new Date(`${hasta}T23:59:59.999Z`)
@@ -43,21 +48,30 @@ export async function GET(req: Request) {
       ubicacion: { select: { nombre: true } },
       proyecto: { select: { codigo: true, nombre: true } },
       _count: { select: { asistencias: true } },
+      // Para saber cuáles necesitan que alguien registre salidas a mano y
+      // cuáles solo quedaron abiertas por no apretar "Cerrar".
+      asistencias: { select: { userId: true, tipo: true } },
     },
   })
 
   return NextResponse.json(
-    jornadas.map((j) => ({
-      id: j.id,
-      fecha: j.fecha,
-      activa: j.activa,
-      iniciadaEn: j.iniciadaEn,
-      cerradaEn: j.cerradaEn,
-      creador: j.supervisor?.name || j.supervisor?.email || '—',
-      ubicacion: j.ubicacion?.nombre ?? '—',
-      proyectoCodigo: j.proyecto?.codigo ?? null,
-      proyectoNombre: j.proyecto?.nombre ?? null,
-      marcajes: j._count.asistencias,
-    })),
+    jornadas.map((j) => {
+      const conIngreso = new Set(j.asistencias.filter(a => a.tipo === 'ingreso').map(a => a.userId))
+      const conSalida = new Set(j.asistencias.filter(a => a.tipo === 'salida').map(a => a.userId))
+      const salidasPendientes = [...conIngreso].filter(u => !conSalida.has(u)).length
+      return {
+        id: j.id,
+        fecha: j.fecha,
+        activa: j.activa,
+        iniciadaEn: j.iniciadaEn,
+        cerradaEn: j.cerradaEn,
+        creador: j.supervisor?.name || j.supervisor?.email || '—',
+        ubicacion: j.ubicacion?.nombre ?? '—',
+        proyectoCodigo: j.proyecto?.codigo ?? null,
+        proyectoNombre: j.proyecto?.nombre ?? null,
+        marcajes: j._count.asistencias,
+        salidasPendientes,
+      }
+    }),
   )
 }
