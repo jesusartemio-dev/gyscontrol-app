@@ -224,7 +224,7 @@ export default function ImportExcelCronogramaModal({
     }
   }
 
-  const handleImport = async (reemplazar = false) => {
+  const handleImport = async () => {
     const body = buildImportBody()
     if (!body) return
 
@@ -237,7 +237,7 @@ export default function ImportExcelCronogramaModal({
       const res = await fetch(`/api/proyectos/${proyectoId}/cronograma/importar-excel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...body, reemplazar }),
+        body: JSON.stringify(body),
       })
 
       setProgress(90)
@@ -801,20 +801,15 @@ export default function ImportExcelCronogramaModal({
               </div>
             )}
 
-            {conflictData && conflictData.registrosHoras > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700 flex items-start gap-2 max-w-md mx-auto">
-                <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-                <span>Los registros de horas (timesheet) no se eliminarán, solo se desvincularán del cronograma anterior.</span>
-              </div>
-            )}
+            {/* Ya no se reemplaza desde aquí: borrar e importar encima era un riesgo. */}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700 flex items-start gap-2 max-w-md mx-auto">
+              <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+              <span>Para traer cambios usa &quot;Actualizar desde MS Project&quot;. Para empezar de cero, primero usa &quot;Vaciar contenido&quot;.</span>
+            </div>
 
             <div className="flex gap-2 justify-center">
               <Button variant="outline" onClick={reset}>
-                Cancelar
-              </Button>
-              <Button onClick={() => handleImport(true)} className="bg-amber-600 hover:bg-amber-700">
-                <Upload className="h-4 w-4 mr-2" />
-                Reemplazar y reimportar
+                Cerrar
               </Button>
             </div>
           </div>

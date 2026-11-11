@@ -39,7 +39,6 @@ import {
   Lock,
   Unlock,
   Table2,
-  Wrench,
   Sparkles,
   UserCheck,
   GitPullRequestArrow
@@ -57,7 +56,6 @@ import { ProyectoCronogramaTreeView } from './ProyectoCronogramaTreeView'
 import { PesosFasePanel } from './PesosFasePanel'
 import { ProyectoGanttView } from './ProyectoGanttView'
 // CronogramaGanttViewPro deshabilitado - funcionalidad consolidada en Gantt
-import { ProyectoDependencyManager } from './ProyectoDependencyManager'
 import { exportCronogramaToExcel, type RecursoExport } from '@/lib/utils/msProjectExcelExport'
 import { generarMspdiProyecto } from '@/lib/utils/msProjectMspdiExport'
 import ImportExcelCronogramaModal from './ImportExcelCronogramaModal'
@@ -65,7 +63,6 @@ import { SincronizarMsProjectModal } from './SincronizarMsProjectModal'
 import { TraerCambiosLineaBaseModal } from './TraerCambiosLineaBaseModal'
 import { CronogramaVarianza } from './CronogramaVarianza'
 import { CronogramaTableView } from './CronogramaTableView'
-import { AsignarRecursoPorEdt } from './AsignarRecursoPorEdt'
 import { AutoasignarResponsablesModal } from './AutoasignarResponsablesModal'
 import { CronogramaPlanificacionWizard } from './CronogramaPlanificacionWizard'
 import type { ProyectoCronograma } from '@/types/modelos'
@@ -103,7 +100,6 @@ export function ProyectoCronogramaTab({
   const [showImportExcelModal, setShowImportExcelModal] = useState(false)
   const [showSincronizarModal, setShowSincronizarModal] = useState(false)
   const [showTraerLineaBaseModal, setShowTraerLineaBaseModal] = useState(false)
-  const [showAsignarRecursoModal, setShowAsignarRecursoModal] = useState(false)
   const [showAutoasignarResponsablesModal, setShowAutoasignarResponsablesModal] = useState(false)
 
   // Estado de datos
@@ -303,21 +299,6 @@ export function ProyectoCronogramaTab({
     loadCronogramaStats()
     onRefresh?.()
     toast({ title: 'Datos actualizados' })
-  }
-
-  const handleRecalcularProgreso = async () => {
-    try {
-      setIsLoading(true)
-      const response = await fetch(`/api/proyectos/${proyectoId}/cronograma/recalcular-progreso`, { method: 'POST' })
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.error || 'Error al recalcular')
-      handleRefresh()
-      toast({ title: 'Progreso recalculado', description: result.message })
-    } catch (error) {
-      toast({ title: 'Error', description: error instanceof Error ? error.message : 'No se pudo recalcular.', variant: 'destructive' })
-    } finally {
-      setIsLoading(false)
-    }
   }
 
   const handleSaveConfiguracion = async () => {
@@ -692,6 +673,7 @@ export function ProyectoCronogramaTab({
   const esComercial = selectedCronograma?.tipo === 'comercial'
   const esPlanificacion = selectedCronograma?.tipo === 'planificacion'
   const esBloqueado = selectedCronograma?.bloqueado === true || selectedCronograma?.tipo === 'comercial'
+  const puedeImportarExcel = esPlanificacion && !hasCronograma && !tieneEjecucion && !esBloqueado
 
   return (
     <div className="space-y-4">
@@ -917,22 +899,39 @@ export function ProyectoCronogramaTab({
                       Generar con IA (desde catálogo)
                     </DropdownMenuItem>
                   )}
+                  {/* Importar crea la línea base desde cero: solo con la línea base
+                      vacía y sin ejecución. Ya no reemplaza; para empezar de nuevo
+                      se usa "Vaciar contenido" y para traer cambios, "Actualizar". */}
                   <DropdownMenuItem onSelect={() => {
                     setDropdownOpen(false)
                     setTimeout(() => setShowImportExcelModal(true), 100)
-                  }} disabled={esBloqueado}>
+                  }} disabled={!puedeImportarExcel}>
                     <Upload className="h-4 w-4 mr-2" />
-                    Importar desde Excel (MS Project)
+                    <span className="flex flex-col">
+                      <span>Importar desde Excel (MS Project)</span>
+                      {!puedeImportarExcel && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {tieneEjecucion
+                            ? 'Ya hay cronograma de ejecución'
+                            : hasCronograma
+                              ? 'Ya hay línea base: usa Actualizar desde MS Project'
+                              : 'Solo en la línea base vacía'}
+                        </span>
+                      )}
+                    </span>
                   </DropdownMenuItem>
-                  {hasCronograma && (
-                    <DropdownMenuItem onSelect={() => {
-                      setDropdownOpen(false)
-                      setTimeout(() => setShowSincronizarModal(true), 100)
-                    }} disabled={esBloqueado}>
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Actualizar desde MS Project (XML o Excel)
-                    </DropdownMenuItem>
-                  )}
+                  <DropdownMenuItem onSelect={() => {
+                    setDropdownOpen(false)
+                    setTimeout(() => setShowSincronizarModal(true), 100)
+                  }} disabled={esBloqueado || !hasCronograma}>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    <span className="flex flex-col">
+                      <span>Actualizar desde MS Project (XML o Excel)</span>
+                      {!hasCronograma && (
+                        <span className="text-[10px] text-muted-foreground">Primero tiene que haber un cronograma</span>
+                      )}
+                    </span>
+                  </DropdownMenuItem>
                   {selectedCronograma?.tipo === 'ejecucion' && tieneBaseline && (
                     <DropdownMenuItem onSelect={() => {
                       setDropdownOpen(false)
@@ -946,14 +945,6 @@ export function ProyectoCronogramaTab({
                 </>
               )}
 
-              <DropdownMenuItem onSelect={() => {
-                setDropdownOpen(false)
-                setTimeout(() => setShowAsignarRecursoModal(true), 100)
-              }} disabled={!hasCronograma}>
-                <Wrench className="h-4 w-4 mr-2" />
-                Asignar Recursos por EDT
-              </DropdownMenuItem>
-
               {esPlanificacion && (
                 <DropdownMenuItem onSelect={() => {
                   setDropdownOpen(false)
@@ -963,14 +954,6 @@ export function ProyectoCronogramaTab({
                   Re-sincronizar responsables (Organigrama)
                 </DropdownMenuItem>
               )}
-
-              <DropdownMenuItem asChild>
-                <ProyectoDependencyManager
-                  proyectoId={proyectoId}
-                  cronogramaId={selectedCronograma?.id}
-                  onDependenciaChange={handleRefresh}
-                />
-              </DropdownMenuItem>
 
               <DropdownMenuItem onSelect={() => {
                 setDropdownOpen(false)
@@ -1000,19 +983,6 @@ export function ProyectoCronogramaTab({
                   <span className="text-[10px] text-muted-foreground">Igual al abrir; los atrasos se propagan</span>
                 </span>
               </DropdownMenuItem>
-
-              {!esComercial && hasCronograma && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => {
-                    setDropdownOpen(false)
-                    setTimeout(() => handleRecalcularProgreso(), 100)
-                  }} disabled={isLoading}>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Recalcular Progreso
-                  </DropdownMenuItem>
-                </>
-              )}
 
               {!esComercial && (
                 <>
@@ -1204,14 +1174,6 @@ export function ProyectoCronogramaTab({
         onOpenChange={setShowImportExcelModal}
         proyectoId={proyectoId}
         onImportSuccess={handleRefresh}
-      />
-
-      {/* Modal de asignar recurso por EDT */}
-      <AsignarRecursoPorEdt
-        open={showAsignarRecursoModal}
-        onOpenChange={setShowAsignarRecursoModal}
-        cronogramaId={selectedCronograma?.id || ''}
-        onSuccess={handleRefresh}
       />
 
       {/* Modal de autoasignar responsables desde la Matriz de Comunicación */}

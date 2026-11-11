@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { textoDependenciaCreada } from '@/components/cronograma/dependenciasTexto'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, TreePine, Plus, Download, List, Filter, Trash2, Clock, Calculator, Lock, Columns3, Wand2, AlertTriangle, Zap } from 'lucide-react'
+import { RefreshCw, TreePine, Plus, Download, Trash2, Clock, Calculator, Lock, Columns3, Wand2, AlertTriangle, Zap } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -1321,15 +1321,7 @@ export function ProyectoCronogramaTreeView({
               <RefreshCw className={`h-4 w-4 sm:mr-2 ${state.loadingNodes.has('root') ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Actualizar</span>
             </Button>
-            {/* "Vista Lista" y "Filtros" no tienen acción todavía: fuera en celular. */}
-            <Button variant="outline" size="sm" className="hidden md:inline-flex">
-              <List className="h-4 w-4 mr-2" />
-              Vista Lista
-            </Button>
-            <Button variant="outline" size="sm" className="hidden md:inline-flex">
-              <Filter className="h-4 w-4 mr-2" />
-              Filtros
-            </Button>
+            {/* Aquí había "Vista Lista" y "Filtros": botones sin ninguna acción que solo quitaban espacio. */}
 {/* Botón de eliminar cronograma movido al header de ProyectoCronogramaTab */}
           </div>
         </div>
