@@ -583,6 +583,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                         obtenerTexto={() => construirTextoParaIa({ contexto, item: items[edtIdx], objetivo: { tipo: 'edt' } })}
                       />
                       <CopiarPegarTexto
+                        parrafo
                         texto={item.descripcion}
                         onPegar={(t) => marcarDescripcionEditada(edtIdx, t)}
                       />
@@ -682,6 +683,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                             obtenerTexto={() => construirTextoParaIa({ contexto, item: items[edtIdx], objetivo: { tipo: 'actividad', si: subIdx } })}
                           />
                           <CopiarPegarTexto
+                            parrafo
                             texto={sub.descripcion}
                             onPegar={(t) => marcarDescripcionSubItemEditada(edtIdx, subIdx, t)}
                           />

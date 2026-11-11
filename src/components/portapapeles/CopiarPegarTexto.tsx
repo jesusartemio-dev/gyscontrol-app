@@ -96,13 +96,18 @@ export async function leerImagenesPortapapeles(): Promise<File[] | null> {
 }
 
 /** Limpia lo que suele traer una respuesta de IA: comillas envolventes, viñeta inicial, espacios. */
-export function limpiarTextoPegado(t: string, unaLinea: boolean): string {
+export function limpiarTextoPegado(t: string, unaLinea: boolean, parrafo = false): string {
   let s = t.replace(/\r\n/g, '\n').trim()
   // Si se copió la respuesta entera de la IA (bloque ``` + nota), queda solo el bloque.
   const bloque = s.match(/```[^\n]*\n([\s\S]*?)```/)
   if (bloque) s = bloque[1].trim()
   else s = s.replace(/^```[^\n]*\n?|```$/g, '').trim()
   s = s.replace(/^["“”«]+|["“”»]+$/g, '').trim()
+  // Párrafo: la IA corta las líneas para que se lean en el chat; se unen de
+  // nuevo (un salto suelto = espacio; una línea en blanco separa párrafos).
+  if (parrafo && !unaLinea) {
+    s = s.split(/\n[ \t]*\n/).map(p => p.split('\n').map(l => l.trim()).filter(Boolean).join(' ')).filter(Boolean).join('\n\n')
+  }
   if (unaLinea) s = s.replace(/^\s*(?:[-•*·]|\d+[.)])\s+/, '').replace(/\s+/g, ' ').trim()
   return s
 }
@@ -112,6 +117,7 @@ export function CopiarPegarTexto({
   onPegar,
   onCopiado,
   unaLinea = false,
+  parrafo = false,
   conEtiqueta = false,
   className = '',
 }: {
@@ -122,6 +128,8 @@ export function CopiarPegarTexto({
   onCopiado?: () => void
   /** Viñetas de tarea: se pega en una sola línea, sin "- " inicial. */
   unaLinea?: boolean
+  /** Descripción en párrafo: al pegar se unen las líneas cortadas (la IA las corta para que se lean). */
+  parrafo?: boolean
   /** Siempre con texto ("Copiar"/"Pegar"); si no, en celular solo íconos. */
   conEtiqueta?: boolean
   className?: string
@@ -143,7 +151,7 @@ export function CopiarPegarTexto({
   const pegar = async () => {
     const t = await leerTextoPortapapeles()
     if (t == null || !onPegar) return
-    const limpio = limpiarTextoPegado(t, unaLinea)
+    const limpio = limpiarTextoPegado(t, unaLinea, parrafo)
     if (!limpio) return
     onPegar(limpio)
     toast.success('Pegado — revisá y guardá')

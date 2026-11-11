@@ -165,7 +165,7 @@ export function construirTextoParaIa({
   L.push('- No agregues actividades, entregables, plazos, recursos ni compromisos que no estén en el cronograma o en el contrato: el texto no debe generar obligaciones adicionales para GYS.')
   L.push(`- Español técnico y formal, sin títulos${objetivo.tipo === 'tarea' ? '' : ' ni viñetas'}.`)
   L.push('FORMATO DE LA RESPUESTA:')
-  L.push(`1. ${objetivo.tipo === 'tarea' ? 'La línea final' : 'El párrafo final'}, solo, dentro de un bloque de código (entre \`\`\`), para copiarlo y pegarlo tal cual.`)
+  L.push(`1. ${objetivo.tipo === 'tarea' ? 'La línea final' : 'El párrafo final'}, solo, dentro de un bloque de código (entre \`\`\`), para copiarlo y pegarlo tal cual.${objetivo.tipo === 'tarea' ? '' : ' Dentro del bloque corta las líneas cada 90 caracteres aprox. para que se pueda leer sin desplazarse (al pegarlo se vuelven a unir).'}`)
   L.push('2. Debajo, fuera del bloque, una nota breve para revisar: qué tomaste del TDR o del contrato, qué cambiaste respecto al texto actual, qué dejaste fuera a propósito y por qué, y si algo conviene verificar antes de enviarlo al cliente.')
   return L.join('\n')
 }

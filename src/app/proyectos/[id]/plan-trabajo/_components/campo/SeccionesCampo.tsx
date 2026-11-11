@@ -113,6 +113,7 @@ export function EditarTextoDialog({
             conEtiqueta
             texto={texto}
             unaLinea={unaLinea}
+            parrafo={Boolean(textoParaIA)}
             onCopiado={onCopiado}
             onPegar={setTexto}
           />
