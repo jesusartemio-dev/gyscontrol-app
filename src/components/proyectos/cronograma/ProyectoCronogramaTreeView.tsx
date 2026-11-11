@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { textoDependenciaCreada } from '@/components/cronograma/dependenciasTexto'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, TreePine, Plus, Download, List, Filter, Trash2, Clock, Calculator, Lock, Columns3 } from 'lucide-react'
+import { RefreshCw, TreePine, Plus, Download, List, Filter, Trash2, Clock, Calculator, Lock, Columns3, Wand2, AlertTriangle, Zap } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -37,6 +37,24 @@ import { CronogramaTreeViewProps, TreeNode as TreeNodeType, NodeType } from '../
 import type { EdtImportSelection } from '../../cronograma/ImportEdtModal'
 import { useProyectoCronogramaTree } from './hooks/useProyectoCronogramaTree'
 import { useIsMobile } from '@/lib/responsive/breakpoints'
+import { Switch } from '@/components/ui/switch'
+import { avisarPropagacion } from '../../cronograma/avisoPropagacion'
+
+const fechaCorta = (s: string) => new Date(s).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', timeZone: 'UTC' })
+/** Horas laborables como "4h" o "2.5d" (jornada de 9.5 h por defecto del proyecto). */
+const formatearHorasDias = (h: number, hpd = 9.5) => (h < hpd ? `${Math.round(h * 10) / 10}h` : `${Math.round((h / hpd) * 10) / 10}d`)
+
+/** Resultado simulado de "Ajustar tareas a sus predecesoras" (dependencias/ajustar-actividad con simular). */
+interface ResumenAjuste {
+  tareasAjustadas: number
+  totalTareas: number
+  finAntes: string | null
+  finDespues: string | null
+  maxAtrasoHoras: number
+  maxAdelantoHoras: number
+  fijasIncumplidas: number
+  ejemplos: { nombre: string; antes: string; despues: string }[]
+}
 import '../../cronograma/CronogramaTreeView.css'
 
 // ── Wrapper sortable para cada fila del árbol ──────────────────────────────
@@ -853,27 +871,117 @@ export function ProyectoCronogramaTreeView({
     }
   }
 
-  // "Ajustar tareas a sus predecesoras": el ajuste de cada tarea, para todas las
-  // de la actividad (o de todo el EDT) de una vez y en cascada (ver dependencias/ajustar-actividad).
+  // "Ajustar tareas a sus predecesoras" de una actividad, un EDT, una fase o todo
+  // el cronograma (nodo proyecto): primero se simula y se muestra el resumen
+  // (cuántas se mueven, nuevo fin); recién al confirmar se aplica, con
+  // "Deshacer" en el aviso. Ver dependencias/ajustar-actividad y cronogramaAjuste.ts.
+  const cuerpoAjuste = (node: TreeNodeType): Record<string, string> | null => {
+    const id = String(node.id)
+    switch (node.type) {
+      case 'actividad': return { actividadId: id.replace('actividad-', '') }
+      case 'edt': return { edtId: id.replace('edt-', '') }
+      case 'fase': return { faseId: id.replace('fase-', '') }
+      case 'proyecto': return selectedCronograma ? { cronogramaId: selectedCronograma.id } : null
+      default: return null
+    }
+  }
   const handleAjustarActividad = async (nodeId: string) => {
     const node = state.nodes.get(nodeId)
-    if (!node || (node.type !== 'actividad' && node.type !== 'edt')) return
-    const cuerpo = node.type === 'edt'
-      ? { edtId: nodeId.replace('edt-', '') }
-      : { actividadId: nodeId.replace('actividad-', '') }
+    const cuerpo = node ? cuerpoAjuste(node) : null
+    if (!node || !cuerpo) return
+    const nombre = node.type === 'proyecto' ? 'Todo el cronograma' : node.nombre
+    setAjuste({ nombre, cuerpo, resumen: null, aplicando: false })
     try {
       const r = await fetch(`/api/proyectos/${proyectoId}/cronograma/dependencias/ajustar-actividad`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cuerpo),
+        body: JSON.stringify({ ...cuerpo, simular: true }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j.error || 'No se pudo calcular el ajuste')
+      if (!j.data.tareasAjustadas) {
+        setAjuste(null)
+        toast.success(`"${nombre}": todas las tareas ya están pegadas a sus predecesoras`)
+        return
+      }
+      setAjuste({ nombre, cuerpo, resumen: j.data, aplicando: false })
+    } catch (e) {
+      setAjuste(null)
+      toast.error(e instanceof Error ? e.message : 'No se pudo calcular el ajuste')
+    }
+  }
+  const aplicarAjusteConfirmado = async () => {
+    if (!ajuste) return
+    setAjuste({ ...ajuste, aplicando: true })
+    try {
+      const r = await fetch(`/api/proyectos/${proyectoId}/cronograma/dependencias/ajustar-actividad`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ajuste.cuerpo),
       })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(j.error || 'No se pudo ajustar')
+      const nombre = ajuste.nombre
+      setAjuste(null)
       await actions.loadTree([...state.expandedNodes])
-      const n = j.data.tareasAjustadas as number
-      toast.success(n ? `${n} tarea${n === 1 ? '' : 's'} de "${node.nombre}" ajustada${n === 1 ? '' : 's'} a sus predecesoras` : 'Todas las tareas ya cumplen sus predecesoras')
+      onRefresh?.()
+      avisarPropagacion(proyectoId, j.data, async () => { await actions.loadTree([...state.expandedNodes]); onRefresh?.() }, `"${nombre}"`)
     } catch (e) {
+      setAjuste(a => (a ? { ...a, aplicando: false } : a))
       toast.error(e instanceof Error ? e.message : 'No se pudo ajustar')
+    }
+  }
+
+  // 📌 Fijar / quitar fecha fija de una tarea.
+  const handleToggleFijar = async (nodeId: string) => {
+    const node = state.nodes.get(nodeId)
+    if (!node || node.type !== 'tarea') return
+    const fija = !node.data?.fechaFija
+    try {
+      const r = await fetch(`/api/proyectos/${proyectoId}/cronograma/dependencias/fijar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tareaId: nodeId.replace('tarea-', ''), fija }),
+      })
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'No se pudo cambiar')
+      await actions.loadTree([...state.expandedNodes])
+      toast.success(fija ? `📌 "${node.nombre}": fecha fija (el ajuste no la mueve)` : `"${node.nombre}": se ajusta a sus predecesoras otra vez`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo cambiar')
+    }
+  }
+
+  // Programación automática del cronograma (interruptor). Al encenderla, si hay
+  // tareas por ajustar, se ofrece ajustar todo para empezar cuadrado.
+  const raiz = state.rootNodes[0] ? state.nodes.get(state.rootNodes[0]) : undefined
+  const programacionAutomatica = raiz?.data?.programacionAutomatica === true
+  const tareasPorAjustar = Number(raiz?.data?.tareasPorAjustar) || 0
+  const hpdArbol = Number(raiz?.data?.horasPorDia) || 9.5
+  const [cambiandoAuto, setCambiandoAuto] = useState(false)
+  const handleProgramacionAutomatica = async (activo: boolean) => {
+    if (!selectedCronograma) return
+    setCambiandoAuto(true)
+    try {
+      const r = await fetch(`/api/proyectos/${proyectoId}/cronograma/programacion-automatica`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cronogramaId: selectedCronograma.id, activo }),
+      })
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'No se pudo cambiar')
+      await actions.loadTree([...state.expandedNodes])
+      if (activo && tareasPorAjustar > 0 && state.rootNodes[0]) {
+        toast.info(`Programación automática encendida. Hay ${tareasPorAjustar} tarea(s) por ajustar.`, {
+          description: 'Desde ahora, al cambiar una tarea o una dependencia, las que dependen de ella se ajustan solas.',
+          action: { label: 'Ajustar todo', onClick: () => { void handleAjustarActividad(state.rootNodes[0]) } },
+          duration: 12000,
+        })
+      } else {
+        toast.success(activo ? 'Programación automática encendida' : 'Programación automática apagada: usa "Ajustar tareas…" cuando lo necesites')
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo cambiar')
+    } finally {
+      setCambiandoAuto(false)
     }
   }
 
@@ -936,6 +1044,13 @@ export function ProyectoCronogramaTreeView({
 
   // "Generar dependencias desde fechas" de una fase, EDT o actividad.
   const [generarDeps, setGenerarDeps] = useState<{ nodeId: string; nombre: string } | null>(null)
+  // Confirmación de "Ajustar tareas a sus predecesoras" (resumen simulado antes de aplicar).
+  const [ajuste, setAjuste] = useState<{
+    nombre: string
+    cuerpo: Record<string, string>
+    resumen: ResumenAjuste | null
+    aplicando: boolean
+  } | null>(null)
 
   // EDT a otra fase del mismo cronograma (con sus actividades y tareas).
   const [moverFase, setMoverFase] = useState<{ edtId: string; edtNombre: string; faseActualNombre: string } | null>(null)
@@ -1034,7 +1149,7 @@ export function ProyectoCronogramaTreeView({
                     onEncadenarActividad={!isReadOnly && node.type === 'actividad' && !node.data?.isExtrasGroup
                       ? () => handleEncadenarActividad(nodeId)
                       : undefined}
-                    onAjustarActividad={!isReadOnly && ['actividad', 'edt'].includes(node.type) && !node.data?.isExtrasGroup
+                    onAjustarActividad={!isReadOnly && ['actividad', 'edt', 'fase', 'proyecto'].includes(node.type) && !node.data?.isExtrasGroup
                       ? () => handleAjustarActividad(nodeId)
                       : undefined}
                     onProgramarRespecto={
@@ -1049,6 +1164,7 @@ export function ProyectoCronogramaTreeView({
                     }
                     tieneAnterior={!!anteriorDe(nodeId)}
                     onToggleHito={!isReadOnly && node.type === 'tarea' && !node.data?.esExtra ? () => handleToggleHito(nodeId) : undefined}
+                    onToggleFijar={!isReadOnly && node.type === 'tarea' ? () => handleToggleFijar(nodeId) : undefined}
                     onPredecesoras={!isReadOnly && node.type === 'tarea' && !node.data?.esExtra ? () => setPredecesorasDe(nodeId) : undefined}
                     showNumeroColumn
                     onIrATarea={handleIrATarea}
@@ -1154,6 +1270,22 @@ export function ProyectoCronogramaTreeView({
             </Badge>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {/* Programación automática: al cambiar una tarea o dependencia, las que dependen de ella se ajustan solas */}
+            {selectedCronograma && selectedCronograma.tipo !== 'comercial' && (
+              <label
+                className={`flex h-8 cursor-pointer items-center gap-2 rounded-md border px-2 text-xs ${programacionAutomatica ? 'border-indigo-300 bg-indigo-50 text-indigo-800' : 'text-muted-foreground'}`}
+                title="Encendida: al cambiar fechas, duración o dependencias, las tareas que dependen se ajustan solas (con Deshacer). Las tareas sin predecesoras y las 📌 fijas no se mueven."
+              >
+                <Zap className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Programación automática</span>
+                <span className="sm:hidden">Auto</span>
+                <Switch
+                  checked={programacionAutomatica}
+                  disabled={cambiandoAuto || selectedCronograma.bloqueado === true}
+                  onCheckedChange={(v) => { void handleProgramacionAutomatica(v) }}
+                />
+              </label>
+            )}
             {esCelular && (
               <Button
                 variant={verColumnas ? 'secondary' : 'outline'}
@@ -1209,6 +1341,71 @@ export function ProyectoCronogramaTreeView({
             donde se afinan recursos y responsables, y el botón destruía justamente
             eso — sin confirmación y sin mirar si el cronograma estaba bloqueado.
             La Línea Base se genera desde Acciones → "Generar con IA (desde catálogo)". */}
+
+        {/* Aviso general: tareas que no están donde las deja el ajuste a predecesoras */}
+        {tareasPorAjustar > 0 && selectedCronograma?.tipo !== 'comercial' && selectedCronograma?.bloqueado !== true && (
+          <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span className="min-w-0 flex-1">
+              <b>{tareasPorAjustar}</b> tarea{tareasPorAjustar === 1 ? '' : 's'} no {tareasPorAjustar === 1 ? 'está' : 'están'} pegada{tareasPorAjustar === 1 ? '' : 's'} a sus predecesoras
+              (no las cumplen o se pueden compactar). Las marcas <AlertTriangle className="inline h-3 w-3" /> en cada fase, EDT y actividad dicen dónde.
+            </span>
+            {state.rootNodes[0] && (
+              <Button size="sm" variant="outline" className="h-7 bg-white text-xs" onClick={() => { void handleAjustarActividad(state.rootNodes[0]) }}>
+                <Wand2 className="mr-1 h-3.5 w-3.5" /> Ajustar todo…
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Confirmación del ajuste: qué se mueve y cómo queda el fin, antes de aplicar */}
+        <Dialog open={!!ajuste} onOpenChange={(o) => { if (!o && !ajuste?.aplicando) setAjuste(null) }}>
+          <DialogContent className="w-[calc(100vw-1rem)] max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <Wand2 className="h-4 w-4 text-indigo-500" /> Ajustar tareas a sus predecesoras
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-xs font-medium uppercase tracking-wide text-indigo-700">{ajuste?.nombre}</p>
+            {!ajuste?.resumen ? (
+              <p className="flex items-center gap-2 text-sm text-muted-foreground"><RefreshCw className="h-4 w-4 animate-spin" /> Calculando…</p>
+            ) : (
+              <div className="space-y-2 text-sm">
+                <p>
+                  Se moverán <b>{ajuste.resumen.tareasAjustadas}</b> de {ajuste.resumen.totalTareas} tareas: cada una queda pegada a sus
+                  predecesoras con su desfase (+5d, −7d…). Las que no tienen predecesoras y las 📌 fijas no se mueven.
+                </p>
+                <ul className="space-y-0.5 rounded-md border bg-muted/30 px-3 py-2 text-xs">
+                  {ajuste.resumen.maxAtrasoHoras > 0 && <li>La que más se atrasa: <b>+{formatearHorasDias(ajuste.resumen.maxAtrasoHoras, hpdArbol)}</b></li>}
+                  {ajuste.resumen.maxAdelantoHoras < 0 && <li>La que más se adelanta: <b>−{formatearHorasDias(-ajuste.resumen.maxAdelantoHoras, hpdArbol)}</b></li>}
+                  {ajuste.resumen.finAntes && ajuste.resumen.finDespues && (
+                    <li>Fin: {fechaCorta(ajuste.resumen.finAntes)} → <b>{fechaCorta(ajuste.resumen.finDespues)}</b></li>
+                  )}
+                  {ajuste.resumen.fijasIncumplidas > 0 && (
+                    <li className="text-red-700">{ajuste.resumen.fijasIncumplidas} tarea(s) 📌 fija(s) no cumplen su predecesora: no se mueven, revísalas.</li>
+                  )}
+                </ul>
+                {ajuste.resumen.ejemplos.length > 0 && (
+                  <details className="text-xs">
+                    <summary className="cursor-pointer text-muted-foreground">Ver algunas</summary>
+                    <ul className="mt-1 space-y-0.5">
+                      {ajuste.resumen.ejemplos.map((e, i) => (
+                        <li key={i} className="truncate">{e.nombre}: {fechaCorta(e.antes)} → <b>{fechaCorta(e.despues)}</b></li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button variant="outline" size="sm" onClick={() => setAjuste(null)} disabled={ajuste.aplicando}>Cancelar</Button>
+                  <Button size="sm" onClick={() => { void aplicarAjusteConfirmado() }} disabled={ajuste.aplicando}>
+                    {ajuste.aplicando && <RefreshCw className="mr-1 h-3.5 w-3.5 animate-spin" />}
+                    Ajustar {ajuste.resumen.tareasAjustadas}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Árbol jerárquico */}
         {/* Tabla (PC y "Ver todas las columnas"): si no entra en el ancho, se

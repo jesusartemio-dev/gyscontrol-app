@@ -15,6 +15,7 @@ import { z } from 'zod'
 import { logger } from '@/lib/logger'
 import { registrarAvanceTarea, propagarRollup } from '@/lib/services/avanceTarea'
 import { vincularTareas } from '@/lib/services/cronogramaDependencias'
+import { propagarSiAutomatico } from '@/lib/services/cronogramaAjuste'
 import {
   obtenerCalendarioProyecto,
   desplazarDescendientes,
@@ -387,10 +388,31 @@ export async function PUT(
       }
     }
 
+    // Programación automática: si cambiaron fechas/duración, las tareas que
+    // dependen de lo movido (en cascada) se ajustan solas. Lo movido en bloque
+    // (una actividad, un EDT…) cuenta entero; el propio nodo no se reubica.
+    let propagacion: Awaited<ReturnType<typeof propagarSiAutomatico>> = null
+    if (datesChanged || dependencia) {
+      try {
+        const movidas = nodeType === 'tarea'
+          ? [realId]
+          : (await prisma.proyectoTarea.findMany({
+              where: nodeType === 'actividad' ? { proyectoActividadId: realId }
+                : nodeType === 'edt' ? { proyectoEdtId: realId }
+                : { proyectoEdt: { proyectoFaseId: realId } },
+              select: { id: true },
+            })).map(t => t.id)
+        propagacion = await propagarSiAutomatico(id, movidas)
+      } catch (error) {
+        logger.error('❌ [API TREE UPDATE] Error en la programación automática:', error)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: { id: realId, type: nodeType, ...updateData },
       ...(dependencia && { dependencia }),
+      ...(propagacion && { propagacion }),
     })
 
   } catch (error) {
@@ -464,6 +486,22 @@ export async function DELETE(
 
     console.log('🔍 [API TREE DELETE] Eliminando:', { nodeType, realId })
 
+    // El padre se busca ANTES de borrar: después el nodo ya no existe y no hay
+    // cómo saber de qué actividad/EDT/fase era. Antes se buscaba después y no se
+    // recalculaba nada: al borrar la última tarea, la actividad, el EDT y la
+    // fase seguían terminando en la fecha de la tarea borrada (CJM52).
+    let padre: { tipo: 'actividad' | 'edt' | 'fase'; id: string } | null = null
+    if (nodeType === 'tarea') {
+      const t = await prisma.proyectoTarea.findUnique({ where: { id: realId }, select: { proyectoActividadId: true, proyectoEdtId: true } })
+      padre = t?.proyectoActividadId ? { tipo: 'actividad', id: t.proyectoActividadId } : t?.proyectoEdtId ? { tipo: 'edt', id: t.proyectoEdtId } : null
+    } else if (nodeType === 'actividad') {
+      const a = await prisma.proyectoActividad.findUnique({ where: { id: realId }, select: { proyectoEdtId: true } })
+      padre = a ? { tipo: 'edt', id: a.proyectoEdtId } : null
+    } else if (nodeType === 'edt') {
+      const e = await prisma.proyectoEdt.findUnique({ where: { id: realId }, select: { proyectoFaseId: true } })
+      padre = e?.proyectoFaseId ? { tipo: 'fase', id: e.proyectoFaseId } : null
+    }
+
     // ✅ Eliminar según el tipo de nodo (el orden importa por las restricciones de clave foránea)
     switch (nodeType) {
       case 'fase':
@@ -504,7 +542,12 @@ export async function DELETE(
     console.log('✅ [API TREE DELETE] Nodo eliminado exitosamente:', { nodeType, realId })
 
     // ✅ GYS-GEN-12: Recalcular fechas y horas de padres después de la eliminación
-    await recalcularPadresPostOperacion(id, nodeType, nodeId)
+    // (desde el padre guardado antes de borrar, y de ahí hacia arriba).
+    if (padre) {
+      const padreNodeId = buildNodeId(padre.tipo, padre.id)
+      await recalcularNodoPadre(padre.tipo, padreNodeId)
+      await recalcularPadresPostOperacion(id, padre.tipo, padreNodeId)
+    }
 
     return NextResponse.json({
       success: true,

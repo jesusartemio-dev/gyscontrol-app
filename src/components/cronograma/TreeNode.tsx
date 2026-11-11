@@ -6,7 +6,7 @@
 // ===================================================
 
 import React from 'react'
-import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine, ArrowRightLeft, ArrowRightToLine, Columns2, ArrowDown, ArrowRight, ArrowLeft, Layers, Diamond, Link2, Wand2, ListOrdered } from 'lucide-react'
+import { ChevronRight, ChevronDown, Plus, Edit, Trash2, Settings2, Download, Users, UserCheck, Wrench, Copy, GripVertical, ArrowUpToLine, ArrowDownToLine, ArrowRightLeft, ArrowRightToLine, Columns2, ArrowDown, ArrowRight, ArrowLeft, Layers, Diamond, Link2, Wand2, ListOrdered, Pin, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -194,6 +194,8 @@ interface TreeNodeProps {
   tieneAnterior?: boolean
   /** Solo tareas: marcar o quitar como hito ◆. */
   onToggleHito?: () => void
+  /** Solo tareas: 📌 fijar / quitar la fecha fija (no la mueve el ajuste ni la programación automática). */
+  onToggleFijar?: () => void
   /** Solo tareas: abrir sus predecesoras (de cualquier actividad o fase). */
   onPredecesoras?: () => void
   /** Columna "#" con el N° de fila (como el ID de MS Project). */
@@ -292,6 +294,7 @@ export function TreeNode({
   onProgramarRespecto,
   tieneAnterior,
   onToggleHito,
+  onToggleFijar,
   onPredecesoras,
   showNumeroColumn,
   onIrATarea,
@@ -588,6 +591,21 @@ export function TreeNode({
           {/* Children count inline */}
           {!compacto && hasChildren && (
             <span className="text-[10px] text-gray-400 shrink-0">({node.metadata.totalChildren})</span>
+          )}
+
+          {/* ⚠ N: tareas adentro que no están donde las deja el ajuste a predecesoras */}
+          {node.type !== 'tarea' && Number(node.data?.tareasPorAjustar) > 0 && (
+            <span
+              className="inline-flex h-4 shrink-0 items-center gap-0.5 rounded border border-amber-300 bg-amber-50 px-1 text-[10px] font-medium leading-none text-amber-700"
+              title={`${node.data.tareasPorAjustar} tarea(s) no cumplen sus predecesoras o se pueden compactar — usa "Ajustar tareas a sus predecesoras"`}
+            >
+              <AlertTriangle className="h-2.5 w-2.5" />
+              {node.data.tareasPorAjustar}
+            </span>
+          )}
+          {/* 📌 fecha fija */}
+          {node.type === 'tarea' && node.data?.fechaFija && (
+            <span className="shrink-0 text-[10px]" title="Fecha fija: el ajuste a predecesoras y la programación automática no la mueven">📌</span>
           )}
 
           {/* Indicador de hito (◆) y su fecha límite: dorado si es contractual, rojo si la pasa */}
@@ -998,10 +1016,10 @@ export function TreeNode({
               )}
 
               {/* Ajuste de cada tarea a sus predecesoras, para toda la actividad o el EDT en cascada */}
-              {!readOnly && ['actividad', 'edt'].includes(node.type) && onAjustarActividad && (
+              {!readOnly && ['actividad', 'edt', 'fase', 'proyecto'].includes(node.type) && onAjustarActividad && (
                 <DropdownMenuItem onClick={() => { setDropdownOpen(false); onAjustarActividad() }}>
                   <Wand2 className="h-4 w-4 mr-2" />
-                  Ajustar tareas a sus predecesoras
+                  {node.type === 'proyecto' ? 'Ajustar todo el cronograma…' : 'Ajustar tareas a sus predecesoras…'}
                 </DropdownMenuItem>
               )}
 
@@ -1024,6 +1042,14 @@ export function TreeNode({
                 >
                   <Diamond className="h-4 w-4 mr-2" />
                   {node.data?.esHito ? 'Quitar hito' : 'Marcar como hito'}
+                </DropdownMenuItem>
+              )}
+
+              {/* 📌 Fecha fija: el ajuste y la programación automática no la mueven */}
+              {!readOnly && node.type === 'tarea' && onToggleFijar && (
+                <DropdownMenuItem onClick={() => { setDropdownOpen(false); onToggleFijar() }}>
+                  <Pin className="h-4 w-4 mr-2" />
+                  {node.data?.fechaFija ? 'Quitar fecha fija' : 'Fijar fecha (no ajustar)'}
                 </DropdownMenuItem>
               )}
 

@@ -202,8 +202,17 @@ export function generarMspdiProyecto(opts: {
   arbol: NodoArbolExport
   dependencias: DependenciaExport[]
   calendario: CalendarioExport
+  /**
+   * manual (por defecto): tareas en modo manual con sus fechas exactas — MS
+   * Project no recalcula nada (como GYS sin programación automática).
+   * automatico: tareas en automático con "No comenzar antes de" su fecha de
+   * GYS — se ven igual al abrir y, si una se atrasa, MS Project empuja a sus
+   * sucesoras (nada salta al inicio del proyecto). Las 📌 fijas van en manual.
+   */
+  modo?: 'manual' | 'automatico'
 }): string {
   const { proyectoNombre, arbol, dependencias, calendario } = opts
+  const automatico = opts.modo === 'automatico'
   const hpd = calendario.horasPorDia || 8
   const jornadaIni = calendario.horaInicioManana ?? '08:00'
   const jornadaFin = calendario.horaFinTarde ?? '17:00'
@@ -298,6 +307,11 @@ export function generarMspdiProyecto(opts: {
     const limite = esHito && d.fechaLimite
       ? `\n      <Deadline>${new Date(d.fechaLimite).toISOString().slice(0, 10)}T${horaMsp(jornadaFin)}</Deadline>`
       : ''
+    // Modo de programación de la tarea en MS Project. Manual: fechas exactas.
+    // Automático: "No comenzar antes de" (4) su inicio de GYS, para que al
+    // abrir quede igual y los atrasos se propaguen; las 📌 fijas, en manual.
+    const manualTarea = !automatico || d.fechaFija === true
+    const restriccion = automatico && !f.esResumen && !manualTarea && !!ini
 
     // Elementos en el orden del esquema oficial (mspdi_pj12.xsd): versiones de MS
     // Project más estrictas ignoran lo que llega fuera de orden — p. ej. Manual
@@ -306,7 +320,7 @@ export function generarMspdiProyecto(opts: {
       <UID>${f.uid}</UID>
       <ID>${f.uid}</ID>
       <Name>${esc(f.nodo.nombre || '')}</Name>
-      <Manual>${f.esResumen ? 0 : 1}</Manual>
+      <Manual>${f.esResumen ? 0 : manualTarea ? 1 : 0}</Manual>
       <Type>1</Type>
       <IsNull>0</IsNull>
       <OutlineNumber>${f.outlineNumber}</OutlineNumber>
@@ -319,8 +333,8 @@ ${fechas}
       <Milestone>${esHito ? 1 : 0}</Milestone>
       <Summary>${f.esResumen ? 1 : 0}</Summary>
       <PercentComplete>${avance}</PercentComplete>${duracionesAvance}
-      <ConstraintType>0</ConstraintType>
-      <CalendarUID>-1</CalendarUID>${limite}${d.descripcion ? `
+      <ConstraintType>${restriccion ? 4 : 0}</ConstraintType>
+      <CalendarUID>-1</CalendarUID>${restriccion ? `\n      <ConstraintDate>${fechaMsp(ini)}</ConstraintDate>` : ''}${limite}${d.descripcion ? `
       <Notes>${esc(String(d.descripcion))}</Notes>` : ''}
 ${preds}
       <ExtendedAttribute>
@@ -405,7 +419,7 @@ ${trabajoPorDia(calHoras, a.uid, a.inicio, a.fin, a.trabajo)}
   <AutoAddNewResourcesAndTasks>1</AutoAddNewResourcesAndTasks>
   <Autolink>0</Autolink>
   <NewTaskStartDate>0</NewTaskStartDate>
-  <NewTasksAreManual>1</NewTasksAreManual>
+  <NewTasksAreManual>${automatico ? 0 : 1}</NewTasksAreManual>
   <DefaultTaskEVMethod>0</DefaultTaskEVMethod>
   <ProjectExternallyEdited>0</ProjectExternallyEdited>
   <ActualsInSync>0</ActualsInSync>

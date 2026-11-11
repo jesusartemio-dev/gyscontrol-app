@@ -16,6 +16,7 @@ import { isCronogramaBloqueado, cronogramaBloqueadoResponse } from '@/lib/utils/
 import { logger } from '@/lib/logger'
 import { validarPermisoCronograma } from '@/lib/services/cronogramaPermisos'
 import { creaCiclo } from '@/lib/services/cronogramaDependencias'
+import { propagarSiAutomatico } from '@/lib/services/cronogramaAjuste'
 
 // ✅ Schema de validación para crear dependencia
 const createDependenciaSchema = z.object({
@@ -241,9 +242,13 @@ export async function POST(
       }
     })
 
+    // Programación automática: la dependiente se ubica según la nueva predecesora, y lo que depende de ella.
+    const propagacion = await propagarSiAutomatico(id, [validatedData.tareaDependienteId], true)
+
     return NextResponse.json({
       success: true,
-      data: dependencia
+      data: dependencia,
+      ...(propagacion && { propagacion }),
     }, { status: 201 })
 
   } catch (error) {

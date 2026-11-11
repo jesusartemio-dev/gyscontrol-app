@@ -13,6 +13,7 @@ import { logger } from '@/lib/logger'
 import { z } from 'zod'
 import { validarPermisoCronogramaPorTarea } from '@/lib/services/cronogramaPermisos'
 import { isCronogramaBloqueado, cronogramaBloqueadoResponse } from '@/lib/utils/cronogramaLockCheck'
+import { propagarSiAutomatico } from '@/lib/services/cronogramaAjuste'
 
 const updateSchema = z.object({
   tipo: z.enum(['finish_to_start', 'start_to_start', 'finish_to_finish', 'start_to_finish']).optional(),
@@ -45,7 +46,9 @@ export async function PUT(
       where: { id: dependenciaId },
       data: { ...(datos.tipo && { tipo: datos.tipo }), ...(datos.lagMinutos !== undefined && { lagMinutos: datos.lagMinutos }) },
     })
-    return NextResponse.json({ success: true, data: actualizada })
+    // Programación automática: la dependiente se reubica con el nuevo tipo/desfase, y lo que depende de ella.
+    const propagacion = await propagarSiAutomatico(proyectoId, [actualizada.tareaDependienteId], true)
+    return NextResponse.json({ success: true, data: actualizada, ...(propagacion && { propagacion }) })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Datos inválidos', details: error.errors }, { status: 400 })
@@ -97,10 +100,13 @@ export async function DELETE(
     await prisma.proyectoDependenciasTarea.delete({
       where: { id: dependenciaId }
     })
+    // Programación automática: la que dependía se reubica con sus otras predecesoras (si tiene).
+    const propagacion = await propagarSiAutomatico(proyectoId, [dependencia.tareaDependienteId], true)
 
     return NextResponse.json({
       success: true,
-      message: 'Dependencia eliminada correctamente'
+      message: 'Dependencia eliminada correctamente',
+      ...(propagacion && { propagacion }),
     })
 
   } catch (error) {

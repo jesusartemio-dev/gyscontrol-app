@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { TreeNode, CronogramaTreeState, UseCronogramaTreeReturn, NodeType } from '../../../cronograma/types'
+import { avisarPropagacion } from '../../../cronograma/avisoPropagacion'
 
 /** Filas expandidas de la Jerarquía, por proyecto y cronograma (sobreviven a recargar la página). */
 const claveExpandidos = (proyectoId: string, cronogramaId: string) => `cronograma-expandidos:${proyectoId}:${cronogramaId}`
@@ -467,6 +468,8 @@ export function useProyectoCronogramaTree(proyectoId: string, cronogramaId?: str
       console.log('🔄 [HOOK UPDATE] Preserving expanded nodes:', [...state.expandedNodes])
       console.log('🌳 [TREE STATE] Recargando árbol después de edición, preservando expansión')
       await loadTree([...state.expandedNodes])
+      // Programación automática: si se ajustaron sucesoras, aviso con "Deshacer".
+      avisarPropagacion(proyectoId, result.propagacion, () => loadTree([...state.expandedNodes]))
 
     } catch (error) {
       console.error('❌ [HOOK UPDATE] Error:', error)

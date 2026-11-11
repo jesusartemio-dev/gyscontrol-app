@@ -436,7 +436,7 @@ export function ProyectoCronogramaTab({
   // tareas en modo manual con sus fechas exactas, duración, trabajo (HH) como
   // asignación, dependencias con tipo y desfase, hitos y fecha límite, y el ID
   // de GYS de cada elemento (Text1) para poder reimportar actualizando.
-  const handleExportXml = async () => {
+  const handleExportXml = async (modo: 'manual' | 'automatico' = 'manual') => {
     try {
       setIsLoading(true)
       const cronogramaId = selectedCronograma?.id
@@ -453,19 +453,21 @@ export function ProyectoCronogramaTab({
       }
       const dependencias = depsRes.ok ? (await depsRes.json()).data || [] : []
       const calendario = await calRes.json()
-      const xml = generarMspdiProyecto({ proyectoNombre, arbol: raiz, dependencias, calendario })
+      const xml = generarMspdiProyecto({ proyectoNombre, arbol: raiz, dependencias, calendario, modo })
 
       const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' })
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
       const nombreSeguro = (proyectoNombre || 'cronograma').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80)
-      link.download = `${nombreSeguro} - ${selectedCronograma?.nombre || 'cronograma'}.xml`
+      link.download = `${nombreSeguro} - ${selectedCronograma?.nombre || 'cronograma'}${modo === 'automatico' ? ' (automatico)' : ''}.xml`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
       toast({
-        title: 'Exportado para MS Project',
-        description: 'Ábrelo en MS Project con Archivo → Abrir. Incluye calendario, dependencias, hitos y el ID de GYS.',
+        title: modo === 'automatico' ? 'Exportado para MS Project (automático)' : 'Exportado para MS Project (manual)',
+        description: modo === 'automatico'
+          ? 'Tareas en automático con "No comenzar antes de" su fecha: al atrasarse una, MS Project mueve las que dependen de ella. Las 📌 fijas van en manual.'
+          : 'Tareas en manual con sus fechas exactas: MS Project no recalcula nada. Ábrelo con Archivo → Abrir.',
       })
     } catch (error) {
       toast({ title: 'Error en exportación', description: error instanceof Error ? error.message : 'No se pudo exportar.', variant: 'destructive' })
@@ -980,10 +982,23 @@ export function ProyectoCronogramaTab({
 
               <DropdownMenuItem onSelect={() => {
                 setDropdownOpen(false)
-                setTimeout(() => handleExportXml(), 100)
+                setTimeout(() => handleExportXml('manual'), 100)
               }} disabled={isLoading}>
                 <Download className="h-4 w-4 mr-2" />
-                Exportar a MS Project (XML)
+                <span className="flex flex-col">
+                  <span>Exportar a MS Project (XML) — manual</span>
+                  <span className="text-[10px] text-muted-foreground">Fechas exactas; Project no recalcula</span>
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => {
+                setDropdownOpen(false)
+                setTimeout(() => handleExportXml('automatico'), 100)
+              }} disabled={isLoading}>
+                <Download className="h-4 w-4 mr-2" />
+                <span className="flex flex-col">
+                  <span>Exportar a MS Project (XML) — automático</span>
+                  <span className="text-[10px] text-muted-foreground">Igual al abrir; los atrasos se propagan</span>
+                </span>
               </DropdownMenuItem>
 
               {!esComercial && hasCronograma && (

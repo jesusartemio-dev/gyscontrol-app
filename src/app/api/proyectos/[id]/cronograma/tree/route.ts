@@ -101,6 +101,8 @@ export async function GET(
     // ✅ Obtener fases del proyecto según el cronograma especificado
 
     let fases: any[] = []
+    // Programación automática del cronograma (se muestra el interruptor en la vista).
+    let programacionAutomatica = false
 
     if (cronogramaId) {
       // Si se especifica un cronogramaId, obtener fases solo de ese cronograma
@@ -109,7 +111,7 @@ export async function GET(
       // Verificar que el cronograma existe
       const cronogramaExists = await prisma.proyectoCronograma.findUnique({
         where: { id: cronogramaId },
-        select: { id: true, tipo: true, nombre: true, esBaseline: true }
+        select: { id: true, tipo: true, nombre: true, esBaseline: true, programacionAutomatica: true }
       })
 
       if (!cronogramaExists) {
@@ -121,6 +123,7 @@ export async function GET(
       }
 
       console.log('✅ [TREE API] Cronograma found:', cronogramaExists)
+      programacionAutomatica = cronogramaExists.programacionAutomatica
 
       fases = await prisma.proyectoFase.findMany({
         where: {
@@ -431,6 +434,7 @@ export async function GET(
                       recursoNombre: tarea.recurso?.nombre,
                       recursoTipo: tarea.recurso?.tipo,
                       esExtra: tarea.esExtra || false,
+                      fechaFija: tarea.fechaFija || false,
                       esPropuestaIA: tarea.esPropuestaIA || false,
                       justificacionIA: tarea.justificacionIA || null,
                       creadoPorId: tarea.creadoPorId,
@@ -662,7 +666,8 @@ export async function GET(
         fechaFinComercial: proyectoFin,
         horasEstimadas: round1(proyectoHorasTotales),
         horasHombre: round1(proyectoHorasHombre),
-        duracionDiasReal: duracionDiasReal(proyectoInicio, proyectoFin)
+        duracionDiasReal: duracionDiasReal(proyectoInicio, proyectoFin),
+        programacionAutomatica,
       },
       metadata: {
         hasChildren: faseNodes.length > 0,
@@ -797,7 +802,26 @@ export async function GET(
           const r = fechasPorPredecesoras(cal, preds.map(p => ({ tipo: p.dep.tipo, lagMinutos: p.dep.lagMinutos, pred: p.fp })), duracion)
           preds[r.determinante].anotacion.determina = true
         }
+
+        // "Por ajustar" (para los avisos ⚠): la tarea no está donde la deja el
+        // ajuste a predecesoras — no cumple alguna, o todas le dejan holgura
+        // (se puede compactar). Las 📌 fijas no se ajustan: solo cuentan si
+        // no cumplen (ya se ven en rojo).
+        for (const [sucId, preds] of predsPorSucesora) {
+          const nodo = tareasPorId.get(sucId)!.nodo
+          const incumple = preds.some(p => (Number(p.anotacion.horasIncumplidas) || 0) > 0)
+          const conHolgura = preds.every(p => (Number(p.anotacion.horasHolgura) || 0) > 0)
+          if (incumple || (conHolgura && !nodo.data?.fechaFija)) nodo.data.porAjustar = true
+        }
       }
+      const contarPorAjustar = (nodo: any): number => {
+        if (nodo.type === 'tarea') return nodo.data?.porAjustar ? 1 : 0
+        const n = (nodo.children || []).reduce((s: number, h: any) => s + contarPorAjustar(h), 0)
+        if (nodo.data) nodo.data.tareasPorAjustar = n
+        return n
+      }
+      contarPorAjustar(projectNode)
+
     }
 
     const tree = [projectNode]

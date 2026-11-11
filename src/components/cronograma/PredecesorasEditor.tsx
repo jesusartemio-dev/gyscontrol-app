@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { AlertTriangle, Check, Link2, Plus, Trash2, Wand2, ArrowRight } from 'lucide-react'
 import { toast } from 'sonner'
+import { avisarPropagacion } from './avisoPropagacion'
 import type { TreeNode } from './types'
 
 type Tipo = 'finish_to_start' | 'start_to_start' | 'finish_to_finish' | 'start_to_finish'
@@ -203,6 +204,7 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
       // en su lugar marcada como "Predecesora" (no salta la lista).
       toast.success(`Predecesora agregada: ${cand.nombre}`)
       onCambio()
+      avisarPropagacion(proyectoId, j.propagacion, onCambio)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo agregar')
     } finally {
@@ -218,9 +220,11 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cambios),
       })
-      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'No se pudo guardar')
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(j.error || 'No se pudo guardar')
       setLista((l) => l.map((d) => (d.id === dep.id ? { ...d, ...cambios, horasIncumplidas: undefined, horasHolgura: undefined } : d)))
       onCambio()
+      avisarPropagacion(proyectoId, j.propagacion, onCambio)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo guardar')
     } finally {
@@ -233,9 +237,11 @@ export function PredecesorasEditor({ proyectoId, tareaNodeId, nodes, horasPorDia
     try {
       const r = await fetch(`${base}/${dep.id}`, { method: 'DELETE' })
       // 404: ya no existe (p. ej. se borró la otra tarea y la dependencia se fue con ella).
-      if (!r.ok && r.status !== 404) throw new Error((await r.json().catch(() => ({}))).error || 'No se pudo quitar')
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok && r.status !== 404) throw new Error(j.error || 'No se pudo quitar')
       setLista((l) => l.filter((d) => d.id !== dep.id))
       onCambio()
+      avisarPropagacion(proyectoId, j.propagacion, onCambio)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo quitar')
     } finally {
