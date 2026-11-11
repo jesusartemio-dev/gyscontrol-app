@@ -10,7 +10,11 @@ import type { CronogramaContexto, PlanAlcanceDetalladoEdt, PlanTrabajoContexto }
  * copia guardada cuando se generó el plan.
  */
 
-type Fase = NonNullable<CronogramaContexto>['fases'][number]
+/** Marcas que delimitan el texto en la respuesta de la IA: al pegar la respuesta entera se toma solo lo de adentro. */
+export const MARCA_INICIO = '[INICIO DEL TEXTO]'
+export const MARCA_FIN = '[FIN DEL TEXTO]'
+
+type Fase =NonNullable<CronogramaContexto>['fases'][number]
 export type EdtCronograma = Fase['edts'][number]
 
 /** Qué texto se va a trabajar con la IA. */
@@ -165,7 +169,9 @@ export function construirTextoParaIa({
   L.push('- No agregues actividades, entregables, plazos, recursos ni compromisos que no estén en el cronograma o en el contrato: el texto no debe generar obligaciones adicionales para GYS.')
   L.push(`- Español técnico y formal, sin títulos${objetivo.tipo === 'tarea' ? '' : ' ni viñetas'}.`)
   L.push('FORMATO DE LA RESPUESTA:')
-  L.push(`1. ${objetivo.tipo === 'tarea' ? 'La línea final' : 'El párrafo final'}, solo, dentro de un bloque de código (entre \`\`\`), para copiarlo y pegarlo tal cual.${objetivo.tipo === 'tarea' ? '' : ' Dentro del bloque corta las líneas cada 90 caracteres aprox. para que se pueda leer sin desplazarse (al pegarlo se vuelven a unir).'}`)
-  L.push('2. Debajo, fuera del bloque, una nota breve para revisar: qué tomaste del TDR o del contrato, qué cambiaste respecto al texto actual, qué dejaste fuera a propósito y por qué, y si algo conviene verificar antes de enviarlo al cliente.')
+  L.push(`1. ${objetivo.tipo === 'tarea' ? 'La línea final' : 'El texto final'} como texto normal (sin bloque de código, sin negritas ni otro formato), ` +
+    `${objetivo.tipo === 'tarea' ? '' : 'cada párrafo en una sola línea, sin saltos de línea dentro del párrafo, '}` +
+    `entre una línea ${MARCA_INICIO} y una línea ${MARCA_FIN}.`)
+  L.push(`2. Debajo de ${MARCA_FIN}, una nota breve para revisar: qué tomaste del TDR o del contrato, qué cambiaste respecto al texto actual, qué dejaste fuera a propósito y por qué, y si algo conviene verificar antes de enviarlo al cliente.`)
   return L.join('\n')
 }

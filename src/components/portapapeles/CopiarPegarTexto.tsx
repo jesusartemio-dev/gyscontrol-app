@@ -98,9 +98,12 @@ export async function leerImagenesPortapapeles(): Promise<File[] | null> {
 /** Limpia lo que suele traer una respuesta de IA: comillas envolventes, viñeta inicial, espacios. */
 export function limpiarTextoPegado(t: string, unaLinea: boolean, parrafo = false): string {
   let s = t.replace(/\r\n/g, '\n').trim()
-  // Si se copió la respuesta entera de la IA (bloque ``` + nota), queda solo el bloque.
+  // Si se copió la respuesta entera de la IA (texto entre marcas, o bloque
+  // ``` + nota), queda solo el texto. Las marcas pueden venir con ** o \[.
+  const marcado = s.match(/\[INICIO DEL TEXTO\\?\][*_]*\s*([\s\S]*?)\s*[*_\\]*\[FIN DEL TEXTO/i)
   const bloque = s.match(/```[^\n]*\n([\s\S]*?)```/)
-  if (bloque) s = bloque[1].trim()
+  if (marcado) s = marcado[1].replace(/^[*_]+|[*_\\]+$/g, '').trim()
+  else if (bloque) s = bloque[1].trim()
   else s = s.replace(/^```[^\n]*\n?|```$/g, '').trim()
   s = s.replace(/^["“”«]+|["“”»]+$/g, '').trim()
   // Párrafo: la IA corta las líneas para que se lean en el chat; se unen de
@@ -110,6 +113,25 @@ export function limpiarTextoPegado(t: string, unaLinea: boolean, parrafo = false
   }
   if (unaLinea) s = s.replace(/^\s*(?:[-•*·]|\d+[.)])\s+/, '').replace(/\s+/g, ' ').trim()
   return s
+}
+
+/**
+ * Ctrl+V / "Pegar" del celular directo en el cuadro: aplica la misma limpieza
+ * que el botón Pegar (toma solo el texto entre marcas, une las líneas cortadas
+ * del párrafo) y lo inserta donde está el cursor.
+ */
+export function pegarEnCuadro(
+  e: React.ClipboardEvent<HTMLTextAreaElement>,
+  onCambio: (valor: string) => void,
+  unaLinea = false,
+) {
+  const crudo = e.clipboardData.getData('text/plain')
+  if (!crudo) return
+  const limpio = limpiarTextoPegado(crudo, unaLinea, !unaLinea)
+  if (limpio === crudo.trim()) return // nada que corregir: pegado normal
+  e.preventDefault()
+  const ta = e.currentTarget
+  onCambio(ta.value.slice(0, ta.selectionStart) + limpio + ta.value.slice(ta.selectionEnd))
 }
 
 export function CopiarPegarTexto({

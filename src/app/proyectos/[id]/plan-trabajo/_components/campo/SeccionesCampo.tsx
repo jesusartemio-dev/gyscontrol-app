@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { ResultadoTexto } from '@/lib/planTrabajo/textoSecciones'
-import { CopiarPegarTexto, copiarTexto } from '../CopiarPegarTexto'
+import { CopiarPegarTexto, copiarTexto, pegarEnCuadro } from '../CopiarPegarTexto'
 import { BotonCopiarParaIA } from '../CopiarParaIA'
 
 export { copiarTexto }
@@ -122,6 +122,7 @@ export function EditarTextoDialog({
         <Textarea
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
+          onPaste={textoParaIA || unaLinea ? (e) => pegarEnCuadro(e, setTexto, unaLinea) : undefined}
           className="h-[38dvh] resize-none text-[13px] leading-relaxed"
         />
         {!sinCambios && (

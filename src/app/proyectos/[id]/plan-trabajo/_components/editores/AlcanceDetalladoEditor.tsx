@@ -16,7 +16,7 @@ import { GaleriaImagenesAlcance, type GaleriaImagenesAlcanceHandle } from './Gal
 import { HintFotoSugerida } from '@/components/catalogoImagenes/HintFotoSugerida'
 import { DeleteAlertDialog } from '@/components/ui/DeleteAlertDialog'
 import { RegenerarEdtDialog } from './RegenerarEdtDialog'
-import { CopiarPegarTexto } from '../CopiarPegarTexto'
+import { CopiarPegarTexto, pegarEnCuadro } from '../CopiarPegarTexto'
 import { BotonCopiarParaIA, DelCronogramaPanel } from '../CopiarParaIA'
 import { construirTextoParaIa } from '@/lib/planTrabajo/contextoIaAlcance'
 import type { PlanTrabajoImagen } from '@prisma/client'
@@ -588,7 +588,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                         onPegar={(t) => marcarDescripcionEditada(edtIdx, t)}
                       />
                     </div>
-                    <Textarea value={item.descripcion} onChange={e => marcarDescripcionEditada(edtIdx, e.target.value)} rows={4} className="text-sm resize-none" placeholder="Párrafo narrativo de 80-150 palabras describiendo el flujo de trabajo..." />
+                    <Textarea value={item.descripcion} onChange={e => marcarDescripcionEditada(edtIdx, e.target.value)} onPaste={e => pegarEnCuadro(e, v => marcarDescripcionEditada(edtIdx, v))} rows={4} className="text-sm resize-none" placeholder="Párrafo narrativo de 80-150 palabras describiendo el flujo de trabajo..." />
                   </div>
 
                   {item.tipoDetalle === 'detallado' && item.edtRefId && (
@@ -688,7 +688,7 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                             onPegar={(t) => marcarDescripcionSubItemEditada(edtIdx, subIdx, t)}
                           />
                           </div>
-                          <Textarea value={sub.descripcion} onChange={e => marcarDescripcionSubItemEditada(edtIdx, subIdx, e.target.value)} rows={3} className="text-sm resize-none bg-white" placeholder="Descripción narrativa de la actividad..." />
+                          <Textarea value={sub.descripcion} onChange={e => marcarDescripcionSubItemEditada(edtIdx, subIdx, e.target.value)} onPaste={e => pegarEnCuadro(e, v => marcarDescripcionSubItemEditada(edtIdx, subIdx, v))} rows={3} className="text-sm resize-none bg-white" placeholder="Descripción narrativa de la actividad..." />
                           </div>
                           {conGaleriaSub && (
                             <div className="min-w-0">
@@ -769,6 +769,9 @@ export function AlcanceDetalladoEditor({ proyectoId, valor, herramientasYEquipos
                                             />
                                           </div>
                                           <Textarea
+                                            onPaste={e => pegarEnCuadro(e, v => tarea.manualId
+                                              ? updateTarea(edtIdx, subIdx, tareaIdx, { texto: v, nombre: v.trim() })
+                                              : marcarTextoTareaEditado(edtIdx, subIdx, tareaIdx, v), true)}
                                             value={tarea.texto}
                                             onChange={e => tarea.manualId
                                               ? updateTarea(edtIdx, subIdx, tareaIdx, { texto: e.target.value, nombre: e.target.value.trim() })
