@@ -54,6 +54,13 @@ interface Jornada {
   proyecto: ProyectoOption | null
 }
 
+/** Persona con ingreso y sin salida al intentar cerrar la asistencia. */
+interface PendienteSalida {
+  userId: string
+  nombre: string
+  horaIngreso: string
+}
+
 interface Asistencia {
   id: string
   userId: string
@@ -102,6 +109,11 @@ export default function AsistenciaCampoPage() {
   const [dialogHorario, setDialogHorario] = useState(false)
   const [horarioForm, setHorarioForm] = useState({ horaIngresoOverride: '', horaSalidaOverride: '', motivoOverride: '' })
   const [guardandoHorario, setGuardandoHorario] = useState(false)
+  // Personal con ingreso y sin salida al intentar cerrar: el supervisor pone
+  // la hora a la que se fue cada uno en vez de dejar el ingreso huérfano.
+  const [dialogSalidas, setDialogSalidas] = useState(false)
+  const [pendientesSalida, setPendientesSalida] = useState<PendienteSalida[]>([])
+  const [horasSalida, setHorasSalida] = useState<Record<string, string>>({})
   const [dialogTransferir, setDialogTransferir] = useState(false)
   const [transferSel, setTransferSel] = useState('')
   const [transfiriendo, setTransfiriendo] = useState(false)
@@ -363,17 +375,45 @@ export default function AsistenciaCampoPage() {
     }
   }
 
-  async function cerrarJornada() {
+  async function cerrarJornada(salidas?: Array<{ userId: string; hora: string }>) {
     if (!jornada) return
-    if (!confirm('¿Cerrar asistencia de campo? Los trabajadores ya no podrán marcar con este QR.')) return
+    if (!salidas && !confirm('¿Cerrar asistencia de campo? Los trabajadores ya no podrán marcar con este QR.')) return
     setLoading(true)
     try {
-      await fetch(`/api/asistencia/jornada/${jornada.id}/cerrar`, { method: 'POST' })
+      const r = await fetch(`/api/asistencia/jornada/${jornada.id}/cerrar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(salidas ? { salidas } : {}),
+      })
+      const data = await r.json().catch(() => ({}))
+
+      // Queda gente con ingreso y sin salida: el supervisor indica la hora.
+      if (r.status === 409 && Array.isArray(data.pendientes)) {
+        setPendientesSalida(data.pendientes)
+        setHorasSalida(
+          Object.fromEntries(
+            data.pendientes.map((p: PendienteSalida) => [p.userId, data.horaSugerida || '']),
+          ),
+        )
+        setDialogSalidas(true)
+        return
+      }
+      if (!r.ok) {
+        toast.error(data.message || 'No se pudo cerrar la asistencia')
+        return
+      }
+
+      setDialogSalidas(false)
+      setPendientesSalida([])
       setJornada(null)
       setQrImg('')
       setAsistencias([])
       cargarHistorial()
-      toast.success('Asistencia cerrada')
+      toast.success(
+        data.salidasCreadas > 0
+          ? `Asistencia cerrada · ${data.salidasCreadas} salida(s) registradas por ti`
+          : 'Asistencia cerrada',
+      )
     } finally {
       setLoading(false)
     }
@@ -612,7 +652,7 @@ export default function AsistenciaCampoPage() {
               <Button
                 variant="destructive"
                 className="mt-2 w-full"
-                onClick={cerrarJornada}
+                onClick={() => cerrarJornada()}
                 disabled={loading}
               >
                 <StopCircle className="mr-2 h-4 w-4" />
@@ -853,6 +893,60 @@ export default function AsistenciaCampoPage() {
               Guardar
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Salidas pendientes al cerrar */}
+      <Dialog open={dialogSalidas} onOpenChange={setDialogSalidas}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Falta registrar salidas</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Est{pendientesSalida.length === 1 ? 'a persona marcó' : 'as personas marcaron'} su
+              ingreso pero no su salida. Indica a qué hora se {pendientesSalida.length === 1 ? 'fue' : 'fueron'} y
+              se registrará a tu nombre como salida manual.
+            </p>
+            <div className="space-y-2">
+              {pendientesSalida.map(p => (
+                <div key={p.userId} className="flex items-center justify-between gap-3 rounded-md border p-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{p.nombre}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Ingresó{' '}
+                      {new Date(p.horaIngreso).toLocaleTimeString('es-PE', {
+                        hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
+                      })}
+                    </p>
+                  </div>
+                  <Input
+                    type="time"
+                    className="w-32"
+                    value={horasSalida[p.userId] ?? ''}
+                    onChange={e =>
+                      setHorasSalida(prev => ({ ...prev, [p.userId]: e.target.value }))
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDialogSalidas(false)} disabled={loading}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={() =>
+                  cerrarJornada(
+                    pendientesSalida.map(p => ({ userId: p.userId, hora: horasSalida[p.userId] })),
+                  )
+                }
+                disabled={loading || pendientesSalida.some(p => !horasSalida[p.userId])}
+              >
+                Registrar salidas y cerrar
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

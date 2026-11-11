@@ -188,6 +188,11 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       }
     })
 
+    // Ojo: aquí NO se cierra la sesión de asistencia (el QR). Esta jornada se
+    // cierra cuando el supervisor termina de llenar avances, que puede ser 2 o
+    // 3 días después del trabajo — demasiado tarde para el QR. De eso se
+    // encarga el cron cerrar-asistencia la misma noche.
+
     // Calcular horas por tarea del cronograma
     const horasPorTarea: Record<string, number> = {}
     for (const tarea of jornada.tareas) {

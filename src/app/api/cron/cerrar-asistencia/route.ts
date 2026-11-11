@@ -44,17 +44,31 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // Salidas del día (para excluir usuarios que ya marcaron)
+    // Salidas del día, agrupadas POR SESIÓN de asistencia.
+    //
+    // Antes era un único Set de userId para todo el día: si alguien tenía dos
+    // sesiones abiertas en la misma sede (pasa cuando dos supervisores abren
+    // cada uno la suya) y marcaba salida en una, el cron lo daba por cerrado y
+    // la otra se quedaba con el ingreso colgando para siempre.
     const salidas = await prisma.asistencia.findMany({
       where: {
         tipo: 'salida',
         fechaHora: { gte: inicioDiaLima, lte: finDiaLima },
       },
-      select: { userId: true },
+      select: { userId: true, jornadaAsistenciaId: true },
     })
-    const usuariosConSalida = new Set(salidas.map(s => s.userId))
+    const SIN_JORNADA = '__sin_jornada__'
+    const salidasPorJornada = new Map<string, Set<string>>()
+    for (const s of salidas) {
+      const k = s.jornadaAsistenciaId ?? SIN_JORNADA
+      if (!salidasPorJornada.has(k)) salidasPorJornada.set(k, new Set())
+      salidasPorJornada.get(k)!.add(s.userId)
+    }
 
-    const pendientes = ingresos.filter(i => !usuariosConSalida.has(i.userId))
+    const pendientes = ingresos.filter(i => {
+      const k = i.jornadaAsistenciaId ?? SIN_JORNADA
+      return !salidasPorJornada.get(k)?.has(i.userId)
+    })
 
     const cerradas: string[] = []
     const errores: { userId: string; error: string }[] = []
@@ -113,16 +127,70 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Cerrar las sesiones de asistencia (el QR) en las que ya todos salieron.
+    //
+    // La sesión sólo se cerraba si el supervisor apretaba "Cerrar" en la
+    // pantalla del QR, y casi nadie lo hace: para él el día terminó cuando
+    // cerró la jornada de campo — que además puede cerrarse 2 o 3 días
+    // después, cuando llena los avances. El resultado eran sesiones abiertas
+    // meses, que le seguían apareciendo al trabajador en /mi-trabajo/marcar y
+    // hacían que marcara en la sesión equivocada.
+    //
+    // Sólo se cierran las completas. Una sesión donde alguien no marcó salida
+    // se deja abierta a propósito: el supervisor tiene que entrar y registrar
+    // esa salida a mano, y si la cerramos nosotros deja de verla.
+    const sesionesCerradas = await cerrarSesionesCompletas()
+
     return NextResponse.json({
       ok: true,
       fecha: fechaLima,
       revisados: ingresos.length,
       yaTenianSalida: ingresos.length - pendientes.length,
       cerradasAutomaticamente: cerradas.length,
+      sesionesCerradas,
       errores,
     })
   } catch (error: any) {
     console.error('[cerrar-asistencia] error', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+}
+
+/**
+ * Cierra toda sesión de asistencia activa en la que cada persona con ingreso
+ * tenga ya su salida. Devuelve cuántas cerró.
+ *
+ * Mira todas las activas, no sólo las de hoy: las que se acumularon antes de
+ * que esto existiera también se limpian en la primera corrida.
+ */
+async function cerrarSesionesCompletas(): Promise<number> {
+  const activas = await prisma.jornadaAsistencia.findMany({
+    where: { activa: true },
+    select: {
+      id: true,
+      asistencias: { select: { userId: true, tipo: true } },
+    },
+  })
+
+  const completas = activas
+    .filter(j => {
+      const conIngreso = new Set(
+        j.asistencias.filter(a => a.tipo === 'ingreso').map(a => a.userId),
+      )
+      // Sin ingresos no hay nada que cerrar; se abrió y nadie la usó.
+      if (conIngreso.size === 0) return false
+      const conSalida = new Set(
+        j.asistencias.filter(a => a.tipo === 'salida').map(a => a.userId),
+      )
+      return [...conIngreso].every(u => conSalida.has(u))
+    })
+    .map(j => j.id)
+
+  if (completas.length === 0) return 0
+
+  const { count } = await prisma.jornadaAsistencia.updateMany({
+    where: { id: { in: completas }, activa: true },
+    data: { activa: false, cerradaEn: new Date() },
+  })
+  return count
 }
