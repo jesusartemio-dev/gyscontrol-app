@@ -6520,9 +6520,43 @@ model IpercCatalogoPeligro {
   @@map("iperc_catalogo_peligro")
 }
 
-/// Control tipo, por jerarquía. Es la hoja "Controles".
+/// Grupo de la hoja "Controles": un peligro concreto con sus riesgos y las
+/// medidas sugeridas para él.
+///
+/// La hoja no es una lista plana de controles: agrupa por peligro ("Virus,
+/// Bacterias, Hongos", "Ruido", "Trabajo en Alturas") y debajo pone las
+/// medidas con una X en la columna de jerarquía. Al copiarla al código en su
+/// momento se aplanó y se perdieron la descripción del peligro, sus riesgos y
+/// 18 de las 168 medidas.
+model IpercCatalogoGrupoControl {
+  id String @id @default(cuid())
+
+  numero               Int
+  tipoPeligro          String
+  descripcionPeligro   String
+  /// Lista con un riesgo o consecuencia por línea.
+  riesgosConsecuencias String
+
+  activo Boolean @default(true)
+
+  controles IpercCatalogoControl[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([numero])
+  @@index([activo, tipoPeligro])
+  @@map("iperc_catalogo_grupo_control")
+}
+
+/// Control tipo, por jerarquía. Es una fila de la hoja "Controles".
 model IpercCatalogoControl {
   id String @id @default(cuid())
+
+  /// Grupo al que pertenece. Opcional: las entradas sembradas desde el código
+  /// viejo no lo tienen hasta que se importa la hoja.
+  grupoId String?
+  grupo   IpercCatalogoGrupoControl? @relation(fields: [grupoId], references: [id], onDelete: SetNull)
 
   tipoPeligro String // BIOLÓGICO | FÍSICO | QUÍMICO | BIOMECÁNICO | CONDICIONES DE SEGURIDAD | PSICOSOCIAL | FENOMENOS NATURALES
   jerarquia   String // eliminar | sustituir | ingenieria | administrativo | epp
@@ -6536,6 +6570,7 @@ model IpercCatalogoControl {
 
   @@unique([tipoPeligro, jerarquia, texto])
   @@index([activo, tipoPeligro])
+  @@index([grupoId])
   @@map("iperc_catalogo_control")
 }
 

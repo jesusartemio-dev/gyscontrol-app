@@ -25,10 +25,23 @@ export async function GET(req: NextRequest) {
 
   const tipo = tipoDe(req)
   if (tipo === 'controles') {
-    const items = await prisma.ipercCatalogoControl.findMany({
-      orderBy: [{ tipoPeligro: 'asc' }, { jerarquia: 'asc' }, { orden: 'asc' }],
-    })
-    return Response.json({ tipo, items })
+    // Los controles se devuelven agrupados por peligro, como en la hoja del
+    // Excel: un control suelto no dice para que peligro es.
+    const [grupos, items] = await Promise.all([
+      prisma.ipercCatalogoGrupoControl.findMany({
+        orderBy: { numero: 'asc' },
+        include: {
+          controles: { orderBy: [{ jerarquia: 'asc' }, { orden: 'asc' }] },
+        },
+      }),
+      prisma.ipercCatalogoControl.findMany({
+        where: { grupoId: null },
+        orderBy: [{ tipoPeligro: 'asc' }, { jerarquia: 'asc' }, { orden: 'asc' }],
+      }),
+    ])
+    // `items` son los que quedaron sin grupo: vienen del catalogo viejo del
+    // codigo y no figuran en la hoja.
+    return Response.json({ tipo, grupos, items })
   }
   if (tipo === 'matriz') {
     const items = await prisma.ipercCatalogoMatriz.findMany({

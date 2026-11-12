@@ -32,7 +32,12 @@ interface Peligro {
 }
 interface Control {
   id: string; tipoPeligro: string; jerarquia: string; texto: string
-  activo: boolean; orden: number
+  activo: boolean; orden: number; grupoId?: string | null
+}
+interface GrupoControl {
+  id: string; numero: number; tipoPeligro: string
+  descripcionPeligro: string; riesgosConsecuencias: string
+  controles: Control[]
 }
 interface Matriz {
   id: string; severidad: number; probabilidad: string; valor: number; nivel: string
@@ -52,6 +57,8 @@ const colorNivel: Record<string, string> = {
 export default function CatalogoIpercPage() {
   const [tipo, setTipo] = useState<Tipo>('peligros')
   const [items, setItems] = useState<Array<Peligro | Control | Matriz>>([])
+  const [grupos, setGrupos] = useState<GrupoControl[]>([])
+  const [grupoAbierto, setGrupoAbierto] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
   const [busqueda, setBusqueda] = useState('')
   const [editando, setEditando] = useState<Record<string, unknown> | null>(null)
@@ -63,6 +70,7 @@ export default function CatalogoIpercPage() {
       const r = await fetch(`/api/seguridad/catalogo-iperc?tipo=${t}`)
       const d = await r.json()
       setItems(r.ok ? (d.items ?? []) : [])
+      setGrupos(r.ok ? (d.grupos ?? []) : [])
       if (!r.ok) toast.error(d.error ?? 'No se pudo cargar el catálogo')
     } finally {
       setCargando(false)
@@ -156,9 +164,86 @@ export default function CatalogoIpercPage() {
             className="h-8 w-64 pl-7 text-xs"
           />
         </div>
-        <span className="text-xs text-muted-foreground">{filtrados.length} de {items.length}</span>
+        {/* En Controles `items` son solo los sueltos, así que el total real
+            está en los grupos. */}
+        <span className="text-xs text-muted-foreground">
+          {tipo === 'controles'
+            ? `${grupos.length} grupos · ${grupos.reduce((s, g) => s + g.controles.length, 0) + items.length} medidas`
+            : `${filtrados.length} de ${items.length}`}
+        </span>
       </div>
 
+      {tipo === 'controles' && !cargando && (
+        <div className="space-y-2">
+          {grupos
+            .filter(g => !q || JSON.stringify(g).toLowerCase().includes(q))
+            .map(g => {
+              const abierto = grupoAbierto === g.id
+              return (
+                <Card key={g.id}>
+                  <CardContent className="py-3">
+                    <button
+                      className="flex w-full items-start justify-between gap-3 text-left"
+                      onClick={() => setGrupoAbierto(abierto ? null : g.id)}
+                    >
+                      <div className="min-w-0">
+                        <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
+                          <span className="font-mono text-[11px] text-muted-foreground">#{g.numero}</span>
+                          <Badge variant="outline" className="text-[10px]">{g.tipoPeligro}</Badge>
+                          <span>{g.descripcionPeligro}</span>
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          {g.controles.length} medida{g.controles.length === 1 ? '' : 's'} ·{' '}
+                          {lineas(g.riesgosConsecuencias).length} riesgos
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs text-muted-foreground">{abierto ? 'Ocultar' : 'Ver'}</span>
+                    </button>
+
+                    {abierto && (
+                      <div className="mt-3 grid gap-3 border-t pt-3 sm:grid-cols-2">
+                        <div>
+                          <p className="mb-1 text-[11px] font-semibold">Posibles riesgos / consecuencias</p>
+                          <ul className="list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
+                            {lineas(g.riesgosConsecuencias).map((x, i) => <li key={i}>{x}</li>)}
+                          </ul>
+                        </div>
+                        <div>
+                          <p className="mb-1 text-[11px] font-semibold">Medidas de prevención y control</p>
+                          <ul className="space-y-1 text-xs">
+                            {g.controles.map(c => (
+                              <li key={c.id} className="flex items-start justify-between gap-2 rounded bg-slate-50 px-2 py-1">
+                                <span className="flex-1">
+                                  <Badge variant="outline" className="mr-1 text-[9px] uppercase">{c.jerarquia}</Badge>
+                                  {c.texto}
+                                </span>
+                                <button
+                                  onClick={() => setEditando({ ...c })}
+                                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                                  title="Editar"
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          {items.length > 0 && (
+            <p className="text-[11px] text-muted-foreground">
+              Abajo, {items.length} control{items.length === 1 ? '' : 'es'} que no figuran en la hoja del
+              Excel: quedaron del catálogo viejo del código.
+            </p>
+          )}
+        </div>
+      )}
+
+      {!(tipo === 'controles' && items.length === 0) && (
       <Card>
         <CardContent className="p-0">
           {cargando ? (
@@ -252,6 +337,7 @@ export default function CatalogoIpercPage() {
           )}
         </CardContent>
       </Card>
+      )}
 
       <Dialog open={!!editando} onOpenChange={v => { if (!v) setEditando(null) }}>
         <DialogContent className="max-w-lg">
@@ -346,6 +432,11 @@ export default function CatalogoIpercPage() {
       </Dialog>
     </div>
   )
+}
+
+/** Los riesgos vienen como texto con un item por linea. */
+function lineas(texto: string): string[] {
+  return texto.split('\n').map(x => x.trim()).filter(Boolean)
 }
 
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
