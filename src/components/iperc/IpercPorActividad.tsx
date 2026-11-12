@@ -271,11 +271,47 @@ function TablaGrupo({ filas, onEdit, onDelete, onTexto }: { filas: IpercFila[] }
         </thead>
         <tbody>
           {filas.map((f, i) => {
-            const fondo = i % 2 ? 'bg-slate-50' : 'bg-white'
+            // Una tarea casi siempre tiene varios peligros — 49 de 68 tareas
+            // del IPERC de CJM52 tienen 3 filas. La cebra por fila hacia que
+            // esas filas se vieran como tareas distintas: ahora el color
+            // alterna por TAREA y el nombre se escribe solo en la primera.
+            const esPrimera = i === 0 || filas[i - 1].tarea !== f.tarea
+            const esUltima = i === filas.length - 1 || filas[i + 1].tarea !== f.tarea
+            const peligrosDeLaTarea = filas.filter(x => x.tarea === f.tarea).length
+            const grupo = filas.slice(0, i + 1).reduce(
+              (n, x, j, arr) => (j > 0 && arr[j - 1].tarea !== x.tarea ? n + 1 : n), 0,
+            )
+            const fondo = grupo % 2 ? 'bg-slate-50' : 'bg-white'
             return (
-              <tr key={f.id} className={cn('group cursor-pointer hover:[&>td]:bg-indigo-50/70', fondo)} onClick={() => onEdit(f)}>
+              <tr
+                key={f.id}
+                className={cn(
+                  'group cursor-pointer hover:[&>td]:bg-indigo-50/70',
+                  fondo,
+                  esPrimera && i > 0 && '[&>td]:border-t-2 [&>td]:border-t-slate-300',
+                )}
+                onClick={() => onEdit(f)}
+              >
                 <td className={cn(td, fondo, 'font-mono text-[10px] text-muted-foreground')}>{String(f.numero).padStart(3, '0')}</td>
-                <td className={cn(td, fondo, 'sticky left-0 z-[1] font-medium shadow-[inset_-1px_0_0_#e5e7eb]')}>{celda(f.tarea)}</td>
+                <td className={cn(td, fondo, 'sticky left-0 z-[1] font-medium shadow-[inset_-1px_0_0_#e5e7eb]')}>
+                  {esPrimera ? (
+                    <>
+                      {celda(f.tarea)}
+                      {peligrosDeLaTarea > 1 && (
+                        <span className="mt-0.5 block text-[10px] font-normal text-muted-foreground">
+                          {peligrosDeLaTarea} peligros
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span
+                      className="block border-l-2 border-slate-300 pl-2 text-[10px] text-muted-foreground"
+                      title={f.tarea}
+                    >
+                      {esUltima ? '└' : '├'} misma tarea
+                    </span>
+                  )}
+                </td>
                 <td className={cn(td, fondo)}>{celda(f.puestoTrabajo)}<span className="block text-[10px] text-muted-foreground">{f.condicionActividad}</span></td>
                 <td className={cn(td, fondo)}><FactorBadge factor={f.factorRiesgo} /></td>
                 <td className={cn(td, fondo)}>{celda(f.peligro)}</td>
