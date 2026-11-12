@@ -285,7 +285,7 @@ export default function AsistenciaRRHH() {
   }
 
   async function registrarSalida(ingresoId: string, hora: string, quien: string) {
-    if (!hora) { toast.error('Indica la hora de salida'); return }
+    if (!hora) { toast.error('Indica la hora de salida'); return false }
     setGuardandoSalida(ingresoId)
     try {
       const r = await fetch('/api/asistencia/salida-manual', {
@@ -296,12 +296,14 @@ export default function AsistenciaRRHH() {
       const data = await r.json().catch(() => ({}))
       if (!r.ok) {
         toast.error(data.message || 'No se pudo registrar la salida')
-        return
+        return false
       }
       toast.success(`Salida de ${quien} registrada a las ${hora}`)
       cargar()
+      return true
     } catch {
       toast.error('No se pudo registrar la salida')
+      return false
     } finally {
       setGuardandoSalida(null)
     }
@@ -1316,13 +1318,13 @@ export default function AsistenciaRRHH() {
                     ))}
                   </div>
                   <p className="mt-1 text-[10px] text-muted-foreground">
-                    La hora de abajo viene precargada con la m&aacute;s repetida del grupo. Ajusta si sabes otra.
+                    La hora viene precargada con la m&aacute;s repetida del grupo. Puedes elegir la salida de un colaborador o editar la hora manualmente antes de registrar.
                   </p>
                 </div>
               )}
               <div className="max-h-[420px] space-y-2 overflow-y-auto">
                 {pendientesSesion.map(x => (
-                  <div key={x.ingresoId} className="flex items-center justify-between gap-3 rounded-md border p-2">
+                  <div key={x.ingresoId} className="flex flex-col gap-3 rounded-md border p-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{x.nombre}</p>
                       <p className="text-[11px] text-muted-foreground">
@@ -1332,10 +1334,34 @@ export default function AsistenciaRRHH() {
                         })}
                       </p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex shrink-0 flex-col gap-2">
+                      {salidasSesion.length > 0 && (
+                        <Select
+                          value=""
+                          disabled={guardandoSalida === x.ingresoId}
+                          onValueChange={value => {
+                            const referencia = salidasSesion[Number(value)]
+                            if (referencia) setHoraSalidaFix(prev => ({ ...prev, [x.ingresoId]: referencia.hora }))
+                          }}
+                        >
+                          <SelectTrigger className="w-full sm:w-64" aria-label={`Usar salida de otro colaborador para ${x.nombre}`}>
+                            <SelectValue placeholder="Usar salida de…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {salidasSesion.map((r, i) => (
+                              <SelectItem key={`${r.nombre}-${i}`} value={String(i)}>
+                                {r.hora} — {r.nombre}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      <div className="flex items-center gap-2">
                       <Input
                         type="time"
                         className="w-32"
+                        aria-label={`Hora de salida de ${x.nombre}`}
+                        disabled={guardandoSalida === x.ingresoId}
                         value={horaSalidaFix[x.ingresoId] ?? ''}
                         onChange={e => setHoraSalidaFix(prev => ({ ...prev, [x.ingresoId]: e.target.value }))}
                       />
@@ -1343,7 +1369,8 @@ export default function AsistenciaRRHH() {
                         size="sm"
                         disabled={!horaSalidaFix[x.ingresoId] || guardandoSalida === x.ingresoId}
                         onClick={async () => {
-                          await registrarSalida(x.ingresoId, horaSalidaFix[x.ingresoId], x.nombre)
+                          const registrada = await registrarSalida(x.ingresoId, horaSalidaFix[x.ingresoId], x.nombre)
+                          if (!registrada) return
                           setPendientesSesion(prev => prev.filter(y => y.ingresoId !== x.ingresoId))
                           cargarSesiones()
                         }}
@@ -1352,6 +1379,7 @@ export default function AsistenciaRRHH() {
                           ? <Loader2 className="h-3 w-3 animate-spin" />
                           : 'Registrar'}
                       </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
