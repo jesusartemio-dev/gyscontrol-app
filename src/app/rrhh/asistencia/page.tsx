@@ -162,6 +162,11 @@ export default function AsistenciaRRHH() {
   const [sesionSinSalida, setSesionSinSalida] = useState<SesionItem | null>(null)
   const [pendientesSesion, setPendientesSesion] = useState<PendienteSesion[]>([])
   const [cargandoPendientes, setCargandoPendientes] = useState(false)
+  // Salidas ya registradas en esa misma sesion. Cuando a alguien se le olvido
+  // marcar, lo que sabe el supervisor es "se fue con los demas": sin ver la
+  // hora de los demas, la de esta persona seria inventada.
+  type SalidaRef = { nombre: string; hora: string }
+  const [salidasSesion, setSalidasSesion] = useState<SalidaRef[]>([])
   const [cerrandoSesion, setCerrandoSesion] = useState<string | null>(null)
   // Personal con ingreso y sin salida al intentar cerrar: se pide la hora.
   type PendienteSalida = { userId: string; nombre: string; horaIngreso: string }
@@ -237,6 +242,22 @@ export default function AsistenciaRRHH() {
         user: { name: string | null; email: string }
       }> = j.asistencias ?? []
       const conSalida = new Set(marcajes.filter(m => m.tipo === 'salida').map(m => m.userId))
+
+      const hhmm = (iso: string) =>
+        new Date(iso).toLocaleTimeString('es-PE', {
+          hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima',
+        })
+      const refs: SalidaRef[] = marcajes
+        .filter(m => m.tipo === 'salida')
+        .map(m => ({ nombre: m.user?.name || m.user?.email || m.userId, hora: hhmm(m.fechaHora) }))
+        .sort((a, b) => a.hora.localeCompare(b.hora))
+      setSalidasSesion(refs)
+
+      // La hora mas repetida entre los que si marcaron: es la del grupo.
+      const frec = new Map<string, number>()
+      for (const r of refs) frec.set(r.hora, (frec.get(r.hora) ?? 0) + 1)
+      const sugerida = [...frec.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0]
+
       const vistos = new Set<string>()
       const pend: PendienteSesion[] = []
       for (const m of marcajes.filter(x => x.tipo === 'ingreso')) {
@@ -249,6 +270,13 @@ export default function AsistenciaRRHH() {
         })
       }
       setPendientesSesion(pend)
+      if (sugerida) {
+        setHoraSalidaFix(prev => {
+          const n = { ...prev }
+          for (const x of pend) if (!n[x.ingresoId]) n[x.ingresoId] = sugerida
+          return n
+        })
+      }
     } catch {
       toast.error('No se pudo cargar el detalle de la sesion')
     } finally {
@@ -1240,7 +1268,7 @@ export default function AsistenciaRRHH() {
       {/* Sin salida de UNA sesion (desde la pestana Sesiones) */}
       <Dialog
         open={!!sesionSinSalida}
-        onOpenChange={v => { if (!v) { setSesionSinSalida(null); setPendientesSesion([]) } }}
+        onOpenChange={v => { if (!v) { setSesionSinSalida(null); setPendientesSesion([]); setSalidasSesion([]) } }}
       >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -1270,6 +1298,28 @@ export default function AsistenciaRRHH() {
                 Ya nadie queda sin salida en esta asistencia.
               </p>
             ) : (
+              <>
+              {salidasSesion.length > 0 && (
+                <div className="rounded-md border bg-slate-50 p-2">
+                  <p className="mb-1 text-[11px] font-semibold">
+                    Salidas ya registradas en esta asistencia
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {salidasSesion.map((r, i) => (
+                      <span
+                        key={`${r.nombre}-${i}`}
+                        className="rounded border bg-white px-1.5 py-0.5 text-[11px]"
+                      >
+                        <span className="font-mono font-semibold">{r.hora}</span>
+                        <span className="ml-1 text-muted-foreground">{r.nombre}</span>
+                      </span>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    La hora de abajo viene precargada con la m&aacute;s repetida del grupo. Ajusta si sabes otra.
+                  </p>
+                </div>
+              )}
               <div className="max-h-[420px] space-y-2 overflow-y-auto">
                 {pendientesSesion.map(x => (
                   <div key={x.ingresoId} className="flex items-center justify-between gap-3 rounded-md border p-2">
@@ -1306,6 +1356,7 @@ export default function AsistenciaRRHH() {
                   </div>
                 ))}
               </div>
+              </>
             )}
           </div>
         </DialogContent>
