@@ -1,5 +1,7 @@
 from http.server import BaseHTTPRequestHandler
 from openpyxl import load_workbook
+from openpyxl.drawing.image import Image as XlsxImage
+from openpyxl.utils import get_column_letter
 from io import BytesIO
 from email.parser import BytesParser
 from email.policy import default
@@ -18,7 +20,7 @@ MAX_PUESTOS = COL_PUESTOS_FIN - COL_PUESTOS_INICIO + 1
 
 COL_NUMERO = 2
 COL_NOMBRE = 3
-# COL 4 = EVIDENCIA — NO tocar, contiene imágenes EPP
+COL_EVIDENCIA = 4  # la foto del EPP
 COL_RIESGO = 5
 COL_PARTE = 6
 COL_DURABILIDAD = 7
@@ -64,7 +66,7 @@ def escribir_filas_mpp(ws, items: list, columnas_puestos: list):
         ws.cell(r, COL_RIESGO).value = item.get('riesgo', '')
         ws.cell(r, COL_PARTE).value = item.get('parteCuerpo', '')
         ws.cell(r, COL_DURABILIDAD).value = item.get('durabilidad', '')
-        # Columna 4 (EVIDENCIA) NO se toca — imágenes EPP están ahí
+        # La columna 4 (EVIDENCIA) la llena colocar_imagenes()
 
         asignaciones = item.get('asignaciones', {})
         for puesto, col in columnas_puestos:
@@ -73,6 +75,60 @@ def escribir_filas_mpp(ws, items: list, columnas_puestos: list):
         for col in range(COL_PUESTOS_INICIO, COL_PUESTOS_FIN + 1):
             if col not in columnas_usadas:
                 ws.cell(r, col).value = None
+
+
+ALTO_FILA_PUNTOS = 75  # alto de las filas de datos en la plantilla
+
+
+def colocar_imagenes(ws, imagenes: dict, cantidad_items: int):
+    """
+    Pone la foto de cada EPP en su fila, tomada de la base.
+
+    Antes las fotos venian incrustadas en la plantilla y ancladas a filas
+    fijas: la de la fila 12 era la del EPP que cayera en la fila 12. Por eso
+    el catalogo no se podia tocar — agregar o reordenar un EPP descolocaba
+    todas las siguientes. Ahora la imagen viaja con el equipo, asi que
+    primero se quitan las de la plantilla y despues se colocan las que
+    correspondan.
+
+    `imagenes` es {orden: bytes}; un EPP sin foto simplemente deja la celda
+    vacia en vez de heredar la del vecino.
+    """
+    # Quitar solo las del area de datos: los logos de la cabecera se quedan.
+    conservadas = []
+    for img in getattr(ws, '_images', []):
+        fila = None
+        try:
+            fila = img.anchor._from.row + 1  # openpyxl cuenta desde 0
+        except AttributeError:
+            pass
+        if fila is None or fila < DATA_START_ROW:
+            conservadas.append(img)
+    ws._images = conservadas
+
+    if not imagenes:
+        return 0
+
+    colocadas = 0
+    for orden, datos in sorted(imagenes.items()):
+        if orden < 1 or orden > cantidad_items:
+            continue
+        fila = DATA_START_ROW + orden - 1
+        try:
+            img = XlsxImage(BytesIO(datos))
+        except Exception:
+            # Un formato que Pillow no entienda no debe tumbar la exportacion.
+            continue
+        # Encajar en la celda manteniendo la proporcion.
+        alto_px = int(ALTO_FILA_PUNTOS * 96 / 72)
+        if img.height and img.width:
+            escala = alto_px / float(img.height)
+            img.height = alto_px
+            img.width = max(1, int(img.width * escala))
+        img.anchor = f'{get_column_letter(COL_EVIDENCIA)}{fila}'
+        ws.add_image(img)
+        colocadas += 1
+    return colocadas
 
 
 def parsear_multipart(body: bytes, content_type: str) -> dict:
@@ -119,6 +175,20 @@ class handler(BaseHTTPRequestHandler):
             reemplazar_placeholders(ws, cabecera)
             columnas_puestos = escribir_encabezados_puestos(ws, puestos)
             escribir_filas_mpp(ws, items, columnas_puestos)
+
+            # Fotos de los EPP: llegan como partes "imagen_<orden>". Si no
+            # viene ninguna se dejan las de la plantilla, para que una
+            # exportacion vieja siga saliendo igual.
+            imagenes = {}
+            for nombre, datos in parts.items():
+                if nombre.startswith('imagen_') and datos:
+                    try:
+                        imagenes[int(nombre[len('imagen_'):])] = datos
+                    except ValueError:
+                        pass
+            if imagenes:
+                colocadas = colocar_imagenes(ws, imagenes, len(items))
+                print(f'[mpp.render-xlsx] {colocadas} imagenes colocadas desde la base')
 
             output = BytesIO()
             wb.save(output)

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { descargarPlantillaMpp } from '@/lib/mpp/descargarPlantilla'
 import { construirDataBagMpp } from '@/lib/mpp/construirDataBag'
+import { cargarImagenesEpp } from '@/lib/mpp/imagenesEpp'
 
 export const maxDuration = 120
 
@@ -26,7 +27,11 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
       mpp: {
         include: {
           items: {
-            include: { mppEppCatalogo: true },
+            include: {
+              mppEppCatalogo: {
+                include: { catalogoImagen: { select: { driveFileId: true } } },
+              },
+            },
             orderBy: { orden: 'asc' },
           },
         },
@@ -71,6 +76,20 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     'plantilla.xlsx'
   )
   formData.append('dataBag', JSON.stringify(dataBag))
+
+  // Las fotos de los EPP ya no viajan dentro de la plantilla: se bajan de
+  // Drive y se mandan aparte, para que el render las ponga en la fila que le
+  // toque a cada equipo. Si alguna falla, esa celda sale vacía y el resto del
+  // documento se exporta igual.
+  const imagenes = await cargarImagenesEpp(
+    proyecto.mpp.items.map((it, i) => ({
+      orden: i + 1,
+      driveFileId: it.mppEppCatalogo?.catalogoImagen?.driveFileId ?? null,
+    })),
+  )
+  for (const img of imagenes) {
+    formData.append('imagen_' + img.orden, new Blob([new Uint8Array(img.buffer)]), `epp-${img.orden}.png`)
+  }
 
   const internalHeaders: HeadersInit = {}
   if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
