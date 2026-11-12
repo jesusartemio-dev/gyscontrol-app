@@ -119,12 +119,38 @@ async function cargarContexto(proyectoId: string, edtIds: string[]) {
       horasEstimadas: true,
       personasEstimadas: true,
     },
-    orderBy: [{ proyectoEdtId: 'asc' }, { orden: 'asc' }],
+    // Se ordena abajo, en JS: aquí no se puede. Ordenar por `proyectoEdtId`
+    // era ordenar por cuid, o sea al azar — por eso el IPERC salía con
+    // Comisionamiento antes que Construcción.
   })
 
   const faseMap = new Map(fases.map(f => [f.id, f]))
   const edtMap = new Map(edts.map(e => [e.id, e]))
   const actMap = new Map(actividades.map(a => [a.id, a.nombre]))
+  const actOrdenMap = new Map(actividades.map(a => [a.id, a.orden]))
+
+  // Orden del cronograma: fase → EDT → actividad → tarea. Es el orden en que
+  // se va a ejecutar la obra y el que el supervisor espera leer en el IPERC.
+  const ordenTarea = (t: (typeof tareas)[number]) => {
+    const edt = edtMap.get(t.proyectoEdtId)
+    const fase = edt?.proyectoFaseId ? faseMap.get(edt.proyectoFaseId) : null
+    return [
+      fase?.orden ?? 9999,
+      edt?.orden ?? 9999,
+      t.proyectoActividadId ? (actOrdenMap.get(t.proyectoActividadId) ?? 9999) : 9999,
+      t.orden ?? 9999,
+    ]
+  }
+  tareas.sort((a, b) => {
+    const oa = ordenTarea(a)
+    const ob = ordenTarea(b)
+    for (let i = 0; i < oa.length; i++) {
+      if (oa[i] !== ob[i]) return oa[i] - ob[i]
+    }
+    return a.nombre.localeCompare(b.nombre)
+  })
+  /** Posición de cada tarea en el cronograma, para renumerar las filas al final. */
+  const posicionTarea = new Map(tareas.map((t, i) => [t.id, i]))
 
   const tareasParaIperc: TareaParaIperc[] = tareas.map(t => {
     const edt = edtMap.get(t.proyectoEdtId)
@@ -182,7 +208,7 @@ ${fases.map(fase => {
     ? `${contextoTexto}\n\n## ALCANCE DEL PLAN DE TRABAJO (método de trabajo real)\n${alcancePlanTrabajo}`
     : contextoTexto
 
-  return { iperc, tareasParaIperc, contextoTexto: contextoCompleto, edtsNombres }
+  return { iperc, tareasParaIperc, contextoTexto: contextoCompleto, edtsNombres, posicionTarea }
 }
 
 // ─── Resumen ────────────────────────────────────────────────────────────────
@@ -431,7 +457,7 @@ export async function generarConIa(
     return
   }
 
-  const { iperc, tareasParaIperc, contextoTexto, edtsNombres } = ctx
+  const { iperc, tareasParaIperc, contextoTexto, edtsNombres, posicionTarea } = ctx
   if (tareasParaIperc.length === 0) {
     send('error', { mensaje: 'Los EDTs seleccionados no tienen tareas' })
     return
@@ -500,6 +526,11 @@ export async function generarConIa(
 
     if (signal?.aborted) throw new Error('Cancelado por el usuario')
 
+    // Renumerar siguiendo el cronograma. Los lotes corren en paralelo y se
+    // guardan conforme responden, así que el número que recibe cada fila al
+    // insertarse depende de qué lote terminó primero, no del orden de obra.
+    await renumerarSegunCronograma(iperc.id, posicionTarea)
+
     const duracionMs = Date.now() - startMs
     const costoUsd =
       calculateCost(getModelForTask('chat-simple'), 3000, 1500) +
@@ -533,4 +564,44 @@ export async function generarConIa(
       send('error', { mensaje })
     }
   }
+}
+
+/**
+ * Reasigna `numero` a las filas siguiendo el orden del cronograma
+ * (fase → EDT → actividad → tarea), conservando el orden relativo de las
+ * filas que comparten tarea: una tarea genera varias filas de peligro y esas
+ * deben quedar juntas y en la secuencia en que la IA las devolvió.
+ */
+async function renumerarSegunCronograma(
+  ipercId: string,
+  posicionTarea: Map<string, number>,
+): Promise<void> {
+  const filas = await prisma.ipercFila.findMany({
+    where: { ipercId },
+    select: { id: true, numero: true, tareaCronogramaRefId: true },
+  })
+  if (filas.length === 0) return
+
+  const ordenadas = [...filas].sort((a, b) => {
+    // Una fila sin tarea del cronograma (editada a mano) va al final.
+    const pa = a.tareaCronogramaRefId ? posicionTarea.get(a.tareaCronogramaRefId) ?? 1e9 : 1e9
+    const pb = b.tareaCronogramaRefId ? posicionTarea.get(b.tareaCronogramaRefId) ?? 1e9 : 1e9
+    return pa !== pb ? pa - pb : a.numero - b.numero
+  })
+
+  const cambios = ordenadas
+    .map((f, i) => ({ id: f.id, numero: i + 1, antes: f.numero }))
+    .filter(c => c.numero !== c.antes)
+  if (cambios.length === 0) return
+
+  // Dos pasadas: `numero` no es único en BD, pero dejar duplicados a medio
+  // camino confunde a cualquiera que mire la tabla mientras corre.
+  await prisma.$transaction([
+    ...cambios.map(c =>
+      prisma.ipercFila.update({ where: { id: c.id }, data: { numero: -c.numero } }),
+    ),
+    ...cambios.map(c =>
+      prisma.ipercFila.update({ where: { id: c.id }, data: { numero: c.numero } }),
+    ),
+  ])
 }
