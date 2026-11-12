@@ -6491,6 +6491,71 @@ model CatalogoImagen {
   @@map("catalogo_imagen")
 }
 
+// ─── Catálogos del IPERC ────────────────────────────────────────────────────
+//
+// Antes vivían como constantes en src/lib/iperc/catalogos/*.ts y se pegaban en
+// el prompt de la IA. Corregir un dato exigía commit, deploy y un script sobre
+// las filas ya generadas — fue lo que pasó con "Trastornó musculo-esquelético",
+// mal escrito en las 4 entradas ERGONÓMICO y copiado a 108 filas de 5
+// proyectos. En BD, el especialista SSOMA lo corrige y la próxima generación
+// ya sale bien.
+
+/// Peligro tipo con su riesgo y consecuencia. Es la hoja "Peli-Ries-Consec".
+model IpercCatalogoPeligro {
+  id String @id @default(cuid())
+
+  categoria    String // MECÁNICO | LOCATIVO | ELÉCTRICO | FÍSICO | QUÍMICO | ERGONÓMICO | PSICOSOCIAL | BIOLÓGICO | FISICOQUÍMICO
+  peligro      String
+  riesgo       String
+  consecuencia String
+
+  activo Boolean @default(true)
+  orden  Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([categoria, peligro, riesgo])
+  @@index([activo, categoria])
+  @@map("iperc_catalogo_peligro")
+}
+
+/// Control tipo, por jerarquía. Es la hoja "Controles".
+model IpercCatalogoControl {
+  id String @id @default(cuid())
+
+  tipoPeligro String // BIOLÓGICO | FÍSICO | QUÍMICO | BIOMECÁNICO | CONDICIONES DE SEGURIDAD | PSICOSOCIAL | FENOMENOS NATURALES
+  jerarquia   String // eliminar | sustituir | ingenieria | administrativo | epp
+  texto       String
+
+  activo Boolean @default(true)
+  orden  Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tipoPeligro, jerarquia, texto])
+  @@index([activo, tipoPeligro])
+  @@map("iperc_catalogo_control")
+}
+
+/// Una celda de la matriz severidad × probabilidad. Es la hoja "Matriz", la
+/// misma que el Excel consulta con VLOOKUP al abrirse.
+model IpercCatalogoMatriz {
+  id String @id @default(cuid())
+
+  severidad    Int    // 1 catastrófica … 5 menor
+  probabilidad String // A común … E prácticamente imposible
+  valor        Int    // índice 1-25
+  nivel        String // ALTO | MEDIO | BAJO
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([severidad, probabilidad])
+  @@map("iperc_catalogo_matriz")
+}
+
 // ─── IPERC (Identificación de Peligros, Evaluación de Riesgos y Controles) ──
 
 model Iperc {

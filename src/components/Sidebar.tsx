@@ -401,6 +401,7 @@ export default function Sidebar() {
             { href: '/seguridad/reposiciones', label: 'Reposiciones', icon: Clock },
           ],
         },
+        { href: '/seguridad/catalogo-iperc', label: 'Catálogo IPERC', icon: ShieldAlert },
         { href: '/seguridad/empleados', label: 'Empleados', icon: Users },
         {
           href: '#seguridad-campo',

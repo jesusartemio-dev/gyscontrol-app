@@ -371,6 +371,7 @@ export default function MobileSidebar() {
         { href: '/seguridad/stock', label: 'Stock EPP', icon: Warehouse },
         { href: '/seguridad/entregas', label: 'Entregas', icon: ClipboardList },
         { href: '/seguridad/reposiciones', label: 'Reposiciones', icon: Clock },
+        { href: '/seguridad/catalogo-iperc', label: 'Catálogo IPERC', icon: ShieldAlert },
         { href: '/seguridad/empleados', label: 'Empleados', icon: Users },
         { href: '/seguridad/evidencias', label: 'Evidencias diarias', icon: ClipboardCheck },
         { href: '/seguridad/registros', label: 'Todos los registros', icon: FileText },

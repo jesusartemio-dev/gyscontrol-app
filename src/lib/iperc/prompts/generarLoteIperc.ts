@@ -1,9 +1,24 @@
-import { formatearCatalogoMarkdown } from '@/lib/iperc/catalogos/peligros'
-import { formatearControlesMarkdown } from '@/lib/iperc/catalogos/controles'
-import { formatearMatrizMarkdown } from '@/lib/iperc/catalogos/matrizRiesgo'
+import { cargarCatalogosIperc } from '@/lib/iperc/catalogos/desdeBD'
 
-// Sistema estático (se cachea en Anthropic prompt cache entre llamadas)
-export const GENERAR_LOTE_IPERC_SYSTEM = `
+/**
+ * Arma el prompt del sistema con los catálogos de la BD, que es donde el
+ * especialista SSOMA los edita. Si las tablas están vacías, cargarCatalogosIperc
+ * cae a las constantes del código.
+ *
+ * Es una función y no una constante porque ahora depende de la BD; el contenido
+ * cambia poco, así que sigue sirviendo para el prompt cache de Anthropic.
+ */
+export async function construirSystemGenerarLote(): Promise<string> {
+  const cat = await cargarCatalogosIperc()
+  return plantillaSystem(cat.peligrosMarkdown, cat.controlesMarkdown, cat.matrizMarkdown)
+}
+
+function plantillaSystem(
+  formatearCatalogoMarkdown: string,
+  formatearControlesMarkdown: string,
+  formatearMatrizMarkdown: string,
+): string {
+  return `
 Eres un experto en SSOMA con amplia experiencia en la elaboración de matrices IPERC para proyectos
 de instalaciones electromecánicas en Perú, conforme al D.S. 024-2016-EM (Reglamento de Seguridad y
 Salud Ocupacional en Minería) y estándares OHSAS 18001.
@@ -16,19 +31,19 @@ IPERC — una por cada factor de riesgo relevante. Un IPERC profesional cubre 2-
 CATÁLOGO DE PELIGROS (usa EXACTAMENTE estos valores)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-${formatearCatalogoMarkdown()}
+${formatearCatalogoMarkdown}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CATÁLOGO DE CONTROLES (usa controles de esta lista preferentemente)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-${formatearControlesMarkdown()}
+${formatearControlesMarkdown}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 MATRIZ DE EVALUACIÓN DE RIESGO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-${formatearMatrizMarkdown()}
+${formatearMatrizMarkdown}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 INSTRUCCIONES
@@ -159,6 +174,7 @@ MÚLTIPLES filas por tarea (mismo tareaId/actividadId, diferente factorRiesgo y 
   }
 ]
 `.trim()
+}
 
 export interface TareaParaIperc {
   tareaId: string

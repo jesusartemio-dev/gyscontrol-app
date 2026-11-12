@@ -6,7 +6,7 @@ import { trackUsage, calculateCost } from '@/lib/agente/usageTracker'
 import { adquirirLock, completarLock, fallarLock } from '@/lib/iperc/mutex'
 import { RESUMIR_PLAN_TRABAJO_IPERC_PROMPT } from '@/lib/iperc/prompts/resumirPlanTrabajo'
 import {
-  GENERAR_LOTE_IPERC_SYSTEM,
+  construirSystemGenerarLote,
   buildPromptLote,
   type TareaParaIperc,
 } from '@/lib/iperc/prompts/generarLoteIperc'
@@ -280,7 +280,7 @@ async function generarLote(
     system: [
       {
         type: 'text',
-        text: GENERAR_LOTE_IPERC_SYSTEM,
+        text: await construirSystemGenerarLote(),
         cache_control: { type: 'ephemeral' },
       },
     ],
