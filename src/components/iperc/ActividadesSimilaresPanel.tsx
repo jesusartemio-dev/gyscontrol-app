@@ -272,7 +272,7 @@ export function ActividadesSimilaresPanel({ proyectoId, onAplicado, refreshKey }
       </Card>
 
       <Dialog open={!!dialogo} onOpenChange={v => { if (!v) setDialogo(null) }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col gap-3">
           <DialogHeader>
             <DialogTitle>
               {dialogo?.accion === 'unificar' ? 'Unificar evaluaciones' : 'Fusionar actividades'}
@@ -296,7 +296,11 @@ export function ActividadesSimilaresPanel({ proyectoId, onAplicado, refreshKey }
           </DialogHeader>
 
           {dialogo && (
-            <div className="space-y-3">
+            // El cuerpo scrollea y el pie queda fijo: con el ejemplo y la
+            // lista de cambios, el modal crecia mas que la pantalla y los
+            // botones de aceptar quedaban fuera de alcance.
+            <>
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
               <div>
                 <p className="mb-1 text-xs font-medium">Actividad de referencia</p>
                 <div className="flex flex-wrap gap-1.5">
@@ -349,7 +353,7 @@ export function ActividadesSimilaresPanel({ proyectoId, onAplicado, refreshKey }
                         En estas actividades: {previa.filasAntes} → {previa.filasDespues}
                       </span>
                     </div>
-                    <ul className="max-h-[260px] space-y-2 overflow-y-auto">
+                    <ul className="space-y-2">
                       {previa.afectadas.map(a => (
                         <li key={a.actividad} className="rounded bg-slate-50 p-2">
                           <p className="font-medium">
@@ -411,16 +415,18 @@ export function ActividadesSimilaresPanel({ proyectoId, onAplicado, refreshKey }
                 )}
               </div>
 
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setDialogo(null)} disabled={aplicando}>
-                  Cancelar
-                </Button>
-                <Button onClick={confirmar} disabled={aplicando || cargandoPrevia || !previa}>
-                  {aplicando && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
-                  {dialogo.accion === 'unificar' ? 'Unificar' : 'Fusionar'}
-                </Button>
-              </div>
             </div>
+
+            <div className="flex shrink-0 justify-end gap-2 border-t pt-3">
+              <Button variant="outline" onClick={() => setDialogo(null)} disabled={aplicando}>
+                Cancelar
+              </Button>
+              <Button onClick={confirmar} disabled={aplicando || cargandoPrevia || !previa}>
+                {aplicando && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+                {dialogo.accion === 'unificar' ? 'Unificar' : 'Fusionar'}
+              </Button>
+            </div>
+            </>
           )}
         </DialogContent>
       </Dialog>
