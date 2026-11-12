@@ -6487,6 +6487,8 @@ model CatalogoImagen {
   createdBy   User?    @relation(fields: [createdById], references: [id])
   updatedAt   DateTime @updatedAt
 
+  mppEpps MppEppCatalogo[]
+
   @@index([categoria])
   @@map("catalogo_imagen")
 }
@@ -6770,6 +6772,16 @@ model MppEppCatalogo {
   parteCuerpo String
   durabilidad String?
 
+  /// Foto del equipo, de la biblioteca global de imágenes (en Drive).
+  ///
+  /// Antes las 52 fotos vivían incrustadas en plantilla-mpp.xlsx, ancladas a
+  /// filas fijas: la foto de la fila 12 era la del EPP que cayera en la fila
+  /// 12. Eso impedía tocar el catálogo — agregar, desactivar o reordenar un
+  /// EPP descolocaba todas las fotos siguientes. Al colgarla del equipo, la
+  /// imagen deja de depender de una posición.
+  catalogoImagenId String?
+  catalogoImagen   CatalogoImagen? @relation(fields: [catalogoImagenId], references: [id], onDelete: SetNull)
+
   asignacionesDefault Json // string[] de puestos que lo usan por defecto
 
   activo    Boolean  @default(true)
@@ -6780,6 +6792,7 @@ model MppEppCatalogo {
 
   @@index([parteCuerpo])
   @@index([activo])
+  @@index([catalogoImagenId])
   @@map("mpp_epp_catalogo")
 }
 
