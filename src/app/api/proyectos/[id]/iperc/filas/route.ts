@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { aplicarReglasFila } from '@/lib/iperc/riesgoResidual'
+import { clasificarControles, textoOrdenado, textosDelCatalogo, CAMPOS_CONTROL } from '@/lib/iperc/origenControles'
 import { ipercFilaSchema } from '@/lib/validators/iperc'
 
 type Ctx = { params: Promise<{ id: string }> }
@@ -80,9 +81,29 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     data: {
       ipercId: result.ipercId,
       numero,
-      ...aplicarReglasFila(parsed.data),
+      ...(await conProcedencia(aplicarReglasFila(parsed.data), 'manual')),
     },
   })
 
   return NextResponse.json({ data: fila }, { status: 201 })
+}
+
+/** Marca de dónde vino cada control y ordena: catálogo, luego IA, luego manual. */
+async function conProcedencia<T extends Record<string, unknown>>(
+  data: T,
+  origenNuevos: 'ia' | 'manual',
+): Promise<T> {
+  if (!CAMPOS_CONTROL.some(c => c in data)) return data
+  const origen = clasificarControles(
+    data,
+    await textosDelCatalogo(),
+    null,
+    origenNuevos,
+  )
+  const salida = { ...data } as Record<string, unknown>
+  for (const campo of CAMPOS_CONTROL) {
+    if (campo in salida) salida[campo] = textoOrdenado(origen[campo] ?? [])
+  }
+  salida.origenControles = origen as object
+  return salida as T
 }

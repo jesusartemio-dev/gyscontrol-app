@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '@/lib/prisma'
-import { calcularResidual, normalizarControl } from '@/lib/iperc/riesgoResidual'
+import { calcularResidual } from '@/lib/iperc/riesgoResidual'
+import { clasificarControles, textoOrdenado, textosDelCatalogo } from '@/lib/iperc/origenControles'
 import { getModelForTask } from '@/lib/agente/models'
 import { trackUsage, calculateCost } from '@/lib/agente/usageTracker'
 import { adquirirLock, completarLock, fallarLock } from '@/lib/iperc/mutex'
@@ -349,6 +350,10 @@ async function procesarEnParalelo(
   // Mutex garantiza escrituras DB seriales → número secuencial sin colisiones
   const mutex = new Mutex()
 
+  // Los textos del catalogo, para reconocer que control es criterio de la
+  // empresa y cual redacto la IA.
+  const catalogo = await textosDelCatalogo()
+
   const saveFilas = async (filas: FilaIpercIa[]): Promise<unknown[]> => {
     const release = await mutex.acquire()
     try {
@@ -374,10 +379,29 @@ async function procesarEnParalelo(
               probabilidad: fila.probabilidad,
               eliminar: fila.eliminar,
               sustituir: fila.sustituir,
-              // Los controles se guardan como lista, un item por linea.
-              controlIngenieria: normalizarControl(fila.controlIngenieria),
-              controlAdministrativo: normalizarControl(fila.controlAdministrativo),
-              controlReceptor: normalizarControl(fila.controlReceptor),
+              // Los controles se guardan como lista, un item por linea, y
+              // ordenados: primero lo que es del catalogo, despues lo que
+              // propuso la IA.
+              ...(() => {
+                const origen = clasificarControles(
+                  {
+                    eliminar: fila.eliminar,
+                    sustituir: fila.sustituir,
+                    controlIngenieria: fila.controlIngenieria,
+                    controlAdministrativo: fila.controlAdministrativo,
+                    controlReceptor: fila.controlReceptor,
+                  },
+                  catalogo,
+                  null,
+                  'ia',
+                )
+                return {
+                  controlIngenieria: textoOrdenado(origen.controlIngenieria ?? []),
+                  controlAdministrativo: textoOrdenado(origen.controlAdministrativo ?? []),
+                  controlReceptor: textoOrdenado(origen.controlReceptor ?? []),
+                  origenControles: origen as object,
+                }
+              })(),
               // El residual NO es lo que devolvio la IA: sale de la regla del
               // SSOMA (ingenieria sube la severidad, administrativo la
               // probabilidad). La IA incumplia la regla en 101 de 150 filas.

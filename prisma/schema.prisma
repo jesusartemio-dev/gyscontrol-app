@@ -6657,6 +6657,14 @@ model IpercFila {
   tareaCronogramaRefId     String?
   actividadCronogramaRefId String?
 
+  /// De dónde salió cada control, para distinguirlo en la app:
+  /// { "controlIngenieria": [{ "texto": "...", "origen": "catalogo|ia|manual" }], ... }
+  ///
+  /// Va aparte y no dentro de los campos de control porque esos siguen siendo
+  /// texto: el parser de "Texto / IA", el exportador y el Excel no se enteran
+  /// de esto. En el Excel el control es texto y nada más, como debe ser.
+  origenControles Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

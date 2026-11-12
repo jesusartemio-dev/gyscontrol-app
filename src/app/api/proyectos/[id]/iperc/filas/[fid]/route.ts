@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { aplicarReglasFila } from '@/lib/iperc/riesgoResidual'
+import { clasificarControles, leerOrigenControles, textoOrdenado, textosDelCatalogo, CAMPOS_CONTROL } from '@/lib/iperc/origenControles'
 import { ipercFilaSchema } from '@/lib/validators/iperc'
 
 type Ctx = { params: Promise<{ id: string; fid: string }> }
@@ -78,15 +79,31 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   const actual = await prisma.ipercFila.findUnique({
     where: { id: fid },
     select: {
-      severidad: true, probabilidad: true,
+      severidad: true, probabilidad: true, origenControles: true,
+      eliminar: true, sustituir: true,
       controlIngenieria: true, controlAdministrativo: true, controlReceptor: true,
     },
   })
 
-  const updated = await prisma.ipercFila.update({
-    where: { id: fid },
-    data: aplicarReglasFila(parsed.data, actual),
-  })
+  const data = aplicarReglasFila(parsed.data, actual)
+
+  // Procedencia: lo que no cambio conserva la suya, lo nuevo es manual porque
+  // esta ruta es la edicion desde la app.
+  const tocaControles = CAMPOS_CONTROL.some(c => c in parsed.data)
+  if (tocaControles) {
+    const origen = clasificarControles(
+      data,
+      await textosDelCatalogo(),
+      leerOrigenControles(actual?.origenControles),
+      'manual',
+    )
+    for (const campo of CAMPOS_CONTROL) {
+      if (campo in data) (data as Record<string, unknown>)[campo] = textoOrdenado(origen[campo] ?? [])
+    }
+    ;(data as Record<string, unknown>).origenControles = origen as object
+  }
+
+  const updated = await prisma.ipercFila.update({ where: { id: fid }, data })
 
   return NextResponse.json({ data: updated })
 }

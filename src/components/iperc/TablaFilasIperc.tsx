@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { itemsDeControl } from '@/lib/iperc/riesgoResidual'
+import { itemsConOrigen, leerOrigenControles, type CampoControl, type OrigenControl } from '@/lib/iperc/origenControles'
 import { evaluarRiesgo } from '@/lib/iperc/catalogos/matrizRiesgo'
 import type { IpercFila } from '@/types/iperc'
 
@@ -117,6 +118,21 @@ export function NivelBadge({ severidad, probabilidad }: { severidad: number; pro
   )
 }
 
+/**
+ * Punto de color que dice de dónde salió el control. Sin marca cuando la fila
+ * es anterior a que esto existiera: no se inventa una procedencia que no se sabe.
+ */
+export function MarcaOrigen({ origen }: { origen: OrigenControl | null }) {
+  if (!origen) return <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300" title="Sin procedencia registrada" />
+  const cfg: Record<OrigenControl, { color: string; title: string }> = {
+    catalogo: { color: 'bg-emerald-500', title: 'Del catálogo de la empresa' },
+    ia:       { color: 'bg-indigo-400',  title: 'Propuesto por la IA' },
+    manual:   { color: 'bg-amber-500',   title: 'Escrito a mano en la app' },
+  }
+  const c = cfg[origen]
+  return <span className={cn('mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full', c.color)} title={c.title} />
+}
+
 export function ControlesCell({
   fila,
   onEditarControles,
@@ -125,13 +141,15 @@ export function ControlesCell({
   /** Abre el modal para agregar o quitar controles de esta fila. */
   onEditarControles?: (fila: IpercFila) => void
 }) {
-  const controles = [
-    { tipo: 'ELI', label: 'Eliminación',    texto: fila.eliminar,              color: 'gray'   },
-    { tipo: 'SUS', label: 'Sustitución',    texto: fila.sustituir,             color: 'gray'   },
-    { tipo: 'ING', label: 'Ingeniería',     texto: fila.controlIngenieria,     color: 'blue'   },
-    { tipo: 'ADM', label: 'Administrativo', texto: fila.controlAdministrativo, color: 'orange' },
-    { tipo: 'EPP', label: 'EPP (Receptor)', texto: fila.controlReceptor,       color: 'green'  },
-  ].map(c => ({ ...c, items: itemsDeControl(c.texto) }))
+  const origenes = leerOrigenControles((fila as { origenControles?: unknown }).origenControles)
+  const controles = ([
+    { tipo: 'ELI', label: 'Eliminación',    campo: 'eliminar',              texto: fila.eliminar,              color: 'gray'   },
+    { tipo: 'SUS', label: 'Sustitución',    campo: 'sustituir',             texto: fila.sustituir,             color: 'gray'   },
+    { tipo: 'ING', label: 'Ingeniería',     campo: 'controlIngenieria',     texto: fila.controlIngenieria,     color: 'blue'   },
+    { tipo: 'ADM', label: 'Administrativo', campo: 'controlAdministrativo', texto: fila.controlAdministrativo, color: 'orange' },
+    { tipo: 'EPP', label: 'EPP (Receptor)', campo: 'controlReceptor',       texto: fila.controlReceptor,       color: 'green'  },
+  ] as Array<{ tipo: string; label: string; campo: CampoControl; texto: string; color: string }>)
+    .map(c => ({ ...c, items: itemsConOrigen(c.texto, origenes, c.campo) }))
 
   // ING y ADM siempre se muestran, aunque esten vacios: sin ingenieria la
   // severidad residual no baja y sin administrativo tampoco la probabilidad.
@@ -193,13 +211,23 @@ export function ControlesCell({
                   Sin control — {c.tipo === 'ING' ? 'la severidad residual no baja' : 'la probabilidad residual no baja'}
                 </p>
               ) : (
-                <ul className="list-disc space-y-0.5 pl-4 leading-relaxed">
-                  {c.items.map((x, i) => <li key={i}>{x}</li>)}
+                <ul className="space-y-0.5 leading-relaxed">
+                  {c.items.map((x, i) => (
+                    <li key={i} className="flex items-start gap-1.5">
+                      <MarcaOrigen origen={x.origen} />
+                      <span className="flex-1">{x.texto}</span>
+                    </li>
+                  ))}
                 </ul>
               )}
             </div>
           ))}
         </div>
+        <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t pt-2 text-[10px] text-muted-foreground">
+          <span className="flex items-center gap-1"><MarcaOrigen origen="catalogo" /> del catálogo</span>
+          <span className="flex items-center gap-1"><MarcaOrigen origen="ia" /> propuesto por IA</span>
+          <span className="flex items-center gap-1"><MarcaOrigen origen="manual" /> escrito a mano</span>
+        </p>
         {fila.accionesMejora && fila.accionesMejora !== 'NA' && (
           <div className="mt-3 border-t pt-3">
             <p className="mb-0.5 text-xs font-bold text-muted-foreground">Plan de mejora</p>

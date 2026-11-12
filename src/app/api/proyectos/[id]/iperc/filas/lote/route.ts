@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { aplicarReglasFila } from '@/lib/iperc/riesgoResidual'
+import { clasificarControles, leerOrigenControles, textoOrdenado, textosDelCatalogo, CAMPOS_CONTROL } from '@/lib/iperc/origenControles'
 import { ipercFilaSchema } from '@/lib/validators/iperc'
 
 type Ctx = { params: Promise<{ id: string }> }
@@ -62,16 +63,33 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: 'Algunas filas ya no existen en el IPERC: recargá la página' }, { status: 409 })
   }
 
+  const catalogo = await textosDelCatalogo()
+
   const filas = await prisma.$transaction(async (tx) => {
     for (const a of actualizar) {
       const previa = await tx.ipercFila.findUnique({
         where: { id: a.id },
         select: {
-          severidad: true, probabilidad: true,
+          severidad: true, probabilidad: true, origenControles: true,
+          eliminar: true, sustituir: true,
           controlIngenieria: true, controlAdministrativo: true, controlReceptor: true,
         },
       })
-      await tx.ipercFila.update({ where: { id: a.id }, data: aplicarReglasFila(a.cambios, previa) })
+      const datos = aplicarReglasFila(a.cambios, previa)
+      // Viene de pegar la respuesta de una IA: lo nuevo se marca como tal.
+      if (CAMPOS_CONTROL.some(c => c in a.cambios)) {
+        const origen = clasificarControles(
+          datos,
+          catalogo,
+          leerOrigenControles(previa?.origenControles),
+          'ia',
+        )
+        for (const campo of CAMPOS_CONTROL) {
+          if (campo in datos) (datos as Record<string, unknown>)[campo] = textoOrdenado(origen[campo] ?? [])
+        }
+        ;(datos as Record<string, unknown>).origenControles = origen as object
+      }
+      await tx.ipercFila.update({ where: { id: a.id }, data: datos })
     }
 
     // Nuevas: detrás de su fila ancla, en el orden del texto (varias seguidas
@@ -80,7 +98,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     const ultimaDetrasDe = new Map<string, string>()
     for (const c of crear) {
       const creada = await tx.ipercFila.create({
-        data: { ipercId, numero: orden.length + 1, ...aplicarReglasFila(c.datos) },
+        data: {
+          ipercId,
+          numero: orden.length + 1,
+          ...aplicarReglasFila(c.datos),
+          origenControles: clasificarControles(
+            c.datos, catalogo, null, 'ia',
+          ) as object,
+        },
         select: { id: true },
       })
       const ancla = c.despuesDeId ? (ultimaDetrasDe.get(c.despuesDeId) ?? c.despuesDeId) : null

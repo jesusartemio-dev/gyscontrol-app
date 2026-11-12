@@ -37,6 +37,8 @@ export interface IpercFilaRow {
   responsables: string
   tareaCronogramaRefId: string | null
   actividadCronogramaRefId: string | null
+  /** De dónde salió cada control: { campo: [{ texto, origen }] }. */
+  origenControles?: unknown
 }
 
 // ─── IPERC con filas y generaciones ─────────────────────────────────────────

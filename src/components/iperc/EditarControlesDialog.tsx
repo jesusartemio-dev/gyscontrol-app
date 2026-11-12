@@ -22,7 +22,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog'
 import { Loader2, Plus, X } from 'lucide-react'
-import { itemsDeControl, calcularResidual } from '@/lib/iperc/riesgoResidual'
+import { calcularResidual } from '@/lib/iperc/riesgoResidual'
+import { itemsConOrigen, leerOrigenControles, type OrigenControl } from '@/lib/iperc/origenControles'
+import { MarcaOrigen } from './TablaFilasIperc'
 import type { IpercFila } from '@/types/iperc'
 
 type Campo = 'eliminar' | 'sustituir' | 'controlIngenieria' | 'controlAdministrativo' | 'controlReceptor'
@@ -43,7 +45,8 @@ interface Props {
 }
 
 export function EditarControlesDialog({ proyectoId, fila, onClose, onGuardado }: Props) {
-  const [items, setItems] = useState<Record<Campo, string[]>>({
+  type ItemUI = { texto: string; origen: OrigenControl | null }
+  const [items, setItems] = useState<Record<Campo, ItemUI[]>>({
     eliminar: [], sustituir: [], controlIngenieria: [], controlAdministrativo: [], controlReceptor: [],
   })
   const [nuevo, setNuevo] = useState<Record<string, string>>({})
@@ -51,12 +54,13 @@ export function EditarControlesDialog({ proyectoId, fila, onClose, onGuardado }:
 
   useEffect(() => {
     if (!fila) return
+    const origenes = leerOrigenControles((fila as { origenControles?: unknown }).origenControles)
     setItems({
-      eliminar: itemsDeControl(fila.eliminar),
-      sustituir: itemsDeControl(fila.sustituir),
-      controlIngenieria: itemsDeControl(fila.controlIngenieria),
-      controlAdministrativo: itemsDeControl(fila.controlAdministrativo),
-      controlReceptor: itemsDeControl(fila.controlReceptor),
+      eliminar: itemsConOrigen(fila.eliminar, origenes, 'eliminar'),
+      sustituir: itemsConOrigen(fila.sustituir, origenes, 'sustituir'),
+      controlIngenieria: itemsConOrigen(fila.controlIngenieria, origenes, 'controlIngenieria'),
+      controlAdministrativo: itemsConOrigen(fila.controlAdministrativo, origenes, 'controlAdministrativo'),
+      controlReceptor: itemsConOrigen(fila.controlReceptor, origenes, 'controlReceptor'),
     })
     setNuevo({})
   }, [fila])
@@ -66,7 +70,7 @@ export function EditarControlesDialog({ proyectoId, fila, onClose, onGuardado }:
   const agregar = (campo: Campo) => {
     const texto = (nuevo[campo] ?? '').trim()
     if (!texto) return
-    setItems(prev => ({ ...prev, [campo]: [...prev[campo], texto] }))
+    setItems(prev => ({ ...prev, [campo]: [...prev[campo], { texto, origen: 'manual' as const }] }))
     setNuevo(prev => ({ ...prev, [campo]: '' }))
   }
   const quitar = (campo: Campo, i: number) =>
@@ -131,7 +135,8 @@ export function EditarControlesDialog({ proyectoId, fila, onClose, onGuardado }:
                 <ul className="mb-1.5 space-y-1">
                   {items[campo].map((x, i) => (
                     <li key={i} className="flex items-start justify-between gap-2 rounded bg-slate-50 px-2 py-1 text-xs">
-                      <span className="flex-1">{x}</span>
+                      <MarcaOrigen origen={x.origen} />
+                      <span className="flex-1">{x.texto}</span>
                       <button
                         type="button"
                         onClick={() => quitar(campo, i)}
@@ -161,6 +166,11 @@ export function EditarControlesDialog({ proyectoId, fila, onClose, onGuardado }:
         </div>
 
         <div className="shrink-0 border-t pt-3">
+          <p className="mb-1.5 flex flex-wrap items-center gap-x-2 text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1"><MarcaOrigen origen="catalogo" /> del catálogo</span>
+            <span className="flex items-center gap-1"><MarcaOrigen origen="ia" /> propuesto por IA</span>
+            <span className="flex items-center gap-1"><MarcaOrigen origen="manual" /> escrito a mano</span>
+          </p>
           <p className="mb-2 text-[11px]">
             Riesgo residual:{' '}
             <span className="font-mono font-semibold">
