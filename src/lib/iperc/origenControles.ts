@@ -15,7 +15,6 @@
 // control, que siguen siendo texto plano. El Excel recibe texto, como siempre.
 // ===================================================
 
-import { prisma } from '@/lib/prisma'
 import { itemsDeControl } from './riesgoResidual'
 
 export type OrigenControl = 'catalogo' | 'ia' | 'manual'
@@ -39,21 +38,10 @@ export function ordenarItems(items: ItemControl[]): ItemControl[] {
   return [...items].sort((a, b) => PESO[a.origen] - PESO[b.origen])
 }
 
-const normalizar = (t: string) =>
+export const normalizarTextoControl = (t: string) =>
   t.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/\s+/g, ' ').replace(/\.$/, '').trim()
 
-/** Textos del catálogo de controles, normalizados, para reconocerlos. */
-export async function textosDelCatalogo(): Promise<Set<string>> {
-  try {
-    const filas = await prisma.ipercCatalogoControl.findMany({
-      where: { activo: true },
-      select: { texto: true },
-    })
-    return new Set(filas.map(f => normalizar(f.texto)))
-  } catch {
-    return new Set()
-  }
-}
+const normalizar = normalizarTextoControl
 
 /**
  * Clasifica los controles de una fila.

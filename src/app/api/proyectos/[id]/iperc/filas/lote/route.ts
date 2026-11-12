@@ -5,7 +5,8 @@ import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { aplicarReglasFila } from '@/lib/iperc/riesgoResidual'
-import { clasificarControles, leerOrigenControles, textoOrdenado, textosDelCatalogo, CAMPOS_CONTROL } from '@/lib/iperc/origenControles'
+import { clasificarControles, leerOrigenControles, textoOrdenado, CAMPOS_CONTROL } from '@/lib/iperc/origenControles'
+import { textosDelCatalogo } from '@/lib/iperc/origenControles.server'
 import { ipercFilaSchema } from '@/lib/validators/iperc'
 
 type Ctx = { params: Promise<{ id: string }> }
