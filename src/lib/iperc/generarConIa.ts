@@ -72,7 +72,13 @@ type SendFn = (event: string, data: unknown) => void
 
 // ─── Carga de contexto ──────────────────────────────────────────────────────
 
-async function cargarContexto(proyectoId: string, edtIds: string[]) {
+/**
+ * @param soloTareaIds Cuando viene, limita la generación a esas tareas (un
+ * bloque). El resto del contexto sigue siendo el de los EDTs completos: la IA
+ * necesita ver el proyecto entero para evaluar bien, aunque solo escriba un
+ * tramo.
+ */
+async function cargarContexto(proyectoId: string, edtIds: string[], soloTareaIds?: string[]) {
   const [proyecto, iperc, cronograma] = await Promise.all([
     prisma.proyecto.findUnique({
       where: { id: proyectoId },
@@ -149,10 +155,19 @@ async function cargarContexto(proyectoId: string, edtIds: string[]) {
     }
     return a.nombre.localeCompare(b.nombre)
   })
-  /** Posición de cada tarea en el cronograma, para renumerar las filas al final. */
+  /**
+   * Posición de cada tarea en el cronograma, para renumerar las filas al
+   * final. Se calcula sobre TODAS las tareas de los EDTs, no solo las del
+   * bloque: así los bloques generados por separado encajan en la misma
+   * secuencia global.
+   */
   const posicionTarea = new Map(tareas.map((t, i) => [t.id, i]))
 
-  const tareasParaIperc: TareaParaIperc[] = tareas.map(t => {
+  const tareasDelBloque = soloTareaIds?.length
+    ? tareas.filter(t => soloTareaIds.includes(t.id))
+    : tareas
+
+  const tareasParaIperc: TareaParaIperc[] = tareasDelBloque.map(t => {
     const edt = edtMap.get(t.proyectoEdtId)
     const fase = edt?.proyectoFaseId ? faseMap.get(edt.proyectoFaseId) : null
     const edtNombre = edt?.nombre ?? 'General'
@@ -178,7 +193,7 @@ async function cargarContexto(proyectoId: string, edtIds: string[]) {
   const contextoTexto = `
 PROYECTO: ${proyecto.nombre} (${proyecto.codigo ?? 'sin código'})
 EDTs SELECCIONADOS PARA IPERC: ${edtsNombres.join(', ')}
-TOTAL TAREAS A EVALUAR: ${tareas.length}
+TOTAL TAREAS A EVALUAR EN ESTE BLOQUE: ${tareasDelBloque.length}
 
 ${fases.map(fase => {
     const edtsDeFase = edts.filter(e => e.proyectoFaseId === fase.id)
@@ -322,6 +337,12 @@ async function procesarEnParalelo(
   proyectoId: string,
   send: SendFn,
   signal?: AbortSignal,
+  /**
+   * Desde que numero empezar. Al generar un bloque ya hay filas de otros
+   * bloques: arrancar siempre en 1 dejaria numeros duplicados hasta la
+   * renumeracion final, y si la corrida falla, duplicados permanentes.
+   */
+  numeroBase = 0,
 ): Promise<{ filasGuardadas: number; lotesFallidos: number; lotesConSonnet: number; lotesConHaiku: number }> {
   const totalLotes = lotes.length
   const modeloSonnet = getModelForTask('ssoma-iperc')
@@ -340,7 +361,7 @@ async function procesarEnParalelo(
     try {
       if (filasGuardadas >= MAX_FILAS || filas.length === 0) return []
       const rows = filas.slice(0, MAX_FILAS - filasGuardadas)
-      const startNum = filasGuardadas + 1
+      const startNum = numeroBase + filasGuardadas + 1
       const insertadas = await prisma.$transaction(
         rows.map((fila, i) =>
           prisma.ipercFila.create({
@@ -441,17 +462,23 @@ async function procesarEnParalelo(
 
 // ─── Función principal ──────────────────────────────────────────────────────
 
+/**
+ * @param soloTareaIds Genera solo esas tareas (un bloque) y borra solo sus
+ * filas. Sin esto, se genera todo y se borra todo — que es como estaba y por
+ * lo que no se podia generar por partes.
+ */
 export async function generarConIa(
   proyectoId: string,
   userId: string,
   edtIds: string[],
   send: SendFn,
   signal?: AbortSignal,
+  soloTareaIds?: string[],
 ): Promise<void> {
   const startMs = Date.now()
 
   send('status', { mensaje: 'Cargando contexto del proyecto...', progreso: 5 })
-  const ctx = await cargarContexto(proyectoId, edtIds)
+  const ctx = await cargarContexto(proyectoId, edtIds, soloTareaIds)
   if (!ctx) {
     send('error', { mensaje: 'No se pudo cargar el contexto (IPERC, cronograma o proyecto no encontrado)' })
     return
@@ -503,8 +530,15 @@ export async function generarConIa(
   })
 
   try {
+    // Al regenerar un bloque se borran solo SUS filas; las de los demas
+    // bloques quedan intactas. Las filas agregadas a mano (sin tarea del
+    // cronograma) nunca se tocan.
     send('status', { mensaje: 'Eliminando filas anteriores...', progreso: 8 })
-    await prisma.ipercFila.deleteMany({ where: { ipercId: iperc.id } })
+    await prisma.ipercFila.deleteMany(
+      soloTareaIds?.length
+        ? { where: { ipercId: iperc.id, tareaCronogramaRefId: { in: soloTareaIds } } }
+        : { where: { ipercId: iperc.id } },
+    )
 
     send('status', { mensaje: 'Analizando contexto con IA...', progreso: 12 })
     const resumenProyecto = await resumir(contextoTexto, userId, proyectoId, signal)
@@ -522,7 +556,10 @@ export async function generarConIa(
     })
 
     const { filasGuardadas, lotesFallidos, lotesConSonnet, lotesConHaiku } =
-      await procesarEnParalelo(lotes, resumenProyecto, iperc.id, userId, proyectoId, send, signal)
+      await procesarEnParalelo(
+        lotes, resumenProyecto, iperc.id, userId, proyectoId, send, signal,
+        await maxNumeroActual(iperc.id),
+      )
 
     if (signal?.aborted) throw new Error('Cancelado por el usuario')
 
@@ -604,4 +641,13 @@ async function renumerarSegunCronograma(
       prisma.ipercFila.update({ where: { id: c.id }, data: { numero: c.numero } }),
     ),
   ])
+}
+
+/** Numero mas alto ya usado en el IPERC, para no pisar filas de otros bloques. */
+async function maxNumeroActual(ipercId: string): Promise<number> {
+  const r = await prisma.ipercFila.aggregate({
+    where: { ipercId },
+    _max: { numero: true },
+  })
+  return r._max.numero ?? 0
 }

@@ -6509,6 +6509,7 @@ model Iperc {
   estado String @default("borrador") // borrador | revisado | aprobado
 
   filas          IpercFila[]
+  bloques        IpercBloque[]
   generaciones   IpercGeneracion[]
   versionArchivo IpercVersionArchivo[]
 
@@ -6516,6 +6517,43 @@ model Iperc {
   updatedAt DateTime @updatedAt
 
   @@map("iperc")
+}
+
+/// Tramo del IPERC que se genera en una sola llamada a la IA.
+///
+/// Generar un proyecto entero de una vez no cabe en los 5 min de Vercel: en
+/// CJM52, de 68 tareas solo alcanzó a terminar la primera ola de 3 lotes (30
+/// tareas) y las demás se perdieron sin aviso. Partir en bloques le da a cada
+/// uno su propia petición y su propio límite, y permite reintentar solo el que
+/// falló en vez de rehacer todo.
+///
+/// Los bloques nunca parten una actividad por la mitad: los peligros de una
+/// actividad se evalúan juntos.
+model IpercBloque {
+  id      String @id @default(cuid())
+  ipercId String
+  iperc   Iperc  @relation(fields: [ipercId], references: [id], onDelete: Cascade)
+
+  numero Int
+  nombre String
+
+  /// EDTs y actividades que cubre, para mostrarlos y para rearmar la selección.
+  edtIds        String[]
+  actividadIds  String[]
+  /// Tareas del cronograma que le tocan. Es la unidad real de generación.
+  tareaIds      String[]
+
+  estado        String  @default("pendiente") // pendiente | generando | listo | fallido
+  filasGeneradas Int    @default(0)
+  errorMensaje  String?
+  generadoEn    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([ipercId, numero])
+  @@index([ipercId])
+  @@map("iperc_bloque")
 }
 
 model IpercFila {

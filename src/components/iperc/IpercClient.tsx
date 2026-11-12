@@ -11,6 +11,7 @@ import { CabeceraIperc } from './CabeceraIperc'
 import { PreRequisitosPanelIperc } from './PreRequisitosPanelIperc'
 import { BotonGenerarIaIperc } from './BotonGenerarIaIperc'
 import { SeleccionEdtsModal } from './SeleccionEdtsModal'
+import { PanelBloquesIperc, type BloqueIperc } from './PanelBloquesIperc'
 import { TablaFilasIperc } from './TablaFilasIperc'
 import { IpercPorActividad } from './IpercPorActividad'
 import { EditorFilaSheet } from './EditorFilaSheet'
@@ -30,6 +31,10 @@ export default function IpercClient({ proyectoId }: Props) {
 
   // IA generation state
   const [generando, setGenerando] = useState(false)
+  // Bloques de generacion: el IPERC se arma por partes porque una corrida
+  // entera no cabe en los 5 min de Vercel.
+  const [bloques, setBloques] = useState<BloqueIperc[]>([])
+  const [bloqueGenerandoId, setBloqueGenerandoId] = useState<string | null>(null)
   const [statusMsg, setStatusMsg] = useState('')
   const [progreso, setProgreso] = useState<number | null>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -77,6 +82,19 @@ export default function IpercClient({ proyectoId }: Props) {
   useEffect(() => {
     fetchContexto()
   }, [fetchContexto])
+
+  const fetchBloques = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/proyectos/${proyectoId}/iperc/bloques`)
+      if (!r.ok) return
+      const d = await r.json()
+      setBloques(Array.isArray(d.bloques) ? d.bloques : [])
+    } catch { /* la pantalla funciona igual sin el panel */ }
+  }, [proyectoId])
+
+  useEffect(() => {
+    fetchBloques()
+  }, [fetchBloques])
 
   // Detecta si hay una versión revisada vigente — default automático a esa
   // pestaña la PRIMERA vez que se detecta una (no forzar de nuevo si el
@@ -129,21 +147,46 @@ export default function IpercClient({ proyectoId }: Props) {
   }
 
   // ─── Generar con IA ────────────────────────────────────────────────────────
-  const handleGenerarIA = async (edtIds: string[]) => {
+  /**
+   * Paso 1: definir la estructura. No llama a la IA — lee el cronograma y
+   * parte las tareas en bloques generables. Despues se genera bloque a bloque.
+   */
+  const handleDefinirBloques = async (edtIds: string[]) => {
     if (!contexto?.iperc) return
     setModalEdtsOpen(false)
-    const ctrl = new AbortController()
-    abortRef.current = ctrl
-    setGenerando(true)
-    setStatusMsg('Iniciando…')
-    setProgreso(0)
     setCobertura(null)
-
     try {
-      const res = await fetch(`/api/proyectos/${proyectoId}/iperc/generar-ia`, {
+      const r = await fetch(`/api/proyectos/${proyectoId}/iperc/bloques`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ edtIds }),
+      })
+      const d = await r.json()
+      if (!r.ok) {
+        toast.error(d.error ?? 'No se pudo definir la estructura')
+        return
+      }
+      setBloques(d.bloques ?? [])
+      toast.success(`${d.bloques?.length ?? 0} bloques definidos. Genera uno por uno o todos los pendientes.`)
+    } catch {
+      toast.error('No se pudo definir la estructura')
+    }
+  }
+
+  /** Paso 2: generar UN bloque. Devuelve true si quedo completo. */
+  const generarBloque = async (bloqueId: string): Promise<boolean> => {
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+    setBloqueGenerandoId(bloqueId)
+    setGenerando(true)
+    setStatusMsg('Iniciando…')
+    setProgreso(0)
+    let completo = false
+
+    try {
+      const res = await fetch(`/api/proyectos/${proyectoId}/iperc/bloques/${bloqueId}/generar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         signal: ctrl.signal,
       })
 
@@ -176,7 +219,6 @@ export default function IpercClient({ proyectoId }: Props) {
             setProgreso(100)
             setStatusMsg('Completado')
             await fetchContexto()
-            toast.success('IPERC generado con IA')
             const totalFilas = typeof data.totalFilas === 'number' ? data.totalFilas : 0
             const totalTareas = typeof data.totalTareas === 'number' ? data.totalTareas : 0
             const edtsEvaluados = typeof data.edtsEvaluados === 'number' ? data.edtsEvaluados : 0
@@ -186,6 +228,13 @@ export default function IpercClient({ proyectoId }: Props) {
               : { sonnet: 0, haiku: 0 }
             setCobertura({ totalFilas, totalTareas, edtsEvaluados, modelosUsados, lotesFallidos })
           },
+          // El servidor cuenta las tareas realmente cubiertas en BD, no los
+          // eventos: si la peticion muere por timeout no llega ninguno.
+          onBloque: (data) => {
+            completo = !!data.completo
+            if (completo) toast.success(`Bloque listo · ${data.filas} filas`)
+            else toast.warning(`El bloque quedo incompleto: ${data.sinEvaluar} tareas sin evaluar. Reintentalo.`)
+          },
           onLoteFallido: (num, msg) => {
             toast.warning(`Lote ${num} falló: ${msg}. Los otros lotes continúan.`)
           },
@@ -193,13 +242,30 @@ export default function IpercClient({ proyectoId }: Props) {
         ctrl.signal
       )
     } catch (e: unknown) {
-      if (ctrl.signal.aborted) return
+      if (ctrl.signal.aborted) return false
       toast.error(e instanceof Error ? e.message : 'Error en generación')
     } finally {
       setGenerando(false)
+      setBloqueGenerandoId(null)
       setStatusMsg('')
       setProgreso(null)
       abortRef.current = null
+      await fetchBloques()
+    }
+    return completo
+  }
+
+  /** Genera en serie los bloques que faltan. En serie, no en paralelo: cada
+   *  bloque ya usa 3 llamadas concurrentes a la IA. */
+  const generarPendientes = async () => {
+    const porHacer = bloques.filter(b => b.estado !== 'listo')
+    for (const b of porHacer) {
+      if (abortRef.current?.signal.aborted) break
+      const ok = await generarBloque(b.id)
+      if (!ok) {
+        toast.warning('Se detuvo en el bloque que fallo. Revisa y reintenta desde ahi.')
+        break
+      }
     }
   }
 
@@ -372,6 +438,17 @@ export default function IpercClient({ proyectoId }: Props) {
           Generación en progreso en segundo plano…
         </div>
       )}
+
+      <PanelBloquesIperc
+        bloques={bloques}
+        generandoId={bloqueGenerandoId}
+        statusMsg={statusMsg}
+        progreso={progreso}
+        onGenerar={generarBloque}
+        onGenerarPendientes={generarPendientes}
+        onRedefinir={handleAbrirModal}
+        disabled={isGenerando}
+      />
 
       {/* Filas por actividad (tabla en PC, tarjetas en celular) con "Texto / IA"
           por actividad, por fila o todo. Sin filas: el estado vacío de siempre. */}
@@ -571,7 +648,7 @@ export default function IpercClient({ proyectoId }: Props) {
         open={modalEdtsOpen}
         proyectoId={proyectoId}
         onClose={() => setModalEdtsOpen(false)}
-        onConfirmar={handleGenerarIA}
+        onConfirmar={handleDefinirBloques}
         generando={generando}
       />
 

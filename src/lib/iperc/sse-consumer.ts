@@ -3,6 +3,12 @@ export interface SSEIpercCallbacks {
   onFilasParciales: (filas: unknown[]) => void
   onCompletado: (data: Record<string, unknown>) => Promise<void>
   onLoteFallido?: (lote: number, mensaje: string) => void
+  /**
+   * Cierre de un bloque. Lo manda el servidor despues de contar en BD cuantas
+   * tareas quedaron realmente cubiertas, que es lo unico fiable: si la
+   * peticion muere por timeout no llega ningun evento.
+   */
+  onBloque?: (data: { completo: boolean; filas: number; sinEvaluar: number }) => void
 }
 
 function parseSSEPart(
@@ -28,7 +34,7 @@ export async function readSSEStreamIperc(
   callbacks: SSEIpercCallbacks,
   signal?: AbortSignal
 ): Promise<void> {
-  const { onStatus, onFilasParciales, onCompletado, onLoteFallido } = callbacks
+  const { onStatus, onFilasParciales, onCompletado, onLoteFallido, onBloque } = callbacks
   const reader = res.body!.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
@@ -73,6 +79,13 @@ export async function readSSEStreamIperc(
       case 'completado':
         doneCalled = true
         await onCompletado(data)
+        break
+      case 'bloque':
+        onBloque?.({
+          completo: !!data.completo,
+          filas: typeof data.filas === 'number' ? data.filas : 0,
+          sinEvaluar: typeof data.sinEvaluar === 'number' ? data.sinEvaluar : 0,
+        })
         break
       case 'error':
         throw new Error(String(data.mensaje ?? 'Error en generación IA'))
