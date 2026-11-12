@@ -86,12 +86,12 @@ export const PELIGROS_CATALOGO: PeligroCatalogo[] = [
   { categoria: 'QUÍMICO', peligro: 'Atmosfera toxica', riesgo: 'Inhalación de gases tóxicos', consecuencia: 'Intoxicación, muerte' },
 
   // ERGONÓMICO (7)
-  { categoria: 'ERGONÓMICO', peligro: 'Diseño de puesto de trabajo', riesgo: 'Carga física de trabajo', consecuencia: 'Trastornó musculo-esquelético' },
+  { categoria: 'ERGONÓMICO', peligro: 'Diseño de puesto de trabajo', riesgo: 'Carga física de trabajo', consecuencia: 'Trastorno músculo-esquelético' },
   { categoria: 'ERGONÓMICO', peligro: 'Exposición prolongada a pantalla de visualización de datos', riesgo: 'Fatiga visual', consecuencia: 'Disminución de la agudeza visual y dolor de cabeza' },
-  { categoria: 'ERGONÓMICO', peligro: 'Manipulación manual de carga', riesgo: 'Carga física de trabajo', consecuencia: 'Trastornó musculo-esquelético' },
-  { categoria: 'ERGONÓMICO', peligro: 'Postura forzada de trabajo', riesgo: 'Carga física de trabajo', consecuencia: 'Trastornó musculo-esquelético' },
+  { categoria: 'ERGONÓMICO', peligro: 'Manipulación manual de carga', riesgo: 'Carga física de trabajo', consecuencia: 'Trastorno músculo-esquelético' },
+  { categoria: 'ERGONÓMICO', peligro: 'Postura forzada de trabajo', riesgo: 'Carga física de trabajo', consecuencia: 'Trastorno músculo-esquelético' },
   { categoria: 'ERGONÓMICO', peligro: 'Postura habitual', riesgo: 'Carga física de trabajo', consecuencia: 'Lesiones musculares' },
-  { categoria: 'ERGONÓMICO', peligro: 'Trabajo repetitivo', riesgo: 'Carga física de trabajo', consecuencia: 'Trastornó musculo-esquelético' },
+  { categoria: 'ERGONÓMICO', peligro: 'Trabajo repetitivo', riesgo: 'Carga física de trabajo', consecuencia: 'Trastorno músculo-esquelético' },
   { categoria: 'ERGONÓMICO', peligro: 'Trabajos prolongados de pie', riesgo: 'Carga física de trabajo', consecuencia: 'Lesiones musculares, fatiga y dolores en los miembros inferiores,' },
 
   // PSICOSOCIAL (4)

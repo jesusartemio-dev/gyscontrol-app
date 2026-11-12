@@ -96,7 +96,7 @@ export function EditarIpercTextoDialog({ open, onOpenChange, proyectoId, titulo,
             <Sparkles className="h-4 w-4 text-indigo-500" /> Editar con texto / IA
           </DialogTitle>
           <DialogDescription className="text-xs">
-            Copiá, pegalo en Claude o ChatGPT, pedile los cambios y pegá acá su respuesta. Antes de guardar vas a ver qué cambia.
+            Copia el texto, pégalo en Claude o ChatGPT, pídele los cambios y pega aquí su respuesta. Antes de guardar vas a ver qué cambia.
           </DialogDescription>
         </DialogHeader>
 
@@ -198,7 +198,7 @@ export function EditarIpercTextoDialog({ open, onOpenChange, proyectoId, titulo,
 
           {!hayCambios && resultado.errores.length === 0 && (
             <p className="flex items-center gap-1 text-muted-foreground">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Sin cambios todavía: pegá la respuesta de la IA.
+              <CheckCircle2 className="h-3.5 w-3.5" /> Sin cambios todavía: pega aquí la respuesta de la IA.
             </p>
           )}
         </div>

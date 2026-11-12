@@ -489,7 +489,7 @@ export default function IpercClient({ proyectoId }: Props) {
             </p>
             {cobertura.lotesFallidos > 0 && (
               <p className="text-amber-600">
-                ⚠ {cobertura.lotesFallidos} {cobertura.lotesFallidos === 1 ? 'lote falló' : 'lotes fallaron'} — algunas tareas no tienen filas. Podés agregarlas manualmente.
+                ⚠ {cobertura.lotesFallidos} {cobertura.lotesFallidos === 1 ? 'lote falló' : 'lotes fallaron'} — algunas tareas no tienen filas. Puedes agregarlas manualmente.
               </p>
             )}
           </AlertDescription>

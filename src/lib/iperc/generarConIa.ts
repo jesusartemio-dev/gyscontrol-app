@@ -485,7 +485,7 @@ export async function generarConIa(
   const lock = await adquirirLock(iperc.id)
   if (!lock.ok) {
     const segs = Math.round((Date.now() - lock.conflicto!.iniciadaEn.getTime()) / 1000)
-    send('error', { mensaje: `Ya hay una generación en curso, iniciada hace ${segs}s. Esperá a que termine o aguardá 10 min.` })
+    send('error', { mensaje: `Ya hay una generación en curso, iniciada hace ${segs}s. Espera a que termine, o 10 minutos si quedó colgada.` })
     return
   }
 
