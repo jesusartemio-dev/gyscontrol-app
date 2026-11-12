@@ -1,6 +1,7 @@
 from http.server import BaseHTTPRequestHandler
 from openpyxl import load_workbook
 from openpyxl.styles import Border, Side, Alignment
+from openpyxl.utils import get_column_letter
 from io import BytesIO
 from email.parser import BytesParser
 from email.policy import default
@@ -25,6 +26,74 @@ def reemplazar_placeholders(ws, cabecera: dict):
 def aplicar_borde(cell):
     thin = Side(border_style='thin', color='000000')
     cell.border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+
+def preparar_area_datos(ws, cantidad_filas: int) -> int:
+    """
+    Corre hacia abajo lo que la plantilla trae debajo del area de datos.
+
+    La plantilla reserva unas pocas filas y debajo pone el pie (firmas,
+    leyenda), con celdas combinadas. Al crecer el IPERC —CJM52 paso de 82 a 186
+    filas— la escritura llegaba a ese bloque y openpyxl reventaba con
+    "'MergedCell' object attribute 'value' is read-only", porque en un rango
+    combinado solo la celda de arriba a la izquierda acepta valor.
+
+    Devuelve cuantas filas se desplazo el bloque inferior.
+    """
+    rangos = list(ws.merged_cells.ranges)
+
+    # Primera fila ocupada por debajo del area de datos: o una combinacion, o
+    # contenido propio de la plantilla.
+    primera_abajo = None
+    for rango in rangos:
+        if rango.min_row >= DATA_START_ROW:
+            primera_abajo = rango.min_row if primera_abajo is None else min(primera_abajo, rango.min_row)
+    for fila in range(DATA_START_ROW, ws.max_row + 1):
+        if any(ws.cell(fila, c).value not in (None, '') for c in range(1, ws.max_column + 1)):
+            primera_abajo = fila if primera_abajo is None else min(primera_abajo, fila)
+            break
+
+    if primera_abajo is None:
+        return 0
+
+    reservadas = primera_abajo - DATA_START_ROW
+    if cantidad_filas <= reservadas:
+        return 0
+
+    delta = cantidad_filas - reservadas
+    ultima = ws.max_row
+    ancho = get_column_letter(ws.max_column)
+
+    # Las combinaciones se deshacen ANTES de mover: move_range se lleva las
+    # celdas y despues openpyxl ya no encuentra las del rango para soltarlo.
+    del_bloque = [r for r in rangos if r.min_row >= primera_abajo]
+    for rango in del_bloque:
+        ws.unmerge_cells(str(rango))
+
+    ws.move_range(f'A{primera_abajo}:{ancho}{ultima}', rows=delta)
+
+    # move_range mueve los valores pero no las combinaciones: se rehacen en su
+    # nueva posicion.
+    for rango in del_bloque:
+        ws.merge_cells(
+            start_row=rango.min_row + delta,
+            start_column=rango.min_col,
+            end_row=rango.max_row + delta,
+            end_column=rango.max_col,
+        )
+
+    # Red de seguridad: lo que siga pisando el area de datos se deshace, porque
+    # si no la escritura vuelve a fallar.
+    fin_datos = DATA_START_ROW + cantidad_filas - 1
+    for rango in list(ws.merged_cells.ranges):
+        if rango.min_row <= fin_datos and rango.max_row >= DATA_START_ROW:
+            try:
+                ws.unmerge_cells(str(rango))
+            except KeyError:
+                # El rango ya no tiene celdas reales; con quitarlo de la lista basta.
+                ws.merged_cells.ranges.remove(rango)
+
+    return delta
 
 
 def insertar_filas_iperc(ws, filas: list):
@@ -109,6 +178,7 @@ class handler(BaseHTTPRequestHandler):
             ws = wb[ws_name]
 
             reemplazar_placeholders(ws, cabecera)
+            preparar_area_datos(ws, len(filas))
             insertar_filas_iperc(ws, filas)
 
             output = BytesIO()
