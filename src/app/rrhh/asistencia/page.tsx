@@ -156,6 +156,12 @@ export default function AsistenciaRRHH() {
   const [dialogSinSalida, setDialogSinSalida] = useState(false)
   const [horaSalidaFix, setHoraSalidaFix] = useState<Record<string, string>>({})
   const [guardandoSalida, setGuardandoSalida] = useState<string | null>(null)
+  // Pendientes de UNA sesion, al pinchar su "N sin salida". Es independiente
+  // del rango de fechas: la sesion puede ser de hoy y el rango de octubre.
+  type PendienteSesion = { ingresoId: string; nombre: string; horaIngreso: string }
+  const [sesionSinSalida, setSesionSinSalida] = useState<SesionItem | null>(null)
+  const [pendientesSesion, setPendientesSesion] = useState<PendienteSesion[]>([])
+  const [cargandoPendientes, setCargandoPendientes] = useState(false)
   const [cerrandoSesion, setCerrandoSesion] = useState<string | null>(null)
   // Personal con ingreso y sin salida al intentar cerrar: se pide la hora.
   type PendienteSalida = { userId: string; nombre: string; horaIngreso: string }
@@ -214,6 +220,39 @@ export default function AsistenciaRRHH() {
       setSesiones([])
     } finally {
       setSesionesLoading(false)
+    }
+  }
+
+  /** Abre el detalle de quien no marco salida en una sesion concreta. */
+  async function verSinSalidaDeSesion(sesion: SesionItem) {
+    setSesionSinSalida(sesion)
+    setPendientesSesion([])
+    setCargandoPendientes(true)
+    try {
+      const r = await fetch(`/api/asistencia/jornada/${sesion.id}/en-vivo`)
+      if (!r.ok) throw new Error()
+      const j = await r.json()
+      const marcajes: Array<{
+        id: string; userId: string; tipo: string; fechaHora: string
+        user: { name: string | null; email: string }
+      }> = j.asistencias ?? []
+      const conSalida = new Set(marcajes.filter(m => m.tipo === 'salida').map(m => m.userId))
+      const vistos = new Set<string>()
+      const pend: PendienteSesion[] = []
+      for (const m of marcajes.filter(x => x.tipo === 'ingreso')) {
+        if (conSalida.has(m.userId) || vistos.has(m.userId)) continue
+        vistos.add(m.userId)
+        pend.push({
+          ingresoId: m.id,
+          nombre: m.user?.name || m.user?.email || m.userId,
+          horaIngreso: m.fechaHora,
+        })
+      }
+      setPendientesSesion(pend)
+    } catch {
+      toast.error('No se pudo cargar el detalle de la sesion')
+    } finally {
+      setCargandoPendientes(false)
     }
   }
 
@@ -792,7 +831,7 @@ export default function AsistenciaRRHH() {
               <LogOut className="h-5 w-5 shrink-0 text-orange-700" />
               <div className="text-sm">
                 <p className="font-bold text-orange-900">
-                  {sinSalida.length} ingreso(s) sin salida en el rango
+                  {sinSalida.length} ingreso(s) sin salida entre el {desde} y el {hasta}
                 </p>
                 <p className="text-xs text-orange-800">
                   {sinSalida.slice(0, 4).map(r => r.nombre).join(', ')}
@@ -1154,12 +1193,13 @@ export default function AsistenciaRRHH() {
                           ? <Badge variant="outline" className="bg-emerald-100 text-emerald-700">activa</Badge>
                           : <Badge variant="outline" className="text-muted-foreground">cerrada</Badge>}
                         {s.activa && s.salidasPendientes > 0 && (
-                          <div
-                            className="mt-0.5 text-[10px] font-medium text-amber-700"
-                            title="Personas con ingreso y sin salida. Al cerrar se te pedira la hora a la que se fueron."
+                          <button
+                            onClick={() => verSinSalidaDeSesion(s)}
+                            className="mt-0.5 text-[10px] font-medium text-amber-700 underline underline-offset-2 hover:text-amber-900"
+                            title="Ver quienes son y registrarles la salida"
                           >
                             {s.salidasPendientes} sin salida
-                          </div>
+                          </button>
                         )}
                       </TableCell>
                       {esAdmin && (
@@ -1196,6 +1236,80 @@ export default function AsistenciaRRHH() {
           </Card>
         )
       )}
+
+      {/* Sin salida de UNA sesion (desde la pestana Sesiones) */}
+      <Dialog
+        open={!!sesionSinSalida}
+        onOpenChange={v => { if (!v) { setSesionSinSalida(null); setPendientesSesion([]) } }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Sin salida en esta asistencia</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              {sesionSinSalida?.ubicacion}
+              {sesionSinSalida?.proyectoCodigo ? ` · ${sesionSinSalida.proyectoCodigo}` : ''}
+              {' · '}
+              {sesionSinSalida && new Date(sesionSinSalida.fecha).toLocaleDateString('es-PE', {
+                weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC',
+              })}
+              {' · creada por '}{sesionSinSalida?.creador}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Indica a qué hora se fue cada uno. Queda como salida manual a tu nombre y
+              <span className="font-medium"> la sesión sigue abierta</span>: el resto del
+              personal puede seguir marcando.
+            </p>
+            {cargandoPendientes ? (
+              <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Cargando...
+              </div>
+            ) : pendientesSesion.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                Ya nadie queda sin salida en esta asistencia.
+              </p>
+            ) : (
+              <div className="max-h-[420px] space-y-2 overflow-y-auto">
+                {pendientesSesion.map(x => (
+                  <div key={x.ingresoId} className="flex items-center justify-between gap-3 rounded-md border p-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{x.nombre}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Ingresó{' '}
+                        {new Date(x.horaIngreso).toLocaleTimeString('es-PE', {
+                          hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
+                        })}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Input
+                        type="time"
+                        className="w-32"
+                        value={horaSalidaFix[x.ingresoId] ?? ''}
+                        onChange={e => setHoraSalidaFix(prev => ({ ...prev, [x.ingresoId]: e.target.value }))}
+                      />
+                      <Button
+                        size="sm"
+                        disabled={!horaSalidaFix[x.ingresoId] || guardandoSalida === x.ingresoId}
+                        onClick={async () => {
+                          await registrarSalida(x.ingresoId, horaSalidaFix[x.ingresoId], x.nombre)
+                          setPendientesSesion(prev => prev.filter(y => y.ingresoId !== x.ingresoId))
+                          cargarSesiones()
+                        }}
+                      >
+                        {guardandoSalida === x.ingresoId
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : 'Registrar'}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Ingresos sin salida: registrar a mano */}
       <Dialog open={dialogSinSalida} onOpenChange={setDialogSinSalida}>
