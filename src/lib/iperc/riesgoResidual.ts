@@ -124,12 +124,16 @@ export function normalizarControl(texto?: string | null): string {
   return items.join('\n')
 }
 
+/** La viñeta de los IPERC del SSOMA. */
+const VINIETA = '•'
+
 /** Como lo espera el Excel del SSOMA: una viñeta por línea. */
 export function controlParaExcel(texto?: string | null): string {
   const items = itemsDeControl(texto)
   if (items.length === 0) return 'NA'
-  if (items.length === 1) return items[0]
-  return items.map(x => `* ${x}`).join('\n')
+  // La viñeta que usa el SSOMA en sus IPERC. Incluso con un solo control la
+  // lleva, para que las celdas se vean parejas en toda la columna.
+  return items.map(x => `${VINIETA} ${x}`).join('\n')
 }
 
 // ─── Aplicación a una fila que se va a guardar ──────────────────────────────
