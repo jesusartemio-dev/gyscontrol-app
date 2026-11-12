@@ -245,9 +245,11 @@ function TarjetasFilas({ filas, onEdit, onDelete, onTexto }: { filas: IpercFila[
 
 /** PC: tabla de la actividad; Tarea fija a la izquierda al desplazar. */
 function TablaGrupo({ filas, onEdit, onDelete, onTexto }: { filas: IpercFila[] } & AccionesFila) {
-  const th = 'px-2 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap'
-  const td = 'px-2 py-1.5 align-top'
-  const celda = (t: string) => <span className="line-clamp-3 leading-snug" title={t}>{t || '—'}</span>
+  const th = 'px-1.5 py-1 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap'
+  const td = 'px-1.5 py-1 align-top'
+  // Dos lineas, no tres: con tres, una fila ocupaba casi 100 px de alto y en
+  // pantalla entraban seis. El texto completo sigue en el title y en el editor.
+  const celda = (t: string) => <span className="line-clamp-2 leading-tight" title={t}>{t || '—'}</span>
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[1150px] border-separate border-spacing-0 text-xs">
@@ -312,10 +314,10 @@ function TablaGrupo({ filas, onEdit, onDelete, onTexto }: { filas: IpercFila[] }
                     </span>
                   )}
                 </td>
-                <td className={cn(td, fondo)}>{celda(f.puestoTrabajo)}<span className="block text-[10px] text-muted-foreground">{f.condicionActividad}</span></td>
+                <td className={cn(td, fondo)}>{celda(f.puestoTrabajo)}<span className="block text-[10px] leading-tight text-muted-foreground">{f.condicionActividad}</span></td>
                 <td className={cn(td, fondo)}><FactorBadge factor={f.factorRiesgo} /></td>
                 <td className={cn(td, fondo)}>{celda(f.peligro)}</td>
-                <td className={cn(td, fondo)}>{celda(f.riesgo)}<span className="line-clamp-2 text-[10px] text-muted-foreground" title={f.consecuencia}>{f.consecuencia}</span></td>
+                <td className={cn(td, fondo)}>{celda(f.riesgo)}<span className="line-clamp-1 text-[10px] leading-tight text-muted-foreground" title={f.consecuencia}>{f.consecuencia}</span></td>
                 <td className={cn(td, fondo, 'text-center')}><SeveridadBadge valor={f.severidad} /></td>
                 <td className={cn(td, fondo, 'text-center')}><ProbabilidadBadge valor={f.probabilidad} /></td>
                 <td className={cn(td, fondo)}><NivelBadge severidad={f.severidad} probabilidad={f.probabilidad} /></td>
@@ -325,13 +327,13 @@ function TablaGrupo({ filas, onEdit, onDelete, onTexto }: { filas: IpercFila[] }
                 <td className={cn(td, fondo)}><NivelBadge severidad={f.severidadResidual} probabilidad={f.probabilidadResidual} /></td>
                 <td className={cn(td, fondo)} onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-0.5">
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Texto / IA de esta fila" onClick={() => onTexto(f)}>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Texto / IA de esta fila" onClick={() => onTexto(f)}>
                       <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Editar" onClick={() => onEdit(f)}>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Editar" onClick={() => onEdit(f)}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" title="Eliminar" onClick={() => onDelete(f.id)}>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" title="Eliminar" onClick={() => onDelete(f.id)}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>

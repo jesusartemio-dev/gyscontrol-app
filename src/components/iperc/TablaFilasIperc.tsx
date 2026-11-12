@@ -62,58 +62,30 @@ function CeldaConTooltip({ text, className }: { text: string; className?: string
 }
 
 export function FactorBadge({ factor }: { factor: string }) {
-  const colors: Record<string, string> = {
-    'MECÁNICO':      'bg-slate-100 text-slate-700',
-    'LOCATIVO':      'bg-purple-100 text-purple-700',
-    'ELÉCTRICO':     'bg-yellow-100 text-yellow-800',
-    'FÍSICO':        'bg-blue-100 text-blue-700',
-    'QUÍMICO':       'bg-pink-100 text-pink-700',
-    'ERGONÓMICO':    'bg-teal-100 text-teal-700',
-    'PSICOSOCIAL':   'bg-indigo-100 text-indigo-700',
-    'BIOLÓGICO':     'bg-lime-100 text-lime-700',
-    'FISICOQUÍMICO': 'bg-orange-100 text-orange-700',
-  }
+  // Un solo tono. Antes cada uno de los 9 factores tenia su color y, sumado a
+  // severidad y probabilidad tambien coloreadas, la tabla quedaba arcoiris y
+  // el color dejaba de significar algo. En el IPERC el color es del NIVEL DE
+  // RIESGO: rojo / amarillo / verde. Lo demas se lee, no se colorea.
   return (
-    <span className={cn(
-      'text-[10px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap',
-      colors[factor] ?? 'bg-muted text-muted-foreground'
-    )}>
+    <span className="whitespace-nowrap rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
       {factor}
     </span>
   )
 }
 
 export function SeveridadBadge({ valor }: { valor: number }) {
-  const colors: Record<number, string> = {
-    1: 'bg-red-600 text-white',
-    2: 'bg-red-400 text-white',
-    3: 'bg-amber-400 text-amber-950',
-    4: 'bg-lime-400 text-lime-950',
-    5: 'bg-emerald-500 text-white',
-  }
+  // Valor plano: la severidad por si sola no es "buena" ni "mala", lo que
+  // importa es el nivel que sale de cruzarla con la probabilidad.
   return (
-    <span className={cn(
-      'inline-flex items-center justify-center w-7 h-7 rounded font-bold text-sm',
-      colors[valor] ?? 'bg-muted text-muted-foreground'
-    )}>
+    <span className="inline-flex h-6 w-6 items-center justify-center rounded border border-slate-200 bg-white font-mono text-xs font-semibold text-slate-700">
       {valor}
     </span>
   )
 }
 
 export function ProbabilidadBadge({ valor }: { valor: string }) {
-  const colors: Record<string, string> = {
-    A: 'bg-red-100 text-red-700 border-red-200',
-    B: 'bg-orange-100 text-orange-700 border-orange-200',
-    C: 'bg-amber-100 text-amber-700 border-amber-200',
-    D: 'bg-lime-100 text-lime-700 border-lime-200',
-    E: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  }
   return (
-    <span className={cn(
-      'inline-flex items-center justify-center w-7 h-7 rounded border font-bold text-sm',
-      colors[valor] ?? 'bg-muted text-muted-foreground'
-    )}>
+    <span className="inline-flex h-6 w-6 items-center justify-center rounded border border-slate-200 bg-white font-mono text-xs font-semibold text-slate-700">
       {valor}
     </span>
   )
@@ -123,23 +95,23 @@ export function NivelBadge({ severidad, probabilidad }: { severidad: number; pro
   const ev = evaluarRiesgo(severidad, probabilidad)
   if (!ev) return <span className="text-muted-foreground text-xs">—</span>
 
-  const config: Record<string, { bg: string; text: string; ring: string; Icon: React.ElementType }> = {
-    ALTO:  { bg: 'bg-red-500',     text: 'text-white',        ring: 'ring-2 ring-red-200',     Icon: AlertCircle   },
-    MEDIO: { bg: 'bg-amber-400',   text: 'text-amber-950',    ring: 'ring-2 ring-amber-100',   Icon: AlertTriangle },
-    BAJO:  { bg: 'bg-emerald-500', text: 'text-white',        ring: 'ring-2 ring-emerald-100', Icon: CheckCircle2  },
+  // Los tres colores de siempre del IPERC. Es el unico lugar de la fila que
+  // lleva color, para que signifique algo de un vistazo.
+  const config: Record<string, string> = {
+    ALTO:  'bg-red-600 text-white',
+    MEDIO: 'bg-amber-300 text-amber-950',
+    BAJO:  'bg-emerald-600 text-white',
   }
   const c = config[ev.nivel]
   if (!c) return <span className="text-muted-foreground text-xs">{ev.nivel}</span>
-  const Icon = c.Icon
 
   return (
     <span className={cn(
-      'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap',
-      c.bg, c.text, c.ring
+      'inline-flex min-w-[68px] items-center justify-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold',
+      c,
     )}>
-      <Icon className="w-3 h-3" />
       {ev.nivel}
-      <span className="opacity-75">({ev.valor})</span>
+      <span className="font-mono font-normal opacity-80">{ev.valor}</span>
     </span>
   )
 }
