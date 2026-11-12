@@ -16,7 +16,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
-import { Loader2, FileSpreadsheet, Trash2, Search, ArrowUp, ArrowDown, MapPin, Smartphone, MapPinOff, Moon, Home, Briefcase, AlertTriangle, StopCircle } from 'lucide-react'
+import { Loader2, FileSpreadsheet, Trash2, Search, ArrowUp, ArrowDown, MapPin, Smartphone, MapPinOff, Moon, Home, Briefcase, AlertTriangle, StopCircle, LogOut } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 import { formatearTardanza } from '@/lib/utils/formatTardanza'
@@ -150,6 +150,12 @@ export default function AsistenciaRRHH() {
   // Las sesiones que quedaron abiertas van de abril a hoy, asi que buscarlas
   // por rango de fechas obliga a ir ampliandolo a mano. Este filtro lo ignora.
   const [soloAbiertas, setSoloAbiertas] = useState(false)
+  // Personas con ingreso y sin salida en el rango. Antes solo se veia el hueco
+  // (“sin sal.” en la matriz) pero no habia forma de arreglarlo salvo cerrar
+  // la sesion entera del QR, lo que no sirve a media jornada.
+  const [dialogSinSalida, setDialogSinSalida] = useState(false)
+  const [horaSalidaFix, setHoraSalidaFix] = useState<Record<string, string>>({})
+  const [guardandoSalida, setGuardandoSalida] = useState<string | null>(null)
   const [cerrandoSesion, setCerrandoSesion] = useState<string | null>(null)
   // Personal con ingreso y sin salida al intentar cerrar: se pide la hora.
   type PendienteSalida = { userId: string; nombre: string; horaIngreso: string }
@@ -208,6 +214,29 @@ export default function AsistenciaRRHH() {
       setSesiones([])
     } finally {
       setSesionesLoading(false)
+    }
+  }
+
+  async function registrarSalida(ingresoId: string, hora: string, quien: string) {
+    if (!hora) { toast.error('Indica la hora de salida'); return }
+    setGuardandoSalida(ingresoId)
+    try {
+      const r = await fetch('/api/asistencia/salida-manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ingresoId, hora }),
+      })
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        toast.error(data.message || 'No se pudo registrar la salida')
+        return
+      }
+      toast.success(`Salida de ${quien} registrada a las ${hora}`)
+      cargar()
+    } catch {
+      toast.error('No se pudo registrar la salida')
+    } finally {
+      setGuardandoSalida(null)
     }
   }
 
@@ -414,6 +443,8 @@ export default function AsistenciaRRHH() {
           dpto: ref.empleado?.departamento?.nombre ?? null,
           ubicacion: (primerIngreso ?? ultimaSalida)?.ubicacion?.nombre ?? null,
           ingreso: primerIngreso ? {
+            // El id hace falta para registrarle la salida a mano.
+            id: primerIngreso.id,
             hora: new Date(primerIngreso.fechaHora),
             estado: primerIngreso.estado,
             minutosTarde: primerIngreso.minutosTarde,
@@ -436,6 +467,15 @@ export default function AsistenciaRRHH() {
 
   // Ranking de tardanzas: agrega por persona la tardanza del ingreso de cada día
   // (en el rango filtrado). Solo incluye a quien tuvo al menos una tardanza.
+  /** Ingresos sin salida, de mas reciente a mas antiguo. */
+  const sinSalida = useMemo(
+    () =>
+      resumenPorPersona
+        .filter(r => r.ingreso && !r.salida)
+        .sort((a, b) => b.fecha.localeCompare(a.fecha)),
+    [resumenPorPersona],
+  )
+
   const rankingTardanzas = useMemo(() => {
     type R = { email: string; nombre: string; dpto: string | null; minutos: number; vecesTarde: number; diasConIngreso: number }
     const map = new Map<string, R>()
@@ -739,6 +779,30 @@ export default function AsistenciaRRHH() {
             </div>
             <Button size="sm" variant="outline" onClick={() => setDialogVisitas(true)}>
               Ver detalle
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Ingresos sin salida en el rango */}
+      {esAdmin && sinSalida.length > 0 && (
+        <Card className="mb-4 border-2 border-orange-400 bg-orange-50">
+          <CardContent className="flex items-start justify-between gap-3 py-3">
+            <div className="flex items-start gap-3">
+              <LogOut className="h-5 w-5 shrink-0 text-orange-700" />
+              <div className="text-sm">
+                <p className="font-bold text-orange-900">
+                  {sinSalida.length} ingreso(s) sin salida en el rango
+                </p>
+                <p className="text-xs text-orange-800">
+                  {sinSalida.slice(0, 4).map(r => r.nombre).join(', ')}
+                  {sinSalida.length > 4 ? ` y ${sinSalida.length - 4} más` : ''}
+                  {' · '}puedes registrarles la salida a mano.
+                </p>
+              </div>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setDialogSinSalida(true)}>
+              Registrar salidas
             </Button>
           </CardContent>
         </Card>
@@ -1132,6 +1196,57 @@ export default function AsistenciaRRHH() {
           </Card>
         )
       )}
+
+      {/* Ingresos sin salida: registrar a mano */}
+      <Dialog open={dialogSinSalida} onOpenChange={setDialogSinSalida}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Ingresos sin salida</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Marcaron ingreso y no salida. Indica a qué hora se fue cada uno; queda
+              registrado como <span className="font-medium">salida manual</span> a tu nombre,
+              distinguible de las que marca la propia persona. La sesión del QR no se cierra:
+              el resto del personal puede seguir marcando.
+            </p>
+            <div className="max-h-[420px] space-y-2 overflow-y-auto">
+              {sinSalida.map(r => (
+                <div key={r.key} className="flex items-center justify-between gap-3 rounded-md border p-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{r.nombre}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {r.fecha}
+                      {r.ubicacion ? ` · ${r.ubicacion}` : ''}
+                      {' · ingresó '}
+                      {r.ingreso?.hora.toLocaleTimeString('es-PE', {
+                        hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima',
+                      })}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Input
+                      type="time"
+                      className="w-32"
+                      value={horaSalidaFix[r.key] ?? ''}
+                      onChange={e => setHoraSalidaFix(prev => ({ ...prev, [r.key]: e.target.value }))}
+                    />
+                    <Button
+                      size="sm"
+                      disabled={!horaSalidaFix[r.key] || guardandoSalida === r.ingreso?.id}
+                      onClick={() => r.ingreso && registrarSalida(r.ingreso.id, horaSalidaFix[r.key], r.nombre)}
+                    >
+                      {guardandoSalida === r.ingreso?.id
+                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                        : 'Registrar'}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Salidas pendientes al cerrar una sesion */}
       <Dialog open={!!sesionACerrar} onOpenChange={v => { if (!v) { setSesionACerrar(null); setPendientesSalida([]) } }}>
