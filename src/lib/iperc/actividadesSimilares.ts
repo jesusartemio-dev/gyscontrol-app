@@ -202,9 +202,32 @@ export async function detectarGrupos(ipercId: string): Promise<GrupoSimilar[]> {
   return grupos
 }
 
+/** Una fila como se ve en la tabla, para la previa. */
+export interface FilaEjemplo {
+  tarea: string
+  factorRiesgo: string
+  peligro: string
+  riesgo: string
+  severidad: number
+  probabilidad: string
+  severidadResidual: number
+  probabilidadResidual: string
+}
+
+export interface EjemploPrevia {
+  /** Actividad y tarea sobre la que se muestra el ejemplo. */
+  actividad: string
+  tarea: string
+  antes: FilaEjemplo[]
+  despues: FilaEjemplo[]
+}
+
 export interface PreviaCambio {
   accion: 'unificar' | 'fusionar'
   referencia: string
+  /** Filas de TODO el IPERC, no solo de las actividades del grupo. */
+  totalAntes: number
+  totalDespues: number
   /** Resumen por actividad afectada. */
   afectadas: Array<{
     actividad: string
@@ -219,6 +242,8 @@ export interface PreviaCambio {
   }>
   filasAntes: number
   filasDespues: number
+  /** Cómo queda una tarea concreta, para ver el resultado y no solo el conteo. */
+  ejemplo: EjemploPrevia | null
 }
 
 /**
@@ -281,7 +306,86 @@ export async function calcularPrevia(
       ? filasRef.length
       : filasRef.length + afectadas.reduce((s, a) => s + a.filasDespues, 0)
 
-  return { accion, referencia, afectadas, filasAntes, filasDespues }
+  // Total del IPERC completo: es la cifra que importa para decidir, no la del
+  // puñado de actividades del grupo.
+  const totalAntes = await prisma.ipercFila.count({ where: { ipercId } })
+  const totalDespues = totalAntes - filasAntes + filasDespues
+
+  return {
+    accion, referencia, afectadas, filasAntes, filasDespues,
+    totalAntes, totalDespues,
+    ejemplo: construirEjemplo(accion, referencia, actividades, porActividad, filasRef),
+  }
+}
+
+const aEjemplo = (f: FilaMin): FilaEjemplo => ({
+  tarea: f.tarea,
+  factorRiesgo: f.factorRiesgo,
+  peligro: f.peligro,
+  riesgo: f.riesgo,
+  severidad: f.severidad,
+  probabilidad: f.probabilidad,
+  severidadResidual: f.severidadResidual,
+  probabilidadResidual: f.probabilidadResidual,
+})
+
+/**
+ * Elige una tarea que cambie y muestra cómo queda. Un conteo no alcanza para
+ * decidir: hay que ver que la fila resultante dice lo que debe decir.
+ */
+function construirEjemplo(
+  accion: 'unificar' | 'fusionar',
+  referencia: string,
+  actividades: string[],
+  porActividad: Map<string, FilaMin[]>,
+  filasRef: FilaMin[],
+): EjemploPrevia | null {
+  const otras = actividades.filter(a => a !== referencia)
+
+  if (accion === 'fusionar') {
+    // El resultado es la referencia tal cual; el ejemplo muestra qué se pierde.
+    const primera = otras.find(a => (porActividad.get(a) ?? []).length > 0)
+    if (!primera) return null
+    const fs = porActividad.get(primera)!
+    const tarea = fs[0].tarea
+    return {
+      actividad: primera,
+      tarea,
+      antes: fs.filter(f => f.tarea === tarea).map(aEjemplo),
+      despues: [],
+    }
+  }
+
+  // Unificar: la primera tarea que realmente cambie.
+  for (const act of otras) {
+    const fs = porActividad.get(act) ?? []
+    const porTarea = new Map<string, FilaMin[]>()
+    for (const f of fs) {
+      const k = normalizarTarea(f.tarea)
+      if (!porTarea.has(k)) porTarea.set(k, [])
+      porTarea.get(k)!.push(f)
+    }
+    for (const [k, filasTarea] of porTarea) {
+      const plantilla = filasRef.filter(f => normalizarTarea(f.tarea) === k)
+      if (plantilla.length === 0) continue
+      const cambia =
+        plantilla.length !== filasTarea.length ||
+        plantilla.some((p, i) =>
+          CAMPOS_EVALUACION.some(
+            c => String(p[c as CampoEvaluacion]) !== String(filasTarea[i]?.[c as CampoEvaluacion]),
+          ),
+        )
+      if (!cambia) continue
+      return {
+        actividad: act,
+        tarea: filasTarea[0].tarea,
+        antes: filasTarea.map(aEjemplo),
+        // Conserva el nombre de tarea propio; cambia solo la evaluación.
+        despues: plantilla.map(p => ({ ...aEjemplo(p), tarea: filasTarea[0].tarea })),
+      }
+    }
+  }
+  return null
 }
 
 function contarFilasTrasUnificar(filasRef: FilaMin[], fs: FilaMin[]): number {

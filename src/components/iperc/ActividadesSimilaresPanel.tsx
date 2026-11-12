@@ -41,11 +41,24 @@ export interface GrupoSimilar {
   identicas: boolean
   filasQueSobran: number
 }
+interface FilaEjemplo {
+  tarea: string
+  factorRiesgo: string
+  peligro: string
+  riesgo: string
+  severidad: number
+  probabilidad: string
+  severidadResidual: number
+  probabilidadResidual: string
+}
 interface Previa {
   accion: 'unificar' | 'fusionar'
   referencia: string
+  totalAntes: number
+  totalDespues: number
   filasAntes: number
   filasDespues: number
+  ejemplo: { actividad: string; tarea: string; antes: FilaEjemplo[]; despues: FilaEjemplo[] } | null
   afectadas: Array<{
     actividad: string
     filasAntes: number
@@ -316,11 +329,26 @@ export function ActividadesSimilaresPanel({ proyectoId, onAplicado, refreshKey }
                   <p className="py-3 text-xs text-muted-foreground">Sin datos.</p>
                 ) : (
                   <div className="space-y-2 text-[11px]">
-                    <p>
-                      El IPERC pasa de <strong>{previa.filasAntes}</strong> a{' '}
-                      <strong>{previa.filasDespues}</strong> filas en estas actividades
-                      {previa.filasDespues === previa.filasAntes && ' (no cambia la cantidad, solo el contenido)'}.
-                    </p>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded bg-slate-100 px-2 py-1.5">
+                      <span>
+                        <span className="text-muted-foreground">IPERC completo:</span>{' '}
+                        <strong>{previa.totalAntes}</strong> → <strong>{previa.totalDespues}</strong> filas
+                        {previa.totalDespues < previa.totalAntes ? (
+                          <span className="ml-1 font-semibold text-emerald-700">
+                            −{previa.totalAntes - previa.totalDespues}
+                          </span>
+                        ) : previa.totalDespues > previa.totalAntes ? (
+                          <span className="ml-1 font-semibold text-amber-700">
+                            +{previa.totalDespues - previa.totalAntes}
+                          </span>
+                        ) : (
+                          <span className="ml-1 text-muted-foreground">sin cambio de cantidad</span>
+                        )}
+                      </span>
+                      <span className="text-muted-foreground">
+                        En estas actividades: {previa.filasAntes} → {previa.filasDespues}
+                      </span>
+                    </div>
                     <ul className="max-h-[260px] space-y-2 overflow-y-auto">
                       {previa.afectadas.map(a => (
                         <li key={a.actividad} className="rounded bg-slate-50 p-2">
@@ -346,6 +374,32 @@ export function ActividadesSimilaresPanel({ proyectoId, onAplicado, refreshKey }
                         </li>
                       ))}
                     </ul>
+                    {previa.ejemplo && (
+                      <div className="rounded border">
+                        <p className="border-b bg-slate-50 px-2 py-1 font-medium">
+                          Ejemplo · {previa.ejemplo.actividad} › {previa.ejemplo.tarea}
+                        </p>
+                        <div className="grid gap-px bg-slate-200 sm:grid-cols-2">
+                          <div className="bg-white p-2">
+                            <p className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">Ahora</p>
+                            <TablaEjemplo filas={previa.ejemplo.antes} />
+                          </div>
+                          <div className="bg-white p-2">
+                            <p className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">
+                              {previa.accion === 'fusionar' ? 'Después (se eliminan)' : 'Después'}
+                            </p>
+                            {previa.ejemplo.despues.length === 0 ? (
+                              <p className="py-2 text-muted-foreground">
+                                Estas filas desaparecen; queda solo {previa.referencia}.
+                              </p>
+                            ) : (
+                              <TablaEjemplo filas={previa.ejemplo.despues} />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {previa.accion === 'unificar' &&
                       previa.afectadas.some(a => a.peligrosQueSeQuitan.length > 0) && (
                         <p className="rounded bg-red-50 p-2 text-red-800">
@@ -371,5 +425,28 @@ export function ActividadesSimilaresPanel({ proyectoId, onAplicado, refreshKey }
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+/** Las filas tal como se verian en la tabla del IPERC, resumidas. */
+function TablaEjemplo({ filas }: { filas: FilaEjemplo[] }) {
+  if (filas.length === 0) return <p className="py-2 text-muted-foreground">Sin filas.</p>
+  return (
+    <ul className="space-y-1">
+      {filas.map((f, i) => (
+        <li key={i} className="rounded bg-slate-50 px-1.5 py-1">
+          <p className="font-medium">
+            <span className="mr-1 rounded bg-slate-200 px-1 text-[9px] font-semibold text-slate-600">
+              {f.factorRiesgo}
+            </span>
+            {f.peligro}
+          </p>
+          <p className="text-muted-foreground">{f.riesgo}</p>
+          <p className="font-mono text-[10px] text-muted-foreground">
+            S{f.severidad} {f.probabilidad} → S{f.severidadResidual} {f.probabilidadResidual}
+          </p>
+        </li>
+      ))}
+    </ul>
   )
 }
