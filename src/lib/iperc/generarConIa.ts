@@ -155,14 +155,6 @@ async function cargarContexto(proyectoId: string, edtIds: string[], soloTareaIds
     }
     return a.nombre.localeCompare(b.nombre)
   })
-  /**
-   * Posición de cada tarea en el cronograma, para renumerar las filas al
-   * final. Se calcula sobre TODAS las tareas de los EDTs, no solo las del
-   * bloque: así los bloques generados por separado encajan en la misma
-   * secuencia global.
-   */
-  const posicionTarea = new Map(tareas.map((t, i) => [t.id, i]))
-
   const tareasDelBloque = soloTareaIds?.length
     ? tareas.filter(t => soloTareaIds.includes(t.id))
     : tareas
@@ -223,7 +215,7 @@ ${fases.map(fase => {
     ? `${contextoTexto}\n\n## ALCANCE DEL PLAN DE TRABAJO (método de trabajo real)\n${alcancePlanTrabajo}`
     : contextoTexto
 
-  return { iperc, tareasParaIperc, contextoTexto: contextoCompleto, edtsNombres, posicionTarea }
+  return { iperc, tareasParaIperc, contextoTexto: contextoCompleto, edtsNombres }
 }
 
 // ─── Resumen ────────────────────────────────────────────────────────────────
@@ -484,7 +476,7 @@ export async function generarConIa(
     return
   }
 
-  const { iperc, tareasParaIperc, contextoTexto, edtsNombres, posicionTarea } = ctx
+  const { iperc, tareasParaIperc, contextoTexto, edtsNombres } = ctx
   if (tareasParaIperc.length === 0) {
     send('error', { mensaje: 'Los EDTs seleccionados no tienen tareas' })
     return
@@ -566,7 +558,7 @@ export async function generarConIa(
     // Renumerar siguiendo el cronograma. Los lotes corren en paralelo y se
     // guardan conforme responden, así que el número que recibe cada fila al
     // insertarse depende de qué lote terminó primero, no del orden de obra.
-    await renumerarSegunCronograma(iperc.id, posicionTarea)
+    await renumerarSegunCronograma(iperc.id, proyectoId)
 
     const duracionMs = Date.now() - startMs
     const costoUsd =
@@ -608,25 +600,72 @@ export async function generarConIa(
  * (fase → EDT → actividad → tarea), conservando el orden relativo de las
  * filas que comparten tarea: una tarea genera varias filas de peligro y esas
  * deben quedar juntas y en la secuencia en que la IA las devolvió.
+ *
+ * Las posiciones se calculan sobre el cronograma COMPLETO, no sobre los EDTs
+ * del bloque que se acaba de generar. Si se limitaran al bloque, las filas de
+ * los demás bloques quedarían sin posición y se amontonarían al final: al
+ * generar Comisionamiento de último, toda la Construcción ya generada se iba
+ * detrás suyo.
  */
-async function renumerarSegunCronograma(
-  ipercId: string,
-  posicionTarea: Map<string, number>,
-): Promise<void> {
+async function renumerarSegunCronograma(ipercId: string, proyectoId: string): Promise<void> {
+  const cronograma = await prisma.proyectoCronograma.findUnique({
+    where: { proyectoId_tipo: { proyectoId, tipo: 'planificacion' } },
+    select: { id: true },
+  })
+  if (!cronograma) return
+
+  const [fases, edts, actividades, tareas] = await Promise.all([
+    prisma.proyectoFase.findMany({
+      where: { proyectoCronogramaId: cronograma.id },
+      select: { id: true, orden: true },
+    }),
+    prisma.proyectoEdt.findMany({
+      where: { proyectoCronogramaId: cronograma.id },
+      select: { id: true, orden: true, proyectoFaseId: true },
+    }),
+    prisma.proyectoActividad.findMany({
+      where: { proyectoCronogramaId: cronograma.id },
+      select: { id: true, orden: true },
+    }),
+    prisma.proyectoTarea.findMany({
+      where: { proyectoCronogramaId: cronograma.id },
+      select: { id: true, orden: true, proyectoEdtId: true, proyectoActividadId: true },
+    }),
+  ])
+
+  const faseOrden = new Map(fases.map(f => [f.id, f.orden]))
+  const edtMap = new Map(edts.map(e => [e.id, e]))
+  const actOrden = new Map(actividades.map(a => [a.id, a.orden]))
+
+  const clave = (t: (typeof tareas)[number]) => {
+    const edt = edtMap.get(t.proyectoEdtId)
+    const fo = edt?.proyectoFaseId ? faseOrden.get(edt.proyectoFaseId) ?? 9999 : 9999
+    const eo = edt?.orden ?? 9999
+    const ao = t.proyectoActividadId ? actOrden.get(t.proyectoActividadId) ?? 9999 : 9999
+    return [fo, eo, ao, t.orden ?? 9999]
+  }
+  const ordenadas = [...tareas].sort((a, b) => {
+    const ka = clave(a)
+    const kb = clave(b)
+    for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] - kb[i]
+    return 0
+  })
+  const posicionTarea = new Map(ordenadas.map((t, i) => [t.id, i]))
+
   const filas = await prisma.ipercFila.findMany({
     where: { ipercId },
     select: { id: true, numero: true, tareaCronogramaRefId: true },
   })
   if (filas.length === 0) return
 
-  const ordenadas = [...filas].sort((a, b) => {
-    // Una fila sin tarea del cronograma (editada a mano) va al final.
+  const filasOrdenadas = [...filas].sort((a, b) => {
+    // Una fila sin tarea del cronograma (agregada a mano) va al final.
     const pa = a.tareaCronogramaRefId ? posicionTarea.get(a.tareaCronogramaRefId) ?? 1e9 : 1e9
     const pb = b.tareaCronogramaRefId ? posicionTarea.get(b.tareaCronogramaRefId) ?? 1e9 : 1e9
     return pa !== pb ? pa - pb : a.numero - b.numero
   })
 
-  const cambios = ordenadas
+  const cambios = filasOrdenadas
     .map((f, i) => ({ id: f.id, numero: i + 1, antes: f.numero }))
     .filter(c => c.numero !== c.antes)
   if (cambios.length === 0) return

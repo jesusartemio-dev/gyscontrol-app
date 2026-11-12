@@ -13,7 +13,8 @@
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { Loader2, Play, RefreshCw, CheckCircle2, AlertTriangle, Clock } from 'lucide-react'
+import { useState } from 'react'
+import { Loader2, Play, RefreshCw, CheckCircle2, AlertTriangle, Clock, ChevronDown, ChevronUp } from 'lucide-react'
 
 export interface BloqueIperc {
   id: string
@@ -56,12 +57,39 @@ export function PanelBloquesIperc({
   onRedefinir,
   disabled,
 }: Props) {
+  // Con todo generado el panel ya cumplio su funcion y lo unico que importa
+  // es el IPERC: se contrae a una linea en vez de empujarlo hacia abajo.
+  const todoListo = bloques.length > 0 && bloques.every(b => b.estado === 'listo')
+  const [abiertoManual, setAbiertoManual] = useState<boolean | null>(null)
+  const abierto = abiertoManual ?? !todoListo
+
   if (bloques.length === 0) return null
 
   const listos = bloques.filter(b => b.estado === 'listo').length
   const pendientes = bloques.filter(b => b.estado !== 'listo').length
   const totalTareas = bloques.reduce((s, b) => s + b.totalTareas, 0)
   const totalFilas = bloques.reduce((s, b) => s + b.filasGeneradas, 0)
+
+  if (!abierto) {
+    return (
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+        <p className="flex items-center gap-1.5 text-xs text-emerald-900">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <span>
+            <strong>{bloques.length} bloques generados</strong> · {totalTareas} tareas · {totalFilas} filas
+          </span>
+        </p>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs text-emerald-800 hover:bg-emerald-100"
+          onClick={() => setAbiertoManual(true)}
+        >
+          <ChevronDown className="mr-1 h-3.5 w-3.5" /> Ver bloques
+        </Button>
+      </div>
+    )
+  }
 
   return (
     <Card className="mb-4">
@@ -78,6 +106,16 @@ export function PanelBloquesIperc({
             </p>
           </div>
           <div className="flex gap-2">
+            {todoListo && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setAbiertoManual(false)}
+                disabled={!!generandoId}
+              >
+                <ChevronUp className="mr-1 h-3.5 w-3.5" /> Contraer
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={onRedefinir} disabled={disabled || !!generandoId}>
               Cambiar EDTs
             </Button>
