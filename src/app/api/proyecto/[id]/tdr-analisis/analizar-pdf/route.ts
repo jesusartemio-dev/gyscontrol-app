@@ -8,6 +8,7 @@ import { getModelForTask } from '@/lib/agente/models'
 import { trackUsage } from '@/lib/agente/usageTracker'
 import { calcularCompletitudGeneral } from '@/lib/tdr/completitud'
 import type { TdrAnalisisCore } from '@/types/tdr'
+import { mensajeErrorIA } from '@/lib/ia/errorIA'
 
 export const maxDuration = 300
 
@@ -326,7 +327,7 @@ export async function POST(
         send('done', { analisis: { ...final, cotizacionId: proyectoConCot?.cotizacionId ?? null } })
       } catch (error) {
         console.error('[proyecto/analizar-pdf]', error)
-        send('error', { mensaje: error instanceof Error ? error.message : 'Error interno' })
+        send('error', { mensaje: mensajeErrorIA(error, 'Error al analizar el TDR') })
       } finally {
         controller.close()
       }

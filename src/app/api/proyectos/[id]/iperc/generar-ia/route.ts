@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 import { validarPreRequisitos } from '@/lib/iperc/validarPreRequisitos'
 import { generarConIa } from '@/lib/iperc/generarConIa'
+import { mensajeErrorIA } from '@/lib/ia/errorIA'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -101,8 +102,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       try {
         await generarConIa(proyectoId, userId, edtIds, send, signal)
       } catch (err) {
-        const mensaje = err instanceof Error ? err.message : 'Error interno'
-        send('error', { mensaje })
+        console.error('[iperc/generar-ia]', err)
+        send('error', { mensaje: mensajeErrorIA(err, 'Error al generar el IPERC con IA') })
       } finally {
         controller.close()
       }

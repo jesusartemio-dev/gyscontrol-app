@@ -22,6 +22,7 @@ import {
   SECCIONES_CONFIG,
 } from '@/lib/planTrabajo/prompts/generarPlan'
 import type { PlanTrabajoContexto, PlanPersonal, PlanAlcanceDetalladoEdt } from '@/types/planTrabajo'
+import { mensajeErrorIA } from '@/lib/ia/errorIA'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -387,7 +388,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         console.log(`[generar-ia] done — guardadas=${seccionesGuardadas.length} errores=${seccionesConError.length}`)
       } catch (error: unknown) {
         console.error('[generar-ia] ERROR en start():', error)
-        const mensaje = error instanceof Error ? error.message : 'Error interno'
+        const mensaje = mensajeErrorIA(error, 'Error al generar el plan de trabajo')
         send('error', { mensaje })
       } finally {
         await liberarLockIA(planId)

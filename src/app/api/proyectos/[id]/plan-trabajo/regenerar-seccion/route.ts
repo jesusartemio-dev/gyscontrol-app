@@ -21,6 +21,7 @@ import { generarAlcanceDetallado, preservarEstadoManualTareas, aplicarAlcanceDeR
 import { obtenerCatalogoImagenesActivo, aplicarSugerenciasImagenesIA } from '@/lib/planTrabajo/aplicarSugerenciasImagenesIA'
 import { esSeccionEtapa1, etapa1Completa } from '@/lib/planTrabajo/etapas'
 import type { SeccionRegenerable, PlanPersonal, PlanAlcanceDetalladoEdt } from '@/types/planTrabajo'
+import { mensajeErrorIA } from '@/lib/ia/errorIA'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -391,7 +392,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         send('done', { seccionGuardada: seccion })
       } catch (error: unknown) {
         console.error('[plan-trabajo/regenerar-seccion] Error:', error)
-        const mensaje = error instanceof Error ? error.message : 'Error interno'
+        const mensaje = mensajeErrorIA(error, 'Error al regenerar la seccion')
         send('error', { mensaje })
       } finally {
         await liberarLockIA(planId)
