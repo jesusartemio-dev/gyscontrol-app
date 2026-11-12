@@ -18,6 +18,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { itemsDeControl } from '@/lib/iperc/riesgoResidual'
 import { evaluarRiesgo } from '@/lib/iperc/catalogos/matrizRiesgo'
 import type { IpercFila } from '@/types/iperc'
 
@@ -116,16 +117,26 @@ export function NivelBadge({ severidad, probabilidad }: { severidad: number; pro
   )
 }
 
-export function ControlesCell({ fila }: { fila: IpercFila }) {
+export function ControlesCell({
+  fila,
+  onEditarControles,
+}: {
+  fila: IpercFila
+  /** Abre el modal para agregar o quitar controles de esta fila. */
+  onEditarControles?: (fila: IpercFila) => void
+}) {
   const controles = [
     { tipo: 'ELI', label: 'Eliminación',    texto: fila.eliminar,              color: 'gray'   },
     { tipo: 'SUS', label: 'Sustitución',    texto: fila.sustituir,             color: 'gray'   },
     { tipo: 'ING', label: 'Ingeniería',     texto: fila.controlIngenieria,     color: 'blue'   },
     { tipo: 'ADM', label: 'Administrativo', texto: fila.controlAdministrativo, color: 'orange' },
     { tipo: 'EPP', label: 'EPP (Receptor)', texto: fila.controlReceptor,       color: 'green'  },
-  ].filter(c => c.texto && c.texto.trim() !== '' && c.texto !== 'NA')
+  ].map(c => ({ ...c, items: itemsDeControl(c.texto) }))
 
-  if (controles.length === 0) return <span className="text-muted-foreground text-xs">—</span>
+  // ING y ADM siempre se muestran, aunque esten vacios: sin ingenieria la
+  // severidad residual no baja y sin administrativo tampoco la probabilidad.
+  // Que falten es justamente lo que hay que ver.
+  const visibles = controles.filter(c => c.items.length > 0 || c.tipo === 'ING' || c.tipo === 'ADM')
 
   const badgeColor: Record<string, string> = {
     blue:   'bg-blue-100 text-blue-700',
@@ -144,37 +155,59 @@ export function ControlesCell({ fila }: { fila: IpercFila }) {
     <Popover>
       <PopoverTrigger asChild>
         <button
-          className="flex gap-1 items-center hover:opacity-80 transition-opacity"
+          className="flex flex-wrap items-center gap-1 transition-opacity hover:opacity-80"
           onClick={e => e.stopPropagation()}
+          title="Ver y editar los controles"
         >
-          {controles.map(c => (
+          {visibles.map(c => (
             <span
               key={c.tipo}
-              className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded', badgeColor[c.color])}
+              className={cn(
+                'rounded px-1 py-0.5 text-[10px] font-semibold',
+                c.items.length > 0
+                  ? badgeColor[c.color]
+                  : 'border border-dashed border-red-300 text-red-500',
+              )}
             >
               {c.tipo}
+              {c.items.length > 0 && <span className="ml-0.5 font-mono opacity-70">{c.items.length}</span>}
             </span>
           ))}
         </button>
       </PopoverTrigger>
-      <PopoverContent side="left" className="w-96 max-h-96 overflow-y-auto p-4">
-        <p className="font-semibold text-sm pb-2 border-b mb-3">Jerarquía de controles</p>
+      <PopoverContent side="left" className="max-h-96 w-96 overflow-y-auto p-4">
+        <div className="mb-3 flex items-center justify-between border-b pb-2">
+          <p className="text-sm font-semibold">Jerarquía de controles</p>
+          {onEditarControles && (
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onEditarControles(fila)}>
+              <Pencil className="mr-1 h-3 w-3" /> Editar
+            </Button>
+          )}
+        </div>
         <div className="space-y-3 text-sm">
-          {controles.map(c => (
+          {visibles.map(c => (
             <div key={c.tipo}>
-              <p className={cn('text-xs font-bold mb-0.5', labelColor[c.color])}>{c.label}</p>
-              <p className="text-foreground leading-relaxed">{c.texto}</p>
+              <p className={cn('mb-0.5 text-xs font-bold', labelColor[c.color])}>{c.label}</p>
+              {c.items.length === 0 ? (
+                <p className="text-xs italic text-red-500">
+                  Sin control — {c.tipo === 'ING' ? 'la severidad residual no baja' : 'la probabilidad residual no baja'}
+                </p>
+              ) : (
+                <ul className="list-disc space-y-0.5 pl-4 leading-relaxed">
+                  {c.items.map((x, i) => <li key={i}>{x}</li>)}
+                </ul>
+              )}
             </div>
           ))}
         </div>
         {fila.accionesMejora && fila.accionesMejora !== 'NA' && (
-          <div className="mt-3 pt-3 border-t">
-            <p className="text-xs font-bold text-muted-foreground mb-0.5">Plan de mejora</p>
+          <div className="mt-3 border-t pt-3">
+            <p className="mb-0.5 text-xs font-bold text-muted-foreground">Plan de mejora</p>
             <p className="text-sm leading-relaxed">{fila.accionesMejora}</p>
           </div>
         )}
         {fila.responsables && (
-          <p className="text-xs text-muted-foreground mt-2">
+          <p className="mt-2 text-xs text-muted-foreground">
             <span className="font-medium">Responsable: </span>{fila.responsables}
           </p>
         )}

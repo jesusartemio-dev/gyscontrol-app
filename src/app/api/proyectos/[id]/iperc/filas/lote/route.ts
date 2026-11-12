@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { z } from 'zod'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { aplicarReglasFila } from '@/lib/iperc/riesgoResidual'
 import { ipercFilaSchema } from '@/lib/validators/iperc'
 
 type Ctx = { params: Promise<{ id: string }> }
@@ -63,7 +64,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   const filas = await prisma.$transaction(async (tx) => {
     for (const a of actualizar) {
-      await tx.ipercFila.update({ where: { id: a.id }, data: a.cambios })
+      const previa = await tx.ipercFila.findUnique({
+        where: { id: a.id },
+        select: {
+          severidad: true, probabilidad: true,
+          controlIngenieria: true, controlAdministrativo: true, controlReceptor: true,
+        },
+      })
+      await tx.ipercFila.update({ where: { id: a.id }, data: aplicarReglasFila(a.cambios, previa) })
     }
 
     // Nuevas: detrás de su fila ancla, en el orden del texto (varias seguidas
@@ -72,7 +80,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     const ultimaDetrasDe = new Map<string, string>()
     for (const c of crear) {
       const creada = await tx.ipercFila.create({
-        data: { ipercId, numero: orden.length + 1, ...c.datos },
+        data: { ipercId, numero: orden.length + 1, ...aplicarReglasFila(c.datos) },
         select: { id: true },
       })
       const ancla = c.despuesDeId ? (ultimaDetrasDe.get(c.despuesDeId) ?? c.despuesDeId) : null

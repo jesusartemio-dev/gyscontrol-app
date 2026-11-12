@@ -1,4 +1,5 @@
 import type { Iperc, IpercFila, Proyecto } from '@prisma/client'
+import { controlParaExcel } from '@/lib/iperc/riesgoResidual'
 
 interface IpercEvaluador {
   nombre: string
@@ -49,9 +50,10 @@ export function construirDataBagIperc(iperc: IpercConFilas, proyecto: Proyecto) 
         probabilidad: f.probabilidad,
         eliminar: f.eliminar,
         sustituir: f.sustituir,
-        controlIngenieria: f.controlIngenieria,
-        controlAdministrativo: f.controlAdministrativo,
-        controlReceptor: f.controlReceptor,
+        // Un control por linea con vineta, como los escribe el SSOMA a mano.
+        controlIngenieria: controlParaExcel(f.controlIngenieria),
+        controlAdministrativo: controlParaExcel(f.controlAdministrativo),
+        controlReceptor: controlParaExcel(f.controlReceptor),
         severidadResidual: f.severidadResidual,
         probabilidadResidual: f.probabilidadResidual,
         accionesMejora: f.accionesMejora,

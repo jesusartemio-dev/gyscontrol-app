@@ -55,10 +55,19 @@ Para cada tarea en el lote:
 12. ELIMINAR: "NA" (raramente aplicable en campo)
 13. SUSTITUIR: "NA" salvo que haya alternativa clara
 14. CONTROL INGENIERÍA: guarda de máquinas, aislamiento, señalización física, barreras. Elige del catálogo o adapta.
+    Escribe UN CONTROL POR LÍNEA, sin viñetas ni numeración. No los unas en un párrafo.
 15. CONTROL ADMINISTRATIVO: procedimientos, PETAR, ART, capacitación, supervisión. Elige del catálogo o adapta.
+    Un control por línea, igual que el anterior.
 16. CONTROL RECEPTOR (EPP): guantes, casco, arnés, calzado dieléctrico, etc. Elige del catálogo.
-17. SEVERIDAD RESIDUAL (1-5): después de aplicar los controles.
-18. PROBABILIDAD RESIDUAL (A-E): después de aplicar los controles. Debe ser menor probabilidad que la inicial.
+    Un EPP por línea.
+17. SEVERIDAD RESIDUAL (1-5) y 18. PROBABILIDAD RESIDUAL (A-E): CALCÚLALAS CON ESTA REGLA, no por criterio:
+    - si la fila tiene control de INGENIERÍA  → severidad residual = severidad inicial + 1 (tope 5)
+    - si NO tiene control de ingeniería       → severidad residual = severidad inicial
+    - si la fila tiene control ADMINISTRATIVO → probabilidad residual = una letra más (tope E)
+    - si NO tiene control administrativo      → probabilidad residual = probabilidad inicial
+    El EPP, la eliminación y la sustitución NO modifican la valoración.
+    Es la regla que el especialista SSOMA aplica a mano; el sistema la recalcula igual, así que
+    apartarse de ella solo genera diferencias que se descartan.
 19. ACCIONES DE MEJORA: acciones de seguimiento o mejora continua (puede ser "NA" si no aplica).
 20. RESPONSABLES: cargo responsable de implementar los controles (ej: "Supervisor SSOMA", "Residente de obra").
 

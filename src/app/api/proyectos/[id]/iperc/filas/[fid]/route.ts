@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { aplicarReglasFila } from '@/lib/iperc/riesgoResidual'
 import { ipercFilaSchema } from '@/lib/validators/iperc'
 
 type Ctx = { params: Promise<{ id: string; fid: string }> }
@@ -71,9 +72,20 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: 'Datos inválidos', details: parsed.error.flatten() }, { status: 400 })
   }
 
+  // La regla del SSOMA manda sobre el residual, tambien al editar a mano: con
+  // los campos parciales hace falta la fila actual para conocer severidad,
+  // probabilidad y el control que no se esta tocando.
+  const actual = await prisma.ipercFila.findUnique({
+    where: { id: fid },
+    select: {
+      severidad: true, probabilidad: true,
+      controlIngenieria: true, controlAdministrativo: true, controlReceptor: true,
+    },
+  })
+
   const updated = await prisma.ipercFila.update({
     where: { id: fid },
-    data: parsed.data,
+    data: aplicarReglasFila(parsed.data, actual),
   })
 
   return NextResponse.json({ data: updated })

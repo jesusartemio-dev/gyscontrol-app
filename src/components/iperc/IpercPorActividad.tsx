@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import type { IpercFila } from '@/types/iperc'
 import { ControlesCell, FactorBadge, NivelBadge, ProbabilidadBadge, SeveridadBadge } from './TablaFilasIperc'
 import { EditarIpercTextoDialog } from './EditarIpercTextoDialog'
+import { EditarControlesDialog } from './EditarControlesDialog'
 
 interface Props {
   proyectoId: string
@@ -61,6 +62,7 @@ function ResumenNiveles({ filas }: { filas: IpercFila[] }) {
 
 export function IpercPorActividad({ proyectoId, filas, onEdit, onDelete, onAplicado }: Props) {
   const esCelular = useIsMobile()
+  const [filaControles, setFilaControles] = useState<IpercFila | null>(null)
   const grupos = useMemo<Grupo[]>(() => {
     const mapa = new Map<string, Grupo>()
     for (const f of filas) {
@@ -152,7 +154,7 @@ export function IpercPorActividad({ proyectoId, filas, onEdit, onDelete, onAplic
 
             {abierto && (esCelular
               ? <TarjetasFilas filas={g.filas} onEdit={onEdit} onDelete={onDelete} onTexto={(f) => setTexto({ titulo: `Fila ${f.numero}`, filas: [f] })} />
-              : <TablaGrupo filas={g.filas} onEdit={onEdit} onDelete={onDelete} onTexto={(f) => setTexto({ titulo: `Fila ${f.numero}`, filas: [f] })} />)}
+              : <TablaGrupo filas={g.filas} onEdit={onEdit} onDelete={onDelete} onTexto={(f) => setTexto({ titulo: `Fila ${f.numero}`, filas: [f] })} onControles={setFilaControles} />)}
           </section>
         )
       })}
@@ -168,6 +170,20 @@ export function IpercPorActividad({ proyectoId, filas, onEdit, onDelete, onAplic
           onAplicado={onAplicado}
         />
       )}
+
+      <EditarControlesDialog
+        proyectoId={proyectoId}
+        fila={filaControles}
+        onClose={() => setFilaControles(null)}
+        onGuardado={async () => {
+          // Recargar: el residual cambia al agregar o quitar un control.
+          const r = await fetch(`/api/proyectos/${proyectoId}/iperc/contexto`)
+          if (r.ok) {
+            const d = await r.json()
+            if (d?.iperc?.filas) onAplicado(d.iperc.filas)
+          }
+        }}
+      />
     </div>
   )
 }
@@ -176,10 +192,12 @@ interface AccionesFila {
   onEdit: (fila: IpercFila) => void
   onDelete: (filaId: string) => void
   onTexto: (fila: IpercFila) => void
+  /** Abre el modal de controles de esa fila. */
+  onControles: (fila: IpercFila) => void
 }
 
 /** Celular: una tarjeta por fila. */
-function TarjetasFilas({ filas, onEdit, onDelete, onTexto }: { filas: IpercFila[] } & AccionesFila) {
+function TarjetasFilas({ filas, onEdit, onDelete, onTexto }: { filas: IpercFila[] } & Omit<AccionesFila, 'onControles'>) {
   return (
     <div className="divide-y">
       {filas.map((f) => {
@@ -244,7 +262,7 @@ function TarjetasFilas({ filas, onEdit, onDelete, onTexto }: { filas: IpercFila[
 }
 
 /** PC: tabla de la actividad; Tarea fija a la izquierda al desplazar. */
-function TablaGrupo({ filas, onEdit, onDelete, onTexto }: { filas: IpercFila[] } & AccionesFila) {
+function TablaGrupo({ filas, onEdit, onDelete, onTexto, onControles }: { filas: IpercFila[] } & AccionesFila) {
   const th = 'px-1.5 py-1 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap'
   const td = 'px-1.5 py-1 align-top'
   // Dos lineas, no tres: con tres, una fila ocupaba casi 100 px de alto y en
@@ -321,7 +339,7 @@ function TablaGrupo({ filas, onEdit, onDelete, onTexto }: { filas: IpercFila[] }
                 <td className={cn(td, fondo, 'text-center')}><SeveridadBadge valor={f.severidad} /></td>
                 <td className={cn(td, fondo, 'text-center')}><ProbabilidadBadge valor={f.probabilidad} /></td>
                 <td className={cn(td, fondo)}><NivelBadge severidad={f.severidad} probabilidad={f.probabilidad} /></td>
-                <td className={cn(td, fondo)}><ControlesCell fila={f} /></td>
+                <td className={cn(td, fondo)}><ControlesCell fila={f} onEditarControles={onControles} /></td>
                 <td className={cn(td, fondo, 'text-center')}><SeveridadBadge valor={f.severidadResidual} /></td>
                 <td className={cn(td, fondo, 'text-center')}><ProbabilidadBadge valor={f.probabilidadResidual} /></td>
                 <td className={cn(td, fondo)}><NivelBadge severidad={f.severidadResidual} probabilidad={f.probabilidadResidual} /></td>

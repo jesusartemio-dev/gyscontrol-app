@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { aplicarReglasFila } from '@/lib/iperc/riesgoResidual'
 import { ipercFilaSchema } from '@/lib/validators/iperc'
 
 type Ctx = { params: Promise<{ id: string }> }
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     data: {
       ipercId: result.ipercId,
       numero,
-      ...parsed.data,
+      ...aplicarReglasFila(parsed.data),
     },
   })
 
