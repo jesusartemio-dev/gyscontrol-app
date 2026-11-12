@@ -12,6 +12,7 @@ import { PreRequisitosPanelIperc } from './PreRequisitosPanelIperc'
 import { BotonGenerarIaIperc } from './BotonGenerarIaIperc'
 import { SeleccionEdtsModal } from './SeleccionEdtsModal'
 import { PanelBloquesIperc, type BloqueIperc } from './PanelBloquesIperc'
+import { ActividadesSimilaresPanel } from './ActividadesSimilaresPanel'
 import { TablaFilasIperc } from './TablaFilasIperc'
 import { IpercPorActividad } from './IpercPorActividad'
 import { EditorFilaSheet } from './EditorFilaSheet'
@@ -449,6 +450,14 @@ export default function IpercClient({ proyectoId }: Props) {
         onRedefinir={handleAbrirModal}
         disabled={isGenerando}
       />
+
+      {iperc.filas.length > 0 && (
+        <ActividadesSimilaresPanel
+          proyectoId={proyectoId}
+          refreshKey={iperc.filas.length}
+          onAplicado={fetchContexto}
+        />
+      )}
 
       {/* Filas por actividad (tabla en PC, tarjetas en celular) con "Texto / IA"
           por actividad, por fila o todo. Sin filas: el estado vacío de siempre. */}
