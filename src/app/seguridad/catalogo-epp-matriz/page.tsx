@@ -165,6 +165,25 @@ export default function CatalogoEppMatrizPage() {
           puestos={puestos}
           marcandoId={marcando}
           onEditar={e => setEditando({ ...e })}
+          onCopiar={async (desdePuestoId, hacia) => {
+            const origen = puestos.find(p => p.id === desdePuestoId)
+            const tiene = items.filter(i => i.puestoIdsDefault.includes(hacia.id)).length
+            if (!confirm(
+              `Copiar a "${hacia.nombre}" los EPP de "${origen?.nombre}".` +
+              (tiene > 0 ? ` Se reemplazan los ${tiene} que ya tiene.` : '') +
+              '\n\n¿Continuar?'
+            )) return
+
+            const r = await fetch('/api/seguridad/catalogo-epp-matriz', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ accion: 'copiar-columna', desdePuestoId, haciaPuestoId: hacia.id }),
+            })
+            const d = await r.json()
+            if (!r.ok) { toast.error(d.error ?? 'No se pudo copiar'); return }
+            toast.success(`${d.copiados} EPP copiados a ${hacia.nombre}. Revisa y corrige lo que no aplique.`)
+            await cargar()
+          }}
           onAlternar={async (epp, puestoId) => {
             const tiene = epp.puestoIdsDefault.includes(puestoId)
             const ids = tiene
@@ -408,13 +427,14 @@ export default function CatalogoEppMatrizPage() {
  * nada, que es justo lo que hay que llenar.
  */
 function MatrizPuestos({
-  items, puestos, marcandoId, onAlternar, onEditar,
+  items, puestos, marcandoId, onAlternar, onEditar, onCopiar,
 }: {
   items: Epp[]
   puestos: Puesto[]
   marcandoId: string | null
   onAlternar: (epp: Epp, puestoId: string) => void
   onEditar: (epp: Epp) => void
+  onCopiar: (desdePuestoId: string, hacia: Puesto) => void
 }) {
   if (puestos.length === 0) {
     return (
@@ -456,6 +476,19 @@ function MatrizPuestos({
                   >
                     {porPuesto.get(p.id) ?? 0}
                   </span>
+                  <select
+                    className="mt-0.5 h-4 w-9 cursor-pointer rounded border bg-background text-[9px]"
+                    value=""
+                    title={`Copiar a "${p.nombre}" los EPP de otro puesto`}
+                    onChange={ev => { if (ev.target.value) onCopiar(ev.target.value, p) }}
+                  >
+                    <option value="">⇐</option>
+                    {puestos.filter(o => o.id !== p.id && (porPuesto.get(o.id) ?? 0) > 0).map(o => (
+                      <option key={o.id} value={o.id}>
+                        {o.nombre} ({porPuesto.get(o.id)})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </th>
             ))}

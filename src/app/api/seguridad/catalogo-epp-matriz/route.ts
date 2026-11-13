@@ -101,6 +101,43 @@ export async function PATCH(req: NextRequest) {
 }
 
 /**
+ * Copia la columna de un puesto sobre otro.
+ *
+ * Los cinco puestos que el documento MPP original no tenía arrancan sin
+ * ningún EPP, y llenarlos a mano son hasta 44 clics por columna. Casi
+ * siempre hay un puesto equivalente del que partir: Técnico Electrotecnia de
+ * Técnico Eléctrico, Supervisor de Campo de Supervisor de Proyecto.
+ *
+ * Reemplaza la columna entera, no suma: copiar es decir "que quede igual a
+ * esta", y después se corrige lo que difiera.
+ */
+async function copiarColumna(body: { desdePuestoId?: unknown; haciaPuestoId?: unknown }) {
+  const desde = String(body.desdePuestoId ?? '')
+  const hacia = String(body.haciaPuestoId ?? '')
+  if (!desde || !hacia) {
+    return Response.json({ error: 'Faltan los puestos' }, { status: 400 })
+  }
+  if (desde === hacia) {
+    return Response.json({ error: 'Es el mismo puesto' }, { status: 400 })
+  }
+
+  const origen = await prisma.mppEppPuestoDefault.findMany({
+    where: { puestoId: desde },
+    select: { mppEppCatalogoId: true },
+  })
+
+  await prisma.$transaction([
+    prisma.mppEppPuestoDefault.deleteMany({ where: { puestoId: hacia } }),
+    prisma.mppEppPuestoDefault.createMany({
+      data: origen.map(o => ({ mppEppCatalogoId: o.mppEppCatalogoId, puestoId: hacia })),
+      skipDuplicates: true,
+    }),
+  ])
+
+  return Response.json({ copiados: origen.length })
+}
+
+/**
  * POST — agrega un EPP al catálogo, al final.
  *
  * El `orden` ya no ata la foto a una fila de la plantilla —la imagen cuelga
@@ -114,6 +151,9 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}))
+
+  if (body.accion === 'copiar-columna') return copiarColumna(body)
+
   const puestoIds = leerPuestoIds(body.puestoIdsDefault)
   const nombre = String(body.nombre ?? '').trim()
   if (!nombre) return Response.json({ error: 'Falta el nombre' }, { status: 400 })
