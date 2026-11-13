@@ -53,6 +53,7 @@ export default function IpercClient({ proyectoId }: Props) {
   // EDT selection modal
   const [modalEdtsOpen, setModalEdtsOpen] = useState(false)
   const [estructuraKey, setEstructuraKey] = useState(0)
+  const [lineasFijas, setLineasFijas] = useState(0)
 
   // Editor sheet state
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -92,6 +93,7 @@ export default function IpercClient({ proyectoId }: Props) {
       if (!r.ok) return
       const d = await r.json()
       setBloques(Array.isArray(d.bloques) ? d.bloques : [])
+      setLineasFijas(d.lineasFijas ?? 0)
     } catch { /* la pantalla funciona igual sin el panel */ }
   }, [proyectoId])
 
@@ -186,6 +188,7 @@ export default function IpercClient({ proyectoId }: Props) {
         return
       }
       setBloques(d.bloques ?? [])
+      setLineasFijas(d.lineasFijas ?? 0)
 
       toast.success(
         `${de.items?.length ?? 0} tareas en la lista, ${de.totalFilasPrevistas ?? 0} filas previstas ` +
@@ -477,6 +480,7 @@ export default function IpercClient({ proyectoId }: Props) {
         progreso={progreso}
         onGenerar={generarBloque}
         onGenerarPendientes={generarPendientes}
+        lineasFijas={lineasFijas}
         onRedefinir={handleAbrirModal}
         disabled={isGenerando}
       />

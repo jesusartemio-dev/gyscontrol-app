@@ -4,6 +4,55 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { construirBloques } from '@/lib/iperc/construirBloques'
+import { claveLinea } from '@/lib/iperc/construirEstructura'
+
+/**
+ * Los bloques con lo que de verdad van a generar.
+ *
+ * `tareaIds` son tareas del cronograma, y despues de unir o fusionar varias
+ * apuntan a una sola linea de la estructura: el panel decia "68 tareas"
+ * cuando quedaban 61 lineas, y no decia cuantas filas iban a salir, que es lo
+ * que importa para saber cuanto va a tardar.
+ */
+async function conEstructura(ipercId: string) {
+  const [bloques, items, filas] = await Promise.all([
+    prisma.ipercBloque.findMany({ where: { ipercId }, orderBy: { numero: 'asc' } }),
+    prisma.ipercEstructuraItem.findMany({
+      where: { ipercId, origen: { not: 'fija' } },
+      select: {
+        proceso: true, actividad: true, tarea: true,
+        peligrosPrevistos: true, tareaIds: true,
+      },
+    }),
+    prisma.ipercFila.findMany({
+      where: { ipercId },
+      select: { proceso: true, actividad: true, tarea: true },
+    }),
+  ])
+
+  const conFila = new Set(filas.map(claveLinea))
+
+  return bloques.map(b => {
+    const suyos = items.filter(i => i.tareaIds.some(t => b.tareaIds.includes(t)))
+    // Sin estructura (IPERC de antes de que existiera) se informa el cronograma.
+    const hayEstructura = suyos.length > 0
+    return {
+      id: b.id,
+      numero: b.numero,
+      nombre: b.nombre,
+      totalTareas: hayEstructura ? suyos.length : b.tareaIds.length,
+      totalActividades: b.actividadIds.length,
+      filasPrevistas: hayEstructura
+        ? suyos.reduce((n, i) => n + i.peligrosPrevistos, 0)
+        : null,
+      lineasHechas: hayEstructura ? suyos.filter(i => conFila.has(claveLinea(i))).length : null,
+      estado: b.estado,
+      filasGeneradas: b.filasGeneradas,
+      errorMensaje: b.errorMensaje,
+      generadoEn: b.generadoEn,
+    }
+  })
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -46,23 +95,11 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   })
   if (!iperc) return Response.json({ bloques: [] })
 
-  const bloques = await prisma.ipercBloque.findMany({
-    where: { ipercId: iperc.id },
-    orderBy: { numero: 'asc' },
-  })
-
   return Response.json({
-    bloques: bloques.map(b => ({
-      id: b.id,
-      numero: b.numero,
-      nombre: b.nombre,
-      totalTareas: b.tareaIds.length,
-      totalActividades: b.actividadIds.length,
-      estado: b.estado,
-      filasGeneradas: b.filasGeneradas,
-      errorMensaje: b.errorMensaje,
-      generadoEn: b.generadoEn,
-    })),
+    bloques: await conEstructura(iperc.id),
+    lineasFijas: await prisma.ipercEstructuraItem.count({
+      where: { ipercId: iperc.id, origen: 'fija' },
+    }),
   })
 }
 
@@ -127,22 +164,10 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     }),
   ])
 
-  const bloques = await prisma.ipercBloque.findMany({
-    where: { ipercId: iperc.id },
-    orderBy: { numero: 'asc' },
-  })
-
   return Response.json({
-    bloques: bloques.map(b => ({
-      id: b.id,
-      numero: b.numero,
-      nombre: b.nombre,
-      totalTareas: b.tareaIds.length,
-      totalActividades: b.actividadIds.length,
-      estado: b.estado,
-      filasGeneradas: b.filasGeneradas,
-      errorMensaje: b.errorMensaje,
-      generadoEn: b.generadoEn,
-    })),
+    bloques: await conEstructura(iperc.id),
+    lineasFijas: await prisma.ipercEstructuraItem.count({
+      where: { ipercId: iperc.id, origen: 'fija' },
+    }),
   })
 }

@@ -22,6 +22,10 @@ export interface BloqueIperc {
   nombre: string
   totalTareas: number
   totalActividades: number
+  /** Filas que va a escribir, segun los peligros fijados en la estructura. */
+  filasPrevistas: number | null
+  /** Lineas del bloque que ya tienen filas. */
+  lineasHechas: number | null
   estado: string
   filasGeneradas: number
   errorMensaje: string | null
@@ -37,6 +41,8 @@ interface Props {
   onGenerar: (bloqueId: string) => void
   onGenerarPendientes: () => void
   onRedefinir: () => void
+  /** Lineas que salen del catalogo y no pasan por la IA, asi que no van en bloques. */
+  lineasFijas?: number
   disabled?: boolean
 }
 
@@ -55,6 +61,7 @@ export function PanelBloquesIperc({
   onGenerar,
   onGenerarPendientes,
   onRedefinir,
+  lineasFijas = 0,
   disabled,
 }: Props) {
   // Con todo generado el panel ya cumplio su funcion y lo unico que importa
@@ -69,6 +76,10 @@ export function PanelBloquesIperc({
   const pendientes = bloques.filter(b => b.estado !== 'listo').length
   const totalTareas = bloques.reduce((s, b) => s + b.totalTareas, 0)
   const totalFilas = bloques.reduce((s, b) => s + b.filasGeneradas, 0)
+  // Lo que falta escribir: solo de los bloques que todavia no se generaron.
+  const previstasPendientes = bloques
+    .filter(b => b.estado !== 'listo')
+    .reduce((s, b) => s + (b.filasPrevistas ?? 0), 0)
 
   if (!abierto) {
     return (
@@ -101,8 +112,14 @@ export function PanelBloquesIperc({
               {pendientes > 0 && ` · ${pendientes} por generar`}
             </p>
             <p className="text-xs text-muted-foreground">
-              {totalTareas} tareas en total · {totalFilas} filas generadas. Cada bloque se genera
-              por separado; si uno falla, reintentas solo ese.
+              {totalTareas} tareas en total
+              {totalFilas > 0 && ` · ${totalFilas} filas generadas`}
+              {previstasPendientes > 0 && ` · ${previstasPendientes} filas por generar`}
+              . Cada bloque se genera por separado; si uno falla, reintentas solo ese.
+              {lineasFijas > 0 && (
+                <> Las {lineasFijas} actividades fijas no van en bloques: salen del catálogo
+                sin pasar por la IA.</>
+              )}
             </p>
           </div>
           <div className="flex gap-2">
@@ -147,7 +164,9 @@ export function PanelBloquesIperc({
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
                     {b.totalTareas} tarea{b.totalTareas === 1 ? '' : 's'}
                     {b.totalActividades > 0 && ` · ${b.totalActividades} actividad${b.totalActividades === 1 ? '' : 'es'}`}
-                    {b.filasGeneradas > 0 && ` · ${b.filasGeneradas} filas`}
+                    {b.filasGeneradas > 0
+                      ? ` · ${b.filasGeneradas} filas`
+                      : b.filasPrevistas != null && ` · ${b.filasPrevistas} filas previstas`}
                   </p>
                   {esteGenerando && statusMsg && (
                     <p className="mt-0.5 text-[11px] text-blue-700">
