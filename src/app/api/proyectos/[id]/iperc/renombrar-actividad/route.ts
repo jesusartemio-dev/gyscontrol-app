@@ -12,10 +12,14 @@ type Ctx = { params: Promise<{ id: string }> }
 const ROLES_CON_ACCESO = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'seguridad']
 
 /**
- * POST — renombra un proceso o una actividad en todas sus filas.
+ * POST — renombra un proceso o una actividad.
  *
- * El nombre de la actividad no es de una fila sino del grupo: cambiarlo fila
- * por fila desde el editor dejaría el grupo partido en dos mientras se avanza.
+ * Cada nombre tiene su alcance y no es el mismo:
+ *
+ *  - el PROCESO alcanza a todas sus actividades. "ACTIVIDADES GENERALES" es
+ *    el encabezado de un bloque del IPERC, así que cambiarlo en una sola
+ *    actividad partiría el bloque en dos.
+ *  - la ACTIVIDAD alcanza solo a sus filas.
  *
  * Toca también la estructura, porque la línea se reconoce por proceso +
  * actividad + tarea: si solo se renombraran las filas, la estructura dejaría
@@ -60,18 +64,43 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     return Response.json({ filas: 0, lineas: 0 })
   }
 
-  const donde = { ipercId: iperc.id, proceso, actividad }
+  const ops = []
 
-  const [filas, lineas] = await prisma.$transaction([
-    prisma.ipercFila.updateMany({
-      where: donde,
-      data: { proceso: nuevoProceso, actividad: nuevaActividad, updatedAt: new Date() },
-    }),
-    prisma.ipercEstructuraItem.updateMany({
-      where: donde,
-      data: { proceso: nuevoProceso, actividad: nuevaActividad, updatedAt: new Date() },
-    }),
-  ])
+  // El proceso primero y sobre todas sus actividades; después la actividad,
+  // ya dentro del proceso nuevo.
+  if (nuevoProceso !== proceso) {
+    ops.push(
+      prisma.ipercFila.updateMany({
+        where: { ipercId: iperc.id, proceso },
+        data: { proceso: nuevoProceso, updatedAt: new Date() },
+      }),
+      prisma.ipercEstructuraItem.updateMany({
+        where: { ipercId: iperc.id, proceso },
+        data: { proceso: nuevoProceso, updatedAt: new Date() },
+      }),
+    )
+  }
+  if (nuevaActividad !== actividad) {
+    ops.push(
+      prisma.ipercFila.updateMany({
+        where: { ipercId: iperc.id, proceso: nuevoProceso, actividad },
+        data: { actividad: nuevaActividad, updatedAt: new Date() },
+      }),
+      prisma.ipercEstructuraItem.updateMany({
+        where: { ipercId: iperc.id, proceso: nuevoProceso, actividad },
+        data: { actividad: nuevaActividad, updatedAt: new Date() },
+      }),
+    )
+  }
 
-  return Response.json({ filas: filas.count, lineas: lineas.count })
+  await prisma.$transaction(ops)
+
+  const filas = await prisma.ipercFila.count({
+    where: { ipercId: iperc.id, proceso: nuevoProceso, actividad: nuevaActividad },
+  })
+  const delProceso = await prisma.ipercFila.count({
+    where: { ipercId: iperc.id, proceso: nuevoProceso },
+  })
+
+  return Response.json({ filas, filasDelProceso: delProceso })
 }

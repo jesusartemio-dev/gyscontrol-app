@@ -200,7 +200,7 @@ export default function CatalogoActividadesIpercPage() {
       )}
 
       <Dialog open={!!editando} onOpenChange={v => { if (!v) setEditando(null) }}>
-        <DialogContent className="flex max-h-[92vh] max-w-3xl flex-col gap-3">
+        <DialogContent className="flex max-h-[92vh] max-w-4xl flex-col gap-3">
           <DialogHeader>
             <DialogTitle className="text-base">
               {editando?.id ? 'Editar actividad fija' : 'Nueva actividad fija'}
@@ -213,7 +213,7 @@ export default function CatalogoActividadesIpercPage() {
           {editando && (
             <>
               <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-1">
-                <div className="grid gap-2 sm:grid-cols-3">
+                <div className="grid gap-2 sm:grid-cols-2">
                   <Campo label="Proceso">
                     <Input className="h-8 text-xs" list="procesos-fijos"
                       value={editando.proceso ?? ''}
@@ -226,11 +226,11 @@ export default function CatalogoActividadesIpercPage() {
                     <Input className="h-8 text-xs" value={editando.actividad ?? ''}
                       onChange={e => setEditando({ ...editando, actividad: e.target.value })} />
                   </Campo>
-                  <Campo label="Tarea">
-                    <Input className="h-8 text-xs" value={editando.tarea ?? ''}
-                      onChange={e => setEditando({ ...editando, tarea: e.target.value })} />
-                  </Campo>
                 </div>
+                <Campo label="Tarea">
+                  <Input className="h-8 text-xs" value={editando.tarea ?? ''}
+                    onChange={e => setEditando({ ...editando, tarea: e.target.value })} />
+                </Campo>
 
                 <div className="grid gap-2 sm:grid-cols-3">
                   <Campo label="Puesto de trabajo">

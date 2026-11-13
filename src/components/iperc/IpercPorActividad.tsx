@@ -104,7 +104,7 @@ function ResumenNiveles({ filas }: { filas: IpercFila[] }) {
 export function IpercPorActividad({ proyectoId, filas, onEdit, onDelete, onAplicado }: Props) {
   const [revisandoId, setRevisandoId] = useState<string | null>(null)
   const [renombrando, setRenombrando] = useState<
-    { proceso: string; actividad: string; filas: number } | null
+    { proceso: string; actividad: string; filas: number; actividadesDelProceso: number } | null
   >(null)
 
   /** Marca la linea como revisada. Es una marca de la app: el Excel no la lleva. */
@@ -211,7 +211,12 @@ export function IpercPorActividad({ proyectoId, filas, onEdit, onDelete, onAplic
                 variant="ghost"
                 size="sm"
                 className="h-8 shrink-0 px-2 text-xs"
-                onClick={() => setRenombrando({ proceso: g.proceso, actividad: g.actividad, filas: g.filas.length })}
+                onClick={() => setRenombrando({
+                  proceso: g.proceso,
+                  actividad: g.actividad,
+                  filas: g.filas.length,
+                  actividadesDelProceso: grupos.filter(x => x.proceso === g.proceso).length,
+                })}
                 title="Renombrar el proceso o la actividad en todas sus filas"
               >
                 <Pencil className="h-3.5 w-3.5 sm:mr-1" />
@@ -234,7 +239,10 @@ export function IpercPorActividad({ proyectoId, filas, onEdit, onDelete, onAplic
           const r = await fetch(`/api/proyectos/${proyectoId}/iperc/contexto`)
           if (r.ok) {
             const d = await r.json()
-            if (d?.iperc?.filas) onAplicado(d.iperc.filas)
+            // La ruta responde { data: contexto }: leyendo d.iperc el refresco
+            // no hacia nada y habia que recargar la pagina a mano.
+            const nuevas = d?.data?.iperc?.filas
+            if (nuevas) onAplicado(nuevas)
           }
         }}
       />
@@ -260,7 +268,10 @@ export function IpercPorActividad({ proyectoId, filas, onEdit, onDelete, onAplic
           const r = await fetch(`/api/proyectos/${proyectoId}/iperc/contexto`)
           if (r.ok) {
             const d = await r.json()
-            if (d?.iperc?.filas) onAplicado(d.iperc.filas)
+            // La ruta responde { data: contexto }: leyendo d.iperc el refresco
+            // no hacia nada y habia que recargar la pagina a mano.
+            const nuevas = d?.data?.iperc?.filas
+            if (nuevas) onAplicado(nuevas)
           }
         }}
       />
@@ -278,7 +289,7 @@ function RenombrarActividadDialog({
   proyectoId, datos, onClose, onRenombrado,
 }: {
   proyectoId: string
-  datos: { proceso: string; actividad: string; filas: number } | null
+  datos: { proceso: string; actividad: string; filas: number; actividadesDelProceso: number } | null
   onClose: () => void
   onRenombrado: () => void
 }) {
@@ -310,7 +321,11 @@ function RenombrarActividadDialog({
       })
       const d = await r.json()
       if (!r.ok) { toast.error(d.error ?? 'No se pudo renombrar'); return }
-      toast.success(`${d.filas} fila(s) renombradas`)
+      toast.success(
+        proceso.trim() !== datos.proceso
+          ? `Listo · ${d.filasDelProceso} fila(s) en "${proceso.trim()}"`
+          : `${d.filas} fila(s) renombradas`,
+      )
       onClose()
       onRenombrado()
     } finally {
@@ -324,15 +339,22 @@ function RenombrarActividadDialog({
         <DialogHeader>
           <DialogTitle className="text-base">Renombrar actividad</DialogTitle>
           <DialogDescription className="text-xs">
-            Cambia el nombre en las {datos.filas} fila{datos.filas === 1 ? '' : 's'} de esta
-            actividad y en la estructura del IPERC. No toca el cronograma ni el catálogo.
+            Cambia el nombre en este IPERC y en su estructura. No toca el cronograma ni el
+            catálogo de seguridad.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2.5">
+        <div className="space-y-3">
           <div>
             <label className="mb-1 block text-xs font-medium">Proceso</label>
             <Input className="h-8 text-sm" value={proceso} onChange={(e) => setProceso(e.target.value)} />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Es el encabezado del bloque: el cambio alcanza a{' '}
+              <span className="font-medium">
+                las {datos.actividadesDelProceso} actividades de &ldquo;{datos.proceso}&rdquo;
+              </span>
+              , no solo a esta. Cambiarlo en una sola partiría el bloque en dos.
+            </p>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium">Actividad</label>
@@ -342,6 +364,9 @@ function RenombrarActividadDialog({
               onChange={(e) => setActividad(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !sinCambios) guardar() }}
             />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Alcanza solo a sus {datos.filas} fila{datos.filas === 1 ? '' : 's'}.
+            </p>
           </div>
         </div>
 
