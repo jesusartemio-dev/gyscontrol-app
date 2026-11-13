@@ -159,20 +159,10 @@ export default function IpercClient({ proyectoId }: Props) {
     setModalEdtsOpen(false)
     setCobertura(null)
     try {
-      const r = await fetch(`/api/proyectos/${proyectoId}/iperc/bloques`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ edtIds }),
-      })
-      const d = await r.json()
-      if (!r.ok) {
-        toast.error(d.error ?? 'No se pudo definir la estructura')
-        return
-      }
-      setBloques(d.bloques ?? [])
-
-      // La lista de actividades y tareas que se va a analizar. Va antes que
-      // la IA a propósito: es donde se saca lo que no va y se une lo repetido.
+      // La lista de actividades y tareas va PRIMERO: los bloques se reparten
+      // sobre ella, contando las filas que cada una va a producir. Al revés,
+      // el reparto salía de las tareas crudas del cronograma y quedaba
+      // contando trabajo que la estructura todavía no había depurado.
       const re = await fetch(`/api/proyectos/${proyectoId}/iperc/estructura`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -181,13 +171,26 @@ export default function IpercClient({ proyectoId }: Props) {
       const de = await re.json()
       if (!re.ok) {
         toast.error(de.error ?? 'No se pudo armar la lista de tareas')
-      } else {
-        setEstructuraKey(k => k + 1)
-        toast.success(
-          `${de.items?.length ?? 0} tareas en la lista, ${de.totalFilasPrevistas ?? 0} filas previstas. ` +
-          'Revísala antes de generar.'
-        )
+        return
       }
+      setEstructuraKey(k => k + 1)
+
+      const r = await fetch(`/api/proyectos/${proyectoId}/iperc/bloques`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ edtIds }),
+      })
+      const d = await r.json()
+      if (!r.ok) {
+        toast.error(d.error ?? 'No se pudo repartir el trabajo en bloques')
+        return
+      }
+      setBloques(d.bloques ?? [])
+
+      toast.success(
+        `${de.items?.length ?? 0} tareas en la lista, ${de.totalFilasPrevistas ?? 0} filas previstas ` +
+        `en ${d.bloques?.length ?? 0} bloques. Revísala antes de generar.`
+      )
     } catch {
       toast.error('No se pudo definir la estructura')
     }
@@ -463,6 +466,7 @@ export default function IpercClient({ proyectoId }: Props) {
         proyectoId={proyectoId}
         onArmar={handleAbrirModal}
         refreshKey={estructuraKey + iperc.filas.length}
+        onCambio={fetchBloques}
         disabled={isGenerando}
       />
 

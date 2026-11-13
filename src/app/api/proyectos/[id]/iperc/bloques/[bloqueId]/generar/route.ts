@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { claveLinea } from '@/lib/iperc/construirEstructura'
 import { isIAFeatureEnabled } from '@/lib/agente/featureFlags'
 import { validarPreRequisitos } from '@/lib/iperc/validarPreRequisitos'
 import { generarConIa } from '@/lib/iperc/generarConIa'
@@ -83,6 +84,52 @@ export async function POST(req: NextRequest, ctx: Ctx) {
         }
       }
 
+      /**
+       * Qué tenía que evaluar este bloque y qué quedó sin evaluar.
+       *
+       * Se cuenta contra la estructura revisada, no contra las tareas del
+       * cronograma: al unir dos tareas, las dos apuntan a una sola línea que
+       * se evalúa una vez, y eso es exactamente lo que se pidió. Contando las
+       * del cronograma, un bloque con tareas unidas se marcaba como fallido
+       * aunque hubiera generado todo lo que correspondía.
+       */
+      const cobertura = async (b: { ipercId: string; tareaIds: string[] }) => {
+        const items = await prisma.ipercEstructuraItem.findMany({
+          where: { ipercId: b.ipercId, origen: { not: 'fija' } },
+          select: { proceso: true, actividad: true, tarea: true, tareaIds: true },
+        })
+        const delBloque = items.filter(i => i.tareaIds.some(t => b.tareaIds.includes(t)))
+
+        // Sin estructura (IPERC de antes de que existiera) se cuenta como siempre.
+        if (delBloque.length === 0) {
+          const cubiertas = await prisma.ipercFila.findMany({
+            where: { ipercId: b.ipercId, tareaCronogramaRefId: { in: b.tareaIds } },
+            select: { tareaCronogramaRefId: true },
+            distinct: ['tareaCronogramaRefId'],
+          })
+          return {
+            esperadas: b.tareaIds.length,
+            cubiertas: cubiertas.length,
+            faltantes: Array<string>(b.tareaIds.length - cubiertas.length).fill('(tarea del cronograma)'),
+          }
+        }
+
+        const filas = await prisma.ipercFila.findMany({
+          where: { ipercId: b.ipercId },
+          select: { proceso: true, actividad: true, tarea: true },
+        })
+        const conFila = new Set(filas.map(claveLinea))
+        const faltantes = delBloque
+          .filter(i => !conFila.has(claveLinea(i)))
+          .map(i => i.tarea)
+
+        return {
+          esperadas: delBloque.length,
+          cubiertas: delBloque.length - faltantes.length,
+          faltantes,
+        }
+      }
+
       // El estado del bloque se decide mirando la BD, no los eventos: si la
       // función muere por timeout no llega ningún evento, y el bloque tiene
       // que quedar marcado como fallido igual.
@@ -90,12 +137,10 @@ export async function POST(req: NextRequest, ctx: Ctx) {
         const filas = await prisma.ipercFila.count({
           where: { ipercId: bloque.ipercId, tareaCronogramaRefId: { in: bloque.tareaIds } },
         })
-        const tareasCubiertas = await prisma.ipercFila.findMany({
-          where: { ipercId: bloque.ipercId, tareaCronogramaRefId: { in: bloque.tareaIds } },
-          select: { tareaCronogramaRefId: true },
-          distinct: ['tareaCronogramaRefId'],
-        })
-        const completo = tareasCubiertas.length === bloque.tareaIds.length
+
+        const { esperadas, cubiertas, faltantes } = await cobertura(bloque)
+        const completo = faltantes.length === 0
+
         await prisma.ipercBloque.update({
           where: { id: bloqueId },
           data: {
@@ -104,11 +149,13 @@ export async function POST(req: NextRequest, ctx: Ctx) {
             generadoEn: new Date(),
             errorMensaje: completo
               ? null
-              : `Quedaron ${bloque.tareaIds.length - tareasCubiertas.length} de ${bloque.tareaIds.length} tareas sin evaluar. Reintenta este bloque.`,
+              : `Quedaron ${faltantes.length} de ${esperadas} tareas sin evaluar: ` +
+                `${faltantes.slice(0, 3).join('; ')}` +
+                `${faltantes.length > 3 ? ` y ${faltantes.length - 3} más` : ''}. Reintenta este bloque.`,
             updatedAt: new Date(),
           },
         })
-        return { completo, filas, sinEvaluar: bloque.tareaIds.length - tareasCubiertas.length }
+        return { completo, filas, sinEvaluar: faltantes.length, esperadas, cubiertas }
       }
 
       try {

@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { construirEstructura } from '@/lib/iperc/construirEstructura'
+import { sincronizarBloques } from '@/lib/iperc/construirBloques'
 import {
   detectarFusiones, detectarTareasRepetidas, fusionarActividades,
 } from '@/lib/iperc/reducirEstructura'
@@ -37,7 +38,16 @@ async function autorizar(proyectoId: string) {
   return { userId }
 }
 
-async function devolverEstructura(ipercId: string) {
+/**
+ * Devuelve la estructura y deja los bloques siguiendola.
+ *
+ * Los bloques se definen al elegir los EDTs y la estructura se edita despues:
+ * sin esto, unir dos tareas o fusionar dos actividades dejaba el reparto
+ * contando trabajo que ya no existe.
+ */
+async function devolverEstructura(ipercId: string, proyectoId?: string) {
+  if (proyectoId) await sincronizarBloques(proyectoId, ipercId)
+
   const [items, sugerencias, sugerenciasTareas] = await Promise.all([
     prisma.ipercEstructuraItem.findMany({ where: { ipercId }, orderBy: { orden: 'asc' } }),
     detectarFusiones(ipercId),
@@ -91,8 +101,8 @@ export async function POST(req: NextRequest, ctx: Ctx) {
 
   const body = await req.json().catch(() => ({}))
 
-  if (body.accion === 'unir') return unir(iperc.id, body)
-  if (body.accion === 'fusionar-actividades') return fusionar(iperc.id, body)
+  if (body.accion === 'unir') return unir(iperc.id, proyectoId, body)
+  if (body.accion === 'fusionar-actividades') return fusionar(iperc.id, proyectoId, body)
 
   const edtIds: string[] = Array.isArray(body.edtIds)
     ? body.edtIds.filter((x: unknown) => typeof x === 'string')
@@ -135,7 +145,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     }),
   ])
 
-  return devolverEstructura(iperc.id)
+  return devolverEstructura(iperc.id, proyectoId)
 }
 
 /**
@@ -147,7 +157,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
  * justamente decir que comparten los mismos peligros. Queda el mayor de los
  * dos, que se puede ajustar después.
  */
-async function unir(ipercId: string, body: { itemIds?: unknown; nombre?: unknown }) {
+async function unir(ipercId: string, proyectoId: string, body: { itemIds?: unknown; nombre?: unknown }) {
   const itemIds: string[] = Array.isArray(body.itemIds)
     ? body.itemIds.filter((x: unknown) => typeof x === 'string')
     : []
@@ -188,7 +198,7 @@ async function unir(ipercId: string, body: { itemIds?: unknown; nombre?: unknown
     prisma.ipercEstructuraItem.deleteMany({ where: { id: { in: resto.map(i => i.id) } } }),
   ])
 
-  return devolverEstructura(ipercId)
+  return devolverEstructura(ipercId, proyectoId)
 }
 
 /**
@@ -198,7 +208,7 @@ async function unir(ipercId: string, body: { itemIds?: unknown; nombre?: unknown
  * ejecutan y se avanzan por separado. Para el IPERC son el mismo análisis: los
  * peligros de armar un andamio no cambian por el tramo.
  */
-async function fusionar(ipercId: string, body: { itemIds?: unknown; titulo?: unknown }) {
+async function fusionar(ipercId: string, proyectoId: string, body: { itemIds?: unknown; titulo?: unknown }) {
   const itemIds: string[] = Array.isArray(body.itemIds)
     ? body.itemIds.filter((x: unknown) => typeof x === 'string')
     : []
@@ -215,7 +225,7 @@ async function fusionar(ipercId: string, body: { itemIds?: unknown; titulo?: unk
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : 'No se pudo fusionar' }, { status: 400 })
   }
-  return devolverEstructura(ipercId)
+  return devolverEstructura(ipercId, proyectoId)
 }
 
 /** PATCH — edita una línea: nombre, actividad, proceso o cuántos peligros. */
@@ -252,7 +262,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   }
 
   await prisma.ipercEstructuraItem.update({ where: { id: itemId }, data })
-  return devolverEstructura(iperc.id)
+  return devolverEstructura(iperc.id, proyectoId)
 }
 
 /** DELETE ?itemId= — saca una línea de la estructura. */
@@ -272,5 +282,5 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
   })
   if (count === 0) return Response.json({ error: 'Esa línea no es de este IPERC' }, { status: 404 })
 
-  return devolverEstructura(iperc.id)
+  return devolverEstructura(iperc.id, proyectoId)
 }

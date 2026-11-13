@@ -1,6 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '@/lib/prisma'
-import { PELIGROS_SUGERIDOS, sincronizarEstadoEstructura } from '@/lib/iperc/construirEstructura'
+import {
+  PELIGROS_SUGERIDOS, sincronizarEstadoEstructura, claveLinea,
+} from '@/lib/iperc/construirEstructura'
 import { asegurarFilasFijas } from '@/lib/iperc/filasFijas'
 import { calcularResidual } from '@/lib/iperc/riesgoResidual'
 import { clasificarControles, textoOrdenado } from '@/lib/iperc/origenControles'
@@ -191,7 +193,7 @@ async function cargarContexto(proyectoId: string, edtIds: string[], soloTareaIds
     // Con estructura armada, lo que no esté en ella se sacó a propósito.
     if (hayEstructura && !item) continue
 
-    const claveItem = item ? `${item.proceso}||${item.actividad}||${item.tarea}` : t.id
+    const claveItem = item ? claveLinea(item) : t.id
     if (yaCubierta.has(claveItem)) continue
     yaCubierta.add(claveItem)
 
@@ -752,15 +754,13 @@ async function renumerarSegunCronograma(ipercId: string, proyectoId: string): Pr
     where: { ipercId },
     select: { orden: true, proceso: true, actividad: true, tarea: true },
   })
-  const posEstructura = new Map(
-    estructura.map(e => [`${e.proceso}||${e.actividad}||${e.tarea}`, e.orden]),
-  )
+  const posEstructura = new Map(estructura.map(e => [claveLinea(e), e.orden]))
 
   /** Fila sin lugar conocido: al final, conservando su orden relativo. */
   const SIN_LUGAR = 1e9
 
   const posicion = (f: (typeof filas)[number]): [number, number] => {
-    const enEstructura = posEstructura.get(`${f.proceso}||${f.actividad}||${f.tarea}`)
+    const enEstructura = posEstructura.get(claveLinea(f))
     const enCronograma = f.tareaCronogramaRefId
       ? posicionTarea.get(f.tareaCronogramaRefId) ?? SIN_LUGAR
       : SIN_LUGAR

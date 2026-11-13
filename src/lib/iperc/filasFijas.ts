@@ -12,6 +12,7 @@
 // ===================================================
 
 import { prisma } from '@/lib/prisma'
+import { claveLinea } from '@/lib/iperc/construirEstructura'
 import { calcularResidual, normalizarControl, itemsDeControl } from '@/lib/iperc/riesgoResidual'
 import { CAMPOS_CONTROL } from '@/lib/iperc/origenControles'
 
@@ -48,13 +49,13 @@ export async function asegurarFilasFijas(ipercId: string): Promise<number> {
   ])
 
   const clave = (x: { proceso: string; actividad: string; tarea: string; peligro: string }) =>
-    `${x.proceso}||${x.actividad}||${x.tarea}||${x.peligro}`
+    `${claveLinea(x)}||${x.peligro.trim()}`
   const yaEstan = new Set(existentes.map(clave))
 
   // El grupo se identifica por la tarea; una tarea puede traer varios peligros.
   const porTarea = new Map<string, typeof catalogo>()
   for (const c of catalogo) {
-    const k = `${c.proceso}||${c.actividad}||${c.tarea}`
+    const k = claveLinea(c)
     if (!porTarea.has(k)) porTarea.set(k, [])
     porTarea.get(k)!.push(c)
   }
@@ -64,7 +65,7 @@ export async function asegurarFilasFijas(ipercId: string): Promise<number> {
   const itemsConFilas: string[] = []
 
   for (const item of items) {
-    const grupo = porTarea.get(`${item.proceso}||${item.actividad}||${item.tarea}`) ?? []
+    const grupo = porTarea.get(claveLinea(item)) ?? []
     let agregadasDelItem = 0
 
     for (const c of grupo) {

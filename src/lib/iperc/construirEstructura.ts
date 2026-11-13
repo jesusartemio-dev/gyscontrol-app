@@ -56,7 +56,7 @@ async function itemsFijos(procesos: string[]): Promise<Omit<ItemEstructuraPropue
 
   const grupos = new Map<string, Omit<ItemEstructuraPropuesto, 'orden'>>()
   for (const f of filas) {
-    const clave = `${f.proceso}||${f.actividad}||${f.tarea}`
+    const clave = claveLinea(f)
     const existente = grupos.get(clave)
     if (existente) {
       existente.peligrosPrevistos++
@@ -150,8 +150,8 @@ async function itemsDelCronograma(
       for (const t of tareas.filter(x => x.proyectoActividadId === act.id)) {
         salida.push({
           proceso,
-          actividad: act.nombre,
-          tarea: t.nombre,
+          actividad: limpiarNombre(act.nombre),
+          tarea: limpiarNombre(t.nombre),
           peligrosPrevistos: PELIGROS_SUGERIDOS,
           origen: 'cronograma',
           catalogoActividadFijaId: null,
@@ -166,7 +166,7 @@ async function itemsDelCronograma(
       salida.push({
         proceso,
         actividad: proceso,
-        tarea: t.nombre,
+        tarea: limpiarNombre(t.nombre),
         peligrosPrevistos: PELIGROS_SUGERIDOS,
         origen: 'cronograma',
         catalogoActividadFijaId: null,
@@ -182,6 +182,23 @@ async function itemsDelCronograma(
 /** Quita el numeral del cronograma: "4.2. Construcción" → "Construcción". */
 export function limpiarNombreProceso(nombre: string): string {
   return nombre.replace(/^\s*[\d.]+[.)]?\s*/, '').trim() || nombre.trim()
+}
+
+/** Los espacios de más del cronograma no distinguen nada. */
+export const limpiarNombre = (s: string) => s.replace(/\s+/g, ' ').trim()
+
+/**
+ * La clave con la que una fila del IPERC se reconoce como de una línea de la
+ * estructura.
+ *
+ * Normaliza los espacios a propósito: varias actividades del cronograma de
+ * CJM52 terminan en espacio ("Previos - Movilización y Trabajos preliminares
+ * "), la estructura las guardaba tal cual y la IA devolvía el nombre
+ * recortado. Las claves no coincidían, y por eso un bloque ya generado seguía
+ * figurando como pendiente.
+ */
+export function claveLinea(x: { proceso: string; actividad: string; tarea: string }): string {
+  return `${limpiarNombre(x.proceso)}||${limpiarNombre(x.actividad)}||${limpiarNombre(x.tarea)}`
 }
 
 /** Las filas que saldrán, para avisar antes de generar. */
@@ -211,12 +228,12 @@ export async function sincronizarEstadoEstructura(ipercId: string): Promise<void
 
   const cuenta = new Map<string, number>()
   for (const f of filas) {
-    const k = `${f.proceso}||${f.actividad}||${f.tarea}`
+    const k = claveLinea(f)
     cuenta.set(k, (cuenta.get(k) ?? 0) + 1)
   }
 
   const cambios = items
-    .map(i => ({ i, n: cuenta.get(`${i.proceso}||${i.actividad}||${i.tarea}`) ?? 0 }))
+    .map(i => ({ i, n: cuenta.get(claveLinea(i)) ?? 0 }))
     .filter(({ i, n }) => i.filasGeneradas !== n || i.estado !== (n > 0 ? 'generada' : 'pendiente'))
 
   if (cambios.length === 0) return

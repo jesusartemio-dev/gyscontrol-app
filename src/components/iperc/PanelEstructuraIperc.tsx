@@ -63,10 +63,12 @@ interface Props {
   onArmar: () => void
   /** Cambia cuando algo externo (una generación) pudo mover la estructura. */
   refreshKey?: number
+  /** Al editar la lista, el servidor rehace los bloques: hay que recargarlos. */
+  onCambio?: () => void
   disabled?: boolean
 }
 
-export function PanelEstructuraIperc({ proyectoId, onArmar, refreshKey, disabled }: Props) {
+export function PanelEstructuraIperc({ proyectoId, onArmar, refreshKey, onCambio, disabled }: Props) {
   const [items, setItems] = useState<ItemEstructura[]>([])
   const [total, setTotal] = useState(0)
   const [cargando, setCargando] = useState(true)
@@ -111,6 +113,7 @@ export function PanelEstructuraIperc({ proyectoId, onArmar, refreshKey, disabled
       setSugerencias(d.sugerencias ?? [])
       setSugTareas(d.sugerenciasTareas ?? [])
       setSeleccion(new Set())
+      onCambio?.()
       return true
     } finally {
       setOcupado(false)

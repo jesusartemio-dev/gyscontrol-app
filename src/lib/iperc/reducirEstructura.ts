@@ -161,7 +161,7 @@ export async function detectarFusiones(ipercId: string): Promise<SugerenciaFusio
   // Agrupar por actividad, conservando el orden en que aparecen.
   const porActividad = new Map<string, typeof items>()
   for (const i of items) {
-    const k = `${i.proceso}||${i.actividad}`
+    const k = `${i.proceso.trim()}||${i.actividad.trim()}`
     if (!porActividad.has(k)) porActividad.set(k, [])
     porActividad.get(k)!.push(i)
   }
@@ -264,7 +264,7 @@ export async function detectarTareasRepetidas(ipercId: string): Promise<Sugerenc
 
   const grupos = new Map<string, typeof items>()
   for (const i of items) {
-    const k = `${i.proceso}||${i.actividad}||${normalizarTarea(i.tarea)}`
+    const k = `${i.proceso.trim()}||${i.actividad.trim()}||${normalizarTarea(i.tarea)}`
     if (!grupos.has(k)) grupos.set(k, [])
     grupos.get(k)!.push(i)
   }
