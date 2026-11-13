@@ -23,6 +23,43 @@ describe('derivarPuestosMpp', () => {
     ])
   })
 
+  it('el rolFuncional del puesto manda sobre el texto del cargo', () => {
+    // El organigrama real de CJM52. "Supervisor de Proyecto" adivinado por
+    // palabras da 'supervisor', pero en el catálogo de puestos es 'residente':
+    // leyendo el texto no había residente y la MPP caía al catálogo fijo, con
+    // diez columnas que no son las del proyecto.
+    const nodos = [
+      { id: 'n-gg', parentId: null, cargoLabel: 'Gerencia General', orden: 0, puesto: { rolFuncional: null } },
+      { id: 'n-gp', parentId: 'n-gg', cargoLabel: 'Gerencia de Proyectos', orden: 2, puesto: { rolFuncional: null } },
+      { id: 'n-ssoma', parentId: 'n-gp', cargoLabel: 'Ingeniero de Seguridad', orden: 5, puesto: { rolFuncional: 'ssoma' } },
+      { id: 'n-sup-proy', parentId: 'n-gp', cargoLabel: 'Supervisor de Proyecto', orden: 6, puesto: { rolFuncional: 'residente' } },
+      { id: 'n-sup-campo', parentId: 'n-sup-proy', cargoLabel: 'Supervisor de Campo', orden: 3, puesto: { rolFuncional: 'supervisor' } },
+      { id: 'n-tec', parentId: 'n-sup-campo', cargoLabel: 'Técnico Operativo', orden: 0, puesto: { rolFuncional: null } },
+    ]
+
+    const puestos = derivarPuestosMpp(nodos)
+
+    expect(puestos).toEqual([
+      'Ingeniero de Seguridad',
+      'Supervisor de Proyecto',
+      'Supervisor de Campo',
+      'Técnico Operativo',
+    ])
+  })
+
+  it('un puesto catalogado sin rolFuncional no se rescata adivinando por el texto', () => {
+    // Si el nodo está catalogado, su rolFuncional es la respuesta, incluso
+    // cuando es null: el catálogo dice que ese puesto no cumple un rol.
+    const nodos = [
+      { id: 'n-ssoma', parentId: null, cargoLabel: 'SSOMA', orden: 0, puesto: { rolFuncional: 'ssoma' } },
+      { id: 'n-res', parentId: 'n-ssoma', cargoLabel: 'RESIDENTE', orden: 1, puesto: { rolFuncional: null } },
+    ]
+
+    const puestos = derivarPuestosMpp(nodos)
+
+    expect(puestos).toEqual([...PUESTOS_MPP])
+  })
+
   it('sin nodo RESIDENTE reconocible, cae al catálogo fijo PUESTOS_MPP', () => {
     const nodos = [
       { id: 'n-ger', parentId: null, cargoLabel: 'GERENCIA GENERAL', orden: 0 },
