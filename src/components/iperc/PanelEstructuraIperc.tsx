@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   ListTree, Loader2, Merge, Pencil, RefreshCw, Trash2, ChevronDown, ChevronRight, Check, X,
+  Lightbulb, Combine,
 } from 'lucide-react'
 
 export interface ItemEstructura {
@@ -32,6 +33,17 @@ export interface ItemEstructura {
   totalTareasCronograma: number
   estado: string
   filasGeneradas: number
+}
+
+export interface SugerenciaFusion {
+  clave: string
+  proceso: string
+  actividades: Array<{ actividad: string; itemIds: string[]; tareas: string[]; filas: number }>
+  tareasResultantes: Array<{ nombre: string; peligrosPrevistos: number }>
+  tituloSugerido: string
+  filasActuales: number
+  filasDespues: number
+  ahorro: number
 }
 
 interface Props {
@@ -54,6 +66,9 @@ export function PanelEstructuraIperc({ proyectoId, onArmar, refreshKey, disabled
   const [borrador, setBorrador] = useState('')
   const [unirAbierto, setUnirAbierto] = useState(false)
   const [nombreUnido, setNombreUnido] = useState('')
+  const [sugerencias, setSugerencias] = useState<SugerenciaFusion[]>([])
+  const [fusionando, setFusionando] = useState<SugerenciaFusion | null>(null)
+  const [tituloFusion, setTituloFusion] = useState('')
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -63,6 +78,7 @@ export function PanelEstructuraIperc({ proyectoId, onArmar, refreshKey, disabled
       if (!r.ok) { toast.error(d.error ?? 'No se pudo cargar la estructura'); return }
       setItems(d.items ?? [])
       setTotal(d.totalFilasPrevistas ?? 0)
+      setSugerencias(d.sugerencias ?? [])
       setSeleccion(new Set())
     } finally {
       setCargando(false)
@@ -79,6 +95,7 @@ export function PanelEstructuraIperc({ proyectoId, onArmar, refreshKey, disabled
       if (!r.ok) { toast.error(d.error ?? 'No se pudo guardar'); return false }
       setItems(d.items ?? [])
       setTotal(d.totalFilasPrevistas ?? 0)
+      setSugerencias(d.sugerencias ?? [])
       setSeleccion(new Set())
       return true
     } finally {
@@ -196,6 +213,41 @@ export function PanelEstructuraIperc({ proyectoId, onArmar, refreshKey, disabled
         </div>
       </div>
 
+      {sugerencias.length > 0 && (
+        <div className="border-b bg-amber-50/60 p-2">
+          <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-amber-900">
+            <Lightbulb className="h-3.5 w-3.5" />
+            {sugerencias.length === 1 ? 'Hay trabajo repetido' : `Hay ${sugerencias.length} trabajos repetidos`}
+            {' · '}
+            se pueden ahorrar {sugerencias.reduce((n, s) => n + s.ahorro, 0)} filas de {total}
+          </p>
+          {sugerencias.map(s => (
+            <div
+              key={s.clave}
+              className="mb-1 flex flex-wrap items-center justify-between gap-2 rounded border border-amber-200 bg-white p-2"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs">
+                  {s.actividades.map(a => a.actividad).join('  ·  ')}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {s.actividades.length} actividades con las mismas {s.tareasResultantes.length} tareas
+                  {' · '}
+                  <span className="font-medium text-amber-800">{s.filasActuales} → {s.filasDespues} filas</span>
+                </p>
+              </div>
+              <Button
+                size="sm" variant="outline" className="h-7 shrink-0 text-xs"
+                onClick={() => { setFusionando(s); setTituloFusion(s.tituloSugerido) }}
+                disabled={ocupado || disabled}
+              >
+                <Combine className="mr-1 h-3.5 w-3.5" /> Fusionar
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {abierto && (
         <div className="max-h-[28rem] overflow-y-auto p-1">
           {[...grupos.entries()].map(([proceso, acts]) => (
@@ -256,6 +308,105 @@ export function PanelEstructuraIperc({ proyectoId, onArmar, refreshKey, disabled
               Guardar
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!fusionando} onOpenChange={v => { if (!v) setFusionando(null) }}>
+        <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col gap-3">
+          <DialogHeader>
+            <DialogTitle className="text-base">
+              Fusionar {fusionando?.actividades.length} actividades en una
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Para el cronograma son trabajos distintos, porque se ejecutan y se avanzan por
+              separado. Para el IPERC son el mismo análisis: los peligros de armar un andamio no
+              cambian por el tramo. Fusionarlas no toca el cronograma.
+            </DialogDescription>
+          </DialogHeader>
+
+          {fusionando && (
+            <>
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                <div>
+                  <label className="mb-1 block text-xs font-medium">
+                    Título de la actividad fusionada
+                  </label>
+                  <Input
+                    className="text-sm"
+                    value={tituloFusion}
+                    onChange={e => setTituloFusion(e.target.value)}
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Propuesto a partir de los nombres originales. Edítalo como deba quedar en el
+                    IPERC.
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded border p-2">
+                    <p className="mb-1 text-[11px] font-medium text-muted-foreground">
+                      Antes · {fusionando.filasActuales} filas
+                    </p>
+                    {fusionando.actividades.map(a => (
+                      <div key={a.actividad} className="mb-1.5">
+                        <p className="text-[11px] font-medium">{a.actividad}</p>
+                        {a.tareas.map((t, i) => (
+                          <p key={i} className="truncate pl-2 text-[11px] text-muted-foreground" title={t}>
+                            · {t}
+                          </p>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="rounded border border-emerald-300 bg-emerald-50/50 p-2">
+                    <p className="mb-1 text-[11px] font-medium text-emerald-800">
+                      Después · {fusionando.filasDespues} filas
+                    </p>
+                    <p className="text-[11px] font-medium">{tituloFusion || fusionando.tituloSugerido}</p>
+                    {fusionando.tareasResultantes.map((t, i) => (
+                      <p key={i} className="truncate pl-2 text-[11px] text-muted-foreground" title={t.nombre}>
+                        · {t.nombre} <span className="font-mono">({t.peligrosPrevistos})</span>
+                      </p>
+                    ))}
+                  </div>
+                </div>
+
+                <p className="rounded bg-muted/50 p-2 text-[11px] text-muted-foreground">
+                  Los peligros no se suman: fusionar es decir que estas tareas comparten los mismos
+                  peligros, así que de cada una queda el mayor de los previstos. El IPERC pasa de{' '}
+                  {total} a {total - fusionando.ahorro} filas.
+                </p>
+              </div>
+
+              <div className="flex shrink-0 justify-end gap-2 border-t pt-3">
+                <Button variant="outline" onClick={() => setFusionando(null)} disabled={ocupado}>
+                  Cancelar
+                </Button>
+                <Button
+                  disabled={ocupado || !tituloFusion.trim()}
+                  onClick={async () => {
+                    const ok = await llamar({
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        accion: 'fusionar-actividades',
+                        itemIds: fusionando.actividades.flatMap(a => a.itemIds),
+                        titulo: tituloFusion,
+                      }),
+                    })
+                    if (ok) {
+                      toast.success(`Fusionadas · ${fusionando.ahorro} filas menos`)
+                      setFusionando(null)
+                    }
+                  }}
+                >
+                  {ocupado && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+                  Fusionar y ahorrar {fusionando.ahorro} filas
+                </Button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 

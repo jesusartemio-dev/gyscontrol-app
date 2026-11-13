@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { construirEstructura } from '@/lib/iperc/construirEstructura'
+import { detectarFusiones, fusionarActividades } from '@/lib/iperc/reducirEstructura'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,10 +36,10 @@ async function autorizar(proyectoId: string) {
 }
 
 async function devolverEstructura(ipercId: string) {
-  const items = await prisma.ipercEstructuraItem.findMany({
-    where: { ipercId },
-    orderBy: { orden: 'asc' },
-  })
+  const [items, sugerencias] = await Promise.all([
+    prisma.ipercEstructuraItem.findMany({ where: { ipercId }, orderBy: { orden: 'asc' } }),
+    detectarFusiones(ipercId),
+  ])
   return Response.json({
     items: items.map(i => ({
       id: i.id,
@@ -53,6 +54,7 @@ async function devolverEstructura(ipercId: string) {
       filasGeneradas: i.filasGeneradas,
     })),
     totalFilasPrevistas: items.reduce((n, i) => n + i.peligrosPrevistos, 0),
+    sugerencias,
   })
 }
 
@@ -86,6 +88,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
   const body = await req.json().catch(() => ({}))
 
   if (body.accion === 'unir') return unir(iperc.id, body)
+  if (body.accion === 'fusionar-actividades') return fusionar(iperc.id, body)
 
   const edtIds: string[] = Array.isArray(body.edtIds)
     ? body.edtIds.filter((x: unknown) => typeof x === 'string')
@@ -181,6 +184,33 @@ async function unir(ipercId: string, body: { itemIds?: unknown; nombre?: unknown
     prisma.ipercEstructuraItem.deleteMany({ where: { id: { in: resto.map(i => i.id) } } }),
   ])
 
+  return devolverEstructura(ipercId)
+}
+
+/**
+ * Fusiona varias actividades que repiten el mismo trabajo en una sola.
+ *
+ * Para el cronograma el Tramo 1 y el Tramo 2 son trabajos distintos, porque se
+ * ejecutan y se avanzan por separado. Para el IPERC son el mismo análisis: los
+ * peligros de armar un andamio no cambian por el tramo.
+ */
+async function fusionar(ipercId: string, body: { itemIds?: unknown; titulo?: unknown }) {
+  const itemIds: string[] = Array.isArray(body.itemIds)
+    ? body.itemIds.filter((x: unknown) => typeof x === 'string')
+    : []
+  const titulo = typeof body.titulo === 'string' ? body.titulo.trim() : ''
+  if (itemIds.length < 2) {
+    return Response.json({ error: 'Elige al menos dos actividades' }, { status: 400 })
+  }
+  if (!titulo) {
+    return Response.json({ error: 'Falta el título de la actividad fusionada' }, { status: 400 })
+  }
+
+  try {
+    await fusionarActividades(ipercId, itemIds, titulo)
+  } catch (e) {
+    return Response.json({ error: e instanceof Error ? e.message : 'No se pudo fusionar' }, { status: 400 })
+  }
   return devolverEstructura(ipercId)
 }
 
