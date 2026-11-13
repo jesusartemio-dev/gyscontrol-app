@@ -213,7 +213,24 @@ export default function MppClient({ proyectoId }: Props) {
   }, [fetchAll])
 
   const handleGenerarIA = async () => {
-    if (!confirm('¿Generar MPP con IA? El MPP actual será reemplazado con asignaciones basadas en el análisis del IPERC.')) return
+    // Generar rehace la matriz desde cero: avisar cuantas marcas se pierden,
+    // que es lo unico irreversible. Con la matriz vacia no hay nada que
+    // advertir y el aviso solo estorba.
+    const marcadas = mpp?.items.reduce(
+      (n, it) => n + Object.values(it.asignaciones ?? {}).filter(Boolean).length, 0,
+    ) ?? 0
+
+    const aviso = marcadas > 0
+      ? `Se rehace la matriz de EPP desde cero y se pierden las ${marcadas} marcas actuales, `
+        + 'incluidas las puestas a mano.\n\n'
+        + 'Las columnas se vuelven a tomar del organigrama, los EPP por defecto del catalogo de '
+        + 'seguridad, y la IA agrega encima lo propio del proyecto según el IPERC.\n\n'
+        + '¿Continuar?'
+      : 'Se arma la matriz con los EPP por defecto del catálogo de seguridad, y la IA agrega '
+        + 'encima lo propio del proyecto según el IPERC.\n\n'
+        + '¿Continuar?'
+
+    if (!confirm(aviso)) return
 
     const ctrl = new AbortController()
     abortRef.current = ctrl
