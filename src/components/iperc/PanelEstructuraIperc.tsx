@@ -46,6 +46,17 @@ export interface SugerenciaFusion {
   ahorro: number
 }
 
+export interface SugerenciaTareas {
+  clave: string
+  proceso: string
+  actividad: string
+  tareas: Array<{ itemId: string; nombre: string; peligrosPrevistos: number }>
+  nombreSugerido: string
+  filasActuales: number
+  filasDespues: number
+  ahorro: number
+}
+
 interface Props {
   proyectoId: string
   /** Abre el modal de selección de EDTs para armar o rearmar la lista. */
@@ -67,6 +78,7 @@ export function PanelEstructuraIperc({ proyectoId, onArmar, refreshKey, disabled
   const [unirAbierto, setUnirAbierto] = useState(false)
   const [nombreUnido, setNombreUnido] = useState('')
   const [sugerencias, setSugerencias] = useState<SugerenciaFusion[]>([])
+  const [sugTareas, setSugTareas] = useState<SugerenciaTareas[]>([])
   const [fusionando, setFusionando] = useState<SugerenciaFusion | null>(null)
   const [tituloFusion, setTituloFusion] = useState('')
 
@@ -79,6 +91,7 @@ export function PanelEstructuraIperc({ proyectoId, onArmar, refreshKey, disabled
       setItems(d.items ?? [])
       setTotal(d.totalFilasPrevistas ?? 0)
       setSugerencias(d.sugerencias ?? [])
+      setSugTareas(d.sugerenciasTareas ?? [])
       setSeleccion(new Set())
     } finally {
       setCargando(false)
@@ -96,6 +109,7 @@ export function PanelEstructuraIperc({ proyectoId, onArmar, refreshKey, disabled
       setItems(d.items ?? [])
       setTotal(d.totalFilasPrevistas ?? 0)
       setSugerencias(d.sugerencias ?? [])
+      setSugTareas(d.sugerenciasTareas ?? [])
       setSeleccion(new Set())
       return true
     } finally {
@@ -213,13 +227,17 @@ export function PanelEstructuraIperc({ proyectoId, onArmar, refreshKey, disabled
         </div>
       </div>
 
-      {sugerencias.length > 0 && (
+      {(sugerencias.length > 0 || sugTareas.length > 0) && (
         <div className="border-b bg-amber-50/60 p-2">
           <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-amber-900">
             <Lightbulb className="h-3.5 w-3.5" />
-            {sugerencias.length === 1 ? 'Hay trabajo repetido' : `Hay ${sugerencias.length} trabajos repetidos`}
+            {sugerencias.length + sugTareas.length === 1
+              ? 'Hay trabajo repetido'
+              : `Hay ${sugerencias.length + sugTareas.length} trabajos repetidos`}
             {' · '}
-            se pueden ahorrar {sugerencias.reduce((n, s) => n + s.ahorro, 0)} filas de {total}
+            se pueden ahorrar{' '}
+            {sugerencias.reduce((n, s) => n + s.ahorro, 0) + sugTareas.reduce((n, s) => n + s.ahorro, 0)}
+            {' '}filas de {total}
           </p>
           {sugerencias.map(s => (
             <div
@@ -242,6 +260,35 @@ export function PanelEstructuraIperc({ proyectoId, onArmar, refreshKey, disabled
                 disabled={ocupado || disabled}
               >
                 <Combine className="mr-1 h-3.5 w-3.5" /> Fusionar
+              </Button>
+            </div>
+          ))}
+
+          {sugTareas.map(s => (
+            <div
+              key={s.clave}
+              className="mb-1 flex flex-wrap items-center justify-between gap-2 rounded border border-amber-200 bg-white p-2"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs" title={s.tareas.map(t => t.nombre).join('  ·  ')}>
+                  {s.tareas.map(t => t.nombre).join('  ·  ')}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {s.tareas.length} tareas iguales dentro de &ldquo;{s.actividad}&rdquo;
+                  {' · '}
+                  <span className="font-medium text-amber-800">{s.filasActuales} → {s.filasDespues} filas</span>
+                </p>
+              </div>
+              <Button
+                size="sm" variant="outline" className="h-7 shrink-0 text-xs"
+                onClick={() => {
+                  setSeleccion(new Set(s.tareas.map(t => t.itemId)))
+                  setNombreUnido(s.nombreSugerido)
+                  setUnirAbierto(true)
+                }}
+                disabled={ocupado || disabled}
+              >
+                <Merge className="mr-1 h-3.5 w-3.5" /> Unir
               </Button>
             </div>
           ))}

@@ -4,7 +4,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { construirEstructura } from '@/lib/iperc/construirEstructura'
-import { detectarFusiones, fusionarActividades } from '@/lib/iperc/reducirEstructura'
+import {
+  detectarFusiones, detectarTareasRepetidas, fusionarActividades,
+} from '@/lib/iperc/reducirEstructura'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,9 +38,10 @@ async function autorizar(proyectoId: string) {
 }
 
 async function devolverEstructura(ipercId: string) {
-  const [items, sugerencias] = await Promise.all([
+  const [items, sugerencias, sugerenciasTareas] = await Promise.all([
     prisma.ipercEstructuraItem.findMany({ where: { ipercId }, orderBy: { orden: 'asc' } }),
     detectarFusiones(ipercId),
+    detectarTareasRepetidas(ipercId),
   ])
   return Response.json({
     items: items.map(i => ({
@@ -55,6 +58,7 @@ async function devolverEstructura(ipercId: string) {
     })),
     totalFilasPrevistas: items.reduce((n, i) => n + i.peligrosPrevistos, 0),
     sugerencias,
+    sugerenciasTareas,
   })
 }
 

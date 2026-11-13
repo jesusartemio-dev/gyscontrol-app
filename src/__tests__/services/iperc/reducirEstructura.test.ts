@@ -56,6 +56,24 @@ describe('combinarNombresTarea', () => {
     ])).toBe('T1 y T2 - Armado de Andamios y Desmontaje de Andamios')
   })
 
+  it('parte por guion largo y flecha, no solo por el guion', () => {
+    // Las tres tareas de "Fusionado y Certificación de FO" en CJM52: la
+    // segunda usa flecha donde las otras usan guion.
+    expect(combinarNombresTarea([
+      'T1 Fusionado FO 12H – Filtro D2112 - Gabinete COM 320K',
+      'T2 Fusionado FO 12H – Filtro D2122 → Gabinete COM 320K',
+      'T3 Fusionado FO 12H – Filtro D2088 - Gabinete COM 320K',
+    ])).toBe('Fusionado FO 12H - Filtro D2112, D2122 y D2088 - Gabinete COM 320K')
+  })
+
+  it('el T1/T2 que numera el tramo se cae, pero una palabra que nombra no', () => {
+    // "T1" solo dice de qué tramo se habla; "Armado" es lo que la tarea hace.
+    expect(combinarNombresTarea(['T1 Tendido de FO', 'T2 Tendido de FO']))
+      .toBe('Tendido de FO')
+    expect(combinarNombresTarea(['Armado de Andamios', 'Desmontaje de Andamios']))
+      .toBe('Armado de Andamios y Desmontaje de Andamios')
+  })
+
   it('tareas sin prefijo se combinan como cualquier nombre', () => {
     expect(combinarNombresTarea(['Armado de Andamios', 'Armado de andamio de 2.5 cuerpos']))
       .toBe('Armado de Andamios y andamio de 2.5 cuerpos')
