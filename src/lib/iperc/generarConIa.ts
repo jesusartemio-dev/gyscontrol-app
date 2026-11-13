@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { prisma } from '@/lib/prisma'
+import { PELIGROS_SUGERIDOS, sincronizarEstadoEstructura } from '@/lib/iperc/construirEstructura'
+import { asegurarFilasFijas } from '@/lib/iperc/filasFijas'
 import { calcularResidual } from '@/lib/iperc/riesgoResidual'
 import { clasificarControles, textoOrdenado } from '@/lib/iperc/origenControles'
 import { textosDelCatalogo } from '@/lib/iperc/origenControles.server'
@@ -162,26 +164,58 @@ async function cargarContexto(proyectoId: string, edtIds: string[], soloTareaIds
     ? tareas.filter(t => soloTareaIds.includes(t.id))
     : tareas
 
-  const tareasParaIperc: TareaParaIperc[] = tareasDelBloque.map(t => {
+  // La estructura que el ingeniero de seguridad revisó: qué tareas entran,
+  // con qué nombre y cuántos peligros tiene cada una. Manda sobre el
+  // cronograma, porque ahí ya sacó lo que no va y unió lo repetido.
+  const estructura = await prisma.ipercEstructuraItem.findMany({
+    where: { ipercId: iperc.id, origen: { not: 'fija' } },
+    select: {
+      proceso: true, actividad: true, tarea: true,
+      peligrosPrevistos: true, tareaIds: true,
+    },
+  })
+  // Una tarea unida aparece en varios items solo si alguien la duplicó; con
+  // el primero alcanza.
+  const porTareaId = new Map<string, (typeof estructura)[number]>()
+  for (const e of estructura) {
+    for (const id of e.tareaIds) if (!porTareaId.has(id)) porTareaId.set(id, e)
+  }
+  const hayEstructura = porTareaId.size > 0
+
+  // Una tarea unida a otra se evalúa una sola vez, en la línea que la absorbió.
+  const yaCubierta = new Set<string>()
+
+  const tareasParaIperc: TareaParaIperc[] = []
+  for (const t of tareasDelBloque) {
+    const item = porTareaId.get(t.id)
+    // Con estructura armada, lo que no esté en ella se sacó a propósito.
+    if (hayEstructura && !item) continue
+
+    const claveItem = item ? `${item.proceso}||${item.actividad}||${item.tarea}` : t.id
+    if (yaCubierta.has(claveItem)) continue
+    yaCubierta.add(claveItem)
+
     const edt = edtMap.get(t.proyectoEdtId)
     const fase = edt?.proyectoFaseId ? faseMap.get(edt.proyectoFaseId) : null
     const edtNombre = edt?.nombre ?? 'General'
     const faseNombre = fase?.nombre ?? 'EJECUCIÓN'
     const esAltoRiesgo = esFaseAltoRiesgo(faseNombre)
     const actNombre = t.proyectoActividadId ? (actMap.get(t.proyectoActividadId) ?? edtNombre) : edtNombre
-    return {
+
+    tareasParaIperc.push({
       tareaId: t.id,
       actividadId: t.proyectoActividadId ?? null,
-      proceso: edtNombre,
+      proceso: item?.proceso ?? edtNombre,
       edt: edtNombre,
       faseNombre,
       esAltoRiesgo,
-      actividad: actNombre,
-      tarea: t.nombre,
+      actividad: item?.actividad ?? actNombre,
+      tarea: item?.tarea ?? t.nombre,
       horasEstimadas: t.horasEstimadas ? Number(t.horasEstimadas) : null,
       personasEstimadas: t.personasEstimadas,
-    }
-  })
+      peligrosPrevistos: item?.peligrosPrevistos ?? PELIGROS_SUGERIDOS,
+    })
+  }
 
   const edtsNombres = edts.map(e => e.nombre)
 
@@ -218,7 +252,7 @@ ${fases.map(fase => {
     ? `${contextoTexto}\n\n## ALCANCE DEL PLAN DE TRABAJO (método de trabajo real)\n${alcancePlanTrabajo}`
     : contextoTexto
 
-  return { iperc, tareasParaIperc, contextoTexto: contextoCompleto, edtsNombres }
+  return { iperc, tareasParaIperc, contextoTexto: contextoCompleto, edtsNombres, hayEstructura }
 }
 
 // ─── Resumen ────────────────────────────────────────────────────────────────
@@ -511,8 +545,23 @@ export async function generarConIa(
   }
 
   const { iperc, tareasParaIperc, contextoTexto, edtsNombres } = ctx
+
+  // Las actividades fijas —movilización, bloqueo de energía, cierre— ya están
+  // escritas en el catálogo. Entran acá y no por la IA, que no tiene nada que
+  // inventar ahí. Es idempotente, así que repetirlo por bloque no duplica.
+  const fijas = await asegurarFilasFijas(iperc.id)
+  if (fijas > 0) {
+    send('status', { mensaje: `${fijas} filas de actividades fijas tomadas del catálogo`, progreso: 8 })
+  }
+
   if (tareasParaIperc.length === 0) {
-    send('error', { mensaje: 'Los EDTs seleccionados no tienen tareas' })
+    // Con estructura armada, "sin tareas" casi siempre es que se sacaron o se
+    // unieron todas las de este bloque, no que el cronograma esté vacío.
+    send('error', {
+      mensaje: fijas > 0 || ctx.hayEstructura
+        ? 'Este bloque no tiene tareas en la estructura del IPERC: se quitaron o se unieron a otras'
+        : 'Los EDTs seleccionados no tienen tareas',
+    })
     return
   }
 
@@ -593,6 +642,7 @@ export async function generarConIa(
     // guardan conforme responden, así que el número que recibe cada fila al
     // insertarse depende de qué lote terminó primero, no del orden de obra.
     await renumerarSegunCronograma(iperc.id, proyectoId)
+    await sincronizarEstadoEstructura(iperc.id)
 
     const duracionMs = Date.now() - startMs
     const costoUsd =
@@ -688,15 +738,41 @@ async function renumerarSegunCronograma(ipercId: string, proyectoId: string): Pr
 
   const filas = await prisma.ipercFila.findMany({
     where: { ipercId },
-    select: { id: true, numero: true, tareaCronogramaRefId: true },
+    select: {
+      id: true, numero: true, tareaCronogramaRefId: true,
+      proceso: true, actividad: true, tarea: true,
+    },
   })
   if (filas.length === 0) return
 
+  // Cuando hay estructura revisada, ella manda el orden: cubre también las
+  // actividades fijas —movilización, bloqueo de energía, cierre— que no son
+  // del cronograma y por posición de tarea caerían todas al final.
+  const estructura = await prisma.ipercEstructuraItem.findMany({
+    where: { ipercId },
+    select: { orden: true, proceso: true, actividad: true, tarea: true },
+  })
+  const posEstructura = new Map(
+    estructura.map(e => [`${e.proceso}||${e.actividad}||${e.tarea}`, e.orden]),
+  )
+
+  /** Fila sin lugar conocido: al final, conservando su orden relativo. */
+  const SIN_LUGAR = 1e9
+
+  const posicion = (f: (typeof filas)[number]): [number, number] => {
+    const enEstructura = posEstructura.get(`${f.proceso}||${f.actividad}||${f.tarea}`)
+    const enCronograma = f.tareaCronogramaRefId
+      ? posicionTarea.get(f.tareaCronogramaRefId) ?? SIN_LUGAR
+      : SIN_LUGAR
+    return [enEstructura ?? SIN_LUGAR, enCronograma]
+  }
+
   const filasOrdenadas = [...filas].sort((a, b) => {
-    // Una fila sin tarea del cronograma (agregada a mano) va al final.
-    const pa = a.tareaCronogramaRefId ? posicionTarea.get(a.tareaCronogramaRefId) ?? 1e9 : 1e9
-    const pb = b.tareaCronogramaRefId ? posicionTarea.get(b.tareaCronogramaRefId) ?? 1e9 : 1e9
-    return pa !== pb ? pa - pb : a.numero - b.numero
+    const [ea, ca] = posicion(a)
+    const [eb, cb] = posicion(b)
+    if (ea !== eb) return ea - eb
+    if (ca !== cb) return ca - cb
+    return a.numero - b.numero
   })
 
   const cambios = filasOrdenadas

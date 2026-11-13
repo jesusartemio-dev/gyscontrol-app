@@ -6613,6 +6613,7 @@ model Iperc {
 
   filas          IpercFila[]
   bloques        IpercBloque[]
+  estructura     IpercEstructuraItem[]
   generaciones   IpercGeneracion[]
   versionArchivo IpercVersionArchivo[]
 
@@ -6632,6 +6633,101 @@ model Iperc {
 ///
 /// Los bloques nunca parten una actividad por la mitad: los peligros de una
 /// actividad se evalúan juntos.
+/// Las actividades que van en todo IPERC y no salen del cronograma.
+///
+/// El IPERC real de CJM50 tiene cuatro procesos: ACTIVIDADES GENERALES
+/// (movilización, COVID/dengue, orden y limpieza, desplazamiento en planta,
+/// izaje), SISTEMA DE CONTROL DE ENERGIAS (bloqueo y etiquetado), CIERRE
+/// (retiro de herramientas) y recién después el de construcción, que es el
+/// único que viene del cronograma. Las nueve filas de los tres primeros no
+/// las tenía ninguna de nuestras IPERC generadas.
+///
+/// La fila va escrita entera, no se le pide a la IA: son siempre las mismas y
+/// el SSOMA ya las tiene redactadas. El residual no se guarda porque lo
+/// calcula la regla — ver riesgoResidual.ts.
+model IpercCatalogoActividadFija {
+  id String @id @default(cuid())
+
+  proceso   String
+  actividad String
+  tarea     String
+  orden     Int
+
+  puestoTrabajo      String
+  factorRiesgo       String
+  condicionActividad String
+  peligro            String
+  riesgo             String
+  consecuencia       String
+
+  severidad    Int
+  probabilidad String
+
+  eliminar              String @default("NA")
+  sustituir             String @default("NA")
+  controlIngenieria     String @default("")
+  controlAdministrativo String @default("")
+  controlReceptor       String @default("")
+
+  accionesMejora String @default("")
+  responsables   String @default("")
+
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  estructuraItems IpercEstructuraItem[]
+
+  @@unique([proceso, actividad, tarea, peligro])
+  @@index([activo, proceso])
+  @@map("iperc_catalogo_actividad_fija")
+}
+
+/// La estructura del IPERC antes de analizar nada.
+///
+/// Es cómo trabaja el SSOMA: en una hoja aparte arma la lista de actividades
+/// y tareas, saca lo que no va, une lo repetido, y decide cuántos peligros
+/// tendrá cada tarea. Recién con esa lista cerrada empieza a analizar.
+///
+/// Lo de los peligros no es un detalle: en el IPERC de CJM50 el SSOMA previó
+/// 57 filas para 18 tareas, de 1 a 7 según el trabajo, y acertó en 17 de 18.
+/// Nuestra IA, suelta, le pone 3 a casi todo (97 de 143 tareas).
+model IpercEstructuraItem {
+  id      String @id @default(cuid())
+  ipercId String
+  iperc   Iperc  @relation(fields: [ipercId], references: [id], onDelete: Cascade)
+
+  orden     Int
+  proceso   String
+  actividad String
+  tarea     String
+
+  /// Cuántas filas tendrá esta tarea. La IA escribe exactamente estas.
+  peligrosPrevistos Int @default(3)
+
+  /// cronograma | fija | manual
+  origen String @default("cronograma")
+
+  /// La actividad fija del catálogo, cuando viene de ahí: su fila ya está
+  /// escrita y no pasa por la IA.
+  catalogoActividadFijaId String?
+  catalogoActividadFija   IpercCatalogoActividadFija? @relation(fields: [catalogoActividadFijaId], references: [id], onDelete: SetNull)
+
+  /// Tareas del cronograma que cubre. Más de una cuando se unieron varias.
+  tareaIds                 String[]
+  actividadCronogramaRefId String?
+
+  estado         String @default("pendiente") // pendiente | generada
+  filasGeneradas Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ipercId, orden])
+  @@index([catalogoActividadFijaId])
+  @@map("iperc_estructura_item")
+}
+
 model IpercBloque {
   id      String @id @default(cuid())
   ipercId String

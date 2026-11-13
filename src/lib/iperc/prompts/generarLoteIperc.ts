@@ -24,8 +24,14 @@ de instalaciones electromecánicas en Perú, conforme al D.S. 024-2016-EM (Regla
 Salud Ocupacional en Minería) y estándares OHSAS 18001.
 
 Tu tarea es generar filas de la matriz IPERC para un lote de tareas del cronograma del proyecto.
-Para cada tarea debes identificar TODOS los factores de riesgo aplicables y generar MÚLTIPLES filas
-IPERC — una por cada factor de riesgo relevante. Un IPERC profesional cubre 2-3 peligros por tarea.
+
+CADA TAREA TRAE SU NÚMERO DE PELIGROS: el campo peligros=N dice cuántas filas debes devolver
+para esa tarea. Ni una más ni una menos. Ese número lo fijó el ingeniero de seguridad al armar la
+estructura del IPERC, mirando el trabajo real: va de 1 para una tarea simple a 7 para una compleja.
+No es una sugerencia. Si crees que una tarea necesita otro número, igual devuelve el pedido y elige
+los N peligros más relevantes.
+
+Cada fila de una misma tarea debe tener un factor de riesgo y un peligro DISTINTOS.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CATÁLOGO DE PELIGROS (usa EXACTAMENTE estos valores)
@@ -187,6 +193,8 @@ export interface TareaParaIperc {
   tarea: string
   horasEstimadas: number | null
   personasEstimadas: number
+  /** Cuántas filas tendrá esta tarea, fijado en la estructura del IPERC. */
+  peligrosPrevistos: number
 }
 
 export function buildPromptLote(
@@ -196,7 +204,7 @@ export function buildPromptLote(
 ): string {
   const tareasStr = tareas
     .map((t, i) =>
-      `${i + 1}. proceso="${t.proceso}" edt="${t.edt}" actividad="${t.actividad}" tarea="${t.tarea}" actividadId="${t.actividadId ?? 'N/A'}" tareaId="${t.tareaId}" horas=${t.horasEstimadas ?? '?'} personas=${t.personasEstimadas}`
+      `${i + 1}. peligros=${t.peligrosPrevistos} proceso="${t.proceso}" edt="${t.edt}" actividad="${t.actividad}" tarea="${t.tarea}" actividadId="${t.actividadId ?? 'N/A'}" tareaId="${t.tareaId}" horas=${t.horasEstimadas ?? '?'} personas=${t.personasEstimadas}`
     )
     .join('\n')
 
@@ -204,5 +212,7 @@ export function buildPromptLote(
     ? `\n\nFILAS IPERC YA GENERADAS EN LOTES ANTERIORES (para contexto y consistencia):\n${resumenFilasPrevias}`
     : ''
 
-  return `RESUMEN DEL PROYECTO:\n\n${resumenProyecto}${previoStr}\n\nLOTE DE TAREAS A PROCESAR (genera 2-3 filas IPERC por tarea de campo, 1-2 por tareas administrativas):\n\n${tareasStr}\n\nDevuelve el array JSON. Cada tarea generará múltiples filas. Total esperado: entre ${tareas.length * 2} y ${tareas.length * 3} filas.`
+  const total = tareas.reduce((n, t) => n + t.peligrosPrevistos, 0)
+
+  return `RESUMEN DEL PROYECTO:\n\n${resumenProyecto}${previoStr}\n\nLOTE DE TAREAS A PROCESAR — cada una con el número de filas que debes devolver:\n\n${tareasStr}\n\nDevuelve el array JSON con EXACTAMENTE ${total} filas: la suma de los peligros=N de arriba.`
 }

@@ -12,6 +12,7 @@ import { PreRequisitosPanelIperc } from './PreRequisitosPanelIperc'
 import { BotonGenerarIaIperc } from './BotonGenerarIaIperc'
 import { SeleccionEdtsModal } from './SeleccionEdtsModal'
 import { PanelBloquesIperc, type BloqueIperc } from './PanelBloquesIperc'
+import { PanelEstructuraIperc } from './PanelEstructuraIperc'
 import { ActividadesSimilaresPanel } from './ActividadesSimilaresPanel'
 import { TablaFilasIperc } from './TablaFilasIperc'
 import { IpercPorActividad } from './IpercPorActividad'
@@ -51,6 +52,7 @@ export default function IpercClient({ proyectoId }: Props) {
 
   // EDT selection modal
   const [modalEdtsOpen, setModalEdtsOpen] = useState(false)
+  const [estructuraKey, setEstructuraKey] = useState(0)
 
   // Editor sheet state
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -168,7 +170,24 @@ export default function IpercClient({ proyectoId }: Props) {
         return
       }
       setBloques(d.bloques ?? [])
-      toast.success(`${d.bloques?.length ?? 0} bloques definidos. Genera uno por uno o todos los pendientes.`)
+
+      // La lista de actividades y tareas que se va a analizar. Va antes que
+      // la IA a propósito: es donde se saca lo que no va y se une lo repetido.
+      const re = await fetch(`/api/proyectos/${proyectoId}/iperc/estructura`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ edtIds, forzar: true }),
+      })
+      const de = await re.json()
+      if (!re.ok) {
+        toast.error(de.error ?? 'No se pudo armar la lista de tareas')
+      } else {
+        setEstructuraKey(k => k + 1)
+        toast.success(
+          `${de.items?.length ?? 0} tareas en la lista, ${de.totalFilasPrevistas ?? 0} filas previstas. ` +
+          'Revísala antes de generar.'
+        )
+      }
     } catch {
       toast.error('No se pudo definir la estructura')
     }
@@ -439,6 +458,13 @@ export default function IpercClient({ proyectoId }: Props) {
           Generación en progreso en segundo plano…
         </div>
       )}
+
+      <PanelEstructuraIperc
+        proyectoId={proyectoId}
+        onArmar={handleAbrirModal}
+        refreshKey={estructuraKey + iperc.filas.length}
+        disabled={isGenerando}
+      />
 
       <PanelBloquesIperc
         bloques={bloques}
