@@ -64,13 +64,21 @@ export function limpiarCacheImagenesEpp() {
   cache.clear()
 }
 
-/** Reduce la foto al alto de la celda; si falla, se usa tal cual. */
+/**
+ * Reduce la foto al alto de la celda; si falla, se usa tal cual.
+ *
+ * Que falle importa y por eso se avisa: las 52 fotos pesan 3.3 MB en su
+ * tamaño original y 0.7 MB reducidas, y el envío al render tiene 4.5 MB de
+ * tope. Sin reducir se acerca peligrosamente, y en silencio no habría forma
+ * de saber que es eso.
+ */
 async function achicar(buffer: Buffer): Promise<Buffer> {
   try {
     return await sharp(buffer, { failOn: 'none' })
       .resize({ height: ALTO_MAX, withoutEnlargement: true })
       .toBuffer()
-  } catch {
+  } catch (e) {
+    console.warn('[mpp.imagenesEpp] No se pudo reducir una foto, va en su tamaño original:', e)
     return buffer
   }
 }
