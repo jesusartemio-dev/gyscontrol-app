@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { itemsDeControl } from '@/lib/iperc/riesgoResidual'
 import { Check, ChevronRight, Loader2 } from 'lucide-react'
 import {
@@ -228,6 +229,8 @@ export function EditorFilaSheet({
    * estar en la otra columna o fuera de la vista. Pasaba con las filas cuya
    * condicion venia escrita "No Rutinaria", que no entraba en el enum.
    */
+  const camposConError = Object.keys(errors)
+
   const onInvalido = (errs: Record<string, { message?: string }>) => {
     const campos = Object.keys(errs)
     toast.error(
@@ -336,7 +339,7 @@ export function EditorFilaSheet({
                   value={factorRiesgo}
                   onValueChange={v => setValue('factorRiesgo', v)}
                 >
-                  <SelectTrigger className="h-8 text-xs mt-0.5">
+                  <SelectTrigger className={cn('h-8 text-xs mt-0.5', errors.factorRiesgo && 'border-destructive ring-1 ring-destructive')}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -352,7 +355,7 @@ export function EditorFilaSheet({
                   value={normalizarCondicion(watch('condicionActividad'))}
                   onValueChange={v => setValue('condicionActividad', normalizarCondicion(v))}
                 >
-                  <SelectTrigger className="h-8 text-xs mt-0.5">
+                  <SelectTrigger className={cn('h-8 text-xs mt-0.5', errors.condicionActividad && 'border-destructive ring-1 ring-destructive')}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -417,7 +420,7 @@ export function EditorFilaSheet({
                   value={String(severidad)}
                   onValueChange={v => setValue('severidad', Number(v))}
                 >
-                  <SelectTrigger className="h-8 text-xs mt-0.5">
+                  <SelectTrigger className={cn('h-8 text-xs mt-0.5', errors.severidad && 'border-destructive ring-1 ring-destructive')}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -433,7 +436,7 @@ export function EditorFilaSheet({
                   value={probabilidad}
                   onValueChange={v => setValue('probabilidad', v)}
                 >
-                  <SelectTrigger className="h-8 text-xs mt-0.5">
+                  <SelectTrigger className={cn('h-8 text-xs mt-0.5', errors.probabilidad && 'border-destructive ring-1 ring-destructive')}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -467,7 +470,7 @@ export function EditorFilaSheet({
                   value={String(severidadResidual)}
                   onValueChange={v => setValue('severidadResidual', Number(v))}
                 >
-                  <SelectTrigger className="h-8 text-xs mt-0.5">
+                  <SelectTrigger className={cn('h-8 text-xs mt-0.5', errors.severidadResidual && 'border-destructive ring-1 ring-destructive')}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -483,7 +486,7 @@ export function EditorFilaSheet({
                   value={probabilidadResidual}
                   onValueChange={v => setValue('probabilidadResidual', v)}
                 >
-                  <SelectTrigger className="h-8 text-xs mt-0.5">
+                  <SelectTrigger className={cn('h-8 text-xs mt-0.5', errors.probabilidadResidual && 'border-destructive ring-1 ring-destructive')}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -603,6 +606,24 @@ export function EditorFilaSheet({
 
           </div>
           </div>
+
+          {/* Lo que impide guardar, al lado del boton que se aprieta. Los
+              seis selects —condicion, factor, severidades y probabilidades—
+              no tienen mensaje propio debajo, que es justo donde estaba el
+              problema: el formulario se rechazaba y el boton parecia muerto. */}
+          {camposConError.length > 0 && (
+            <div className="-mx-6 mt-3 shrink-0 border-t border-destructive/30 bg-destructive/5 px-6 py-2">
+              <p className="text-xs font-medium text-destructive">
+                No se puede guardar: {camposConError.length === 1 ? 'falta' : 'faltan'}{' '}
+                {camposConError.map(c => ETIQUETAS[c] ?? c).join(', ')}.
+              </p>
+              <p className="mt-0.5 text-[11px] text-destructive/80">
+                {Object.entries(errors)
+                  .map(([campo, e]) => `${ETIQUETAS[campo] ?? campo}: ${(e as { message?: string })?.message ?? 'inválido'}`)
+                  .join(' · ')}
+              </p>
+            </div>
+          )}
 
           <div className="-mx-6 mt-3 flex shrink-0 flex-wrap items-center gap-2 border-t bg-background px-6 pt-3">
             {isEdit && (
