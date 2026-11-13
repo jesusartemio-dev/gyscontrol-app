@@ -13,6 +13,7 @@ import { BotonGenerarIaIperc } from './BotonGenerarIaIperc'
 import { SeleccionEdtsModal } from './SeleccionEdtsModal'
 import { PanelBloquesIperc, type BloqueIperc } from './PanelBloquesIperc'
 import { PanelEstructuraIperc } from './PanelEstructuraIperc'
+import { AvisoReglaResidual } from './AvisoReglaResidual'
 import { ActividadesSimilaresPanel } from './ActividadesSimilaresPanel'
 import { TablaFilasIperc } from './TablaFilasIperc'
 import { IpercPorActividad } from './IpercPorActividad'
@@ -484,6 +485,14 @@ export default function IpercClient({ proyectoId }: Props) {
         onRedefinir={handleAbrirModal}
         disabled={isGenerando}
       />
+
+      {iperc.filas.length > 0 && (
+        <AvisoReglaResidual
+          proyectoId={proyectoId}
+          refreshKey={iperc.filas.length}
+          onCorregido={fetchContexto}
+        />
+      )}
 
       {iperc.filas.length > 0 && (
         <ActividadesSimilaresPanel

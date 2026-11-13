@@ -18,7 +18,9 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import { itemsDeControl } from '@/lib/iperc/riesgoResidual'
+import {
+  itemsDeControl, cumpleRegla, calcularResidual, tieneControl,
+} from '@/lib/iperc/riesgoResidual'
 import { itemsConOrigen, leerOrigenControles, type CampoControl, type OrigenControl } from '@/lib/iperc/origenControles'
 import { evaluarRiesgo } from '@/lib/iperc/catalogos/matrizRiesgo'
 import type { IpercFila } from '@/types/iperc'
@@ -91,6 +93,51 @@ export function ProbabilidadBadge({ valor }: { valor: string }) {
       {valor}
     </span>
   )
+}
+
+/**
+ * Avisa cuando el residual de una fila no sigue la regla del SSOMA.
+ *
+ * La app recalcula el residual cada vez que se guarda, así que una fila solo
+ * puede quedar fuera de la regla si entró por otro camino: una versión
+ * revisada subida desde Excel, o una fila generada antes de que la regla
+ * existiera. Son justo los casos en los que nadie se iba a dar cuenta.
+ */
+export function AvisoRegla({ fila }: { fila: FilaConResidual }) {
+  if (cumpleRegla(fila)) return null
+
+  const esperado = calcularResidual(
+    fila.severidad, fila.probabilidad, fila.controlIngenieria, fila.controlAdministrativo,
+  )
+  const tieneIng = tieneControl(fila.controlIngenieria)
+  const tieneAdm = tieneControl(fila.controlAdministrativo)
+
+  const porque = [
+    tieneIng ? 'tiene control de ingeniería, así que la severidad residual sube 1' : null,
+    tieneAdm ? 'tiene control administrativo, así que la probabilidad residual sube 1' : null,
+    !tieneIng && !tieneAdm ? 'no tiene controles de ingeniería ni administrativos, así que el residual es igual al inicial' : null,
+  ].filter(Boolean).join('; ')
+
+  return (
+    <span
+      className="ml-0.5 inline-flex cursor-help items-center text-amber-600"
+      title={
+        `Fuera de la regla del SSOMA. Dice S${fila.severidadResidual}${fila.probabilidadResidual} ` +
+        `y debería decir S${esperado.severidadResidual}${esperado.probabilidadResidual}: ${porque}.`
+      }
+    >
+      <AlertTriangle className="h-3.5 w-3.5" />
+    </span>
+  )
+}
+
+interface FilaConResidual {
+  severidad: number
+  probabilidad: string
+  severidadResidual: number
+  probabilidadResidual: string
+  controlIngenieria?: string | null
+  controlAdministrativo?: string | null
 }
 
 export function NivelBadge({ severidad, probabilidad }: { severidad: number; probabilidad: string }) {
@@ -193,11 +240,21 @@ export function ControlesCell({
           ))}
         </button>
       </PopoverTrigger>
-      <PopoverContent side="left" className="max-h-96 w-96 overflow-y-auto p-4">
+      <PopoverContent
+        side="left"
+        className="max-h-96 w-96 overflow-y-auto p-4"
+        // El contenido va en un portal del DOM, pero los eventos suben por el
+        // árbol de React igual: sin esto, cualquier clic acá adentro llegaba
+        // también al onClick de la fila y abría el editor completo encima.
+        onClick={e => e.stopPropagation()}
+      >
         <div className="mb-3 flex items-center justify-between border-b pb-2">
           <p className="text-sm font-semibold">Jerarquía de controles</p>
           {onEditarControles && (
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onEditarControles(fila)}>
+            <Button
+              size="sm" variant="outline" className="h-7 text-xs"
+              onClick={e => { e.stopPropagation(); onEditarControles(fila) }}
+            >
               <Pencil className="mr-1 h-3 w-3" /> Editar
             </Button>
           )}
@@ -426,6 +483,7 @@ export function TablaFilasIperc({ filas, onEdit, onDelete, onGenerar, onAgregar 
                 {/* Nivel residual */}
                 <div className="px-2 shrink-0 flex items-center" style={{ width: COLS[15].w, minWidth: COLS[15].w }}>
                   <NivelBadge severidad={fila.severidadResidual} probabilidad={fila.probabilidadResidual} />
+                  <AvisoRegla fila={fila} />
                 </div>
 
                 {/* Actions */}

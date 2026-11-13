@@ -15,7 +15,9 @@ import { useIsMobile } from '@/lib/responsive/breakpoints'
 import { evaluarRiesgo } from '@/lib/iperc/catalogos/matrizRiesgo'
 import { cn } from '@/lib/utils'
 import type { IpercFila } from '@/types/iperc'
-import { ControlesCell, FactorBadge, NivelBadge, ProbabilidadBadge, SeveridadBadge } from './TablaFilasIperc'
+import {
+  AvisoRegla, ControlesCell, FactorBadge, NivelBadge, ProbabilidadBadge, SeveridadBadge,
+} from './TablaFilasIperc'
 import { EditarIpercTextoDialog } from './EditarIpercTextoDialog'
 import { EditarControlesDialog } from './EditarControlesDialog'
 
@@ -342,7 +344,12 @@ function TablaGrupo({ filas, onEdit, onDelete, onTexto, onControles }: { filas: 
                 <td className={cn(td, fondo)}><ControlesCell fila={f} onEditarControles={onControles} /></td>
                 <td className={cn(td, fondo, 'text-center')}><SeveridadBadge valor={f.severidadResidual} /></td>
                 <td className={cn(td, fondo, 'text-center')}><ProbabilidadBadge valor={f.probabilidadResidual} /></td>
-                <td className={cn(td, fondo)}><NivelBadge severidad={f.severidadResidual} probabilidad={f.probabilidadResidual} /></td>
+                <td className={cn(td, fondo)}>
+                  <span className="inline-flex items-center">
+                    <NivelBadge severidad={f.severidadResidual} probabilidad={f.probabilidadResidual} />
+                    <AvisoRegla fila={f} />
+                  </span>
+                </td>
                 <td className={cn(td, fondo)} onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-0.5">
                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Texto / IA de esta fila" onClick={() => onTexto(f)}>
