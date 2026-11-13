@@ -18,7 +18,9 @@ import { Switch } from '@/components/ui/switch'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog'
-import { ArrowLeft, HardHat, Loader2, Pencil, Plus, Search, ImageOff } from 'lucide-react'
+import {
+  ArrowLeft, HardHat, Loader2, Pencil, Plus, Search, ImageOff, LayoutGrid, Table2,
+} from 'lucide-react'
 
 interface Epp {
   id: string
@@ -47,6 +49,8 @@ export default function CatalogoEppMatrizPage() {
   const [busqueda, setBusqueda] = useState('')
   const [editando, setEditando] = useState<Partial<Epp> | null>(null)
   const [guardando, setGuardando] = useState(false)
+  const [vista, setVista] = useState<'tarjetas' | 'matriz'>('matriz')
+  const [marcando, setMarcando] = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
     setCargando(true)
@@ -133,12 +137,60 @@ export default function CatalogoEppMatrizPage() {
             {sinPuestos} sin puestos asignados
           </span>
         )}
+        <div className="ml-auto flex rounded border">
+          <Button
+            size="sm" variant={vista === 'matriz' ? 'secondary' : 'ghost'}
+            className="h-8 rounded-r-none text-xs"
+            onClick={() => setVista('matriz')}
+          >
+            <Table2 className="mr-1 h-3.5 w-3.5" /> Matriz
+          </Button>
+          <Button
+            size="sm" variant={vista === 'tarjetas' ? 'secondary' : 'ghost'}
+            className="h-8 rounded-l-none text-xs"
+            onClick={() => setVista('tarjetas')}
+          >
+            <LayoutGrid className="mr-1 h-3.5 w-3.5" /> Tarjetas
+          </Button>
+        </div>
       </div>
 
       {cargando ? (
         <div className="flex h-32 items-center justify-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
         </div>
+      ) : vista === 'matriz' ? (
+        <MatrizPuestos
+          items={filtrados}
+          puestos={puestos}
+          marcandoId={marcando}
+          onEditar={e => setEditando({ ...e })}
+          onAlternar={async (epp, puestoId) => {
+            const tiene = epp.puestoIdsDefault.includes(puestoId)
+            const ids = tiene
+              ? epp.puestoIdsDefault.filter(x => x !== puestoId)
+              : [...epp.puestoIdsDefault, puestoId]
+
+            // Optimista: la matriz se usa marcando muchas casillas seguidas y
+            // esperar la respuesta de cada una la vuelve inusable.
+            setItems(prev => prev.map(x => x.id === epp.id ? { ...x, puestoIdsDefault: ids } : x))
+            setMarcando(epp.id)
+            try {
+              const r = await fetch('/api/seguridad/catalogo-epp-matriz', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: epp.id, puestoIdsDefault: ids }),
+              })
+              if (!r.ok) {
+                const d = await r.json().catch(() => ({}))
+                toast.error(d.error ?? 'No se pudo guardar')
+                setItems(prev => prev.map(x => x.id === epp.id ? epp : x))
+              }
+            } finally {
+              setMarcando(null)
+            }
+          }}
+        />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtrados.map(e => (
@@ -347,6 +399,131 @@ export default function CatalogoEppMatrizPage() {
  * Los puestos a los que le toca este EPP. Sin ninguno, la celda queda a
  * criterio de la IA en cada proyecto, y eso conviene que se vea.
  */
+
+/**
+ * EPP contra puestos, como se lee la matriz del proyecto.
+ *
+ * En tarjetas los puestos salían en letra chica y cortados en "+3", que
+ * alcanza para mirar pero no para trabajar: no se veía qué puesto quedaba sin
+ * nada, que es justo lo que hay que llenar.
+ */
+function MatrizPuestos({
+  items, puestos, marcandoId, onAlternar, onEditar,
+}: {
+  items: Epp[]
+  puestos: Puesto[]
+  marcandoId: string | null
+  onAlternar: (epp: Epp, puestoId: string) => void
+  onEditar: (epp: Epp) => void
+}) {
+  if (puestos.length === 0) {
+    return (
+      <p className="rounded border border-dashed p-4 text-sm text-muted-foreground">
+        No hay puestos de campo en el catálogo de puestos.
+      </p>
+    )
+  }
+
+  const porPuesto = new Map(
+    puestos.map(p => [p.id, items.filter(i => i.puestoIdsDefault.includes(p.id)).length]),
+  )
+
+  return (
+    <div className="overflow-x-auto rounded border bg-white">
+      <table className="border-collapse text-xs">
+        <thead>
+          <tr>
+            <th className="sticky left-0 z-20 w-[280px] min-w-[280px] border-b border-r bg-gray-50 px-3 py-2 text-left font-semibold text-gray-700">
+              EPP
+            </th>
+            {puestos.map(p => (
+              <th
+                key={p.id}
+                className="border-b border-r bg-gray-50 align-bottom"
+                style={{ height: 150, width: 42, minWidth: 42, padding: 0 }}
+              >
+                <div className="flex h-full flex-col items-center justify-end pb-1.5">
+                  <span
+                    className="whitespace-nowrap text-[11px] font-medium text-gray-700"
+                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                  >
+                    {p.nombre}
+                  </span>
+                  <span
+                    className={`mt-1 text-[9px] tabular-nums ${
+                      (porPuesto.get(p.id) ?? 0) === 0 ? 'font-semibold text-amber-700' : 'text-muted-foreground'
+                    }`}
+                  >
+                    {porPuesto.get(p.id) ?? 0}
+                  </span>
+                </div>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((e, i) => {
+            const sinNada = e.puestoIdsDefault.length === 0
+            return (
+              <tr key={e.id} className={i % 2 ? 'bg-slate-50/60' : ''}>
+                <td
+                  className={`sticky left-0 z-10 border-b border-r px-2 py-1 ${
+                    i % 2 ? 'bg-slate-50' : 'bg-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      {String(e.orden).padStart(2, '0')}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-medium text-gray-800" title={e.nombre}>
+                      {e.nombre}
+                    </span>
+                    {sinNada && (
+                      <span className="shrink-0 rounded bg-amber-100 px-1 text-[9px] font-semibold text-amber-800">
+                        sin puestos
+                      </span>
+                    )}
+                    {marcandoId === e.id && <Loader2 className="h-3 w-3 shrink-0 animate-spin text-muted-foreground" />}
+                    <Button
+                      size="sm" variant="ghost" className="h-5 w-5 shrink-0 p-0"
+                      onClick={() => onEditar(e)}
+                      title="Editar este EPP"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </td>
+
+                {puestos.map(p => {
+                  const marcado = e.puestoIdsDefault.includes(p.id)
+                  return (
+                    <td key={p.id} className="border-b border-r p-0 text-center">
+                      <button
+                        type="button"
+                        onClick={() => onAlternar(e, p.id)}
+                        title={`${e.nombre} · ${p.nombre}`}
+                        className="flex h-7 w-full items-center justify-center hover:bg-emerald-50"
+                      >
+                        <span
+                          className={`h-3.5 w-3.5 rounded-sm border ${
+                            marcado
+                              ? 'border-emerald-600 bg-emerald-600'
+                              : 'border-gray-300 bg-white'
+                          }`}
+                        />
+                      </button>
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 function PuestosDeEpp({ ids, puestos }: { ids: string[]; puestos: Puesto[] }) {
   if (ids.length === 0) {
     return (
