@@ -8,11 +8,16 @@
 // pegarla de vuelta (ver EditarIpercTextoDialog). También por fila y todo.
 
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Pencil, Sparkles, Trash2, ChevronsUpDown, ChevronsDownUp } from 'lucide-react'
+import {
+  ChevronDown, ChevronRight, Pencil, Sparkles, Trash2, ChevronsUpDown, ChevronsDownUp,
+  Check, Loader2, ShieldCheck,
+} from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useIsMobile } from '@/lib/responsive/breakpoints'
 import { evaluarRiesgo } from '@/lib/iperc/catalogos/matrizRiesgo'
+import { itemsDeControl } from '@/lib/iperc/riesgoResidual'
 import { cn } from '@/lib/utils'
 import type { IpercFila } from '@/types/iperc'
 import {
@@ -48,6 +53,22 @@ function contarNiveles(filas: IpercFila[], residual: boolean) {
   return c
 }
 
+/** Cuántas líneas de la actividad ya se revisaron. */
+function AvanceRevision({ filas }: { filas: IpercFila[] }) {
+  const hechas = filas.filter(f => !!f.revisadaEn).length
+  if (hechas === 0) return null
+  const todas = hechas === filas.length
+  return (
+    <span className={cn(
+      'inline-flex items-center gap-0.5 rounded px-1 text-[10px] font-medium',
+      todas ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700',
+    )}>
+      <ShieldCheck className="h-3 w-3" />
+      {todas ? 'revisada' : `${hechas}/${filas.length} revisadas`}
+    </span>
+  )
+}
+
 function ResumenNiveles({ filas }: { filas: IpercFila[] }) {
   const r = contarNiveles(filas, true)
   const item = (n: number, cls: string, t: string) =>
@@ -63,6 +84,27 @@ function ResumenNiveles({ filas }: { filas: IpercFila[] }) {
 }
 
 export function IpercPorActividad({ proyectoId, filas, onEdit, onDelete, onAplicado }: Props) {
+  const [revisandoId, setRevisandoId] = useState<string | null>(null)
+
+  /** Marca la linea como revisada. Es una marca de la app: el Excel no la lleva. */
+  const onRevisar = async (fila: IpercFila, valor: boolean) => {
+    setRevisandoId(fila.id)
+    try {
+      const r = await fetch(`/api/proyectos/${proyectoId}/iperc/filas/${fila.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ revisada: valor }),
+      })
+      if (!r.ok) { toast.error('No se pudo guardar la marca'); return }
+      const d = await r.json()
+      onAplicado(filas.map(f => f.id === fila.id
+        ? { ...f, revisadaEn: d.data?.revisadaEn ?? null, revisadaPor: d.data?.revisadaPor ?? null }
+        : f))
+    } finally {
+      setRevisandoId(null)
+    }
+  }
+
   const esCelular = useIsMobile()
   const [filaControles, setFilaControles] = useState<IpercFila | null>(null)
   const grupos = useMemo<Grupo[]>(() => {
@@ -138,6 +180,7 @@ export function IpercPorActividad({ proyectoId, filas, onEdit, onDelete, onAplic
                   <span className="block text-sm font-semibold leading-snug text-gray-900">{g.actividad}</span>
                   <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
                     {g.filas.length} fila{g.filas.length === 1 ? '' : 's'}
+                    <AvanceRevision filas={g.filas} />
                     <ResumenNiveles filas={g.filas} />
                   </span>
                 </span>
@@ -155,8 +198,8 @@ export function IpercPorActividad({ proyectoId, filas, onEdit, onDelete, onAplic
             </div>
 
             {abierto && (esCelular
-              ? <TarjetasFilas filas={g.filas} onEdit={onEdit} onDelete={onDelete} onTexto={(f) => setTexto({ titulo: `Fila ${f.numero}`, filas: [f] })} />
-              : <TablaGrupo filas={g.filas} onEdit={onEdit} onDelete={onDelete} onTexto={(f) => setTexto({ titulo: `Fila ${f.numero}`, filas: [f] })} onControles={setFilaControles} />)}
+              ? <TarjetasFilas filas={g.filas} onEdit={onEdit} onDelete={onDelete} onControles={setFilaControles} onRevisar={onRevisar} revisandoId={revisandoId} />
+              : <TablaGrupo filas={g.filas} onEdit={onEdit} onDelete={onDelete} onControles={setFilaControles} onRevisar={onRevisar} revisandoId={revisandoId} />)}
           </section>
         )
       })}
@@ -193,36 +236,94 @@ export function IpercPorActividad({ proyectoId, filas, onEdit, onDelete, onAplic
 interface AccionesFila {
   onEdit: (fila: IpercFila) => void
   onDelete: (filaId: string) => void
-  onTexto: (fila: IpercFila) => void
   /** Abre el modal de controles de esa fila. */
   onControles: (fila: IpercFila) => void
+  /** Marca o desmarca la linea como revisada por el ingeniero de seguridad. */
+  onRevisar: (fila: IpercFila, valor: boolean) => void
+  /** Fila cuyo check se esta guardando. */
+  revisandoId: string | null
 }
 
-/** Celular: una tarjeta por fila. */
-function TarjetasFilas({ filas, onEdit, onDelete, onTexto }: { filas: IpercFila[] } & Omit<AccionesFila, 'onControles'>) {
+export const estaRevisada = (f: IpercFila) => !!f.revisadaEn
+
+/** El check de "ya la revise", con su estado de guardado. */
+function CheckRevisada({
+  fila, onRevisar, revisandoId, tamano = 'sm',
+}: { fila: IpercFila; onRevisar: AccionesFila['onRevisar']; revisandoId: string | null; tamano?: 'sm' | 'md' }) {
+  const revisada = estaRevisada(fila)
+  const guardando = revisandoId === fila.id
+  const lado = tamano === 'md' ? 'h-6 w-6' : 'h-5 w-5'
+  const quien = fila.revisadaPor?.name
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onRevisar(fila, !revisada) }}
+      disabled={guardando}
+      title={revisada
+        ? `Revisada${quien ? ` por ${quien}` : ''}. Clic para desmarcar.`
+        : 'Marcar como revisada'}
+      className={cn(
+        'flex shrink-0 items-center justify-center rounded border transition-colors',
+        lado,
+        revisada
+          ? 'border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-600'
+          : 'border-gray-300 bg-white text-transparent hover:border-emerald-400',
+      )}
+    >
+      {guardando
+        ? <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+        : <Check className="h-3.5 w-3.5" />}
+    </button>
+  )
+}
+
+/**
+ * Celular: una tarjeta por fila.
+ *
+ * Arriba el numero y el check de revisada, que es por donde se lleva la
+ * cuenta al revisar; los controles plegados muestran ING, ADM y EPP por
+ * separado, con su boton para editarlos sin pasar por el editor completo.
+ */
+function TarjetasFilas({
+  filas, onEdit, onDelete, onControles, onRevisar, revisandoId,
+}: { filas: IpercFila[] } & AccionesFila) {
+  const GRUPOS: Array<[string, (f: IpercFila) => string, string]> = [
+    ['Eliminar', f => f.eliminar, 'text-gray-700'],
+    ['Sustituir', f => f.sustituir, 'text-gray-700'],
+    ['Ingeniería', f => f.controlIngenieria, 'text-blue-700'],
+    ['Administrativo', f => f.controlAdministrativo, 'text-orange-700'],
+    ['EPP', f => f.controlReceptor, 'text-emerald-700'],
+  ]
+  const tiene = (t: string) => !!t && t.trim() !== '' && t.trim().toUpperCase() !== 'NA'
+
   return (
     <div className="divide-y">
       {filas.map((f) => {
-        const controles = [
-          ['Eliminar', f.eliminar], ['Sustituir', f.sustituir], ['Ingeniería', f.controlIngenieria],
-          ['Administrativo', f.controlAdministrativo], ['EPP', f.controlReceptor],
-        ].filter(([, t]) => t && t.trim() && t !== 'NA')
+        const conControl = GRUPOS.filter(([, get]) => tiene(get(f)))
+        const revisada = estaRevisada(f)
         return (
-          <div key={f.id} className="space-y-1.5 px-2 py-2.5">
-            <div className="flex items-start gap-1.5">
-              <span className="mt-0.5 shrink-0 font-mono text-[10px] text-muted-foreground">#{f.numero}</span>
+          <div key={f.id} className={cn('space-y-1.5 px-2 py-2.5', revisada && 'bg-emerald-50/40')}>
+            <div className="flex items-start gap-2">
+              <CheckRevisada fila={f} onRevisar={onRevisar} revisandoId={revisandoId} tamano="md" />
+              <span className="mt-0.5 shrink-0 rounded bg-slate-100 px-1.5 font-mono text-[11px] font-semibold text-slate-700">
+                {String(f.numero).padStart(3, '0')}
+              </span>
               <p className="min-w-0 flex-1 text-[13px] font-medium leading-snug text-gray-900">{f.tarea}</p>
             </div>
+
             <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
               <span>{f.puestoTrabajo}</span>
               <FactorBadge factor={f.factorRiesgo} />
               <span>{f.condicionActividad}</span>
             </div>
+
             <p className="text-xs leading-snug"><span className="font-semibold text-gray-600">Peligro: </span>{f.peligro}</p>
             <p className="text-xs leading-snug">
               <span className="font-semibold text-gray-600">Riesgo: </span>{f.riesgo}
               <span className="text-muted-foreground"> → {f.consecuencia}</span>
             </p>
+
             <div className="flex flex-wrap items-center gap-1.5">
               <NivelBadge severidad={f.severidad} probabilidad={f.probabilidad} />
               <span className="text-muted-foreground">→</span>
@@ -230,27 +331,56 @@ function TarjetasFilas({ filas, onEdit, onDelete, onTexto }: { filas: IpercFila[
               <span className="text-[10px] text-muted-foreground">
                 {f.severidad}{f.probabilidad} → {f.severidadResidual}{f.probabilidadResidual}
               </span>
+              <AvisoRegla fila={f} />
             </div>
-            {controles.length > 0 && (
-              <details className="rounded border bg-slate-50 px-2 py-1 text-[11px]">
-                <summary className="cursor-pointer font-medium text-gray-600">Controles ({controles.length})</summary>
-                <div className="mt-1 space-y-1">
-                  {controles.map(([et, t]) => (
-                    <p key={et} className="leading-snug"><span className="font-semibold text-gray-600">{et}: </span>{t}</p>
+
+            <details className="rounded border bg-slate-50 px-2 py-1 text-[11px]">
+              <summary className="flex cursor-pointer items-center gap-1.5 font-medium text-gray-600">
+                Controles
+                <span className="flex gap-1">
+                  {GRUPOS.slice(2).map(([et, get, color]) => (
+                    <span
+                      key={et}
+                      className={cn(
+                        'rounded px-1 text-[9px] font-semibold',
+                        tiene(get(f)) ? `bg-white ${color}` : 'bg-slate-200 text-slate-400',
+                      )}
+                    >
+                      {et.slice(0, 3).toUpperCase()}
+                    </span>
                   ))}
-                  {f.accionesMejora && f.accionesMejora !== 'NA' && (
-                    <p className="leading-snug"><span className="font-semibold text-gray-600">Mejora: </span>{f.accionesMejora}</p>
-                  )}
-                  {f.responsables && <p className="text-muted-foreground">Responsable: {f.responsables}</p>}
-                </div>
-              </details>
-            )}
+                </span>
+              </summary>
+
+              <div className="mt-1.5 space-y-1.5">
+                {conControl.length === 0 && (
+                  <p className="text-amber-700">Esta fila no tiene ningún control cargado.</p>
+                )}
+                {conControl.map(([et, get, color]) => (
+                  <div key={et}>
+                    <p className={cn('text-[10px] font-semibold uppercase', color)}>{et}</p>
+                    {itemsDeControl(get(f)).map((linea, i) => (
+                      <p key={i} className="pl-2 leading-snug">• {linea}</p>
+                    ))}
+                  </div>
+                ))}
+                {f.accionesMejora && f.accionesMejora !== 'NA' && (
+                  <p className="leading-snug"><span className="font-semibold text-gray-600">Mejora: </span>{f.accionesMejora}</p>
+                )}
+                {f.responsables && <p className="text-muted-foreground">Responsable: {f.responsables}</p>}
+
+                <Button
+                  variant="outline" size="sm" className="h-7 w-full px-2 text-[11px]"
+                  onClick={() => onControles(f)}
+                >
+                  <Pencil className="mr-1 h-3 w-3" /> Editar controles
+                </Button>
+              </div>
+            </details>
+
             <div className="flex items-center justify-end gap-1.5">
-              <Button variant="outline" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onTexto(f)}>
-                <Sparkles className="mr-1 h-3 w-3 text-indigo-500" /> Texto / IA
-              </Button>
               <Button variant="outline" size="sm" className="h-7 px-2 text-[11px]" onClick={() => onEdit(f)}>
-                <Pencil className="mr-1 h-3 w-3" /> Editar
+                <Pencil className="mr-1 h-3 w-3" /> Editar fila
               </Button>
               <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => onDelete(f.id)} title="Eliminar fila">
                 <Trash2 className="h-3.5 w-3.5" />
@@ -264,7 +394,7 @@ function TarjetasFilas({ filas, onEdit, onDelete, onTexto }: { filas: IpercFila[
 }
 
 /** PC: tabla de la actividad; Tarea fija a la izquierda al desplazar. */
-function TablaGrupo({ filas, onEdit, onDelete, onTexto, onControles }: { filas: IpercFila[] } & AccionesFila) {
+function TablaGrupo({ filas, onEdit, onDelete, onControles, onRevisar, revisandoId }: { filas: IpercFila[] } & AccionesFila) {
   const th = 'px-1.5 py-1 text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap'
   const td = 'px-1.5 py-1 align-top'
   // Dos lineas, no tres: con tres, una fila ocupaba casi 100 px de alto y en
@@ -275,6 +405,7 @@ function TablaGrupo({ filas, onEdit, onDelete, onTexto, onControles }: { filas: 
       <table className="w-full min-w-[1150px] border-separate border-spacing-0 text-xs">
         <thead>
           <tr className="bg-white">
+            <th className={cn(th, 'w-8 text-center')} title="Revisada" />
             <th className={cn(th, 'w-10')}>#</th>
             <th className={cn(th, 'sticky left-0 z-[1] w-64 bg-white shadow-[inset_-1px_0_0_#e5e7eb]')}>Tarea</th>
             <th className={cn(th, 'w-32')}>Puesto</th>
@@ -303,7 +434,7 @@ function TablaGrupo({ filas, onEdit, onDelete, onTexto, onControles }: { filas: 
             const grupo = filas.slice(0, i + 1).reduce(
               (n, x, j, arr) => (j > 0 && arr[j - 1].tarea !== x.tarea ? n + 1 : n), 0,
             )
-            const fondo = grupo % 2 ? 'bg-slate-50' : 'bg-white'
+            const fondo = estaRevisada(f) ? 'bg-emerald-50/50' : grupo % 2 ? 'bg-slate-50' : 'bg-white'
             return (
               <tr
                 key={f.id}
@@ -314,6 +445,9 @@ function TablaGrupo({ filas, onEdit, onDelete, onTexto, onControles }: { filas: 
                 )}
                 onClick={() => onEdit(f)}
               >
+                <td className={cn(td, fondo, 'text-center')} onClick={(e) => e.stopPropagation()}>
+                  <CheckRevisada fila={f} onRevisar={onRevisar} revisandoId={revisandoId} />
+                </td>
                 <td className={cn(td, fondo, 'font-mono text-[10px] text-muted-foreground')}>{String(f.numero).padStart(3, '0')}</td>
                 <td className={cn(td, fondo, 'sticky left-0 z-[1] font-medium shadow-[inset_-1px_0_0_#e5e7eb]')}>
                   {esPrimera ? (
@@ -352,9 +486,6 @@ function TablaGrupo({ filas, onEdit, onDelete, onTexto, onControles }: { filas: 
                 </td>
                 <td className={cn(td, fondo)} onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-0.5">
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Texto / IA de esta fila" onClick={() => onTexto(f)}>
-                      <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
-                    </Button>
                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Editar" onClick={() => onEdit(f)}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>

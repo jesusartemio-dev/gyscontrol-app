@@ -69,6 +69,20 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status })
 
   const body = await req.json()
+
+  // La marca de revisada va sola: es de la app, no del contenido de la fila,
+  // y marcarla no debe pasar por las reglas ni tocar la procedencia.
+  if (typeof body.revisada === 'boolean' && Object.keys(body).length === 1) {
+    const updated = await prisma.ipercFila.update({
+      where: { id: fid },
+      data: body.revisada
+        ? { revisadaEn: new Date(), revisadaPorId: session.user.id }
+        : { revisadaEn: null, revisadaPorId: null },
+      include: { revisadaPor: { select: { name: true } } },
+    })
+    return NextResponse.json({ data: updated })
+  }
+
   const parsed = ipercFilaSchema.partial().safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ error: 'Datos inválidos', details: parsed.error.flatten() }, { status: 400 })
@@ -104,7 +118,22 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     ;(data as Record<string, unknown>).origenControles = origen as object
   }
 
-  const updated = await prisma.ipercFila.update({ where: { id: fid }, data })
+  // Si vino la marca junto con los cambios —el "guardar y siguiente" de la
+  // revisión— manda esa. Si no, editar el contenido borra la marca: lo que se
+  // reviso ya no es lo que dice la fila.
+  if (typeof body.revisada === 'boolean') {
+    Object.assign(data, body.revisada
+      ? { revisadaEn: new Date(), revisadaPorId: session.user.id }
+      : { revisadaEn: null, revisadaPorId: null })
+  } else {
+    Object.assign(data, { revisadaEn: null, revisadaPorId: null })
+  }
+
+  const updated = await prisma.ipercFila.update({
+    where: { id: fid },
+    data,
+    include: { revisadaPor: { select: { name: true } } },
+  })
 
   return NextResponse.json({ data: updated })
 }

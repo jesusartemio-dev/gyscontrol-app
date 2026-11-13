@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Plus, RefreshCw, Loader2, Info, Trash2, Download, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,7 @@ import { SeleccionEdtsModal } from './SeleccionEdtsModal'
 import { PanelBloquesIperc, type BloqueIperc } from './PanelBloquesIperc'
 import { PanelEstructuraIperc } from './PanelEstructuraIperc'
 import { AvisoReglaResidual } from './AvisoReglaResidual'
+import { AvanceRevisionIperc } from './AvanceRevisionIperc'
 import { ActividadesSimilaresPanel } from './ActividadesSimilaresPanel'
 import { TablaFilasIperc } from './TablaFilasIperc'
 import { IpercPorActividad } from './IpercPorActividad'
@@ -302,6 +303,36 @@ export default function IpercClient({ proyectoId }: Props) {
     setSheetOpen(true)
   }
 
+  /**
+   * Dónde está la fila abierta dentro del IPERC, para revisar de corrido.
+   *
+   * El orden es el del documento, que es como se revisa: tal como sale
+   * impreso, no como lo devolvió la consulta.
+   */
+  const filasOrdenadas = useMemo(
+    () => [...(contexto?.iperc?.filas ?? [])].sort((a, b) => a.numero - b.numero),
+    [contexto?.iperc?.filas],
+  )
+
+  const indiceFila = filaEditando
+    ? filasOrdenadas.findIndex((f: IpercFila) => f.id === filaEditando.id)
+    : -1
+
+  const posicionFila = indiceFila >= 0
+    ? { indice: indiceFila, total: filasOrdenadas.length }
+    : null
+
+  /** Pasa a la siguiente fila sin cerrar el editor. La última cierra. */
+  const irASiguienteFila = () => {
+    const siguiente = filasOrdenadas[indiceFila + 1]
+    if (!siguiente) {
+      toast.success('Era la última fila del IPERC')
+      setSheetOpen(false)
+      return
+    }
+    setFilaEditando(siguiente)
+  }
+
   const handleAgregarFila = () => {
     setFilaEditando(null)
     setSheetOpen(true)
@@ -513,13 +544,17 @@ export default function IpercClient({ proyectoId }: Props) {
           onAgregar={handleAgregarFila}
         />
       ) : (
-        <IpercPorActividad
-          proyectoId={proyectoId}
-          filas={iperc.filas}
-          onEdit={handleEditarFila}
-          onDelete={handleEliminarFila}
-          onAplicado={handleFilasAplicadas}
-        />
+        <>
+          <AvanceRevisionIperc filas={iperc.filas} />
+
+          <IpercPorActividad
+            proyectoId={proyectoId}
+            filas={iperc.filas}
+            onEdit={handleEditarFila}
+            onDelete={handleEliminarFila}
+            onAplicado={handleFilasAplicadas}
+          />
+        </>
       )}
 
       {/* Resumen post-generación */}
@@ -711,6 +746,8 @@ export default function IpercClient({ proyectoId }: Props) {
         proyectoId={proyectoId}
         fila={filaEditando}
         onSaved={handleFilaSaved}
+        posicion={posicionFila}
+        onSiguiente={irASiguienteFila}
       />
     </div>
   )

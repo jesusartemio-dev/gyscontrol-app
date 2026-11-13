@@ -49,7 +49,10 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   const iperc = await prisma.iperc.findUnique({
     where: { proyectoId },
     include: {
-      filas: { orderBy: { numero: 'asc' } },
+      filas: {
+        orderBy: { numero: 'asc' },
+        include: { revisadaPor: { select: { name: true } } },
+      },
       generaciones: { orderBy: { createdAt: 'desc' }, take: 10 },
     },
   })

@@ -1,6 +1,16 @@
-import type { Iperc, IpercFila, IpercGeneracion } from '@prisma/client'
+import type { Iperc, IpercFila as IpercFilaPrisma, IpercGeneracion } from '@prisma/client'
 
-export type { Iperc, IpercFila, IpercGeneracion }
+/**
+ * La fila como la devuelve la API: el modelo mas quien la dio por revisada.
+ *
+ * `revisadaPor` es una relacion, asi que no viene en el tipo de Prisma pero
+ * si en la respuesta, porque la consulta la incluye.
+ */
+export type IpercFila = IpercFilaPrisma & {
+  revisadaPor?: { name: string | null } | null
+}
+
+export type { Iperc, IpercGeneracion }
 
 // ─── Estado del IPERC ───────────────────────────────────────────────────────
 export type IpercEstado = 'borrador' | 'revisado' | 'aprobado'
@@ -39,6 +49,10 @@ export interface IpercFilaRow {
   actividadCronogramaRefId: string | null
   /** De dónde salió cada control: { campo: [{ texto, origen }] }. */
   origenControles?: unknown
+  /** Cuándo el ingeniero de seguridad dio por revisada la línea. Solo en la app. */
+  revisadaEn?: string | Date | null
+  revisadaPorId?: string | null
+  revisadaPor?: { name: string | null } | null
 }
 
 // ─── IPERC con filas y generaciones ─────────────────────────────────────────

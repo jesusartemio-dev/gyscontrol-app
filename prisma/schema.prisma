@@ -2211,6 +2211,7 @@ model User {
   avancesTareaRegistrados                  ProyectoTareaAvance[]
   plantillaOrgNodos                        PlantillaOrgNodo[]
   gastosFijosMensualesRegistrados          GastoFijoMensual[]
+  ipercFilasRevisadas                      IpercFila[]                          @relation("IpercFilaRevisor")
 
   @@map("user")
 }
@@ -6791,6 +6792,14 @@ model IpercFila {
   tareaCronogramaRefId     String?
   actividadCronogramaRefId String?
 
+  /// Cuándo el ingeniero de seguridad dio por revisada esta línea.
+  ///
+  /// Es una marca de la app y no sale en el Excel: sirve para no perder el
+  /// hilo revisando 168 filas de a una, y para ver de un vistazo cuánto falta.
+  revisadaEn    DateTime?
+  revisadaPorId String?
+  revisadaPor   User?     @relation("IpercFilaRevisor", fields: [revisadaPorId], references: [id], onDelete: SetNull)
+
   /// De dónde salió cada control, para distinguirlo en la app:
   /// { "controlIngenieria": [{ "texto": "...", "origen": "catalogo|ia|manual" }], ... }
   ///
@@ -6804,6 +6813,7 @@ model IpercFila {
 
   @@index([ipercId])
   @@index([ipercId, numero])
+  @@index([revisadaPorId])
   @@map("iperc_fila")
 }
 

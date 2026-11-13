@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
+import { itemsDeControl } from '@/lib/iperc/riesgoResidual'
+import { Check, ChevronRight, Loader2 } from 'lucide-react'
 import {
   Sheet,
   SheetContent,
@@ -90,10 +91,23 @@ interface Props {
   proyectoId: string
   fila: IpercFila | null
   onSaved: (fila: IpercFila) => void
+  /** Para revisar de corrido: cuantas filas hay, en cual vamos y cual sigue. */
+  posicion?: { indice: number; total: number } | null
+  onSiguiente?: () => void
 }
 
-export function EditorFilaSheet({ open, onClose, proyectoId, fila, onSaved }: Props) {
+export function EditorFilaSheet({
+  open, onClose, proyectoId, fila, onSaved, posicion, onSiguiente,
+}: Props) {
   const isEdit = fila !== null
+  // Si se marca al guardar. Arranca con lo que ya tenga la fila.
+  const [marcarRevisada, setMarcarRevisada] = useState(false)
+  // Lo decide el boton que se apriete, no un estado que haya que limpiar.
+  const irAlSiguiente = useRef(false)
+
+  useEffect(() => {
+    setMarcarRevisada(!!fila?.revisadaEn)
+  }, [fila])
 
   const {
     register,
@@ -188,7 +202,7 @@ export function EditorFilaSheet({ open, onClose, proyectoId, fila, onSaved }: Pr
       const res = await fetch(url, {
         method: isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
+        body: JSON.stringify(isEdit ? { ...values, revisada: marcarRevisada } : values),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -197,7 +211,12 @@ export function EditorFilaSheet({ open, onClose, proyectoId, fila, onSaved }: Pr
       const { data } = await res.json()
       toast.success(isEdit ? 'Fila actualizada' : 'Fila agregada')
       onSaved(data)
-      onClose()
+      if (irAlSiguiente.current && onSiguiente) {
+        irAlSiguiente.current = false
+        onSiguiente()
+      } else {
+        onClose()
+      }
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Error al guardar')
     }
@@ -205,9 +224,24 @@ export function EditorFilaSheet({ open, onClose, proyectoId, fila, onSaved }: Pr
 
   return (
     <Sheet open={open} onOpenChange={v => !v && onClose()}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+      <SheetContent
+        side="right"
+        className="flex w-full flex-col overflow-y-auto sm:max-w-none lg:w-[85vw] xl:w-[75vw]"
+      >
         <SheetHeader className="mb-4">
-          <SheetTitle>{isEdit ? 'Editar fila' : 'Nueva fila'} IPERC</SheetTitle>
+          <SheetTitle className="flex flex-wrap items-center gap-2">
+            {isEdit ? 'Editar fila' : 'Nueva fila'} IPERC
+            {fila && (
+              <span className="rounded bg-slate-100 px-1.5 font-mono text-xs font-normal text-slate-700">
+                {String(fila.numero).padStart(3, '0')}
+              </span>
+            )}
+            {posicion && (
+              <span className="text-xs font-normal text-muted-foreground">
+                {posicion.indice + 1} de {posicion.total}
+              </span>
+            )}
+          </SheetTitle>
         </SheetHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -387,9 +421,25 @@ export function EditorFilaSheet({ open, onClose, proyectoId, fila, onSaved }: Pr
                 ] as const
               ).map(({ key, label, jerarquia }) => {
                 const sugerencias = getControlesSugeridos(jerarquia)
+                // Cuantos controles tiene cargados: plegado, no se veia cual
+                // estaba lleno y cual vacio, y habia que abrir los cinco.
+                const cargados = itemsDeControl(watch(key)).length
                 return (
                   <AccordionItem key={key} value={key} className="border-b last:border-b-0 px-2">
-                    <AccordionTrigger className="text-xs py-2">{label}</AccordionTrigger>
+                    <AccordionTrigger className="py-2 text-xs">
+                      <span className="flex items-center gap-2">
+                        {label}
+                        {cargados > 0 ? (
+                          <span className="rounded bg-emerald-100 px-1.5 text-[10px] font-semibold text-emerald-800">
+                            {cargados}
+                          </span>
+                        ) : (
+                          <span className="rounded bg-slate-100 px-1.5 text-[10px] text-slate-400">
+                            vacío
+                          </span>
+                        )}
+                      </span>
+                    </AccordionTrigger>
                     <AccordionContent>
                       {sugerencias.length > 0 && (
                         <div className="mb-1.5 flex flex-wrap gap-1">
@@ -498,14 +548,45 @@ export function EditorFilaSheet({ open, onClose, proyectoId, fila, onSaved }: Pr
             </div>
           </div>
 
-          <div className="flex gap-2 pt-2 border-t">
-            <Button type="submit" disabled={isSubmitting} size="sm">
-              {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}
-              {isEdit ? 'Guardar cambios' : 'Agregar fila'}
-            </Button>
+          <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center gap-2 border-t bg-background px-6 pb-2 pt-3">
+            {isEdit && (
+              <label className="mr-auto flex cursor-pointer items-center gap-2 text-xs">
+                <span
+                  className={`flex h-5 w-5 items-center justify-center rounded border transition-colors ${
+                    marcarRevisada
+                      ? 'border-emerald-500 bg-emerald-500 text-white'
+                      : 'border-gray-300 bg-white text-transparent'
+                  }`}
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </span>
+                <input
+                  type="checkbox"
+                  className="sr-only"
+                  checked={marcarRevisada}
+                  onChange={e => setMarcarRevisada(e.target.checked)}
+                />
+                <span className={marcarRevisada ? 'font-medium text-emerald-800' : 'text-muted-foreground'}>
+                  Revisada y conforme
+                </span>
+              </label>
+            )}
+
             <Button type="button" variant="ghost" size="sm" onClick={onClose}>
               Cancelar
             </Button>
+            <Button type="submit" disabled={isSubmitting} size="sm" variant={onSiguiente ? 'outline' : 'default'}>
+              {isSubmitting && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
+              {isEdit ? 'Guardar' : 'Agregar fila'}
+            </Button>
+            {isEdit && onSiguiente && (
+              <Button
+                type="submit" size="sm" disabled={isSubmitting}
+                onClick={() => { irAlSiguiente.current = true }}
+              >
+                Guardar y siguiente <ChevronRight className="ml-1 h-3.5 w-3.5" />
+              </Button>
+            )}
           </div>
         </form>
       </SheetContent>
