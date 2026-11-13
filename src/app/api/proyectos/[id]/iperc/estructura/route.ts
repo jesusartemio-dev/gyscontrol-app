@@ -3,7 +3,9 @@ import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { construirEstructura } from '@/lib/iperc/construirEstructura'
+import {
+  construirEstructura, sincronizarEstadoEstructura,
+} from '@/lib/iperc/construirEstructura'
 import { sincronizarBloques } from '@/lib/iperc/construirBloques'
 import {
   detectarFusiones, detectarTareasRepetidas, fusionarActividades,
@@ -145,6 +147,11 @@ export async function POST(req: NextRequest, ctx: Ctx) {
     }),
   ])
 
+  // Una linea que ya tiene filas vuelve a quedar marcada como generada: al
+  // rearmar nacen todas pendientes, y sin esto el trabajo ya hecho figuraba
+  // como si faltara.
+  await sincronizarEstadoEstructura(iperc.id)
+
   return devolverEstructura(iperc.id, proyectoId)
 }
 
@@ -171,6 +178,12 @@ async function unir(ipercId: string, proyectoId: string, body: { itemIds?: unkno
   })
   if (items.length !== itemIds.length) {
     return Response.json({ error: 'Alguna tarea ya no está' }, { status: 404 })
+  }
+  if (items.some(i => i.estado === 'generada')) {
+    return Response.json(
+      { error: 'Esas tareas ya tienen filas generadas. Para unirlas hay que rearmar la estructura.' },
+      { status: 409 },
+    )
   }
   if (new Set(items.map(i => i.actividad)).size > 1) {
     return Response.json(
@@ -243,9 +256,19 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
 
   const actual = await prisma.ipercEstructuraItem.findFirst({
     where: { id: itemId, ipercId: iperc.id },
-    select: { id: true },
+    select: { id: true, estado: true },
   })
   if (!actual) return Response.json({ error: 'Esa línea no es de este IPERC' }, { status: 404 })
+
+  // Una línea ya generada no se edita acá. Renombrarla dejaría sus filas con
+  // el nombre viejo y la línea no volvería a reconocerse como suya; cambiarle
+  // los peligros no cambia nada, porque ya están escritos.
+  if (actual.estado === 'generada') {
+    return Response.json(
+      { error: 'Esta tarea ya tiene filas generadas: se edita en el IPERC, no en la estructura.' },
+      { status: 409 },
+    )
+  }
 
   const data: Record<string, unknown> = { updatedAt: new Date() }
   if (typeof body.tarea === 'string' && body.tarea.trim()) data.tarea = body.tarea.trim()
@@ -277,10 +300,19 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
   const itemId = req.nextUrl.searchParams.get('itemId') ?? ''
   if (!itemId) return Response.json({ error: 'Falta itemId' }, { status: 400 })
 
-  const { count } = await prisma.ipercEstructuraItem.deleteMany({
+  const item = await prisma.ipercEstructuraItem.findFirst({
     where: { id: itemId, ipercId: iperc.id },
+    select: { estado: true },
   })
-  if (count === 0) return Response.json({ error: 'Esa línea no es de este IPERC' }, { status: 404 })
+  if (!item) return Response.json({ error: 'Esa línea no es de este IPERC' }, { status: 404 })
+  if (item.estado === 'generada') {
+    return Response.json(
+      { error: 'Esta tarea ya tiene filas generadas: bórralas desde el IPERC.' },
+      { status: 409 },
+    )
+  }
+
+  await prisma.ipercEstructuraItem.deleteMany({ where: { id: itemId, ipercId: iperc.id } })
 
   return devolverEstructura(iperc.id, proyectoId)
 }

@@ -244,6 +244,13 @@ export function PanelEstructuraIperc({ proyectoId, onArmar, refreshKey, onCambio
         </div>
       </div>
 
+      {abierto && todoGenerado && (
+        <p className="border-b bg-emerald-50/60 px-3 py-1.5 text-[11px] text-emerald-900">
+          Todas estas tareas ya tienen sus filas: la lista queda de solo lectura. El contenido se
+          edita en el IPERC, y para cambiar la lista hay que rearmarla.
+        </p>
+      )}
+
       {abierto && (sugerencias.length > 0 || sugTareas.length > 0) && (
         <div className="border-b bg-amber-50/60 p-2">
           <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-amber-900">
@@ -530,6 +537,10 @@ function Fila({
   const [editandoN, setEditandoN] = useState(false)
   const [n, setN] = useState(String(item.peligrosPrevistos))
   const esFija = item.origen === 'fija'
+  // Una linea ya generada es de solo lectura: renombrarla dejaria sus filas
+  // con el nombre viejo, y cambiarle los peligros no cambia nada porque ya
+  // estan escritos. Se edita en el IPERC, no aca.
+  const generada = item.estado === 'generada'
 
   return (
     <div className={`group flex items-center gap-2 px-2 py-0.5 pl-6 hover:bg-muted/40 ${marcado ? 'bg-blue-50' : ''}`}>
@@ -538,11 +549,22 @@ function Fila({
         className="h-3.5 w-3.5 shrink-0"
         checked={marcado}
         onChange={onMarcar}
-        disabled={ocupado || esFija}
-        title={esFija ? 'Las actividades fijas no se unen' : 'Marcar para unir'}
+        disabled={ocupado || esFija || generada}
+        title={
+          generada ? 'Ya tiene filas generadas: se edita en el IPERC'
+            : esFija ? 'Las actividades fijas no se unen'
+            : 'Marcar para unir'
+        }
       />
 
-      {editandoN ? (
+      {generada ? (
+        <span
+          className="w-7 shrink-0 text-center font-mono text-[11px] text-muted-foreground"
+          title="Peligros que se generaron para esta tarea"
+        >
+          {item.peligrosPrevistos}
+        </span>
+      ) : editandoN ? (
         <span className="flex items-center gap-0.5">
           <Input
             className="h-6 w-12 px-1 text-center text-xs"
@@ -587,14 +609,16 @@ function Fila({
         <Badge className="h-4 shrink-0 bg-emerald-600 text-[9px]">{item.filasGeneradas}</Badge>
       )}
 
-      <span className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-        <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={onEditar} disabled={ocupado} title="Renombrar">
-          <Pencil className="h-3 w-3" />
-        </Button>
-        <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive" onClick={onQuitar} disabled={ocupado} title="Quitar del IPERC">
-          <Trash2 className="h-3 w-3" />
-        </Button>
-      </span>
+      {!generada && (
+        <span className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={onEditar} disabled={ocupado} title="Renombrar">
+            <Pencil className="h-3 w-3" />
+          </Button>
+          <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive" onClick={onQuitar} disabled={ocupado} title="Quitar del IPERC">
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </span>
+      )}
     </div>
   )
 }
