@@ -22,9 +22,9 @@ const APLICAR = process.argv.includes('--aplicar')
 /**
  * Los diez nombres del catálogo viejo contra el catálogo de puestos.
  *
- * Tres no existen como puesto —no hay Soldador, Técnico Andamiero ni Operador
- * de manlift en el organigrama— así que sus EPP por defecto se pierden; van
- * explícitos en null para que se vea que es a propósito y no un olvido.
+ * Técnico Andamiero, Soldador y Operador de Manlift no existían como puesto y
+ * sus 79 asignaciones se perdían; se crearon con
+ * crear-puestos-campo-faltantes.ts.
  *
  * Dos son aproximaciones y conviene que el SSOMA las mire: 'Técnico
  * Electrónico' se lleva a 'Técnico Eléctrico' (está también 'Técnico
@@ -37,9 +37,9 @@ const MAPEO: Record<string, string | null> = {
   'Técnico instrumentista': 'Técnico Instrumentista',
   'Técnico Electrónico': 'Técnico Eléctrico',
   'Sup. De Andamio': 'Supervisor Andamiero',
-  'Técnico Andamiero': null,
-  'Operador de manlift': null,
-  Soldador: null,
+  'Técnico Andamiero': 'Técnico Andamiero',
+  'Operador de manlift': 'Operador de Manlift',
+  Soldador: 'Soldador',
   'Técnico Auxiliar': 'Técnico Auxiliar Mecánico',
 }
 
