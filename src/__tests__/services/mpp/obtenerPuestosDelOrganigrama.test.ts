@@ -47,6 +47,54 @@ describe('derivarPuestosMpp', () => {
     ])
   })
 
+  it('el supervisor aporta su rama aunque sea hermana del residente', () => {
+    // El organigrama real de CJM44. El residente es el Coordinador de
+    // Ingeniería y su subárbol es solo el Cadista; los técnicos de campo
+    // cuelgan del Supervisor de Construcción, que es una rama hermana. Con el
+    // residente solo, la matriz dejaba fuera a los cuatro que van a obra.
+    const nodos = [
+      { id: 'n-gestor', parentId: null, cargoLabel: 'Gestor de Proyecto', orden: 0, puesto: { rolFuncional: 'gestor' } },
+      { id: 'n-lider', parentId: 'n-gestor', cargoLabel: 'Lider de Proyectos', orden: 0, puesto: { rolFuncional: 'gestor' } },
+      { id: 'n-ssoma', parentId: 'n-gestor', cargoLabel: 'Supervisor de Seguridad (HSEQ)', orden: 1, puesto: { rolFuncional: 'ssoma' } },
+      { id: 'n-sup', parentId: 'n-gestor', cargoLabel: 'Supervisor de Construccion', orden: 2, puesto: { rolFuncional: 'supervisor' } },
+      { id: 'n-tec1', parentId: 'n-sup', cargoLabel: 'Técnico Eléctrico-Instrumentista', orden: 0, puesto: { rolFuncional: null } },
+      { id: 'n-tec2', parentId: 'n-sup', cargoLabel: 'Técnico Auxiliar Mecánico', orden: 1, puesto: { rolFuncional: null } },
+      { id: 'n-andam', parentId: 'n-sup', cargoLabel: 'Supervisor Andamiero', orden: 2, puesto: { rolFuncional: null } },
+      { id: 'n-coord', parentId: null, cargoLabel: 'Coordinador de Ingeniería', orden: 1, puesto: { rolFuncional: 'residente' } },
+      { id: 'n-cad', parentId: 'n-coord', cargoLabel: 'Cadista', orden: 0, puesto: { rolFuncional: 'cadista' } },
+    ]
+
+    const puestos = derivarPuestosMpp(nodos)
+
+    // El Coordinador va primero porque está más arriba en el árbol; los
+    // gestores quedan fuera, que no van a obra.
+    expect(puestos).toEqual([
+      'Supervisor de Seguridad (HSEQ)',
+      'Coordinador de Ingeniería',
+      'Cadista',
+      'Supervisor de Construccion',
+      'Técnico Eléctrico-Instrumentista',
+      'Técnico Auxiliar Mecánico',
+      'Supervisor Andamiero',
+    ])
+    expect(puestos).not.toContain('Gestor de Proyecto')
+    expect(puestos).not.toContain('Lider de Proyectos')
+  })
+
+  it('sin residente, el supervisor sostiene las columnas (caso CJM39)', () => {
+    const nodos = [
+      { id: 'n-gg', parentId: null, cargoLabel: 'GERENCIA GENERAL', orden: 0, puesto: { rolFuncional: null } },
+      { id: 'n-com', parentId: 'n-gg', cargoLabel: 'COMERCIAL', orden: 1, puesto: { rolFuncional: 'comercial' } },
+      { id: 'n-gestor', parentId: 'n-gg', cargoLabel: 'Gestor de Proyecto', orden: 2, puesto: { rolFuncional: 'gestor' } },
+      { id: 'n-ssoma', parentId: 'n-gestor', cargoLabel: 'Supervisor de Seguridad (HSEQ)', orden: 0, puesto: { rolFuncional: 'ssoma' } },
+      { id: 'n-sup', parentId: 'n-gestor', cargoLabel: 'Supervisor de Construccion', orden: 1, puesto: { rolFuncional: 'supervisor' } },
+    ]
+
+    const puestos = derivarPuestosMpp(nodos)
+
+    expect(puestos).toEqual(['Supervisor de Seguridad (HSEQ)', 'Supervisor de Construccion'])
+  })
+
   it('un puesto catalogado sin rolFuncional no se rescata adivinando por el texto', () => {
     // Si el nodo está catalogado, su rolFuncional es la respuesta, incluso
     // cuando es null: el catálogo dice que ese puesto no cumple un rol.

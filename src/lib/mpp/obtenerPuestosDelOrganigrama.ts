@@ -28,19 +28,66 @@ function rolDeNodo(nodo: OrgNodoPuesto): string | null {
   return matchRolPorCargo(nodo.cargoLabel)
 }
 
+/** Los roles cuya gente va a obra, y por lo tanto necesita EPP. */
+const ROLES_RAIZ = new Set(['residente', 'supervisor'])
+
 /**
- * SSOMA + el nodo RESIDENTE con todo su subárbol (BFS), deduplicado por
- * cargoLabel. Sin RESIDENTE reconocible, o con un resultado muy chico
- * (organigrama incompleto), cae al catálogo fijo PUESTOS_MPP — la MPP nunca
- * queda sin columnas.
+ * Cuántos padres tiene cada nodo encima. Un organigrama con un ciclo (padre
+ * que termina apuntándose a sí mismo) no cuelga el cálculo: se corta al
+ * repetir un nodo.
+ */
+function calcularProfundidad(nodos: OrgNodoPuesto[]): Map<string, number> {
+  const porId = new Map(nodos.map(n => [n.id, n]))
+  const profundidad = new Map<string, number>()
+
+  for (const nodo of nodos) {
+    let nivel = 0
+    let actual = nodo
+    const vistos = new Set<string>([nodo.id])
+    while (actual.parentId) {
+      const padre = porId.get(actual.parentId)
+      if (!padre || vistos.has(padre.id)) break
+      vistos.add(padre.id)
+      actual = padre
+      nivel++
+    }
+    profundidad.set(nodo.id, nivel)
+  }
+  return profundidad
+}
+
+/**
+ * Las columnas de la matriz son los puestos que van a obra: el SSOMA, más
+ * cada nodo con rol de residente o de supervisor con todo su subárbol (BFS),
+ * deduplicado por cargoLabel. Gerencia, Comercial, Logística y los gestores
+ * quedan fuera: no necesitan EPP.
+ *
+ * El supervisor cuenta como raíz por sí mismo, no solo cuando cuelga del
+ * residente. Mirando los 13 proyectos con organigrama: en CJM44, CJM45, CJM48
+ * y QRM15 el residente es el Coordinador de Ingeniería y su subárbol es solo
+ * el Cadista, mientras los técnicos de campo cuelgan del Supervisor de
+ * Construcción, que es una rama hermana. Con el residente solo, la matriz
+ * dejaba fuera justo a los que más EPP necesitan. Y CJM39, que no tiene
+ * ningún nodo marcado como residente, se quedaba sin columnas propias.
+ *
+ * Sin ninguna raíz reconocible, o con un resultado muy chico (organigrama
+ * incompleto), cae al catálogo fijo PUESTOS_MPP — la MPP nunca queda sin
+ * columnas.
  */
 export function derivarPuestosMpp(nodos: OrgNodoPuesto[]): string[] {
   const porOrden = (a: OrgNodoPuesto, b: OrgNodoPuesto) => a.orden - b.orden
 
   const ssoma = nodos.filter(n => rolDeNodo(n) === 'ssoma').sort(porOrden)[0]
-  const residente = nodos.filter(n => rolDeNodo(n) === 'residente').sort(porOrden)[0]
 
-  if (!residente) return [...PUESTOS_MPP]
+  // Las raíces se recorren de arriba hacia abajo: si un supervisor cuelga del
+  // residente, la rama del residente va primero y se lo lleva dentro. Por
+  // `orden` solo, el subordinado podía salir antes que su jefe.
+  const profundidad = calcularProfundidad(nodos)
+  const raices = nodos
+    .filter(n => ROLES_RAIZ.has(rolDeNodo(n) ?? ''))
+    .sort((a, b) => (profundidad.get(a.id)! - profundidad.get(b.id)!) || porOrden(a, b))
+
+  if (raices.length === 0) return [...PUESTOS_MPP]
 
   const hijosPorPadre = new Map<string, OrgNodoPuesto[]>()
   for (const nodo of nodos) {
@@ -61,11 +108,16 @@ export function derivarPuestosMpp(nodos: OrgNodoPuesto[]): string[] {
 
   if (ssoma) agregar(ssoma.cargoLabel)
 
-  const cola: OrgNodoPuesto[] = [residente]
-  while (cola.length > 0) {
-    const actual = cola.shift()!
-    agregar(actual.cargoLabel)
-    cola.push(...(hijosPorPadre.get(actual.id) ?? []))
+  // Una rama completa por raíz, no todas a la vez: así las columnas salen
+  // agrupadas por equipo y no intercaladas. Un supervisor que ya venía en el
+  // subárbol del residente se deduplica solo.
+  for (const raiz of raices) {
+    const cola: OrgNodoPuesto[] = [raiz]
+    while (cola.length > 0) {
+      const actual = cola.shift()!
+      agregar(actual.cargoLabel)
+      cola.push(...(hijosPorPadre.get(actual.id) ?? []))
+    }
   }
 
   return puestos.length < MIN_PUESTOS_VALIDOS ? [...PUESTOS_MPP] : puestos
