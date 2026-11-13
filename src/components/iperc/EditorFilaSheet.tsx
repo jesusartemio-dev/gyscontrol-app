@@ -226,9 +226,9 @@ export function EditorFilaSheet({
     <Sheet open={open} onOpenChange={v => !v && onClose()}>
       <SheetContent
         side="right"
-        className="flex w-full flex-col overflow-y-auto sm:max-w-none lg:w-[85vw] xl:w-[75vw]"
+        className="flex h-full w-full flex-col gap-0 overflow-hidden sm:max-w-none lg:w-[96vw]"
       >
-        <SheetHeader className="mb-4">
+        <SheetHeader className="mb-3 shrink-0">
           <SheetTitle className="flex flex-wrap items-center gap-2">
             {isEdit ? 'Editar fila' : 'Nueva fila'} IPERC
             {fila && (
@@ -244,10 +244,16 @@ export function EditorFilaSheet({
           </SheetTitle>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
+          {/* En PC, dos columnas: a la izquierda qué es y cuánto vale el
+              riesgo, a la derecha los controles, que son lo que lo baja. Así
+              entra sin desplazar la página y el scroll aparece solo dentro de
+              los controles cuando se despliegan. */}
+          <div className="grid min-h-0 flex-1 gap-x-6 gap-y-4 overflow-y-auto pr-1 lg:grid-cols-2 lg:overflow-hidden">
+          <div className="space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-2">
           {/* Origen */}
           <div>
-            <h3 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
+            <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Origen
             </h3>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -271,7 +277,7 @@ export function EditorFilaSheet({
 
           {/* Puesto y Factor */}
           <div>
-            <h3 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
+            <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Puesto y Factor
             </h3>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -316,7 +322,7 @@ export function EditorFilaSheet({
 
           {/* Peligro con autocomplete */}
           <div>
-            <h3 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
+            <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Peligro / Riesgo
             </h3>
             {peligrosSugeridos.length > 0 && (
@@ -357,7 +363,7 @@ export function EditorFilaSheet({
 
           {/* Evaluación inicial */}
           <div>
-            <h3 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
+            <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Evaluación inicial
             </h3>
             <div className="grid grid-cols-3 gap-2 items-end">
@@ -405,9 +411,62 @@ export function EditorFilaSheet({
             </div>
           </div>
 
+          {/* Evaluación residual */}
+          <div>
+            <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Evaluación residual
+            </h3>
+            <div className="grid grid-cols-3 gap-2 items-end">
+              <div>
+                <Label className="text-xs">Severidad residual</Label>
+                <Select
+                  value={String(severidadResidual)}
+                  onValueChange={v => setValue('severidadResidual', Number(v))}
+                >
+                  <SelectTrigger className="h-8 text-xs mt-0.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SEVERIDADES.map(s => (
+                      <SelectItem key={s} value={String(s)} className="text-xs">{SEV_LABELS[s]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Probabilidad residual</Label>
+                <Select
+                  value={probabilidadResidual}
+                  onValueChange={v => setValue('probabilidadResidual', v)}
+                >
+                  <SelectTrigger className="h-8 text-xs mt-0.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROBABILIDADES.map(p => (
+                      <SelectItem key={p} value={p} className="text-xs">{PROB_LABELS[p]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="pb-0.5">
+                {nivelResidual ? (
+                  <Badge className={`${badgeNivelRiesgo(nivelResidual.nivel)} text-xs`}>
+                    {nivelResidual.nivel} ({nivelResidual.valor})
+                  </Badge>
+                ) : (
+                  <span className="text-xs text-muted-foreground">—</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          </div>
+
+          <div className="space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-2">
           {/* Controles */}
           <div>
-            <h3 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
+            <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Controles
             </h3>
             <Accordion type="multiple" className="border rounded-md">
@@ -473,59 +532,9 @@ export function EditorFilaSheet({
             </Accordion>
           </div>
 
-          {/* Evaluación residual */}
-          <div>
-            <h3 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
-              Evaluación residual
-            </h3>
-            <div className="grid grid-cols-3 gap-2 items-end">
-              <div>
-                <Label className="text-xs">Severidad residual</Label>
-                <Select
-                  value={String(severidadResidual)}
-                  onValueChange={v => setValue('severidadResidual', Number(v))}
-                >
-                  <SelectTrigger className="h-8 text-xs mt-0.5">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SEVERIDADES.map(s => (
-                      <SelectItem key={s} value={String(s)} className="text-xs">{SEV_LABELS[s]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs">Probabilidad residual</Label>
-                <Select
-                  value={probabilidadResidual}
-                  onValueChange={v => setValue('probabilidadResidual', v)}
-                >
-                  <SelectTrigger className="h-8 text-xs mt-0.5">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PROBABILIDADES.map(p => (
-                      <SelectItem key={p} value={p} className="text-xs">{PROB_LABELS[p]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="pb-0.5">
-                {nivelResidual ? (
-                  <Badge className={`${badgeNivelRiesgo(nivelResidual.nivel)} text-xs`}>
-                    {nivelResidual.nivel} ({nivelResidual.valor})
-                  </Badge>
-                ) : (
-                  <span className="text-xs text-muted-foreground">—</span>
-                )}
-              </div>
-            </div>
-          </div>
-
           {/* Plan de acción */}
           <div>
-            <h3 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
+            <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Plan de acción
             </h3>
             <div className="space-y-2">
@@ -548,7 +557,10 @@ export function EditorFilaSheet({
             </div>
           </div>
 
-          <div className="sticky bottom-0 -mx-6 flex flex-wrap items-center gap-2 border-t bg-background px-6 pb-2 pt-3">
+          </div>
+          </div>
+
+          <div className="-mx-6 mt-3 flex shrink-0 flex-wrap items-center gap-2 border-t bg-background px-6 pt-3">
             {isEdit && (
               <label className="mr-auto flex cursor-pointer items-center gap-2 text-xs">
                 <span
