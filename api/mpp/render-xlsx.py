@@ -2,6 +2,8 @@ from http.server import BaseHTTPRequestHandler
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image as XlsxImage
 from openpyxl.utils import get_column_letter
+from openpyxl.drawing.spreadsheet_drawing import OneCellAnchor, AnchorMarker
+from openpyxl.drawing.xdr import XDRPositiveSize2D
 from io import BytesIO
 from email.parser import BytesParser
 from email.policy import default
@@ -77,7 +79,26 @@ def escribir_filas_mpp(ws, items: list, columnas_puestos: list):
                 ws.cell(r, col).value = None
 
 
-ALTO_FILA_PUNTOS = 75  # alto de las filas de datos en la plantilla
+# Un pixel son 9525 EMU, que es la unidad en la que Excel posiciona dibujos.
+EMU_POR_PX = 9525
+
+# Cuanto de la celda ocupa la foto. El resto es el aire para que no toque los
+# bordes ni se monte sobre la cuadricula.
+PROPORCION_EN_CELDA = 0.86
+
+
+def ancho_columna_px(ws, col: int) -> int:
+    """Ancho de la columna en pixeles. Excel lo guarda en caracteres."""
+    dim = ws.column_dimensions.get(get_column_letter(col))
+    chars = dim.width if dim and dim.width else (ws.sheet_format.defaultColWidth or 8.43)
+    return int(round(chars * 7 + 5))
+
+
+def alto_fila_px(ws, fila: int) -> int:
+    """Alto de la fila en pixeles. Excel lo guarda en puntos."""
+    dim = ws.row_dimensions.get(fila)
+    puntos = dim.height if dim and dim.height else (ws.sheet_format.defaultRowHeight or 15)
+    return int(round(puntos * 96 / 72))
 
 
 def colocar_imagenes(ws, imagenes: dict, cantidad_items: int):
@@ -119,13 +140,35 @@ def colocar_imagenes(ws, imagenes: dict, cantidad_items: int):
         except Exception:
             # Un formato que Pillow no entienda no debe tumbar la exportacion.
             continue
-        # Encajar en la celda manteniendo la proporcion.
-        alto_px = int(ALTO_FILA_PUNTOS * 96 / 72)
-        if img.height and img.width:
-            escala = alto_px / float(img.height)
-            img.height = alto_px
-            img.width = max(1, int(img.width * escala))
-        img.anchor = f'{get_column_letter(COL_EVIDENCIA)}{fila}'
+        if not img.width or not img.height:
+            continue
+
+        # Se mide contra la celda de verdad, no contra un alto fijo: las filas
+        # de la plantilla van de 190 a 227 puntos, asi que con un valor
+        # constante la foto salia a un tercio del alto disponible.
+        celda_w = ancho_columna_px(ws, COL_EVIDENCIA)
+        celda_h = alto_fila_px(ws, fila)
+
+        escala = min(
+            celda_w * PROPORCION_EN_CELDA / float(img.width),
+            celda_h * PROPORCION_EN_CELDA / float(img.height),
+        )
+        ancho = max(1, int(img.width * escala))
+        alto = max(1, int(img.height * escala))
+        img.width, img.height = ancho, alto
+
+        # Anclada a la celda con el sobrante repartido a los dos lados: con el
+        # ancla simple la foto se pega a la esquina superior izquierda.
+        marca = AnchorMarker(
+            col=COL_EVIDENCIA - 1,
+            colOff=int((celda_w - ancho) / 2 * EMU_POR_PX),
+            row=fila - 1,
+            rowOff=int((celda_h - alto) / 2 * EMU_POR_PX),
+        )
+        img.anchor = OneCellAnchor(
+            _from=marca,
+            ext=XDRPositiveSize2D(ancho * EMU_POR_PX, alto * EMU_POR_PX),
+        )
         ws.add_image(img)
         colocadas += 1
     return colocadas
