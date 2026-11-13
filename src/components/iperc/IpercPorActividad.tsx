@@ -53,6 +53,20 @@ function contarNiveles(filas: IpercFila[], residual: boolean) {
   return c
 }
 
+/**
+ * Qué números de fila cubre la actividad.
+ *
+ * Con los grupos cerrados, el nombre de la actividad no dice en qué parte del
+ * documento estás: el IPERC se lee y se comenta por número de fila.
+ */
+function rangoFilas(filas: IpercFila[]): string {
+  const nums = filas.map(f => f.numero)
+  const min = Math.min(...nums)
+  const max = Math.max(...nums)
+  const n = (x: number) => String(x).padStart(3, '0')
+  return min === max ? n(min) : `${n(min)}–${n(max)}`
+}
+
 /** Cuántas líneas de la actividad ya se revisaron. */
 function AvanceRevision({ filas }: { filas: IpercFila[] }) {
   const hechas = filas.filter(f => !!f.revisadaEn).length
@@ -179,6 +193,7 @@ export function IpercPorActividad({ proyectoId, filas, onEdit, onDelete, onAplic
                   <span className="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{g.proceso}</span>
                   <span className="block text-sm font-semibold leading-snug text-gray-900">{g.actividad}</span>
                   <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
+                    <span className="font-mono text-slate-600">{rangoFilas(g.filas)}</span>
                     {g.filas.length} fila{g.filas.length === 1 ? '' : 's'}
                     <AvanceRevision filas={g.filas} />
                     <ResumenNiveles filas={g.filas} />
@@ -334,15 +349,15 @@ function TarjetasFilas({
               <AvisoRegla fila={f} />
             </div>
 
-            <details className="rounded border bg-slate-50 px-2 py-1 text-[11px]">
-              <summary className="flex cursor-pointer items-center gap-1.5 font-medium text-gray-600">
+            <details className="rounded border bg-slate-50 px-2 py-1.5 text-[11px]">
+              <summary className="flex cursor-pointer items-center gap-2 text-[13px] font-medium text-gray-700">
                 Controles
                 <span className="flex gap-1">
                   {GRUPOS.slice(2).map(([et, get, color]) => (
                     <span
                       key={et}
                       className={cn(
-                        'rounded px-1 text-[9px] font-semibold',
+                        'rounded px-1.5 py-0.5 text-[11px] font-semibold',
                         tiene(get(f)) ? `bg-white ${color}` : 'bg-slate-200 text-slate-400',
                       )}
                     >
