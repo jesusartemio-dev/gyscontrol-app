@@ -402,6 +402,7 @@ export default function Sidebar() {
           ],
         },
         { href: '/seguridad/catalogo-iperc', label: 'Catálogo IPERC', icon: ShieldAlert },
+        { href: '/seguridad/catalogo-actividades-iperc', label: 'Actividades fijas IPERC', icon: ClipboardList },
         { href: '/seguridad/catalogo-epp-matriz', label: 'Catálogo EPP (Matriz)', icon: HardHat },
         { href: '/seguridad/empleados', label: 'Empleados', icon: Users },
         {

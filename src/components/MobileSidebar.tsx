@@ -372,6 +372,7 @@ export default function MobileSidebar() {
         { href: '/seguridad/entregas', label: 'Entregas', icon: ClipboardList },
         { href: '/seguridad/reposiciones', label: 'Reposiciones', icon: Clock },
         { href: '/seguridad/catalogo-iperc', label: 'Catálogo IPERC', icon: ShieldAlert },
+        { href: '/seguridad/catalogo-actividades-iperc', label: 'Actividades fijas IPERC', icon: ClipboardList },
         { href: '/seguridad/catalogo-epp-matriz', label: 'Catálogo EPP (Matriz)', icon: HardHat },
         { href: '/seguridad/empleados', label: 'Empleados', icon: Users },
         { href: '/seguridad/evidencias', label: 'Evidencias diarias', icon: ClipboardCheck },

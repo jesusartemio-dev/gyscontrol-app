@@ -7,13 +7,17 @@
 // Cada actividad tiene "Texto / IA" para copiarla, mejorarla en una IA y
 // pegarla de vuelta (ver EditarIpercTextoDialog). También por fila y todo.
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ChevronDown, ChevronRight, Pencil, Sparkles, Trash2, ChevronsUpDown, ChevronsDownUp,
   Check, Loader2, ShieldCheck,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useIsMobile } from '@/lib/responsive/breakpoints'
 import { evaluarRiesgo } from '@/lib/iperc/catalogos/matrizRiesgo'
@@ -99,6 +103,9 @@ function ResumenNiveles({ filas }: { filas: IpercFila[] }) {
 
 export function IpercPorActividad({ proyectoId, filas, onEdit, onDelete, onAplicado }: Props) {
   const [revisandoId, setRevisandoId] = useState<string | null>(null)
+  const [renombrando, setRenombrando] = useState<
+    { proceso: string; actividad: string; filas: number } | null
+  >(null)
 
   /** Marca la linea como revisada. Es una marca de la app: el Excel no la lleva. */
   const onRevisar = async (fila: IpercFila, valor: boolean) => {
@@ -201,14 +208,14 @@ export function IpercPorActividad({ proyectoId, filas, onEdit, onDelete, onAplic
                 </span>
               </button>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 className="h-8 shrink-0 px-2 text-xs"
-                onClick={() => setTexto({ titulo: `${g.proceso} › ${g.actividad}`, filas: g.filas })}
-                title="Esta actividad como texto para trabajarla con una IA"
+                onClick={() => setRenombrando({ proceso: g.proceso, actividad: g.actividad, filas: g.filas.length })}
+                title="Renombrar el proceso o la actividad en todas sus filas"
               >
-                <Sparkles className="h-3.5 w-3.5 text-indigo-500 sm:mr-1" />
-                <span className="hidden sm:inline">Texto / IA</span>
+                <Pencil className="h-3.5 w-3.5 sm:mr-1" />
+                <span className="hidden sm:inline">Renombrar</span>
               </Button>
             </div>
 
@@ -218,6 +225,19 @@ export function IpercPorActividad({ proyectoId, filas, onEdit, onDelete, onAplic
           </section>
         )
       })}
+
+      <RenombrarActividadDialog
+        proyectoId={proyectoId}
+        datos={renombrando}
+        onClose={() => setRenombrando(null)}
+        onRenombrado={async () => {
+          const r = await fetch(`/api/proyectos/${proyectoId}/iperc/contexto`)
+          if (r.ok) {
+            const d = await r.json()
+            if (d?.iperc?.filas) onAplicado(d.iperc.filas)
+          }
+        }}
+      />
 
       {texto && (
         <EditarIpercTextoDialog
@@ -245,6 +265,94 @@ export function IpercPorActividad({ proyectoId, filas, onEdit, onDelete, onAplic
         }}
       />
     </div>
+  )
+}
+
+/**
+ * Renombra el proceso o la actividad en todas sus filas de una vez.
+ *
+ * El nombre es del grupo, no de la fila: cambiarlo desde el editor fila por
+ * fila dejaria el grupo partido en dos mientras se avanza.
+ */
+function RenombrarActividadDialog({
+  proyectoId, datos, onClose, onRenombrado,
+}: {
+  proyectoId: string
+  datos: { proceso: string; actividad: string; filas: number } | null
+  onClose: () => void
+  onRenombrado: () => void
+}) {
+  const [proceso, setProceso] = useState('')
+  const [actividad, setActividad] = useState('')
+  const [guardando, setGuardando] = useState(false)
+
+  useEffect(() => {
+    setProceso(datos?.proceso ?? '')
+    setActividad(datos?.actividad ?? '')
+  }, [datos])
+
+  if (!datos) return null
+
+  const sinCambios = proceso.trim() === datos.proceso && actividad.trim() === datos.actividad
+
+  const guardar = async () => {
+    setGuardando(true)
+    try {
+      const r = await fetch(`/api/proyectos/${proyectoId}/iperc/renombrar-actividad`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proceso: datos.proceso,
+          actividad: datos.actividad,
+          nuevoProceso: proceso,
+          nuevaActividad: actividad,
+        }),
+      })
+      const d = await r.json()
+      if (!r.ok) { toast.error(d.error ?? 'No se pudo renombrar'); return }
+      toast.success(`${d.filas} fila(s) renombradas`)
+      onClose()
+      onRenombrado()
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-base">Renombrar actividad</DialogTitle>
+          <DialogDescription className="text-xs">
+            Cambia el nombre en las {datos.filas} fila{datos.filas === 1 ? '' : 's'} de esta
+            actividad y en la estructura del IPERC. No toca el cronograma ni el catálogo.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2.5">
+          <div>
+            <label className="mb-1 block text-xs font-medium">Proceso</label>
+            <Input className="h-8 text-sm" value={proceso} onChange={(e) => setProceso(e.target.value)} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium">Actividad</label>
+            <Input
+              className="h-8 text-sm"
+              value={actividad}
+              onChange={(e) => setActividad(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !sinCambios) guardar() }}
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose} disabled={guardando}>Cancelar</Button>
+          <Button onClick={guardar} disabled={guardando || sinCambios || !actividad.trim() || !proceso.trim()}>
+            {guardando && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />} Renombrar
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
