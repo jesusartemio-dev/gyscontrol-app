@@ -6,6 +6,15 @@ import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
+/**
+ * La lista final de puestos por defecto, o null si el payload no la trae
+ * —editar solo el nombre no debe borrar las asignaciones—.
+ */
+function leerPuestoIds(valor: unknown): string[] | null {
+  if (!Array.isArray(valor)) return null
+  return [...new Set((valor as unknown[]).map(x => String(x)).filter(Boolean))]
+}
+
 const ROLES_VER = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos', 'seguridad']
 const ROLES_EDITAR = ['admin', 'gerente', 'seguridad']
 
@@ -18,14 +27,30 @@ export async function GET() {
   if (!session?.user?.id) return Response.json({ error: 'No autorizado' }, { status: 401 })
   if (!tieneRol(session, ROLES_VER)) return Response.json({ error: 'Sin acceso' }, { status: 403 })
 
-  const items = await prisma.mppEppCatalogo.findMany({
-    orderBy: { orden: 'asc' },
-    include: {
-      catalogoImagen: { select: { id: true, driveFileId: true, nombre: true } },
-      _count: { select: { mppItems: true } },
-    },
+  const [items, puestos] = await Promise.all([
+    prisma.mppEppCatalogo.findMany({
+      orderBy: { orden: 'asc' },
+      include: {
+        catalogoImagen: { select: { id: true, driveFileId: true, nombre: true } },
+        puestosDefault: { select: { puestoId: true } },
+        _count: { select: { mppItems: true } },
+      },
+    }),
+    // Solo los de campo: son los que pueden ser columna de una matriz de EPP.
+    prisma.puesto.findMany({
+      where: { vaACampo: true, activo: true },
+      orderBy: { orden: 'asc' },
+      select: { id: true, nombre: true, categoria: true },
+    }),
+  ])
+
+  return Response.json({
+    items: items.map(({ puestosDefault, ...resto }) => ({
+      ...resto,
+      puestoIdsDefault: puestosDefault.map(p => p.puestoId),
+    })),
+    puestos,
   })
-  return Response.json({ items })
 }
 
 /** PATCH — edita una entrada. body: { id, ...campos } */
@@ -43,7 +68,20 @@ export async function PATCH(req: NextRequest) {
   const soloDefinidos = <T extends object>(o: T) =>
     Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined))
 
+  // Los puestos por defecto se reemplazan enteros: llega la lista final.
+  const puestoIds = leerPuestoIds(body.puestoIdsDefault)
+
   try {
+    if (puestoIds) {
+      await prisma.$transaction([
+        prisma.mppEppPuestoDefault.deleteMany({ where: { mppEppCatalogoId: id } }),
+        prisma.mppEppPuestoDefault.createMany({
+          data: puestoIds.map(puestoId => ({ mppEppCatalogoId: id, puestoId })),
+          skipDuplicates: true,
+        }),
+      ])
+    }
+
     const item = await prisma.mppEppCatalogo.update({
       where: { id },
       data: soloDefinidos({
@@ -76,6 +114,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}))
+  const puestoIds = leerPuestoIds(body.puestoIdsDefault)
   const nombre = String(body.nombre ?? '').trim()
   if (!nombre) return Response.json({ error: 'Falta el nombre' }, { status: 400 })
 
@@ -91,6 +130,7 @@ export async function POST(req: NextRequest) {
       asignacionesDefault: Array.isArray(body.asignacionesDefault) ? body.asignacionesDefault : [],
       catalogoImagenId: body.catalogoImagenId ?? null,
       updatedAt: new Date(),
+      puestosDefault: puestoIds ? { create: puestoIds.map(puestoId => ({ puestoId })) } : undefined,
     },
   })
   return Response.json({ item }, { status: 201 })

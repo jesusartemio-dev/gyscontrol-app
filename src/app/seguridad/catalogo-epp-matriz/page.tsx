@@ -29,12 +29,20 @@ interface Epp {
   durabilidad: string | null
   activo: boolean
   asignacionesDefault: string[]
+  puestoIdsDefault: string[]
   catalogoImagen: { id: string; driveFileId: string; nombre: string } | null
   _count: { mppItems: number }
 }
 
+interface Puesto {
+  id: string
+  nombre: string
+  categoria: string | null
+}
+
 export default function CatalogoEppMatrizPage() {
   const [items, setItems] = useState<Epp[]>([])
+  const [puestos, setPuestos] = useState<Puesto[]>([])
   const [cargando, setCargando] = useState(true)
   const [busqueda, setBusqueda] = useState('')
   const [editando, setEditando] = useState<Partial<Epp> | null>(null)
@@ -47,6 +55,7 @@ export default function CatalogoEppMatrizPage() {
       const d = await r.json()
       if (!r.ok) { toast.error(d.error ?? 'No se pudo cargar'); setItems([]); return }
       setItems(d.items ?? [])
+      setPuestos(d.puestos ?? [])
     } finally {
       setCargando(false)
     }
@@ -81,6 +90,7 @@ export default function CatalogoEppMatrizPage() {
     : items
 
   const partes = [...new Set(items.map(i => i.parteCuerpo))]
+  const sinPuestos = items.filter(i => i.puestoIdsDefault.length === 0).length
 
   return (
     <div className="container mx-auto space-y-4 p-4">
@@ -93,15 +103,16 @@ export default function CatalogoEppMatrizPage() {
             <HardHat className="h-5 w-5 text-amber-600" /> Catálogo EPP — Matriz
           </h1>
         </div>
-        <Button size="sm" onClick={() => setEditando({ parteCuerpo: 'OTRO', asignacionesDefault: [] })}>
+        <Button size="sm" onClick={() => setEditando({ parteCuerpo: 'OTRO', asignacionesDefault: [], puestoIdsDefault: [] })}>
           <Plus className="mr-1 h-4 w-4" /> Agregar EPP
         </Button>
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Es la base de la matriz de EPP de cada proyecto. Un cambio aquí entra en las próximas
-        matrices que se generen; las ya emitidas no se tocan. Las fotos salen de la biblioteca de
-        imágenes en Drive.
+        Es la base de la matriz de EPP de cada proyecto: los puestos marcados aquí entran
+        marcados, y la IA solo agrega encima lo propio del proyecto. Un cambio entra en las
+        próximas matrices que se generen; las ya emitidas no se tocan. Los puestos son los del
+        organigrama que van a campo, y las fotos salen de la biblioteca de imágenes en Drive.
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -117,6 +128,11 @@ export default function CatalogoEppMatrizPage() {
         <span className="text-xs text-muted-foreground">
           {filtrados.length} de {items.length} · {partes.length} partes del cuerpo
         </span>
+        {sinPuestos > 0 && (
+          <span className="text-xs text-amber-700">
+            {sinPuestos} sin puestos asignados
+          </span>
+        )}
       </div>
 
       {cargando ? (
@@ -169,9 +185,7 @@ export default function CatalogoEppMatrizPage() {
                   <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground" title={e.riesgo}>
                     {e.riesgo}
                   </p>
-                  <p className="mt-1 text-[10px] text-muted-foreground">
-                    {e.asignacionesDefault.length} puesto{e.asignacionesDefault.length === 1 ? '' : 's'} por defecto
-                  </p>
+                  <PuestosDeEpp ids={e.puestoIdsDefault} puestos={puestos} />
                 </div>
               </CardContent>
             </Card>
@@ -243,6 +257,54 @@ export default function CatalogoEppMatrizPage() {
                     onChange={e => setEditando({ ...editando, durabilidad: e.target.value })}
                   />
                 </Campo>
+                <div className="rounded border p-2">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-medium">Puestos que lo usan por defecto</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Es la base de la matriz. La IA solo agrega encima lo propio de cada proyecto.
+                      </p>
+                    </div>
+                    <CopiarDe
+                      puestos={puestos}
+                      items={items}
+                      excluir={editando.id}
+                      onCopiar={ids => setEditando({ ...editando, puestoIdsDefault: ids })}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                    {puestos.map(p => {
+                      const marcado = (editando.puestoIdsDefault ?? []).includes(p.id)
+                      return (
+                        <label key={p.id} className="flex cursor-pointer items-center gap-1.5 text-[11px]">
+                          <input
+                            type="checkbox"
+                            className="h-3.5 w-3.5"
+                            checked={marcado}
+                            onChange={() => {
+                              const actuales = editando.puestoIdsDefault ?? []
+                              setEditando({
+                                ...editando,
+                                puestoIdsDefault: marcado
+                                  ? actuales.filter(x => x !== p.id)
+                                  : [...actuales, p.id],
+                              })
+                            }}
+                          />
+                          <span className={marcado ? '' : 'text-muted-foreground'}>{p.nombre}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+
+                  {(editando.puestoIdsDefault ?? []).length === 0 && (
+                    <p className="mt-2 text-[11px] text-amber-700">
+                      Sin ningún puesto, este EPP queda a criterio de la IA en cada proyecto.
+                    </p>
+                  )}
+                </div>
+
                 {editando.id && (
                   <div className="flex items-center justify-between rounded border p-2">
                     <div>
@@ -278,6 +340,63 @@ export default function CatalogoEppMatrizPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+/**
+ * Los puestos a los que le toca este EPP. Sin ninguno, la celda queda a
+ * criterio de la IA en cada proyecto, y eso conviene que se vea.
+ */
+function PuestosDeEpp({ ids, puestos }: { ids: string[]; puestos: Puesto[] }) {
+  if (ids.length === 0) {
+    return (
+      <p className="mt-1 text-[10px] text-amber-700">Sin puestos · lo decide la IA</p>
+    )
+  }
+
+  const nombres = puestos.filter(p => ids.includes(p.id)).map(p => p.nombre)
+  const visibles = nombres.slice(0, 3)
+
+  return (
+    <p className="mt-1 text-[10px] text-muted-foreground" title={nombres.join(', ')}>
+      {visibles.join(' · ')}
+      {nombres.length > visibles.length && ` +${nombres.length - visibles.length}`}
+    </p>
+  )
+}
+
+/**
+ * Copia los puestos de otro EPP. Llenar los cinco puestos que el catálogo
+ * viejo no traía son 52 EPP × varias casillas: casi siempre el de al lado ya
+ * tiene la respuesta.
+ */
+function CopiarDe({
+  puestos, items, excluir, onCopiar,
+}: {
+  puestos: Puesto[]
+  items: Epp[]
+  excluir?: string
+  onCopiar: (ids: string[]) => void
+}) {
+  const candidatos = items.filter(i => i.id !== excluir && i.puestoIdsDefault.length > 0)
+  if (candidatos.length === 0 || puestos.length === 0) return null
+
+  return (
+    <select
+      className="h-7 max-w-[13rem] rounded border bg-background px-1 text-[11px]"
+      value=""
+      onChange={e => {
+        const origen = candidatos.find(i => i.id === e.target.value)
+        if (origen) onCopiar([...origen.puestoIdsDefault])
+      }}
+    >
+      <option value="">Copiar puestos de…</option>
+      {candidatos.map(i => (
+        <option key={i.id} value={i.id}>
+          {i.nombre.slice(0, 40)} ({i.puestoIdsDefault.length})
+        </option>
+      ))}
+    </select>
   )
 }
 

@@ -145,6 +145,22 @@ export async function* generarMppConIa(
 
   const nombresEppValidos = new Set(catalogo.map((c) => c.nombre))
 
+  // Los EPP que el catálogo le asigna a cada puesto por defecto: puestoId →
+  // ids de EPP. Es la base de la matriz, antes de que la IA proponga nada.
+  const defaults = await prisma.mppEppPuestoDefault.findMany({
+    where: { puestoId: { in: contexto.columnas.map(c => c.puestoId).filter((x): x is string => !!x) } },
+    select: { puestoId: true, mppEppCatalogoId: true },
+  })
+  const defaultsPorPuesto = new Map<string, Set<string>>()
+  for (const d of defaults) {
+    if (!defaultsPorPuesto.has(d.puestoId)) defaultsPorPuesto.set(d.puestoId, new Set())
+    defaultsPorPuesto.get(d.puestoId)!.add(d.mppEppCatalogoId)
+  }
+  console.log(
+    `[mpp ia] base del catálogo: ${defaults.length} asignaciones en ` +
+    `${defaultsPorPuesto.size} de ${contexto.columnas.length} columnas`
+  )
+
   // Clasificar ajustes por EPP válido
   let aplicados = 0
   let ignorados = ajustesPuestosIgnorados
@@ -174,11 +190,17 @@ export async function* generarMppConIa(
     })
 
     for (const epp of catalogo) {
-      // Inicializar todas las columnas de este proyecto en false — la matriz
-      // parte vacía, la IA asigna desde cero (no hay defaults del catálogo).
+      // La base es el criterio de la empresa: los EPP que el catálogo ya le
+      // asigna a cada puesto, tomados de la MPP real. La IA solo agrega o
+      // quita encima de eso lo que sea propio del proyecto.
+      //
+      // Antes la matriz partía con todas las celdas en false y la IA la
+      // llenaba desde cero, aunque la respuesta ya estaba en el catálogo.
       const asignaciones: Record<string, boolean> = {}
-      for (const puesto of contexto.puestos) {
-        asignaciones[puesto] = false
+      for (const columna of contexto.columnas) {
+        asignaciones[columna.nombre] = columna.puestoId
+          ? (defaultsPorPuesto.get(columna.puestoId)?.has(epp.id) ?? false)
+          : false
       }
       // Aplicar ajustes IA ya filtrados (solo puestos de este proyecto)
       for (const ajuste of ajustesValidos) {

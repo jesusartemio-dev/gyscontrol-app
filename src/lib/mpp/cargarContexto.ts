@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { obtenerIpercParaContexto } from '@/lib/iperc/obtenerIpercParaContexto'
-import { obtenerPuestosDelOrganigrama } from './obtenerPuestosDelOrganigrama'
+import { obtenerColumnasMpp, type ColumnaMpp } from './obtenerPuestosDelOrganigrama'
 
 interface ResumenPeligrosPorPuesto {
   puesto: string
@@ -28,6 +28,8 @@ export interface ContextoMpp {
   catalogoEpp: Array<{ nombre: string; riesgo: string; parteCuerpo: string }>
   /** Columnas (cargos) derivadas del organigrama del proyecto — ver obtenerPuestosDelOrganigrama.ts. */
   puestos: string[]
+  /** Lo mismo, con el puestoId de cada columna: con eso se buscan los EPP por defecto. */
+  columnas: ColumnaMpp[]
 }
 
 export async function cargarContextoMpp(proyectoId: string): Promise<ContextoMpp> {
@@ -52,7 +54,8 @@ export async function cargarContextoMpp(proyectoId: string): Promise<ContextoMpp
   if (!proyecto) throw new Error('Proyecto no encontrado')
   if (!proyecto.iperc) throw new Error('Proyecto sin IPERC')
 
-  const puestos = await obtenerPuestosDelOrganigrama(proyectoId)
+  const columnas = await obtenerColumnasMpp(proyectoId)
+  const puestos = columnas.map(c => c.nombre)
 
   const filas = proyecto.iperc.filas
 
@@ -139,5 +142,6 @@ export async function cargarContextoMpp(proyectoId: string): Promise<ContextoMpp
     catalogoCount: catalogo.length,
     catalogoEpp,
     puestos,
+    columnas,
   }
 }

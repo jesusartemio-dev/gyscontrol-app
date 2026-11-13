@@ -6026,6 +6026,7 @@ model Puesto {
   personalProyecto PersonalProyecto[]
   plantillaNodos   PlantillaOrgNodo[]
   proyectoNodos    ProyectoOrgNodo[]
+  eppDefaults      MppEppPuestoDefault[]
 
   @@map("puesto")
 }
@@ -6782,7 +6783,15 @@ model MppEppCatalogo {
   catalogoImagenId String?
   catalogoImagen   CatalogoImagen? @relation(fields: [catalogoImagenId], references: [id], onDelete: SetNull)
 
-  asignacionesDefault Json // string[] de puestos que lo usan por defecto
+  /// EN RETIRO: string[] con los diez nombres fijos del catálogo viejo
+  /// ('Técnico Electrónico', 'Sup. De Andamio'...), que no son los puestos del
+  /// organigrama. Nunca se usó al generar. Lo reemplaza `puestosDefault`, que
+  /// apunta al catálogo de puestos. Se conserva hasta terminar la migración.
+  asignacionesDefault Json
+
+  /// Los puestos a los que este EPP le toca por defecto. Es la base de la
+  /// matriz: la IA solo agrega lo específico del proyecto encima.
+  puestosDefault MppEppPuestoDefault[]
 
   activo    Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -6794,6 +6803,32 @@ model MppEppCatalogo {
   @@index([activo])
   @@index([catalogoImagenId])
   @@map("mpp_epp_catalogo")
+}
+
+/// Qué EPP le toca a cada puesto por defecto, el criterio de la empresa.
+///
+/// Es la base de la matriz de EPP de cada proyecto: antes la matriz arrancaba
+/// con todas las celdas vacías y la IA las llenaba desde cero, aunque la MPP
+/// real ya tenía la respuesta. Ahora la IA solo agrega lo específico del
+/// proyecto encima de esto.
+///
+/// Va contra el catálogo de puestos, no contra texto libre: los nombres del
+/// organigrama varían por proyecto ("HSEQ", "Supervisor de Seguridad (HSEQ)")
+/// y el puesto es el mismo.
+model MppEppPuestoDefault {
+  id String @id @default(cuid())
+
+  mppEppCatalogoId String
+  mppEppCatalogo   MppEppCatalogo @relation(fields: [mppEppCatalogoId], references: [id], onDelete: Cascade)
+
+  puestoId String
+  puesto   Puesto @relation(fields: [puestoId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([mppEppCatalogoId, puestoId])
+  @@index([puestoId])
+  @@map("mpp_epp_puesto_default")
 }
 
 model Mpp {
