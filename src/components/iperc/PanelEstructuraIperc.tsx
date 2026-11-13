@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   ListTree, Loader2, Merge, Pencil, RefreshCw, Trash2, ChevronDown, ChevronRight, Check, X,
-  Lightbulb, Combine,
+  Lightbulb, Combine, CheckCircle2,
 } from 'lucide-react'
 
 export interface ItemEstructura {
@@ -73,7 +73,7 @@ export function PanelEstructuraIperc({ proyectoId, onArmar, refreshKey, onCambio
   const [total, setTotal] = useState(0)
   const [cargando, setCargando] = useState(true)
   const [ocupado, setOcupado] = useState(false)
-  const [abierto, setAbierto] = useState(true)
+  const [abiertoManual, setAbiertoManual] = useState<boolean | null>(null)
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set())
   const [editando, setEditando] = useState<ItemEstructura | null>(null)
   const [borrador, setBorrador] = useState('')
@@ -153,6 +153,11 @@ export function PanelEstructuraIperc({ proyectoId, onArmar, refreshKey, onCambio
     return porProceso
   }, [items])
 
+  // Con todo generado la lista ya cumplio su funcion: se contrae sola, como
+  // el panel de bloques, para no comerse la pantalla al volver al IPERC.
+  const todoGenerado = items.length > 0 && items.every(i => i.estado === 'generada')
+  const abierto = abiertoManual ?? !todoGenerado
+
   const seleccionados = items.filter(i => seleccion.has(i.id))
   const actividadesDeSeleccion = new Set(seleccionados.map(i => i.actividad))
   const puedeUnir = seleccionados.length >= 2 && actividadesDeSeleccion.size === 1
@@ -189,18 +194,25 @@ export function PanelEstructuraIperc({ proyectoId, onArmar, refreshKey, onCambio
   }
 
   return (
-    <div className="rounded border">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/30 p-2">
+    <div className={`rounded border ${todoGenerado ? 'border-emerald-200' : ''}`}>
+      <div
+        className={`flex flex-wrap items-center justify-between gap-2 p-2 ${
+          abierto ? 'border-b' : ''
+        } ${todoGenerado ? 'bg-emerald-50' : 'bg-muted/30'}`}
+      >
         <button
-          className="flex items-center gap-2 text-sm font-medium"
-          onClick={() => setAbierto(v => !v)}
+          className={`flex items-center gap-2 text-sm font-medium ${
+            todoGenerado ? 'text-emerald-900' : ''
+          }`}
+          onClick={() => setAbiertoManual(!abierto)}
         >
           {abierto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          <ListTree className="h-4 w-4" />
+          {todoGenerado ? <CheckCircle2 className="h-4 w-4" /> : <ListTree className="h-4 w-4" />}
           Estructura del IPERC
-          <span className="font-normal text-muted-foreground">
-            {items.length} tareas · {total} filas previstas
-            {generadas > 0 && ` · ${generadas} ya generadas`}
+          <span className={`font-normal ${todoGenerado ? 'text-emerald-800' : 'text-muted-foreground'}`}>
+            {todoGenerado
+              ? `${items.length} tareas · ${total} filas, todo generado`
+              : `${items.length} tareas · ${total} filas previstas${generadas > 0 ? ` · ${generadas} ya generadas` : ''}`}
           </span>
         </button>
 
@@ -221,16 +233,18 @@ export function PanelEstructuraIperc({ proyectoId, onArmar, refreshKey, onCambio
                 : 'Solo se unen tareas de la misma actividad'}
             </span>
           )}
-          <Button
-            size="sm" variant="ghost" className="h-7 text-xs"
-            onClick={onArmar} disabled={ocupado || disabled}
-          >
-            <RefreshCw className="mr-1 h-3.5 w-3.5" /> Rearmar
-          </Button>
+          {(abierto || !todoGenerado) && (
+            <Button
+              size="sm" variant="ghost" className="h-7 text-xs"
+              onClick={onArmar} disabled={ocupado || disabled}
+            >
+              <RefreshCw className="mr-1 h-3.5 w-3.5" /> Rearmar
+            </Button>
+          )}
         </div>
       </div>
 
-      {(sugerencias.length > 0 || sugTareas.length > 0) && (
+      {abierto && (sugerencias.length > 0 || sugTareas.length > 0) && (
         <div className="border-b bg-amber-50/60 p-2">
           <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-amber-900">
             <Lightbulb className="h-3.5 w-3.5" />
