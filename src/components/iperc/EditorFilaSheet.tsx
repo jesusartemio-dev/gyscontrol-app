@@ -60,6 +60,35 @@ const PROB_LABELS: Record<string, string> = {
   E: 'E – Práct. imposible',
 }
 
+/**
+ * La condicion tal como la espera el formulario.
+ *
+ * En la base conviven "No rutinaria" (211 filas) y "No Rutinaria" (2, las
+ * actividades fijas importadas del Excel del SSOMA, que la escribe asi). Con
+ * el enum a secas, abrir una de esas dos dejaba el select vacio y el guardado
+ * no hacia nada: zod rechazaba y el submit ni se ejecutaba.
+ */
+export function normalizarCondicion(valor: unknown): 'Rutinaria' | 'No rutinaria' {
+  return /^\s*no/i.test(String(valor ?? '')) ? 'No rutinaria' : 'Rutinaria'
+}
+
+/** Para nombrar el campo en el aviso con las mismas palabras del formulario. */
+const ETIQUETAS: Record<string, string> = {
+  proceso: 'Proceso',
+  actividad: 'Actividad',
+  tarea: 'Tarea',
+  puestoTrabajo: 'Puesto de trabajo',
+  factorRiesgo: 'Factor de riesgo',
+  condicionActividad: 'Condición',
+  peligro: 'Peligro',
+  riesgo: 'Riesgo',
+  consecuencia: 'Consecuencia',
+  severidad: 'Severidad',
+  probabilidad: 'Probabilidad',
+  severidadResidual: 'Severidad residual',
+  probabilidadResidual: 'Probabilidad residual',
+}
+
 const filaFormSchema = z.object({
   proceso: z.string().min(1, 'Requerido'),
   actividad: z.string().min(1, 'Requerido'),
@@ -160,7 +189,7 @@ export function EditorFilaSheet({
           tarea: fila.tarea,
           puestoTrabajo: fila.puestoTrabajo,
           factorRiesgo: fila.factorRiesgo,
-          condicionActividad: fila.condicionActividad as 'Rutinaria' | 'No rutinaria',
+          condicionActividad: normalizarCondicion(fila.condicionActividad),
           peligro: fila.peligro,
           riesgo: fila.riesgo,
           consecuencia: fila.consecuencia,
@@ -192,6 +221,21 @@ export function EditorFilaSheet({
 
   const getControlesSugeridos = (jerarquia: string) =>
     CONTROLES_CATALOGO.filter(c => c.jerarquia === jerarquia).slice(0, 5)
+
+  /**
+   * Sin esto, un campo invalido dejaba el boton de guardar sin hacer nada:
+   * react-hook-form no llama al submit y el error quedaba en un <p> que podia
+   * estar en la otra columna o fuera de la vista. Pasaba con las filas cuya
+   * condicion venia escrita "No Rutinaria", que no entraba en el enum.
+   */
+  const onInvalido = (errs: Record<string, { message?: string }>) => {
+    const campos = Object.keys(errs)
+    toast.error(
+      campos.length === 1
+        ? `Falta o es invalido: ${ETIQUETAS[campos[0]] ?? campos[0]}`
+        : `Hay ${campos.length} campos sin completar: ${campos.map(c => ETIQUETAS[c] ?? c).join(', ')}`,
+    )
+  }
 
   const onSubmit = async (values: FilaFormValues) => {
     try {
@@ -244,7 +288,7 @@ export function EditorFilaSheet({
           </SheetTitle>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
+        <form onSubmit={handleSubmit(onSubmit, onInvalido)} className="flex min-h-0 flex-1 flex-col">
           {/* En PC, dos columnas: a la izquierda qué es y cuánto vale el
               riesgo, a la derecha los controles, que son lo que lo baja. Así
               entra sin desplazar la página y el scroll aparece solo dentro de
@@ -305,8 +349,8 @@ export function EditorFilaSheet({
               <div>
                 <Label className="text-xs">Condición *</Label>
                 <Select
-                  value={watch('condicionActividad')}
-                  onValueChange={v => setValue('condicionActividad', v as 'Rutinaria' | 'No rutinaria')}
+                  value={normalizarCondicion(watch('condicionActividad'))}
+                  onValueChange={v => setValue('condicionActividad', normalizarCondicion(v))}
                 >
                   <SelectTrigger className="h-8 text-xs mt-0.5">
                     <SelectValue />
