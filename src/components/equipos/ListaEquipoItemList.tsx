@@ -30,7 +30,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, RotateCcw, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers, MoreHorizontal, Lock, Zap, GripVertical, Link2, AlignJustify } from 'lucide-react'
+import { Pencil, Trash2, Search, Package, Clock, AlertTriangle, CheckCircle, XCircle, Grid3X3, List, RotateCcw, Plus, ShoppingCart, FileText, Download, Tag, ChevronDown, Wrench, Trophy, Layers, MoreHorizontal, Lock, Zap, GripVertical, Link2, AlignJustify, Copy, Check } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ListaEquipoItem } from '@/types'
@@ -45,6 +45,7 @@ import ModalEditarListaItem from './ModalEditarListaItem'
 import VincularCatalogoModal from '@/components/cotizaciones/VincularCatalogoModal'
 import TipoItemBadge from '@/components/shared/TipoItemBadge'
 import DescripcionExpandible from '@/components/shared/DescripcionExpandible'
+import BotonCopiarItem, { copiarAlPortapapeles, textoDeItem } from '@/components/shared/BotonCopiarItem'
 import { CONTENEDOR_TABLA_SCROLL, CABECERA_FIJA, CABECERA_FIJA_PAGINA } from '@/hooks/useVistaCompacta'
 import {
   DropdownMenu,
@@ -211,6 +212,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
     onError: (msg) => toast.error(msg),
   })
   const [searchTerm, setSearchTerm] = useState('')
+  const [copiadoLista, setCopiadoLista] = useState(false)
   const [categoriaFiltro, setCategoriaFiltro] = useState('__ALL__')
   const [isLoading, setIsLoading] = useState(false)
 
@@ -315,6 +317,20 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
       return (a.orden ?? 0) - (b.orden ?? 0) || a.createdAt.localeCompare(b.createdAt)
     })
   }, [itemsWithResumen, searchTerm, categoriaFiltro, localItems, canDragItems])
+
+  /**
+   * Los ítems que se están viendo, como texto.
+   *
+   * Es lo que se pide cuando hay que mandarle una lista a un proveedor o
+   * revisarla fuera de la app: exportar a Excel es demasiado y copiar uno por
+   * uno, inviable.
+   */
+  const copiarVisibles = async () => {
+    const texto = filteredItems.map(textoDeItem).join('\n\n')
+    if (!(await copiarAlPortapapeles(texto))) return
+    setCopiadoLista(true)
+    setTimeout(() => setCopiadoLista(false), 1500)
+  }
 
   const handleDragEndItems = async (event: DragEndEvent) => {
     const { active, over } = event
@@ -468,6 +484,20 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
         {/* Stats */}
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
           <span>{filteredItems.length} de {items.length}</span>
+          {filteredItems.length > 0 && (
+            <button
+              type="button"
+              onClick={copiarVisibles}
+              title="Copiar los ítems que se están viendo, para pegarlos en otro lado"
+              className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors ${
+                copiadoLista ? 'text-emerald-600' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-700'
+              }`}
+            >
+              {copiadoLista
+                ? <><Check className="h-3 w-3" /> Copiados</>
+                : <><Copy className="h-3 w-3" /> Copiar {filteredItems.length}</>}
+            </button>
+          )}
           <span className={`font-medium ${stats.verificados === stats.total ? 'text-green-600' : 'text-muted-foreground'}`}>
             {stats.verificados}/{stats.total} verificados
           </span>
@@ -718,6 +748,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                              {item.codigo}
                            </div>
                            <TipoItemBadge tipoItem={(item as any).tipoItem} catalogoEquipoId={item.catalogoEquipoId} />
+                           <BotonCopiarItem item={item} />
                          </div>
                          <DescripcionExpandible
                            texto={item.descripcion}
@@ -1097,6 +1128,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[10px] text-gray-500">
                       <span className="font-mono">{item.codigo}</span>
                       {marca && <span>· {marca}</span>}
+                      <BotonCopiarItem item={item} />
                     </div>
                     {item.comentarioRevision && (
                       <p className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-blue-700" title={item.comentarioRevision}>
