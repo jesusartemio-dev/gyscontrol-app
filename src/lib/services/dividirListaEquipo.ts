@@ -131,6 +131,14 @@ export async function dividirLista(o: { listaId: string; itemIds: string[]; nomb
       const quedan = await tx.listaEquipoItem.count({ where: { listaId: lista.id, desgloseDeProyectoEquipoCotizadoItemId: cotizadoId } })
       if (!quedan) {
         await tx.desgloseEquipoItem.deleteMany({ where: { proyectoEquipoCotizadoItemId: cotizadoId, listaEquipoId: lista.id } })
+        // Si el desglose se fue entero, el cotizado tiene que apuntar a la
+        // parte. `listaId` es lo que mira el borrado de una lista para
+        // resetear sus cotizados: sin esto, borrar la original reseteaba un
+        // desglose que ya vivía en la parte.
+        await tx.proyectoEquipoCotizadoItem.updateMany({
+          where: { id: cotizadoId, listaId: lista.id },
+          data: { listaId: creada.id },
+        })
       }
     }
     return creada
