@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import { CantidadPedidoInput } from './CantidadPedidoInput'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select,
@@ -109,12 +110,13 @@ export default function PedidoDesdeListaModal({
     }
 
     lista.listaEquipoItem.forEach((item) => {
-      const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0)
+      const cantidadDisponible = Math.round((item.cantidad - (item.cantidadPedida || 0)) * 1000) / 1000
       if (cantidadDisponible > 0) {
         const previousSelection = itemSelections[item.id]
         selections[item.id] = {
           itemId: item.id,
-          selected: previousSelection?.selected || false,
+          // Por defecto todos los pendientes (con todo lo que falta pedir).
+          selected: previousSelection ? previousSelection.selected : true,
           cantidadPedida: previousSelection?.cantidadPedida
             ? Math.min(previousSelection.cantidadPedida, cantidadDisponible)
             : cantidadDisponible,
@@ -129,7 +131,7 @@ export default function PedidoDesdeListaModal({
   const itemsDisponibles = useMemo(() => {
     if (!lista?.listaEquipoItem || !Array.isArray(lista.listaEquipoItem)) return []
     return lista.listaEquipoItem.filter((item) => {
-      const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0)
+      const cantidadDisponible = Math.round((item.cantidad - (item.cantidadPedida || 0)) * 1000) / 1000
       return cantidadDisponible > 0
     })
   }, [lista.listaEquipoItem])
@@ -222,11 +224,11 @@ export default function PedidoDesdeListaModal({
     setEsUrgente(false)
     const selections: Record<string, ItemSelection> = {}
     lista?.listaEquipoItem?.forEach((item) => {
-      const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0)
+      const cantidadDisponible = Math.round((item.cantidad - (item.cantidadPedida || 0)) * 1000) / 1000
       if (cantidadDisponible > 0) {
         selections[item.id] = {
           itemId: item.id,
-          selected: false,
+          selected: true,
           cantidadPedida: cantidadDisponible,
           cantidadDisponible,
         }
@@ -365,30 +367,19 @@ export default function PedidoDesdeListaModal({
                                 <label className="text-[10px] text-gray-500" onClick={(e) => e.stopPropagation()}>
                                   Cantidad:
                                 </label>
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  max={selection.cantidadDisponible}
-                                  value={selection.cantidadPedida}
-                                  onChange={(e) => {
-                                    e.stopPropagation()
-                                    const nuevaCantidad = Math.min(
-                                      Math.max(1, parseInt(e.target.value) || 1),
-                                      selection.cantidadDisponible
-                                    )
-                                    setItemSelections((prev) => ({
-                                      ...prev,
-                                      [item.id]: {
-                                        ...prev[item.id],
-                                        cantidadPedida: nuevaCantidad,
-                                        selected: true,
-                                      },
-                                    }))
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                  disabled={loading}
-                                  className="w-16 h-6 text-xs text-center font-semibold"
-                                />
+                                <span onClick={(e) => e.stopPropagation()}>
+                                  <CantidadPedidoInput
+                                    value={selection.cantidadPedida}
+                                    max={selection.cantidadDisponible}
+                                    disabled={loading}
+                                    onChange={(nuevaCantidad) =>
+                                      setItemSelections((prev) => ({
+                                        ...prev,
+                                        [item.id]: { ...prev[item.id], cantidadPedida: nuevaCantidad, selected: true },
+                                      }))
+                                    }
+                                  />
+                                </span>
                                 <span className="text-[10px] text-gray-500">
                                   / {selection.cantidadDisponible} disp.
                                 </span>

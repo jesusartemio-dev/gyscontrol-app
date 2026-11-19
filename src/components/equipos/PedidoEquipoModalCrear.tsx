@@ -26,6 +26,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
+import { CantidadPedidoInput } from './CantidadPedidoInput'
 import { PedidoEquipoPayload, ListaEquipo, ListaEquipoItem } from '@/types'
 import {
   Plus,
@@ -92,12 +93,15 @@ export default function PedidoEquipoModalCrear({
         // Initialize item selections
         const selections: Record<string, ItemSelection> = {}
         items.forEach((item: ListaEquipoItem) => {
-          const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0)
+          const cantidadDisponible = Math.round((item.cantidad - (item.cantidadPedida || 0)) * 1000) / 1000
           if (cantidadDisponible > 0) {
+            // Por defecto TODOS los ítems pendientes, con TODO lo que falta pedir.
+            // Antes arrancaba sin seleccionar y con cantidad 1: con prisa en el
+            // celular se creaban pedidos de "1 de 3" sin darse cuenta.
             selections[item.id] = {
               itemId: item.id,
-              selected: false,
-              cantidadPedida: Math.min(cantidadDisponible, 1),
+              selected: true,
+              cantidadPedida: cantidadDisponible,
               cantidadDisponible,
             }
           }
@@ -117,7 +121,7 @@ export default function PedidoEquipoModalCrear({
   // Calculate available items
   const itemsDisponibles = useMemo(() => {
     return listaItems.filter((item) => {
-      const cantidadDisponible = item.cantidad - (item.cantidadPedida || 0)
+      const cantidadDisponible = Math.round((item.cantidad - (item.cantidadPedida || 0)) * 1000) / 1000
       return cantidadDisponible > 0
     })
   }, [listaItems])
@@ -382,53 +386,44 @@ export default function PedidoEquipoModalCrear({
                             : 'border-gray-200 bg-white hover:border-gray-300'
                         }`}
                       >
-                        <div className="flex items-center gap-2">
+                        {/* Dos filas: arriba qué es (se lee completo en el celular),
+                            abajo cuánto: disponible, cantidad a pedir y subtotal. */}
+                        <div className="flex items-start gap-2">
                           <Checkbox
                             checked={selection.selected}
                             onCheckedChange={(checked) =>
-                              handleItemSelectionChange(item.id, 'selected', checked)
+                              handleItemSelectionChange(item.id, 'selected', checked === true)
                             }
                             disabled={loading}
+                            className="mt-0.5"
                           />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <span className="font-medium text-xs">{item.codigo}</span>
-                                <span className="text-xs text-muted-foreground ml-2 truncate">{item.descripcion}</span>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <span className="text-xs font-medium">
-                                  ${(item.precioElegido || 0).toLocaleString()}
+                          <div className="flex-1 min-w-0 space-y-1.5">
+                            <p className="text-xs leading-snug">
+                              <span className="font-semibold">{item.codigo}</span>{' '}
+                              <span className="text-muted-foreground line-clamp-2">{item.descripcion}</span>
+                            </p>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                              <span className="text-[11px] text-muted-foreground">
+                                Disp. <span className="font-medium text-gray-800">{selection.cantidadDisponible}</span> {item.unidad}
+                              </span>
+                              {selection.selected ? (
+                                <span className="ml-auto flex items-center gap-2">
+                                  <CantidadPedidoInput
+                                    value={selection.cantidadPedida}
+                                    max={selection.cantidadDisponible}
+                                    disabled={loading}
+                                    onChange={(v) => handleItemSelectionChange(item.id, 'cantidadPedida', v)}
+                                  />
+                                  {selection.cantidadPedida < selection.cantidadDisponible && (
+                                    <span className="text-[10px] font-medium text-amber-700">parcial</span>
+                                  )}
+                                  <span className="text-xs font-medium text-blue-700 min-w-[3.5rem] text-right tabular-nums">
+                                    ${((item.precioElegido || 0) * selection.cantidadPedida).toLocaleString()}
+                                  </span>
                                 </span>
-                                <span className="text-[10px] text-muted-foreground">
-                                  Disp: {selection.cantidadDisponible}
-                                </span>
-                                {selection.selected && (
-                                  <>
-                                    <Input
-                                      type="number"
-                                      min="1"
-                                      max={selection.cantidadDisponible}
-                                      value={selection.cantidadPedida}
-                                      onChange={(e) =>
-                                        handleItemSelectionChange(
-                                          item.id,
-                                          'cantidadPedida',
-                                          Math.min(
-                                            Math.max(1, parseInt(e.target.value) || 1),
-                                            selection.cantidadDisponible
-                                          )
-                                        )
-                                      }
-                                      disabled={loading}
-                                      className="h-7 w-16 text-xs"
-                                    />
-                                    <span className="text-xs font-medium text-blue-700 w-16 text-right">
-                                      ${((item.precioElegido || 0) * selection.cantidadPedida).toLocaleString()}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
+                              ) : (
+                                <span className="ml-auto text-[11px] text-muted-foreground">no se pide</span>
+                              )}
                             </div>
                           </div>
                         </div>
