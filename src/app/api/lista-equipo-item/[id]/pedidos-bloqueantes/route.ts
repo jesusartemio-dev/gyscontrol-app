@@ -47,7 +47,15 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
       },
     })
 
+    // También los pedidos en borrador: no bloquean, pero el reemplazo los mueve
+    // al ítem nuevo y el usuario tiene que saberlo.
+    const enBorrador = await prisma.pedidoEquipoItem.findMany({
+      where: { listaEquipoItemId: id, pedidoEquipo: { estado: EstadoPedido.borrador } },
+      select: { cantidadPedida: true, pedidoEquipo: { select: { id: true, codigo: true } } },
+    })
+
     return NextResponse.json({
+      enBorrador: enBorrador.map(p => ({ pedidoId: p.pedidoEquipo.id, pedidoCodigo: p.pedidoEquipo.codigo, cantidadPedida: p.cantidadPedida })),
       total: pedidoItems.length,
       bloqueantes: pedidoItems.map(p => ({
         pedidoEquipoItemId: p.id,

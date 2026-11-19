@@ -74,6 +74,12 @@ export default function ModalReemplazarEquipo({
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Pedidos del ítem: los enviados o más avanzados bloquean el reemplazo; los
+  // en borrador se pasan al equipo nuevo.
+  const [pedidos, setPedidos] = useState<{
+    bloqueantes: { pedidoCodigo: string; pedidoEstado: string }[]
+    enBorrador: { pedidoCodigo: string; cantidadPedida: number }[]
+  } | null>(null)
 
   // Determine replacement context
   const esReemplazoDeReemplazo = !!item?.reemplazaProyectoEquipoCotizadoItemId
@@ -94,7 +100,24 @@ export default function ModalReemplazarEquipo({
       .then(([e, c]) => { setEquipos(e); setCategorias(c) })
       .catch(() => { setError('Error al cargar los datos del catálogo'); toast.error('Error al cargar catálogo') })
       .finally(() => setInitialLoading(false))
+
+    setPedidos(null)
+    if (item?.id) {
+      fetch(`/api/lista-equipo-item/${item.id}/pedidos-bloqueantes`)
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => d && setPedidos({ bloqueantes: d.bloqueantes ?? [], enBorrador: d.enBorrador ?? [] }))
+        .catch(() => { /* sin aviso: el servidor igual valida al mover */ })
+    }
   }, [open])
+
+  const bloqueado = (pedidos?.bloqueantes.length ?? 0) > 0
+  // Qué falta para poder reemplazar (antes el botón quedaba gris sin decir por qué).
+  const faltante = bloqueado
+    ? 'el ítem está en un pedido enviado o aprobado'
+    : !selected ? 'seleccionar el equipo nuevo'
+    : !(cantidad > 0) ? 'la cantidad'
+    : !motivoCambio.trim() ? 'el motivo del reemplazo'
+    : null
 
   const equiposFiltrados = equipos.filter((e) => {
     const matchCat = categoriaFiltro === 'todas' || e.categoriaId === categoriaFiltro
@@ -108,10 +131,11 @@ export default function ModalReemplazarEquipo({
       toast.error('No se pudo identificar el usuario. Inicia sesión nuevamente.')
       return
     }
-    if (!selected || cantidad <= 0 || !motivoCambio.trim()) {
-      toast.warning('Completa todos los campos requeridos')
+    if (faltante) {
+      toast.warning(`Falta: ${faltante}`)
       return
     }
+    if (!selected) return
 
     try {
       setLoading(true)
@@ -120,29 +144,11 @@ export default function ModalReemplazarEquipo({
       const proyectoEquipoItemOriginal =
         item.reemplazaProyectoEquipoCotizadoItemId || item.proyectoEquipoItemId || null
 
-      // Step 1: sacar el ítem anterior de la lista.
-      // Antes esto dependía del origen: un 'cotizado' sin cotizaciones se
-      // borraba, pero un 'nuevo' o un 'reemplazo' se quedaba, y la lista
-      // terminaba con dos filas del mismo equipo. El criterio real no es el
-      // origen sino si hay cotizaciones de proveedor que perder.
-      const tieneCotizaciones = (item.cotizaciones?.length ?? 0) > 0
-      if (tieneCotizaciones) {
-        // Se conserva para no borrar el historial de cotizaciones, pero se
-        // desvincula del ítem cotizado: el reemplazo pasa a ser el vigente.
-        await updateListaEquipoItem(item.id, {
-          estado: 'borrador',
-          proyectoEquipoItemId: null,
-        })
-      } else {
-        const eliminado = await deleteListaEquipoItem(item.id)
-        if (!eliminado) {
-          // La API rechaza el borrado si hay pedidos u otra dependencia.
-          await updateListaEquipoItem(item.id, { estado: 'borrador' })
-          toast.warning('El ítem anterior no se pudo eliminar (tiene pedidos u otra dependencia). Quedó en la lista como borrador.')
-        }
-      }
+      // Orden: 1) crear el nuevo, 2) pasarle los pedidos en borrador, 3) sacar el
+      // viejo. Antes se intentaba borrar el viejo primero: si tenía pedido no se
+      // podía, quedaban los dos en la lista y el pedido seguía con el viejo.
 
-      // Step 2: Create new replacement item
+      // Step 1: Create new replacement item
       // Inherit presupuesto from the original cotizado item (price GYS quoted to client)
       const presupuestoHeredado = item.presupuesto || item.proyectoEquipoItem?.precioCliente || 0
       const nuevoItem = await createListaEquipoItem({
@@ -162,8 +168,39 @@ export default function ModalReemplazarEquipo({
         reemplazaProyectoEquipoCotizadoItemId: proyectoEquipoItemOriginal ?? undefined,
         responsableId: session.user.id,
       })
+      if (!nuevoItem?.id) throw new Error('No se pudo crear el ítem nuevo')
 
-      // Step 3: Update ProyectoEquipoItem if linked
+      // Step 2: los pedidos en borrador (o cancelados) del viejo pasan al nuevo.
+      const mover = await fetch(`/api/lista-equipo-item/${item.id}/mover-pedidos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nuevoItemId: nuevoItem.id }),
+      })
+      const movido = await mover.json().catch(() => null)
+      if (!mover.ok) {
+        // No dejar dos ítems: se deshace el nuevo y no se toca el viejo.
+        await deleteListaEquipoItem(nuevoItem.id)
+        toast.error(movido?.error || 'No se pudieron pasar los pedidos al equipo nuevo')
+        return
+      }
+
+      // Step 3: sacar el ítem anterior de la lista. Se conserva solo si tiene
+      // cotizaciones de proveedor (para no perder su historial).
+      const tieneCotizaciones = (item.cotizaciones?.length ?? 0) > 0
+      if (tieneCotizaciones) {
+        await updateListaEquipoItem(item.id, {
+          estado: 'borrador',
+          proyectoEquipoItemId: null,
+        })
+      } else {
+        const eliminado = await deleteListaEquipoItem(item.id)
+        if (!eliminado) {
+          await updateListaEquipoItem(item.id, { estado: 'borrador' })
+          toast.warning('El ítem anterior no se pudo eliminar (tiene otra dependencia). Quedó en la lista como borrador.')
+        }
+      }
+
+      // Step 4: Update ProyectoEquipoItem if linked
       if (proyectoEquipoItemOriginal && nuevoItem) {
         await updateProyectoEquipoItem(proyectoEquipoItemOriginal, {
           listaEquipoSeleccionadoId: nuevoItem.id,
@@ -176,7 +213,10 @@ export default function ModalReemplazarEquipo({
         })
       }
 
-      toast.success('Ítem reemplazado correctamente')
+      const nMovidas = (movido?.movidas ?? []).length
+      toast.success(nMovidas > 0
+        ? `Ítem reemplazado. ${(movido.movidas as { pedido: string }[]).map(m => m.pedido).join(', ')} ahora pide el equipo nuevo.`
+        : 'Ítem reemplazado correctamente')
       onUpdated?.()
       onClose()
     } catch (error) {
@@ -240,6 +280,27 @@ export default function ModalReemplazarEquipo({
                   </div>
                 </div>
               </div>
+
+              {/* Pedidos del ítem */}
+              {bloqueado && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p>
+                    No se puede reemplazar: está en{' '}
+                    <strong>{pedidos!.bloqueantes.map(p => `${p.pedidoCodigo} (${p.pedidoEstado})`).join(', ')}</strong>.
+                    Pasa ese pedido a borrador primero (Volver a Enviado → Volver a Borrador).
+                  </p>
+                </div>
+              )}
+              {!bloqueado && (pedidos?.enBorrador.length ?? 0) > 0 && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p>
+                    Está en <strong>{pedidos!.enBorrador.map(p => p.pedidoCodigo).join(', ')}</strong> (borrador):
+                    al reemplazar, ese pedido pasará a pedir el equipo nuevo (sin pasar de la cantidad nueva).
+                  </p>
+                </div>
+              )}
 
               {/* Filters */}
               <div className="flex items-center gap-2">
@@ -373,11 +434,16 @@ export default function ModalReemplazarEquipo({
                         </label>
                         <Input
                           type="number"
-                          min={1}
+                          inputMode="decimal"
+                          step="any"
+                          min={0}
                           value={cantidad}
-                          onChange={(e) => setCantidad(parseInt(e.target.value) || 1)}
+                          onChange={(e) => setCantidad(Number(e.target.value))}
                           className="h-8 text-sm"
                         />
+                        <p className="text-[10px] text-muted-foreground">
+                          Antes: {item?.cantidad} {item?.unidad}. Ojo si cambia la unidad (p. ej. metros → piezas de 2 m).
+                        </p>
                       </div>
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-gray-700 flex items-center gap-1">
@@ -401,9 +467,9 @@ export default function ModalReemplazarEquipo({
           {/* Footer */}
           <div className="border-t px-6 py-3 bg-gray-50 flex items-center justify-between">
             <div className="text-xs text-gray-500">
-              {selected
-                ? <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-green-600" /> {selected.codigo} seleccionado</span>
-                : 'Selecciona un equipo para continuar'
+              {faltante
+                ? <span className="flex items-center gap-1 font-medium text-amber-700"><AlertCircle className="h-3 w-3" /> Falta: {faltante}</span>
+                : <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-green-600" /> {selected?.codigo} seleccionado</span>
               }
             </div>
             <div className="flex gap-2">
@@ -413,7 +479,7 @@ export default function ModalReemplazarEquipo({
               <Button
                 size="sm"
                 onClick={handleReemplazar}
-                disabled={!selected || loading || !motivoCambio.trim() || cantidad <= 0}
+                disabled={loading || !!faltante}
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 {loading ? (
