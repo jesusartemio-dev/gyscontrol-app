@@ -481,8 +481,8 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
           </Select>
         )}
 
-        {/* Stats */}
-        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+        {/* Stats — en celular hacen salto de línea en vez de partirse palabra por palabra */}
+        <div className="flex basis-full flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground sm:basis-auto [&>*]:whitespace-nowrap">
           <span>{filteredItems.length} de {items.length}</span>
           {filteredItems.length > 0 && (
             <button
@@ -519,7 +519,7 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
                 stats.coberturaBuena === stats.total ? 'bg-green-500' :
                 stats.sinCotizaciones > 0 ? 'bg-red-500' : 'bg-amber-500'
               }`} />
-              {stats.coberturaBuena}/{stats.total} con 3+ cot.
+              {stats.coberturaBuena}/{stats.total} con 3+ cotiz.
             </span>
           )}
         </div>
@@ -1178,9 +1178,11 @@ export default function ListaEquipoItemList({ listaId, proyectoId, listaCodigo, 
       {renderHeader()}
 
       {!editable && listaEstado && listaEstado !== 'borrador' && listaEstado !== 'por_revisar' && (
-        <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
           <Lock className="h-3.5 w-3.5 shrink-0" />
-          <span>
+          {/* Corto en celular (ocupaba 3 líneas); completo en PC. */}
+          <span className="sm:hidden">Solo lectura: se edita en Borrador.</span>
+          <span className="hidden sm:inline">
             Esta lista está en estado <strong>{estadoLabels[listaEstado] ?? listaEstado}</strong> — solo se puede editar en estado Borrador.
           </span>
         </div>

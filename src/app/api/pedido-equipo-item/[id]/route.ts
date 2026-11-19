@@ -102,6 +102,27 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     // 🔢 Calcular la diferencia en cantidadPedida para actualizar lista
     const diferencia = body.cantidadPedida - itemAnterior.cantidadPedida
 
+    // Tope: al subir la cantidad no se puede pedir más de lo que tiene la lista
+    // (cantidad de la lista − lo pedido en otros pedidos). Antes no había tope.
+    if (diferencia > 0 && itemAnterior.listaEquipoItemId) {
+      const [lista, otros] = await Promise.all([
+        prisma.listaEquipoItem.findUnique({ where: { id: itemAnterior.listaEquipoItemId }, select: { cantidad: true, unidad: true } }),
+        prisma.pedidoEquipoItem.aggregate({
+          where: { listaEquipoItemId: itemAnterior.listaEquipoItemId, id: { not: id } },
+          _sum: { cantidadPedida: true },
+        }),
+      ])
+      if (lista) {
+        const tope = Math.round((lista.cantidad - (otros._sum.cantidadPedida ?? 0)) * 1000) / 1000
+        if (body.cantidadPedida > tope + 1e-9) {
+          return NextResponse.json(
+            { error: `Máximo ${tope} ${lista.unidad}: es lo que falta pedir de este ítem en la lista` },
+            { status: 400 }
+          )
+        }
+      }
+    }
+
     // 📅 Recalcular fechaOrdenCompraRecomendada si hay tiempoEntregaDias
     let fechaOC: Date | null = null
     const dias = body.tiempoEntregaDias ?? itemAnterior.tiempoEntregaDias

@@ -32,7 +32,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { RollbackButton } from '@/components/RollbackButton'
-import { StepPill, StepLine, type StepStatus } from '@/components/ui/status-stepper'
+import { StepPill, StepLine, PasoActualMovil, type StepStatus } from '@/components/ui/status-stepper'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 interface Props {
@@ -108,12 +108,14 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-4 py-2 px-3 bg-gray-50/80 border border-gray-200 rounded-lg',
+        'flex flex-col gap-2 py-2 px-3 bg-gray-50/80 border border-gray-200 rounded-lg sm:flex-row sm:items-center sm:justify-between sm:gap-4',
         className
       )}
     >
+      {/* Celular: estado actual y paso; PC: la fila de píldoras. */}
+      <PasoActualMovil steps={steps} className="sm:hidden" />
       {/* Pill flow */}
-      <div className="flex items-center overflow-x-auto flex-1 min-w-0">
+      <div className="hidden sm:flex items-center overflow-x-auto flex-1 min-w-0">
         {steps.map((step, i) => (
           <React.Fragment key={step.key}>
             {i > 0 && <StepLine nextStatus={step.status} />}
@@ -122,8 +124,8 @@ export default function ListaEstadoFlujoBanner({ estado, listaId, totalItems = 0
         ))}
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex items-center gap-2 flex-shrink-0">
+      {/* Action Buttons — en celular bajan a su fila y se acomodan (antes se salían por la derecha) */}
+      <div className="flex flex-wrap items-center gap-2 sm:flex-shrink-0">
         {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
 
         {/* Verification progress - relevant in borrador and por_revisar */}

@@ -179,7 +179,8 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
   const [revertirRechazo, setRevertirRechazo] = useState<{ confirmando: boolean; motivo: string; procesando: boolean }>({ confirmando: false, motivo: '', procesando: false })
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
   const [confirmDeleteItem, setConfirmDeleteItem] = useState<{ id: string; codigo: string } | null>(null)
-  const [editItem, setEditItem] = useState<{ id: string; codigo: string; descripcion: string; cantidad: number; comentario: string } | null>(null)
+  const [editItem, setEditItem] = useState<{ id: string; codigo: string; descripcion: string; cantidad: number; comentario: string; max?: number | null; unidad?: string } | null>(null)
+  const [completando, setCompletando] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
   const [showAgregarDeListaModal, setShowAgregarDeListaModal] = useState(false)
   const [localPedidoItems, setLocalPedidoItems] = useState<any[]>([])
@@ -283,6 +284,11 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
 
   const handleSaveEditItem = async () => {
     if (!editItem) return
+    if (!(editItem.cantidad > 0)) { toast.error('Indica una cantidad mayor a 0'); return }
+    if (editItem.max != null && editItem.cantidad > editItem.max + 1e-9) {
+      toast.error(`Máximo ${editItem.max} ${editItem.unidad ?? ''}: es lo que falta pedir en la lista`)
+      return
+    }
     setEditSaving(true)
     try {
       const res = await fetch(`/api/pedido-equipo-item/${editItem.id}`, {
@@ -290,7 +296,11 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cantidadPedida: editItem.cantidad, comentarioLogistica: editItem.comentario || null }),
       })
-      if (!res.ok) { toast.error('Error al guardar'); return }
+      if (!res.ok) {
+        const e = await res.json().catch(() => null)
+        toast.error(e?.error || 'Error al guardar')
+        return
+      }
       toast.success('Item actualizado')
       setEditItem(null)
       await reloadPedido()
@@ -298,6 +308,34 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
       toast.error('Error al guardar')
     } finally {
       setEditSaving(false)
+    }
+  }
+
+  // Borrador: lleva todos los ítems a lo que falta pedir en la lista (un clic,
+  // en vez de editar ítem por ítem un pedido que salió "1 de 3").
+  const handleCompletarPendiente = async () => {
+    if (!pedido) return
+    setCompletando(true)
+    try {
+      const sim = await fetch(`/api/pedido-equipo/${pedido.id}/completar-pendiente`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ simular: true }),
+      }).then(r => r.json())
+      if (sim.error) { toast.error(sim.error); return }
+      const cambios = (sim.cambios ?? []) as { codigo: string; antes: number; despues: number }[]
+      if (cambios.length === 0) { toast.info('Todos los ítems ya tienen lo pendiente de la lista'); return }
+      const detalle = cambios.slice(0, 8).map(c => `• ${c.codigo}: ${c.antes} → ${c.despues}`).join('\n')
+      if (!window.confirm(`Se completarán ${cambios.length} ítem(s) con lo que falta pedir en la lista:\n\n${detalle}${cambios.length > 8 ? `\n… y ${cambios.length - 8} más` : ''}\n\n¿Continuar?`)) return
+      const res = await fetch(`/api/pedido-equipo/${pedido.id}/completar-pendiente`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+      })
+      const r = await res.json().catch(() => null)
+      if (!res.ok) { toast.error(r?.error || 'No se pudo completar'); return }
+      toast.success(`${cambios.length} ítem(s) completados con lo pendiente`)
+      await reloadPedido()
+    } catch {
+      toast.error('No se pudo completar')
+    } finally {
+      setCompletando(false)
     }
   }
 
@@ -437,6 +475,21 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
   if (loading) return <LoadingSkeleton />
   if (!proyecto || !pedido) notFound()
 
+  // Lo máximo que puede llevar un ítem de este pedido: cantidad de la lista −
+  // lo pedido en otros pedidos. null si no viene de una lista.
+  const topeItem = (item: any): number | null => {
+    const l = item?.listaEquipoItem
+    if (!l || l.cantidad == null) return null
+    return Math.round((l.cantidad - (l.cantidadPedida || 0) + (item.cantidadPedida || 0)) * 1000) / 1000
+  }
+  const abrirEditarItem = (item: any) => setEditItem({
+    id: item.id, codigo: item.codigo, descripcion: item.descripcion, cantidad: item.cantidadPedida,
+    comentario: item.comentarioLogistica || '', max: topeItem(item), unidad: item.unidad,
+  })
+  const itemsIncompletos = pedido.estado === 'borrador'
+    ? (pedido.items || []).filter((i: any) => { const t = topeItem(i); return t != null && t > (i.cantidadPedida || 0) + 1e-9 }).length
+    : 0
+
   const stats = {
     totalItems: pedido.items?.length || 0,
     totalCost: pedido.items?.reduce((sum, item) => sum + (item.costoTotal || 0), 0) || 0,
@@ -464,7 +517,8 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="px-4 py-3">
           {/* Breadcrumb */}
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+          {/* En celular no: el layout ya muestra la ruta del proyecto arriba. */}
+          <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
             <Link href="/proyectos" className="hover:text-foreground">Proyectos</Link>
             <ChevronRight className="h-3 w-3" />
             <Link href={`/proyectos/${proyectoId}`} className="hover:text-foreground">{proyecto.codigo}</Link>
@@ -475,20 +529,20 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
           </div>
 
           {/* Title row */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-3">
               <Button variant="ghost" size="sm" asChild className="h-7 px-2">
                 <Link href={`/proyectos/${proyectoId}/pedidos`}>
                   <ArrowLeft className="h-3.5 w-3.5" />
                 </Link>
               </Button>
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                <div className="hidden h-8 w-8 rounded-lg bg-blue-100 sm:flex items-center justify-center">
                   <Package className="h-4 w-4 text-blue-600" />
                 </div>
                 <div>
                   <h1 className="text-base font-semibold">{pedido.codigo}</h1>
-                  <p className="text-[10px] text-muted-foreground">{proyecto.nombre}</p>
+                  <p className="max-w-[60vw] truncate text-[10px] text-muted-foreground sm:max-w-none">{proyecto.nombre}</p>
                 </div>
               </div>
             </div>
@@ -498,8 +552,8 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button variant="outline" size="sm" onClick={handleCopiarEnlace} className="h-7 text-xs">
-                      <Copy className="h-3 w-3 mr-1" />
-                      Copiar
+                      <Copy className="h-3 w-3 sm:mr-1" />
+                      <span className="hidden sm:inline">Copiar</span>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent className="text-xs">Copia mensaje listo para pegar en WhatsApp</TooltipContent>
@@ -511,12 +565,12 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                 onClick={handleCompartirWhatsApp}
                 className="h-7 text-xs text-green-700 border-green-300 hover:bg-green-50"
               >
-                <MessageCircle className="h-3 w-3 mr-1" />
-                WhatsApp
+                <MessageCircle className="h-3 w-3 sm:mr-1" />
+                <span className="hidden sm:inline">WhatsApp</span>
               </Button>
               <Button variant="outline" size="sm" onClick={() => setShowEditModal(true)} className="h-7 text-xs">
-                <Edit className="h-3 w-3 mr-1" />
-                Editar
+                <Edit className="h-3 w-3 sm:mr-1" />
+                <span className="hidden sm:inline">Editar</span>
               </Button>
               {(pedido.estado === 'borrador' || pedido.estado === 'cancelado') && (
                 <Button
@@ -525,8 +579,8 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                   onClick={() => deleteValidation.requestDelete(pedidoId)}
                   className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                 >
-                  <Trash2 className="h-3 w-3 mr-1" />
-                  Eliminar
+                  <Trash2 className="h-3 w-3 sm:mr-1" />
+                  <span className="hidden sm:inline">Eliminar</span>
                 </Button>
               )}
             </div>
@@ -869,8 +923,17 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
           )
         })()}
 
-        {/* Stats cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {/* Stats: en celular una sola tira (las 4 tarjetas ocupaban media pantalla). */}
+        <div className="md:hidden rounded-lg border bg-white px-3 py-2">
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <span><span className="font-semibold">{stats.totalItems}</span> ítems</span>
+            <span className="font-semibold text-emerald-600">{formatCurrency(stats.totalCost)}</span>
+            <span><span className="font-semibold text-green-600">{stats.entregados}</span> entregados</span>
+            <span className="font-medium">{stats.progress.toFixed(0)}%</span>
+          </div>
+          <Progress value={stats.progress} className="mt-1.5 h-1.5" />
+        </div>
+        <div className="hidden md:grid grid-cols-4 gap-3">
           <div className="bg-white rounded-lg border p-3">
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">Items</span>
@@ -1057,6 +1120,18 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
             </div>
           </div>
 
+          {itemsIncompletos > 0 && (
+            <div className="flex flex-wrap items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              <span className="flex-1 min-w-[12rem]">
+                {itemsIncompletos} ítem(s) llevan menos de lo que falta pedir en la lista.
+              </span>
+              <Button size="sm" className="h-7 text-xs" onClick={handleCompletarPendiente} disabled={completando}>
+                {completando ? 'Completando…' : 'Completar con lo pendiente'}
+              </Button>
+            </div>
+          )}
+
           {pedido.items && pedido.items.length > 0 && vistaItems === 'compacta' ? (
             /* Vista compacta (campo): qué es, cuánto se pidió / llegó y cuándo llega.
                Sin costos ni acciones. 4 columnas: entra sin scroll horizontal en el celular. */
@@ -1095,10 +1170,34 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                           )}
                         </td>
                         <td className="px-1 py-1.5 text-center whitespace-nowrap">
-                          <div><span className="font-semibold text-gray-900">{pedida}</span> <span className="text-[10px] text-gray-500">{item.unidad}</span></div>
-                          <div className={cn('text-[10px] tabular-nums', llego >= pedida && pedida > 0 ? 'text-green-600' : llego > 0 ? 'text-blue-600' : 'text-gray-400')}>
-                            llegó {llego}
-                          </div>
+                          {(() => {
+                            const tope = topeItem(item)
+                            const deLista = item.listaEquipoItem?.cantidad
+                            const corto = pedido.estado === 'borrador' && tope != null && tope > pedida + 1e-9
+                            const contenido = (
+                              <>
+                                <div>
+                                  <span className={cn('font-semibold', corto ? 'text-amber-700' : 'text-gray-900')}>{pedida}</span>
+                                  {deLista != null && deLista !== pedida && <span className="text-[10px] text-gray-500"> de {deLista}</span>}
+                                  {' '}<span className="text-[10px] text-gray-500">{item.unidad}</span>
+                                </div>
+                                {pedido.estado === 'borrador' ? (
+                                  <div className="text-[10px] text-blue-600">✏️ editar</div>
+                                ) : (
+                                  <div className={cn('text-[10px] tabular-nums', llego >= pedida && pedida > 0 ? 'text-green-600' : llego > 0 ? 'text-blue-600' : 'text-gray-400')}>
+                                    llegó {llego}
+                                  </div>
+                                )}
+                              </>
+                            )
+                            // En borrador la cantidad se toca para editar (en el celular
+                            // el lápiz de la vista completa queda fuera de la pantalla).
+                            return pedido.estado === 'borrador' ? (
+                              <button type="button" className="w-full rounded px-1 py-0.5 hover:bg-blue-50" onClick={() => abrirEditarItem(item)}>
+                                {contenido}
+                              </button>
+                            ) : contenido
+                          })()}
                         </td>
                         <td className="px-1 py-1.5 text-center">
                           {item.tipoItem === 'servicio' ? (
@@ -1268,7 +1367,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
                         <td className="px-2 py-2">
                           <div className="flex items-center gap-0.5">
                             <button
-                              onClick={() => setEditItem({ id: item.id, codigo: item.codigo, descripcion: item.descripcion, cantidad: item.cantidadPedida, comentario: (item as any).comentarioLogistica || '' })}
+                              onClick={() => abrirEditarItem(item)}
                               className="p-1 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors"
                               title="Editar item"
                             >
@@ -1533,13 +1632,28 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
               <p className="text-xs text-muted-foreground font-mono truncate">{editItem.codigo} — {editItem.descripcion}</p>
               <div>
                 <label className="text-[10px] text-muted-foreground font-medium">Cantidad *</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={editItem.cantidad}
-                  onChange={(e) => setEditItem({ ...editItem, cantidad: Number(e.target.value) })}
-                  className="mt-1 w-full h-8 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-                />
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    min={0}
+                    max={editItem.max ?? undefined}
+                    value={editItem.cantidad}
+                    onChange={(e) => setEditItem({ ...editItem, cantidad: Number(e.target.value) })}
+                    className="w-full h-8 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  {editItem.max != null && editItem.max !== editItem.cantidad && (
+                    <Button type="button" variant="outline" size="sm" className="h-8 shrink-0 text-xs" onClick={() => setEditItem({ ...editItem, cantidad: editItem.max! })}>
+                      Todo ({editItem.max})
+                    </Button>
+                  )}
+                </div>
+                {editItem.max != null && (
+                  <p className={cn('mt-1 text-[10px]', editItem.cantidad > editItem.max + 1e-9 ? 'text-red-600 font-medium' : 'text-muted-foreground')}>
+                    Máx. {editItem.max} {editItem.unidad}: lo que falta pedir de este ítem en la lista.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-[10px] text-muted-foreground font-medium">Comentario</label>

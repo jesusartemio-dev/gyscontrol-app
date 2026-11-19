@@ -108,6 +108,56 @@ export function StepPill({ label, status, interactive, loading, disabled, onClic
   )
 }
 
+/**
+ * Celular: en vez de la fila de píldoras (se cortaba y no se veía el estado),
+ * el estado actual + "paso N de M" + el siguiente, y una barra de segmentos.
+ * Tocándolo se despliegan todos los pasos. Usar junto a la fila de píldoras
+ * con `sm:hidden` aquí y `hidden sm:flex` en la fila.
+ */
+export function PasoActualMovil({ steps, className, onStepClick, disabled }: {
+  steps: { key: string; label: string; status: StepStatus }[]
+  className?: string
+  /** Si se pasa, los pasos desplegados se pueden tocar (cambiar de estado). */
+  onStepClick?: (key: string) => void
+  disabled?: boolean
+}) {
+  const [abierto, setAbierto] = React.useState(false)
+  // Paso actual; si no hay (p. ej. proyecto pausado), el último completado.
+  const iActual = steps.findIndex(s => s.status !== 'completed' && s.status !== 'future')
+  const idx = iActual >= 0 ? iActual : Math.max(0, steps.map(s => s.status).lastIndexOf('completed'))
+  const actual = steps[idx] ?? steps[0]
+  const siguiente = steps.slice(idx + 1).find(s => s.status === 'future')
+  if (!actual) return null
+  return (
+    <div className={cn('w-full min-w-0', className)}>
+      <button type="button" className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 text-left" onClick={() => setAbierto(a => !a)}>
+        <StepPill label={actual.label} status={actual.status} />
+        <span className="text-[11px] text-muted-foreground">paso {idx + 1} de {steps.length}</span>
+        {siguiente && <span className="text-[11px] text-muted-foreground">· sigue: <span className="text-gray-700">{siguiente.label}</span></span>}
+        <span className="ml-auto text-[10px] text-blue-600">{abierto ? 'ocultar' : 'ver pasos'}</span>
+      </button>
+      <div className="mt-1.5 flex gap-0.5">
+        {steps.map(s => <div key={s.key} className={cn('h-1 flex-1 rounded-full', getLineColor(s.status))} />)}
+      </div>
+      {abierto && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {steps.map(s => (
+            <StepPill
+              key={s.key}
+              label={s.label}
+              status={s.status}
+              interactive={!!onStepClick}
+              disabled={disabled}
+              onClick={onStepClick ? () => onStepClick(s.key) : undefined}
+              className="px-2 py-1 text-[10px]"
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Full stepper for linear flows
 interface StatusStepperProps {
   steps: StatusStep[]

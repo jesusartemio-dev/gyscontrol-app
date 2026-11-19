@@ -45,6 +45,7 @@ import {
   Loader2,
   List,
   LayoutGrid,
+  SlidersHorizontal,
   HardHat,
   Settings,
   ArrowUpDown
@@ -106,6 +107,8 @@ export default function ProyectosPage() {
   const [filterAnio, setFilterAnio] = useState<string>(savedFilters.filterAnio ?? 'all')
   const [filterMes, setFilterMes] = useState<string>(savedFilters.filterMes ?? 'all')
   const [includeInternos, setIncludeInternos] = useState<boolean>(savedFilters.includeInternos === 'true')
+  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false)
+  const filtrosActivos = [filterStatus, filterClienteId, filterGestorId, filterMoneda, filterAnio, filterMes].filter(v => v !== 'all').length + (includeInternos ? 1 : 0)
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; proyecto?: Proyecto }>({ show: false })
   const { page, limit, handlePageChange, handleLimitChange, reset: resetPagination } = usePagination(1, 12)
 
@@ -516,6 +519,23 @@ export default function ProyectosPage() {
           />
         </div>
 
+        {/* Celular: los filtros van plegados (ocupaban media pantalla antes del
+            primer proyecto). El número dice cuántos hay activos. */}
+        <Button
+          variant={filtrosActivos > 0 ? 'default' : 'outline'}
+          size="sm"
+          className="h-8 gap-1 text-xs sm:hidden"
+          onClick={() => setFiltrosAbiertos(v => !v)}
+          aria-expanded={filtrosAbiertos}
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          Filtros{filtrosActivos > 0 ? ` (${filtrosActivos})` : ''}
+        </Button>
+        <span className="text-xs text-muted-foreground sm:hidden">
+          {filteredProyectos.length} de {proyectos.length}
+        </span>
+
+        <div className={filtrosAbiertos ? 'contents' : 'hidden sm:contents'}>
         <Select value={filterStatus} onValueChange={(value: string) => setFilterStatus(value as FilterStatus)}>
           <SelectTrigger className="w-[160px] h-8 text-xs">
             <SelectValue />
@@ -639,8 +659,9 @@ export default function ProyectosPage() {
             <List className="h-3.5 w-3.5" />
           </Button>
         </div>
+        </div>
 
-        <span className="text-xs text-muted-foreground ml-auto">
+        <span className="hidden sm:inline text-xs text-muted-foreground ml-auto">
           {filteredProyectos.length} de {proyectos.length}
         </span>
       </div>

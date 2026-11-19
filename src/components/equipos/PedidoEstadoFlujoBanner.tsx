@@ -25,7 +25,7 @@ import { toast } from 'sonner'
 import { validarTransicionPedido } from '@/lib/utils/flujoPedidoEquipo'
 import { useSession } from 'next-auth/react'
 import { RollbackButton } from '@/components/RollbackButton'
-import { StepPill, StepLine, type StepStatus } from '@/components/ui/status-stepper'
+import { StepPill, StepLine, PasoActualMovil, type StepStatus } from '@/components/ui/status-stepper'
 
 interface PedidoEstadoFlujoBannerProps {
   estado: string
@@ -135,9 +135,23 @@ const PedidoEstadoFlujoBanner: React.FC<PedidoEstadoFlujoBannerProps> = ({
   return (
     <>
       <div className="bg-white rounded-lg border p-3">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 sm:flex-nowrap sm:gap-4">
+          {/* Celular: estado actual y paso (ocupa la fila; los botones bajan a la siguiente). */}
+          <div className="basis-full sm:hidden">
+            <PasoActualMovil
+              steps={isCancelled ? [...steps, { key: 'cancelado', label: 'Cancelado', status: 'cancelled' as StepStatus }] : steps}
+            />
+            {(() => {
+              const sig = steps.find(s => s.canAdvance)
+              return sig ? (
+                <Button size="sm" className="mt-2 h-7 text-xs" disabled={isUpdating} onClick={() => handleEstadoChange(sig.key)}>
+                  Pasar a {sig.label} →
+                </Button>
+              ) : null
+            })()}
+          </div>
           {/* Flow pills */}
-          <div className="flex items-center flex-1 overflow-x-auto">
+          <div className="hidden sm:flex items-center flex-1 overflow-x-auto">
             {steps.map((step, idx) => (
               <React.Fragment key={step.key}>
                 {idx > 0 && <StepLine nextStatus={step.status} />}

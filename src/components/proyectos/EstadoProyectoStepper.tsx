@@ -35,7 +35,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { StepPill, StepLine, type StepStatus, type StatusStep } from '@/components/ui/status-stepper'
+import { StepPill, StepLine, PasoActualMovil, type StepStatus, type StatusStep } from '@/components/ui/status-stepper'
 
 interface Props {
   proyecto: Proyecto
@@ -223,7 +223,14 @@ export default function EstadoProyectoStepper({ proyecto, onUpdated, compact = f
   // Full stepper version with pills
   return (
     <div className="flex items-center gap-1 flex-wrap">
-      <div className="flex items-center overflow-x-auto">
+      {/* Celular: estado actual + "paso N de M"; tocando se despliegan los pasos para cambiarlo. */}
+      <PasoActualMovil
+        steps={steps}
+        onStepClick={handleEstadoChange}
+        disabled={loadingEstado !== null}
+        className="basis-full sm:hidden"
+      />
+      <div className="hidden sm:flex items-center overflow-x-auto">
         {steps.map((step, index) => (
           <React.Fragment key={step.key}>
             {index > 0 && <StepLine nextStatus={step.status} />}

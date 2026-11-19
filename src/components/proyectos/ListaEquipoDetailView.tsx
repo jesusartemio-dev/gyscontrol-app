@@ -206,23 +206,27 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
   return (
     <div className="space-y-4">
       {/* Header compacto */}
-      <div className="flex items-start justify-between gap-4 pb-3 border-b">
-        <div className="space-y-1">
+      {/* En celular: título, datos y acciones uno debajo del otro (antes el
+          título se partía en 3 líneas y los botones se salían de la pantalla). */}
+      <div className="flex flex-col gap-2 pb-3 border-b sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0 space-y-1">
           {/* Volver: lo pone la ruta del layout del proyecto (sube un nivel, a Listas). */}
 
           {/* Título con icono */}
-          <div className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-orange-600" />
-            <h1 className="text-lg font-semibold">{lista?.nombre || 'Lista de Equipos'}</h1>
-            {lista?.codigo && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-mono">
-                {lista.codigo}
-              </Badge>
-            )}
+          <div className="flex items-start gap-2">
+            <Package className="mt-0.5 h-5 w-5 shrink-0 text-orange-600" />
+            <h1 className="text-base font-semibold leading-snug sm:text-lg">
+              {lista?.nombre || 'Lista de Equipos'}
+              {lista?.codigo && (
+                <Badge variant="secondary" className="ml-2 align-middle text-[10px] px-1.5 py-0 font-mono whitespace-nowrap">
+                  {lista.codigo}
+                </Badge>
+              )}
+            </h1>
           </div>
 
           {/* Stats inline */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
             <Badge className={cn('text-[10px] px-1.5 py-0 font-normal', statusInfo.className)}>
               <StatusIcon className="h-2.5 w-2.5 mr-0.5" />
               {statusInfo.label}
@@ -251,7 +255,7 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
         </div>
 
         {/* Acciones */}
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           {/* Solo se muestra si esta lista es una parte (004B…); explica si no se puede unir. */}
           <UnirParteButton key={`unir-${versionDivision}`} listaId={listaId} proyectoId={proyectoId} />
           {lista && (lista.estado === 'borrador' || lista.estado === 'por_revisar') && items.length > 1 && (
@@ -277,8 +281,8 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
             className="h-7 text-xs"
             title="Copia el detalle listo para pegar en WhatsApp"
           >
-            <Copy className="h-3 w-3 mr-1" />
-            Copiar
+            <Copy className="h-3 w-3 sm:mr-1" />
+            <span className="hidden sm:inline">Copiar</span>
           </Button>
 
           <Button
@@ -287,8 +291,8 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
             onClick={handleCompartirWhatsApp}
             className="h-7 text-xs text-green-700 border-green-300 hover:bg-green-50"
           >
-            <MessageCircle className="h-3 w-3 mr-1" />
-            WhatsApp
+            <MessageCircle className="h-3 w-3 sm:mr-1" />
+            <span className="hidden sm:inline">WhatsApp</span>
           </Button>
 
           <Button
@@ -297,8 +301,8 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
             onClick={() => setIsEditModalOpen(true)}
             className="h-7 text-xs"
           >
-            <Edit className="h-3 w-3 mr-1" />
-            Editar
+            <Edit className="h-3 w-3 sm:mr-1" />
+            <span className="hidden sm:inline">Editar</span>
           </Button>
 
           {lista && (
