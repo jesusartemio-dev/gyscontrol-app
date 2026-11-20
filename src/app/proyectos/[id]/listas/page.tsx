@@ -8,7 +8,7 @@
 import { useEffect, useState, useMemo, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { getProyectoById } from '@/lib/services/proyecto';
-import { getListaEquiposPorProyecto, deleteListaEquipo, reordenarListasEquipo } from '@/lib/services/listaEquipo';
+import { getListaEquiposPorProyecto, reordenarListasEquipo } from '@/lib/services/listaEquipo';
 import {
   DndContext,
   closestCenter,
@@ -31,16 +31,6 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
   ArrowLeft,
   List,
   Search,
@@ -54,7 +44,6 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  ShoppingCart,
   GripVertical,
   AlignJustify,
 } from 'lucide-react';
@@ -83,6 +72,8 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import ModalCrearListaEquipo from '@/components/equipos/ModalCrearListaEquipo';
 import { BarraAvance } from '@/components/shared/BarraAvance';
+import { useDeleteWithValidation } from '@/hooks/useDeleteWithValidation';
+import { DeleteWithValidationDialog } from '@/components/DeleteWithValidationDialog';
 import { abreviarNombre } from '@/lib/utils';
 import type { Proyecto } from '@/types';
 
@@ -232,17 +223,27 @@ function CeldaNombreYGrupos({ lista }: { lista: any }) {
 const ListasTable = memo(function ListasTable({
   listas,
   proyectoId,
-  onDelete,
   onRefresh,
   loading
 }: {
   listas: any[];
   proyectoId: string;
-  onDelete: (lista: any) => void;
   onRefresh: () => void;
   loading: boolean;
 }) {
   const router = useRouter();
+  // El mismo flujo que pedidos: antes de confirmar se consulta /api/can-delete
+  // y el diálogo dice por qué no se puede, en vez de dejar al usuario confirmar
+  // un borrado que el servidor va a rechazar con un "Error al eliminar" pelado.
+  const deleteValidation = useDeleteWithValidation({
+    entity: 'listaEquipo',
+    deleteEndpoint: (id) => `/api/lista-equipo/${id}`,
+    onSuccess: () => {
+      toast.success('Lista eliminada');
+      onRefresh();
+    },
+    onError: (error) => toast.error(error),
+  });
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState('all');
   const [sortField, setSortField] = useState<string>('createdAt');
@@ -568,7 +569,7 @@ const ListasTable = memo(function ListasTable({
                     {getEstadoBadge(lista.estado)}
                   </TableCell>
                   <TableCell className="py-2" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -577,14 +578,18 @@ const ListasTable = memo(function ListasTable({
                       >
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => onDelete(lista)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      {/* Solo en borrador: es lo único que el servidor permite
+                          borrar, y además bloquea si hay pedidos u OCs. */}
+                      {lista.estado === 'borrador' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => deleteValidation.requestDelete(lista.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                     </>)}
@@ -619,7 +624,7 @@ const ListasTable = memo(function ListasTable({
                     {getEstadoBadge(lista.estado)}
                   </TableCell>
                   <TableCell className="py-2" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -628,14 +633,18 @@ const ListasTable = memo(function ListasTable({
                       >
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => onDelete(lista)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      {/* Solo en borrador: es lo único que el servidor permite
+                          borrar, y además bloquea si hay pedidos u OCs. */}
+                      {lista.estado === 'borrador' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => deleteValidation.requestDelete(lista.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -645,6 +654,19 @@ const ListasTable = memo(function ListasTable({
         </Table>
         )}
       </div>
+
+      <DeleteWithValidationDialog
+        open={deleteValidation.dialogOpen}
+        onOpenChange={(open) => !open && deleteValidation.cancelDelete()}
+        checking={deleteValidation.checking}
+        deleting={deleteValidation.deleting}
+        allowed={deleteValidation.canDeleteResult?.allowed ?? null}
+        blockers={deleteValidation.canDeleteResult?.blockers ?? []}
+        message={deleteValidation.canDeleteResult?.message ?? ''}
+        onConfirm={deleteValidation.confirmDelete}
+        onCancel={deleteValidation.cancelDelete}
+        entityLabel="lista"
+      />
     </div>
   );
 });
@@ -655,8 +677,6 @@ export default function EquipmentListsPage({ params }: PageProps) {
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [listas, setListas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [listaToDelete, setListaToDelete] = useState<{ id: string; nombre: string; codigo?: string } | null>(null);
 
   useEffect(() => {
     params.then(p => setProyectoId(p.id));
@@ -685,30 +705,6 @@ export default function EquipmentListsPage({ params }: PageProps) {
   useEffect(() => {
     if (proyectoId) fetchData();
   }, [proyectoId]);
-
-  const handleDeleteClick = (lista: any) => {
-    setListaToDelete({ id: lista.id, nombre: lista.nombre, codigo: lista.codigo });
-    setDeleteDialogOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!listaToDelete) return;
-
-    try {
-      const success = await deleteListaEquipo(listaToDelete.id);
-      if (success) {
-        toast.success('Lista eliminada');
-        fetchData();
-      } else {
-        toast.error('Error al eliminar');
-      }
-    } catch (error) {
-      toast.error('Error al eliminar');
-    } finally {
-      setDeleteDialogOpen(false);
-      setListaToDelete(null);
-    }
-  };
 
   if (loading && !proyecto) return <LoadingSkeleton />;
 
@@ -749,47 +745,9 @@ export default function EquipmentListsPage({ params }: PageProps) {
       <ListasTable
         listas={listas}
         proyectoId={proyectoId}
-        onDelete={handleDeleteClick}
         onRefresh={fetchData}
         loading={loading}
       />
-
-      {/* Modal de confirmación de eliminación */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Trash2 className="h-5 w-5 text-red-600" />
-              Eliminar Lista de Equipos
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="text-muted-foreground text-sm space-y-2">
-                <span>¿Estás seguro de que deseas eliminar esta lista?</span>
-                {listaToDelete && (
-                  <div className="bg-muted/50 rounded-md p-3 mt-2">
-                    <span className="font-medium text-foreground block">{listaToDelete.nombre}</span>
-                    {listaToDelete.codigo && (
-                      <span className="text-xs text-muted-foreground font-mono block">{listaToDelete.codigo}</span>
-                    )}
-                  </div>
-                )}
-                <span className="text-red-600 text-sm font-medium mt-2 block">
-                  Esta acción no se puede deshacer.
-                </span>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="h-9">Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="h-9 bg-red-600 hover:bg-red-700 text-white"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
