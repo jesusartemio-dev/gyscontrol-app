@@ -500,7 +500,7 @@ const PedidosTable = memo(function PedidosTable({
                   >
                     {(dragHandle) => (<>
                     {dragHandle}
-                    <TableCell className="font-mono text-xs text-muted-foreground py-2">
+                    <TableCell className="font-mono text-xs text-muted-foreground py-2 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         {pedido.codigo || '-'}
                         {(pedido as any).esUrgente && (
@@ -604,7 +604,7 @@ const PedidosTable = memo(function PedidosTable({
                     className="group cursor-pointer hover:bg-muted/50"
                     onClick={() => router.push(`/proyectos/${proyectoId}/pedidos/${pedido.id}`)}
                   >
-                    <TableCell className="font-mono text-xs text-muted-foreground py-2">
+                    <TableCell className="font-mono text-xs text-muted-foreground py-2 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         {pedido.codigo || '-'}
                         {(pedido as any).esUrgente && (

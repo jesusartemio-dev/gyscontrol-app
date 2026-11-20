@@ -132,6 +132,56 @@ function SortableListaRow({ lista, disabled, onClick, children }: {
   );
 }
 
+/**
+ * Los grupos de equipo cotizado de los que salen los ítems de la lista, sin
+ * repetir. Un mismo grupo aparece en muchos ítems y la lista puede juntar
+ * varios, así que se deduplica por id.
+ */
+function gruposCotizados(lista: any): string[] {
+  return [...new Map<string, string>(
+    (lista.items || [])
+      .filter((i: any) => i.proyectoEquipoCotizado || i.proyectoEquipoItem?.proyectoEquipoCotizado)
+      .map((i: any) => {
+        const grupo = i.proyectoEquipoCotizado || i.proyectoEquipoItem?.proyectoEquipoCotizado;
+        return [grupo.id as string, grupo.nombre as string];
+      })
+  ).values()];
+}
+
+/** El código en su propia columna, igual que en la tabla de pedidos. */
+function CeldaCodigo({ codigo }: { codigo?: string | null }) {
+  return (
+    <TableCell className="font-mono text-xs text-muted-foreground py-2 whitespace-nowrap">
+      {codigo || '-'}
+    </TableCell>
+  );
+}
+
+/** Nombre de la lista arriba y los grupos cotizados debajo, como "Nombre / Proveedor" en pedidos. */
+function CeldaNombreYGrupos({ lista }: { lista: any }) {
+  const grupos = gruposCotizados(lista);
+  return (
+    <TableCell className="py-2">
+      <div>
+        <span className="text-sm font-medium line-clamp-2 block" title={lista.nombre ?? undefined}>
+          {lista.nombre}
+        </span>
+        {grupos.length > 0 ? (
+          <div className="flex flex-wrap gap-1 mt-0.5">
+            {grupos.map((nombre, idx) => (
+              <Badge key={idx} variant="outline" className="text-[10px] px-1.5 py-0 font-normal whitespace-nowrap">
+                {nombre}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <span className="text-xs text-muted-foreground">Sin equipo cotizado</span>
+        )}
+      </div>
+    </TableCell>
+  );
+}
+
 // Componente de tabla de listas
 const ListasTable = memo(function ListasTable({
   listas,
@@ -380,15 +430,26 @@ const ListasTable = memo(function ListasTable({
           <TableHeader className={CABECERA_FIJA}>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
               {canDrag && <TableHead className="w-6 p-0" />}
-              <TableHead className="w-[25%]">
+              {/* Mismo arranque que la tabla de pedidos: el código solo, en su
+                  propia columna y en una línea. Antes iba debajo del nombre en
+                  letra de 10 px y se partía. */}
+              <TableHead className="w-[120px]">
+                <button
+                  onClick={() => handleSort('codigo')}
+                  className="flex items-center text-xs font-medium"
+                >
+                  Código<SortIcon field="codigo" />
+                </button>
+              </TableHead>
+              {/* Sin ancho mínimo, las columnas de ancho fijo la aprietan. */}
+              <TableHead className="min-w-[220px]">
                 <button
                   onClick={() => handleSort('nombre')}
                   className="flex items-center text-xs font-medium"
                 >
-                  Nombre<SortIcon field="nombre" />
+                  Nombre / Equipo Cot.<SortIcon field="nombre" />
                 </button>
               </TableHead>
-              <TableHead className="w-[25%] text-xs font-medium">Equipos Cotizados</TableHead>
               <TableHead className="w-[80px] text-right">
                 <button
                   onClick={() => handleSort('totalItems')}
@@ -439,35 +500,8 @@ const ListasTable = memo(function ListasTable({
                     >
                       {(dragHandle) => (<>
                       {dragHandle}
-                  <TableCell className="py-2">
-                    <div>
-                      <span className="text-xs font-medium line-clamp-2">{lista.nombre}</span>
-                      <span className="font-mono text-[10px] text-muted-foreground block">{lista.codigo || '-'}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="py-2">
-                    {(() => {
-                      const grupos = [...new Map<string, string>(
-                        (lista.items || [])
-                          .filter((i: any) => i.proyectoEquipoCotizado || i.proyectoEquipoItem?.proyectoEquipoCotizado)
-                          .map((i: any) => {
-                            const grupo = i.proyectoEquipoCotizado || i.proyectoEquipoItem?.proyectoEquipoCotizado;
-                            return [grupo.id as string, grupo.nombre as string];
-                          })
-                      ).values()];
-                      return grupos.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {grupos.map((nombre, idx) => (
-                            <Badge key={idx} variant="outline" className="text-[10px] px-1.5 py-0 font-normal whitespace-nowrap">
-                              {nombre}
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      );
-                    })()}
-                  </TableCell>
+                  <CeldaCodigo codigo={lista.codigo} />
+                  <CeldaNombreYGrupos lista={lista} />
                   <TableCell className="text-right font-mono text-sm py-2">
                     {lista.totalItems || lista.items?.length || 0}
                   </TableCell>
@@ -536,35 +570,8 @@ const ListasTable = memo(function ListasTable({
                   className="group cursor-pointer hover:bg-muted/50"
                   onClick={() => router.push(`/proyectos/${proyectoId}/listas/${lista.id}`)}
                 >
-                  <TableCell className="py-2">
-                    <div>
-                      <span className="text-xs font-medium line-clamp-2">{lista.nombre}</span>
-                      <span className="font-mono text-[10px] text-muted-foreground block">{lista.codigo || '-'}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="py-2">
-                    {(() => {
-                      const grupos = [...new Map<string, string>(
-                        (lista.items || [])
-                          .filter((i: any) => i.proyectoEquipoCotizado || i.proyectoEquipoItem?.proyectoEquipoCotizado)
-                          .map((i: any) => {
-                            const grupo = i.proyectoEquipoCotizado || i.proyectoEquipoItem?.proyectoEquipoCotizado;
-                            return [grupo.id as string, grupo.nombre as string];
-                          })
-                      ).values()];
-                      return grupos.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {grupos.map((nombre, idx) => (
-                            <Badge key={idx} variant="outline" className="text-[10px] px-1.5 py-0 font-normal whitespace-nowrap">
-                              {nombre}
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      );
-                    })()}
-                  </TableCell>
+                  <CeldaCodigo codigo={lista.codigo} />
+                  <CeldaNombreYGrupos lista={lista} />
                   <TableCell className="text-right font-mono text-sm py-2">
                     {lista.totalItems || lista.items?.length || 0}
                   </TableCell>
