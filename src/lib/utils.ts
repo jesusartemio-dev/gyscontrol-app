@@ -31,6 +31,38 @@ export const formatDate = (date: Date | string): string => {
   }).format(utcDate)
 }
 
+/** Zona horaria de la operación. Todo lo que lleva hora se muestra en esta. */
+export const ZONA_HORARIA = 'America/Lima'
+
+/**
+ * Para instantes reales (`createdAt`, la fecha de un evento del historial), a
+ * diferencia de `formatDate`, que es para campos de solo fecha.
+ *
+ * `formatDate` lee los componentes UTC a propósito: así una `fechaNecesaria`
+ * guardada como medianoche UTC se muestra el día que se eligió. Pero aplicada a
+ * un instante corre el día: un pedido hecho a las 8:54 p.m. de Lima es 01:54
+ * UTC del día siguiente, y el historial lo mostraba con la fecha de mañana.
+ */
+export const formatFechaHora = (date: Date | string, conHora = true): string => {
+  const d = typeof date === 'string' ? new Date(date) : date
+  if (Number.isNaN(d.getTime())) return '—'
+  return new Intl.DateTimeFormat('es-PE', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    ...(conHora ? { hour: '2-digit', minute: '2-digit' } : {}),
+    timeZone: ZONA_HORARIA,
+  }).format(d)
+}
+
+/** El día de hoy en Lima, guardado como medianoche UTC igual que los selectores de fecha. */
+export const hoyComoFechaSola = (): Date => {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric', month: '2-digit', day: '2-digit', timeZone: ZONA_HORARIA,
+  }).format(new Date())
+  return new Date(`${partes}T00:00:00.000Z`)
+}
+
 // 📅 Date parsing utilities for date-only values (timezone-safe)
 export const parseDateOnly = (dateString: string): Date => {
   // For date-only strings like "2025-10-15", append UTC time to avoid timezone conversion

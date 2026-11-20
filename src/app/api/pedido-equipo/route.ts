@@ -14,6 +14,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { registrarCreacion } from '@/lib/services/audit'
 import { randomUUID } from 'crypto'
+import { hoyComoFechaSola } from '@/lib/utils'
 
 // ✅ Obtener todos los pedidos con filtros avanzados
 export async function GET(request: Request) {
@@ -374,7 +375,8 @@ export async function POST(request: Request) {
           observacion: body.observacion ?? '',
           prioridad: body.prioridad || 'media',
           esUrgente: body.esUrgente || false,
-          fechaPedido: body.fechaPedido ? new Date(body.fechaPedido) : now,
+          // Campo de día, no instante: ver la nota en desde-lista/route.ts.
+          fechaPedido: body.fechaPedido ? new Date(body.fechaPedido) : hoyComoFechaSola(),
           fechaNecesaria: new Date(body.fechaNecesaria),
           fechaEntregaEstimada: body.fechaEntregaEstimada ? new Date(body.fechaEntregaEstimada) : null,
           fechaEntregaReal: body.fechaEntregaReal ? new Date(body.fechaEntregaReal) : null,
@@ -509,7 +511,8 @@ export async function POST(request: Request) {
             pedidoEquipoId: pedido.id,
             tipo: 'pedido_urgente' as const,
             descripcion: `Pedido urgente creado en borrador. Motivo: ${body.observacion || 'No especificado'}. Pendiente de agregar ítems.`,
-            usuarioId: body.responsableId,
+            // Quién hizo la acción, no a quién se le asignó el pedido.
+            usuarioId: session.user.id ?? body.responsableId,
             metadata: { esUrgente: true, itemCount: itemsCreados },
             updatedAt: now,
           },

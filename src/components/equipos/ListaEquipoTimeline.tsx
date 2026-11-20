@@ -7,7 +7,7 @@ import {
   History, ChevronDown, ShoppingCart, Warehouse, Package, PackageCheck, X, RefreshCw,
   Activity, FileCheck, Send, ArrowLeftRight, CheckCircle2, Ban, DollarSign, FileX, Sparkles,
 } from 'lucide-react'
-import { cn, formatDate } from '@/lib/utils'
+import { cn, formatFechaHora } from '@/lib/utils'
 
 interface Evento {
   id: string
@@ -142,7 +142,7 @@ export default function ListaEquipoTimeline({
                             <strong>{row.eventos.length} cotizaciones seleccionadas</strong>
                           </p>
                           <p className="text-muted-foreground text-[10px]">
-                            {formatDate(row.fecha)} • {row.usuario}
+                            {formatFechaHora(row.fecha)} • {row.usuario}
                           </p>
                         </div>
                         <ChevronDown className={cn('h-3 w-3 text-gray-400 transition-transform', open && 'rotate-180')} />
@@ -154,7 +154,7 @@ export default function ListaEquipoTimeline({
                               <Icon className={cn('h-3 w-3 flex-shrink-0 mt-0.5 opacity-70', color)} />
                               <div className="flex-1 min-w-0">
                                 <p className="text-gray-600">{evento.descripcion}</p>
-                                <p className="text-muted-foreground text-[10px]">{formatDate(evento.fechaEvento)}</p>
+                                <p className="text-muted-foreground text-[10px]">{formatFechaHora(evento.fechaEvento)}</p>
                               </div>
                             </div>
                           ))}
@@ -171,7 +171,7 @@ export default function ListaEquipoTimeline({
                     <div className="flex-1 min-w-0">
                       <p className="text-gray-700">{evento.descripcion}</p>
                       <p className="text-muted-foreground text-[10px]">
-                        {formatDate(evento.fechaEvento)} • {evento.user?.name ?? 'Sistema'}
+                        {formatFechaHora(evento.fechaEvento)} • {evento.user?.name ?? 'Sistema'}
                       </p>
                     </div>
                   </div>

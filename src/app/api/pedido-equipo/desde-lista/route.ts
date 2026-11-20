@@ -8,16 +8,21 @@
 // ===================================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import logger from '@/lib/logger'
 import { PedidoEquipoPayload } from '@/types'
 import { randomUUID } from 'crypto'
 import { notificarPorRol } from '@/lib/utils/notificaciones'
 import { crearEvento } from '@/lib/utils/trazabilidad'
+import { hoyComoFechaSola } from '@/lib/utils'
 
 // POST - Crear pedido desde lista contextual
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    const usuarioSesionId = (session?.user as { id?: string } | undefined)?.id
     const payload: PedidoEquipoPayload = await request.json()
     logger.info('Creando pedido desde lista contextual:', payload)
 
@@ -152,7 +157,12 @@ export async function POST(request: NextRequest) {
           numeroSecuencia: nuevoNumero,
           estado: 'borrador',
           observacion: payload.observacion || '',
-          fechaNecesaria: payload.fechaNecesaria ? new Date(payload.fechaNecesaria) : new Date(),
+          // fechaPedido es un campo de día, no un instante: se guarda como
+          // medianoche UTC igual que las fechas que vienen del selector. Con el
+          // `now()` por defecto de Prisma, un pedido hecho de noche en Lima
+          // quedaba con la fecha del día siguiente.
+          fechaPedido: payload.fechaPedido ? new Date(payload.fechaPedido) : hoyComoFechaSola(),
+          fechaNecesaria: payload.fechaNecesaria ? new Date(payload.fechaNecesaria) : hoyComoFechaSola(),
           prioridad: payload.prioridad || 'media',
           esUrgente: payload.esUrgente || false,
           presupuestoTotal: costoTotal,
@@ -252,7 +262,10 @@ export async function POST(request: NextRequest) {
       pedidoEquipoId: resultado.pedido.id,
       tipo: 'pedido_creado',
       descripcion: `Pedido ${codigoGenerado} creado con ${resultado.items.length} items desde lista`,
-      usuarioId: payload.responsableId,
+      // Quién hizo la acción, no a quién se le asignó el pedido. Usar el
+      // responsable hacía que el historial dijera que el pedido lo creó el
+      // responsable de la lista, aunque lo hubiera creado otra persona.
+      usuarioId: usuarioSesionId ?? payload.responsableId,
       metadata: {
         pedidoCodigo: codigoGenerado,
         proyectoCodigo: proyecto.codigo,
