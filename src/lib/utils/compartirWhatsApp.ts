@@ -67,20 +67,25 @@ interface OpcionesMensaje {
   icono: string
   codigo: string
   nombre?: string | null
-  proyecto: string
+  /**
+   * La línea que ubica el documento. Es el proyecto en un pedido o lista de
+   * obra, y el centro de costo en un pedido interno de gastos, que no tiene
+   * proyecto.
+   */
+  contexto: { etiqueta: string; valor: string }
   estado: string
-  /** Líneas extra de cabecera, ej. "Necesario: 15/11/2026". */
+  /** Líneas extra de cabecera, ej. "Requerido: 15/11/2026". */
   extras?: string[]
   items: ItemCompartible[]
   url: string
 }
 
-function construirMensaje({ icono, codigo, nombre, proyecto, estado, extras = [], items, url }: OpcionesMensaje): string {
+function construirMensaje({ icono, codigo, nombre, contexto, estado, extras = [], items, url }: OpcionesMensaje): string {
   const titulo = nombre?.trim() ? `${icono} *${codigo}* — ${nombre.trim()}` : `${icono} *${codigo}*`
 
   const cabecera = [
     titulo,
-    `Proyecto: ${proyecto}`,
+    ...(contexto.valor?.trim() ? [`${contexto.etiqueta}: ${contexto.valor.trim()}`] : []),
     `Estado: ${estado} | ${items.length} ítem(s)`,
     ...extras,
   ]

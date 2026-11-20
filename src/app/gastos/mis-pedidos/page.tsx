@@ -34,14 +34,31 @@ const PRIORIDADES = [
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(amount)
 
+// timeZone UTC a propósito: las fechas son campos de día guardados como
+// medianoche UTC; sin esto en Lima se leen como el día anterior.
 const formatDate = (date: string) =>
-  new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+  new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
+
+// Los pedidos internos comparten los estados de PedidoEquipo. `en_proceso` y
+// `completado` no existen; los reales son aprobado, atendido, parcial y
+// entregado, que caían al color gris por defecto.
+const ESTADO_LABELS: Record<string, string> = {
+  borrador: 'Borrador',
+  enviado: 'Enviado',
+  aprobado: 'Aprobado',
+  atendido: 'Atendido',
+  parcial: 'Parcial',
+  entregado: 'Entregado',
+  cancelado: 'Cancelado',
+}
 
 const estadoColor: Record<string, string> = {
   borrador: 'bg-gray-100 text-gray-700',
   enviado: 'bg-blue-100 text-blue-700',
-  en_proceso: 'bg-amber-100 text-amber-700',
-  completado: 'bg-green-100 text-green-700',
+  aprobado: 'bg-indigo-100 text-indigo-700',
+  atendido: 'bg-amber-100 text-amber-700',
+  parcial: 'bg-amber-100 text-amber-700',
+  entregado: 'bg-green-100 text-green-700',
   cancelado: 'bg-red-100 text-red-700',
 }
 
@@ -209,7 +226,7 @@ export default function MisPedidosPage() {
                     </TableCell>
                     <TableCell>
                       <Badge className={`text-xs border-0 ${estadoColor[pedido.estado] ?? 'bg-gray-100 text-gray-700'}`}>
-                        {pedido.estado}
+                        {ESTADO_LABELS[pedido.estado] ?? pedido.estado}
                       </Badge>
                     </TableCell>
                     <TableCell>

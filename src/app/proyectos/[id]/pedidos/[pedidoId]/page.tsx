@@ -448,7 +448,7 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
     return mensajeCompartirPedido({
       codigo: pedido.codigo,
       nombre: (pedido as any).nombre,
-      proyecto: proyecto.nombre,
+      contexto: { etiqueta: 'Proyecto', valor: proyecto.nombre },
       estado: ESTADO_LABELS[pedido.estado || ''] ?? pedido.estado ?? '',
       // Para quien lo recibe en el grupo de obra, la fecha requerida es el dato
       // que decide si tiene que moverse hoy: va en la cabecera, no en el enlace.

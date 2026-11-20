@@ -147,9 +147,9 @@ const ListaEquipoDetailView: React.FC<ListaEquipoDetailViewProps> = ({
     return mensajeCompartirLista({
       codigo: lista.codigo,
       nombre: lista.nombre,
-      proyecto: proyecto.nombre,
+      contexto: { etiqueta: 'Proyecto', valor: proyecto.nombre },
       estado: statusConfig[lista.estado || 'borrador']?.label ?? lista.estado ?? '',
-      extras: lista.fechaNecesaria ? [`Necesario: ${formatDate(lista.fechaNecesaria)}`] : [],
+      extras: lista.fechaNecesaria ? [`Requerido: ${formatDate(lista.fechaNecesaria)}`] : [],
       items: items.map(i => ({
         codigo: i.codigo,
         descripcion: i.descripcion,

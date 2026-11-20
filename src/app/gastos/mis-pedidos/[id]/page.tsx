@@ -19,6 +19,7 @@ import { getPedidoInternoById, deletePedidoInterno, type PedidoInterno, type Ped
 import { getCentrosCosto } from '@/lib/services/centroCosto'
 import type { CentroCosto } from '@/types'
 import PedidoEstadoFlujoBanner from '@/components/equipos/PedidoEstadoFlujoBanner'
+import { mensajeCompartirPedido } from '@/lib/utils/compartirWhatsApp'
 
 const UNIDADES = ['und', 'par', 'm', 'm²', 'm³', 'kg', 'lt', 'caja', 'bolsa', 'rollo', 'juego', 'set']
 
@@ -100,14 +101,31 @@ const ITEM_VACIO: ItemDraft = {
 const formatCurrency = (amount: number, moneda: string = 'PEN') =>
   new Intl.NumberFormat('es-PE', { style: 'currency', currency: moneda }).format(amount)
 
+// timeZone UTC a propósito: fechaNecesaria es un campo de día guardado como
+// medianoche UTC. Sin esto, en Lima (UTC-5) se leía como las 7 p.m. del día
+// anterior y la pantalla mostraba un día menos.
 const formatDate = (date: string) =>
-  new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' })
+  new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' })
+
+// Los pedidos internos comparten los estados de PedidoEquipo: en producción hay
+// entregado, parcial, aprobado y cancelado, no los de `estadoColor` de abajo.
+const ESTADO_LABELS: Record<string, string> = {
+  borrador: 'Borrador',
+  enviado: 'Enviado',
+  aprobado: 'Aprobado',
+  atendido: 'Atendido',
+  parcial: 'Parcial',
+  entregado: 'Entregado',
+  cancelado: 'Cancelado',
+}
 
 const estadoColor: Record<string, string> = {
   borrador: 'bg-gray-100 text-gray-700',
   enviado: 'bg-blue-100 text-blue-700',
-  en_proceso: 'bg-amber-100 text-amber-700',
-  completado: 'bg-green-100 text-green-700',
+  aprobado: 'bg-indigo-100 text-indigo-700',
+  atendido: 'bg-amber-100 text-amber-700',
+  parcial: 'bg-amber-100 text-amber-700',
+  entregado: 'bg-green-100 text-green-700',
   cancelado: 'bg-red-100 text-red-700',
 }
 
@@ -433,12 +451,27 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
 
   const buildShareText = useCallback(() => {
     if (!pedido) return ''
-    const url = window.location.href
-    const numItems = pedido.pedidoEquipoItem?.length ?? 0
-    const nombre = pedido.nombre ? ` — ${pedido.nombre}` : ''
-    const cc = pedido.centroCosto?.nombre ?? ''
-    const solicitante = pedido.user?.name ?? ''
-    return `📦 *${pedido.codigo}*${nombre}\nCentro de costo: ${cc}\nSolicitante: ${solicitante}\nEstado: ${pedido.estado} | ${numItems} ítem(s)\n🔗 ${url}`
+    // Mismo formato que los pedidos de proyecto: el mensaje lleva el detalle
+    // de lo que se pide, no solo el conteo. Quien lo recibe en el chat tenía
+    // que abrir el enlace para saber de qué se trataba.
+    const solicitante = pedido.user?.name
+    return mensajeCompartirPedido({
+      codigo: pedido.codigo,
+      nombre: pedido.nombre,
+      contexto: { etiqueta: 'Centro de costo', valor: pedido.centroCosto?.nombre ?? '' },
+      estado: ESTADO_LABELS[pedido.estado] ?? pedido.estado,
+      extras: [
+        ...(solicitante ? [`Solicitante: ${solicitante}`] : []),
+        ...(pedido.fechaNecesaria ? [`Requerido: ${formatDate(pedido.fechaNecesaria)}`] : []),
+      ],
+      items: (pedido.pedidoEquipoItem ?? []).map(i => ({
+        codigo: i.codigo,
+        descripcion: i.descripcion,
+        cantidad: i.cantidadPedida,
+        unidad: i.unidad,
+      })),
+      url: window.location.href,
+    })
   }, [pedido])
 
   const handleCopiarEnlace = useCallback(() => {
@@ -505,7 +538,7 @@ export default function DetallePedidoInternoPage({ params }: { params: Promise<{
               </Badge>
             )}
             <Badge className={`border-0 text-xs ${estadoColor[pedido.estado] ?? 'bg-gray-100 text-gray-700'}`}>
-              {pedido.estado}
+              {ESTADO_LABELS[pedido.estado] ?? pedido.estado}
             </Badge>
             {pedido.prioridad && (
               <Badge className={`border-0 text-xs capitalize ${prioridadColor[pedido.prioridad] ?? ''}`}>
