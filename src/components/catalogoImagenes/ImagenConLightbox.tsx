@@ -52,7 +52,14 @@ export function ImagenConLightbox({ src, alt, alturaClase = 'h-40', className = 
             // El botón de cerrar del Dialog queda sobre la imagen (sin padding
             // que lo separe), así que necesita su propio fondo para leerse
             // tanto sobre un diagrama blanco como sobre una foto oscura.
-            className="max-w-[96vw] sm:max-w-[96vw] w-[96vw] h-[94vh] p-0 gap-0 bg-black/95 border-0 rounded-md overflow-hidden
+            // grid-rows-[minmax(0,1fr)] es lo que hace que la imagen entre
+            // entera. DialogContent es un grid cuyas filas son `auto`: sin
+            // esto, el `h-full` del visor se resuelve contra una fila que a su
+            // vez se dimensiona por su contenido, así que la imagen salía a
+            // tamaño natural, desbordaba los 94vh y overflow-hidden la cortaba.
+            // El `minmax(0,...)` es imprescindible — un `1fr` pelado tiene
+            // mínimo min-content y vuelve a crecer con la imagen.
+            className="max-w-[96vw] sm:max-w-[96vw] w-[96vw] h-[94vh] grid-rows-[minmax(0,1fr)] p-0 gap-0 bg-black/95 border-0 rounded-md overflow-hidden
               [&>button:last-child]:z-10 [&>button:last-child]:rounded-full [&>button:last-child]:bg-black/60
               [&>button:last-child]:p-1.5 [&>button:last-child]:text-white [&>button:last-child]:opacity-100
               [&>button:last-child]:hover:bg-black/80"
@@ -96,10 +103,16 @@ function VisorConZoom({ src, alt }: { src: string; alt: string }) {
     setEscalaAjuste(Math.min(cont.clientWidth / img.naturalWidth, cont.clientHeight / img.naturalHeight, 1))
   }, [])
 
+  // ResizeObserver y no solo `window.resize`: el contenedor también cambia de
+  // tamaño al montarse el modal, antes de que la ventana dispare nada, y de
+  // esa primera medición depende que el porcentaje arranque bien.
   useEffect(() => {
     medir()
-    window.addEventListener('resize', medir)
-    return () => window.removeEventListener('resize', medir)
+    const cont = contenedorRef.current
+    if (!cont || typeof ResizeObserver === 'undefined') return
+    const obs = new ResizeObserver(medir)
+    obs.observe(cont)
+    return () => obs.disconnect()
   }, [medir])
 
   /**
@@ -254,7 +267,12 @@ function VisorConZoom({ src, alt }: { src: string; alt: string }) {
         <Boton onClick={() => zoomHacia(escala / PASO_BOTON)} titulo="Alejar (−)" desactivado={escala <= ESCALA_MIN}>
           <Minus className="h-4 w-4" />
         </Boton>
-        <span className="w-16 text-center text-xs tabular-nums text-white/70">{porcentaje}%</span>
+        {/* "Ajustado" y no el porcentaje: al abrir una imagen grande el
+            indicador decía "48%", que se lee como si la imagen estuviera
+            recortada cuando es justo al revés — se ve entera. */}
+        <span className="w-20 text-center text-xs tabular-nums text-white/70">
+          {escala === ESCALA_MIN ? 'Ajustado' : `${porcentaje}%`}
+        </span>
         <Boton onClick={() => zoomHacia(escala * PASO_BOTON)} titulo="Acercar (+)" desactivado={escala >= ESCALA_MAX}>
           <Plus className="h-4 w-4" />
         </Boton>
