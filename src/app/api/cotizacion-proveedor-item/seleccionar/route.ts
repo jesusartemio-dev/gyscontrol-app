@@ -13,6 +13,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { propagarPrecioLogisticaCatalogo } from '@/lib/services/catalogoPrecioSync'
+import { aUsd, FaltaTipoCambioError } from '@/lib/services/precioCotizacionProveedor'
 
 export async function POST(request: Request) {
   try {
@@ -46,6 +47,19 @@ export async function POST(request: Request) {
       )
     }
 
+    // La lista va en USD; el proveedor pudo cotizar en soles o euros.
+    let precioUsd: number
+    let costoUsd: number
+    try {
+      precioUsd = aUsd(cotizacionItem.precioUnitario, cotizacionItem.cotizacionProveedor)
+      costoUsd = aUsd(cotizacionItem.costoTotal, cotizacionItem.cotizacionProveedor)
+    } catch (e) {
+      if (e instanceof FaltaTipoCambioError) {
+        return NextResponse.json({ error: e.message }, { status: 400 })
+      }
+      throw e
+    }
+
     // Transacción para actualizar la selección y copiar precios
     await prisma.$transaction(async (tx) => {
       // Desmarcar todas las cotizaciones del ítem como no seleccionadas
@@ -75,8 +89,8 @@ export async function POST(request: Request) {
         },
         data: {
           cotizacionSeleccionadaId: cotizacionProveedorItemId,
-          precioElegido: cotizacionItem.precioUnitario,
-          costoElegido: cotizacionItem.costoTotal,
+          precioElegido: precioUsd,
+          costoElegido: costoUsd,
           tiempoEntrega: cotizacionItem.tiempoEntrega,
           tiempoEntregaDias: cotizacionItem.tiempoEntregaDias,
           proveedorId: cotizacionItem.cotizacionProveedor?.proveedorId || undefined,
@@ -93,9 +107,15 @@ export async function POST(request: Request) {
     if (listaItem?.catalogoEquipoId && cotizacionItem.precioUnitario != null) {
       propagarPrecioLogisticaCatalogo({
         catalogoEquipoId: listaItem.catalogoEquipoId,
-        precioLogistica: Math.round(cotizacionItem.precioUnitario * 100) / 100,
+        precioLogistica: Math.round(precioUsd * 100) / 100,
         userId,
-        metadata: { origen: 'cotizacion-proveedor-seleccionar', listaEquipoItemId },
+        metadata: {
+          origen: 'cotizacion-proveedor-seleccionar',
+          listaEquipoItemId,
+          monedaOriginal: cotizacionItem.cotizacionProveedor?.moneda ?? 'USD',
+          precioOriginal: cotizacionItem.precioUnitario,
+          tipoCambioUsado: cotizacionItem.cotizacionProveedor?.tipoCambio ?? null,
+        },
       }).catch(err => console.error('Error propagating precioLogistica:', err))
     }
 

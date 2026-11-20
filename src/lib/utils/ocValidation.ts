@@ -109,25 +109,48 @@ export function clasificarOC(oc: OCVinculada | null): 'bloqueada' | 'editable' |
  * Actualiza los items y totales de una OC en borrador cuando cambia el precio.
  * Recalcula subtotal, igv (según oc.aplicaIgv), total.
  * Retorna si hubo cambio de proveedor (para warning).
+ *
+ * `nuevoPrecioUnitarioUsd` va en USD, que es la moneda en que se guardan las
+ * listas y los pedidos. La OC, en cambio, se emite en la moneda del proveedor,
+ * así que acá se convierte de vuelta usando `tipoCambioUsd` (cuántos soles por
+ * dólar, el mismo de la cotización). Sin tipo de cambio no se toca el precio:
+ * mejor dejar la OC como estaba que escribirle dólares diciendo que son soles.
  */
 export async function actualizarOCBorrador(
   oc: OCVinculada,
-  nuevoPrecioUnitario: number,
+  nuevoPrecioUnitarioUsd: number,
   nuevoProveedorId: string | null,
-  tx?: PrismaLike
-): Promise<{ warningProveedor: boolean; ocNumero: string }> {
+  tx?: PrismaLike,
+  tipoCambioUsd?: number | null
+): Promise<{ warningProveedor: boolean; ocNumero: string; precioNoAplicado?: boolean }> {
   const db = (tx || prisma) as any
 
+  const ocEnUsd = (oc.ocMoneda || 'USD') === 'USD'
+  // El precio tal como debe quedar escrito en la OC, en su propia moneda.
+  let precioOc = nuevoPrecioUnitarioUsd
+  let precioNoAplicado = false
+  if (!ocEnUsd && nuevoPrecioUnitarioUsd !== 0) {
+    if (tipoCambioUsd && tipoCambioUsd > 0) {
+      precioOc = oc.ocMoneda === 'EUR'
+        ? Math.round((nuevoPrecioUnitarioUsd / tipoCambioUsd) * 10000) / 10000
+        : Math.round((nuevoPrecioUnitarioUsd * tipoCambioUsd) * 10000) / 10000
+    } else {
+      precioNoAplicado = true
+    }
+  }
+
   // Actualizar cada OC item vinculado con el nuevo precio
-  for (const item of oc.items) {
-    await db.ordenCompraItem.update({
-      where: { id: item.id },
-      data: {
-        precioUnitario: nuevoPrecioUnitario,
-        costoTotal: item.cantidad * nuevoPrecioUnitario,
-        updatedAt: new Date(),
-      }
-    })
+  if (!precioNoAplicado) {
+    for (const item of oc.items) {
+      await db.ordenCompraItem.update({
+        where: { id: item.id },
+        data: {
+          precioUnitario: precioOc,
+          costoTotal: item.cantidad * precioOc,
+          updatedAt: new Date(),
+        }
+      })
+    }
   }
 
   // Recalcular totales de la OC completa
@@ -146,5 +169,5 @@ export async function actualizarOCBorrador(
 
   const warningProveedor = nuevoProveedorId !== null && nuevoProveedorId !== oc.ocProveedorId
 
-  return { warningProveedor, ocNumero: oc.ocNumero }
+  return { warningProveedor, ocNumero: oc.ocNumero, precioNoAplicado }
 }

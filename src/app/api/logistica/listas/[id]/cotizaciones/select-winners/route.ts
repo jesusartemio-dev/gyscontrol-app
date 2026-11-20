@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { propagarPrecioLogisticaCatalogo } from '@/lib/services/catalogoPrecioSync'
 import { checkOCVinculada, clasificarOC, actualizarOCBorrador } from '@/lib/utils/ocValidation'
 import { crearEvento } from '@/lib/utils/trazabilidad'
+import { aUsd } from '@/lib/services/precioCotizacionProveedor'
 
 export async function POST(
   request: NextRequest,
@@ -43,7 +44,7 @@ export async function POST(
       },
       include: {
         cotizacionProveedor: {
-          select: { proveedorId: true, proveedor: { select: { nombre: true } } }
+          select: { proveedorId: true, moneda: true, tipoCambio: true, proveedor: { select: { nombre: true } } }
         },
         listaEquipoItem: {
           select: { descripcion: true, listaId: true, precioElegido: true }
@@ -54,6 +55,25 @@ export async function POST(
     if (validQuotations.length !== quotationIds.length) {
       return NextResponse.json(
         { error: 'Una o más cotizaciones seleccionadas no son válidas' },
+        { status: 400 }
+      )
+    }
+
+    // Las listas llevan todo en USD. Si una cotización está en otra moneda y no
+    // trae tipo de cambio, no hay con qué convertirla: cortar acá antes de
+    // escribir nada, porque guardarla tal cual deja soles disfrazados de dólares.
+    const sinTipoCambio = validQuotations.filter(
+      q => (q.cotizacionProveedor?.moneda ?? 'USD') !== 'USD'
+        && !((q.cotizacionProveedor?.tipoCambio ?? 0) > 0)
+        && (q.precioUnitario ?? 0) > 0
+    )
+    if (sinTipoCambio.length > 0) {
+      return NextResponse.json(
+        {
+          error: `${sinTipoCambio.length} cotización(es) están en moneda extranjera sin tipo de cambio. ` +
+            `Define el tipo de cambio antes de seleccionarlas: ` +
+            sinTipoCambio.map(q => q.codigo).join(', '),
+        },
         { status: 400 }
       )
     }
@@ -119,7 +139,9 @@ export async function POST(
         const winnerQuotation = validQuotations.find(q => q.id === quotationId)
         if (winnerQuotation) {
           const proveedorId = winnerQuotation.cotizacionProveedor?.proveedorId ?? null
-          const precioUnitario = winnerQuotation.precioUnitario ?? 0
+          // El proveedor puede haber cotizado en soles o euros; la lista va en USD.
+          const precioUnitario = aUsd(winnerQuotation.precioUnitario, winnerQuotation.cotizacionProveedor)
+          const costoElegido = aUsd(winnerQuotation.costoTotal, winnerQuotation.cotizacionProveedor)
           const tiempoEntrega = winnerQuotation.tiempoEntrega || 'Stock'
           const tiempoEntregaDias = winnerQuotation.tiempoEntregaDias ?? 0
 
@@ -128,10 +150,10 @@ export async function POST(
             where: { id: itemId },
             data: {
               cotizacionSeleccionadaId: quotationId,
-              precioElegido: winnerQuotation.precioUnitario,
+              precioElegido: precioUnitario,
               tiempoEntrega: winnerQuotation.tiempoEntrega,
               tiempoEntregaDias: winnerQuotation.tiempoEntregaDias,
-              costoElegido: winnerQuotation.costoTotal,
+              costoElegido,
               proveedorId,
               seleccionadoPorId: userId || null,
               fechaSeleccion: new Date(),
@@ -177,12 +199,17 @@ export async function POST(
           const clasificacion = clasificarOC(ocVinculada)
 
           if (clasificacion === 'editable' && ocVinculada) {
-            const resultado = await actualizarOCBorrador(ocVinculada, precioUnitario, proveedorId, tx)
+            const resultado = await actualizarOCBorrador(
+              ocVinculada, precioUnitario, proveedorId, tx,
+              winnerQuotation.cotizacionProveedor?.tipoCambio,
+            )
             const listaItem = await tx.listaEquipoItem.findUnique({
               where: { id: itemId },
               select: { codigo: true }
             })
-            const msg = resultado.warningProveedor
+            const msg = resultado.precioNoAplicado
+              ? `OC ${resultado.ocNumero} (borrador) está en ${ocVinculada.ocMoneda} y no hay tipo de cambio: su precio quedó sin actualizar.`
+              : resultado.warningProveedor
               ? `OC ${resultado.ocNumero} (borrador) actualizada. Proveedor cambió — considera regenerar la OC.`
               : `OC ${resultado.ocNumero} (borrador) actualizada con nuevo precio.`
             warnings.push({ codigo: listaItem?.codigo || itemId, mensaje: msg })

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Check, AlertTriangle, ChevronDown, Eye } from "lucide-react"
+import Link from "next/link"
 import { CotizacionProveedorItem } from "@/types/modelos"
 import { cn } from "@/lib/utils"
 import { seleccionarCotizacion } from "@/lib/services/cotizacionProveedorItem"
@@ -351,33 +352,74 @@ export function CotizacionCodigoSimple({
           const isSelected = cotizacion.id === cotizacionSeleccionadaId
           const precio = cotizacion.precioUnitario || 0
           const tiempoEntrega = cotizacion.tiempoEntrega || "No especificado"
+          // El proveedor cotiza en su moneda; la lista guarda USD. Mostrar el
+          // número tal cual con un "$" delante es lo que hacía ver un precio de
+          // S/17,107.69 como si fueran 17 mil dólares.
+          const moneda = cotizacion.cotizacionProveedor?.moneda || 'USD'
+          const tipoCambio = cotizacion.cotizacionProveedor?.tipoCambio ?? null
+          const simbolo = moneda === 'PEN' ? 'S/' : moneda === 'EUR' ? '€' : '$'
+          const enUsd = moneda === 'USD' ? null
+            : tipoCambio && tipoCambio > 0
+              ? (moneda === 'EUR' ? precio * tipoCambio : precio / tipoCambio)
+              : null
+          const cotizacionId = cotizacion.cotizacionProveedor?.id
+
+          const insignia = (
+            <span
+              className={cn(
+                "text-[10px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1",
+                cotizacionId ? "cursor-pointer hover:underline" : "cursor-help",
+                isSelected
+                  ? "bg-gray-100 text-gray-800 font-medium"
+                  : "text-gray-400"
+              )}
+            >
+              {isSelected && (
+                <Check className="w-2.5 h-2.5 text-green-600" />
+              )}
+              {codigo}
+            </span>
+          )
 
           return (
             <Tooltip key={cotizacion.id}>
               <TooltipTrigger asChild>
-                <span
-                  className={cn(
-                    "text-[10px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 cursor-help",
-                    isSelected
-                      ? "bg-gray-100 text-gray-800 font-medium"
-                      : "text-gray-400"
-                  )}
-                >
-                  {isSelected && (
-                    <Check className="w-2.5 h-2.5 text-green-600" />
-                  )}
-                  {codigo}
-                </span>
+                {cotizacionId ? (
+                  <Link href={`/logistica/cotizaciones/${cotizacionId}`}>{insignia}</Link>
+                ) : (
+                  insignia
+                )}
               </TooltipTrigger>
               <TooltipContent side="right" className="max-w-xs">
                 <div className="space-y-1">
                   <p className="font-semibold text-sm">{codigo}</p>
+                  {cotizacion.cotizacionProveedor?.proveedor?.nombre && (
+                    <p className="text-xs text-muted-foreground">
+                      {cotizacion.cotizacionProveedor.proveedor.nombre}
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground">
-                    <span className="font-medium">Precio:</span> ${precio.toFixed(2)} USD
+                    <span className="font-medium">Precio:</span>{' '}
+                    {simbolo}{precio.toLocaleString(moneda === 'PEN' ? 'es-PE' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {moneda}
                   </p>
+                  {moneda !== 'USD' && (
+                    enUsd !== null ? (
+                      <p className="text-xs text-muted-foreground">
+                        <span className="font-medium">En la lista:</span> ${enUsd.toFixed(2)} USD
+                        <span className="text-[10px]"> (TC {tipoCambio})</span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-amber-500">
+                        Cotización en {moneda} sin tipo de cambio: no se puede pasar a USD.
+                      </p>
+                    )
+                  )}
                   <p className="text-xs text-muted-foreground">
                     <span className="font-medium">Tiempo de entrega:</span> {tiempoEntrega}
                   </p>
+                  {cotizacionId && (
+                    <p className="text-[10px] text-blue-400 pt-0.5">Clic para abrir la cotización</p>
+                  )}
                 </div>
               </TooltipContent>
             </Tooltip>

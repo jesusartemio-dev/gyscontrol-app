@@ -5,6 +5,37 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { calcularTotalesOC } from '@/lib/utils/ocTotales'
 
+/**
+ * El tipo de cambio con que se convierte el precio de una OC en moneda
+ * extranjera a los USD del pedido.
+ *
+ * La OC no guarda tipo de cambio propio; el único que hay es el de la
+ * cotización del proveedor que se eligió para ese ítem, que es justamente de
+ * donde salió el precio de la OC.
+ */
+async function tipoCambioDeLaCotizacion(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tx: any,
+  pedidoEquipoItemId: string | null,
+  listaEquipoItemId: string | null,
+): Promise<number | null> {
+  let listaItemId = listaEquipoItemId
+  if (!listaItemId && pedidoEquipoItemId) {
+    const pedidoItem = await tx.pedidoEquipoItem.findUnique({
+      where: { id: pedidoEquipoItemId },
+      select: { listaEquipoItemId: true },
+    })
+    listaItemId = pedidoItem?.listaEquipoItemId ?? null
+  }
+  if (!listaItemId) return null
+
+  const listaItem = await tx.listaEquipoItem.findUnique({
+    where: { id: listaItemId },
+    select: { cotizacionSeleccionada: { select: { cotizacionProveedor: { select: { tipoCambio: true } } } } },
+  })
+  return listaItem?.cotizacionSeleccionada?.cotizacionProveedor?.tipoCambio ?? null
+}
+
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
@@ -73,13 +104,36 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         },
       })
 
-      // 2. Actualizar PedidoEquipoItem si está vinculado
+      // 2. Actualizar PedidoEquipoItem si está vinculado.
+      //
+      // La OC se emite en la moneda del proveedor y el pedido lleva todo en USD.
+      // Copiar el precio tal cual metía soles en un campo que se muestra en
+      // dólares (es lo que hacía parecer un andamio de $4,888 como $17,108).
+      // Si la OC no está en USD, se convierte con el tipo de cambio de la
+      // cotización elegida; si no hay con qué convertir, se deja el precio del
+      // pedido como estaba y solo se registra la moneda real.
       if (item.pedidoEquipoItemId) {
+        let precioPedido = precioUnitario
+        let costoPedido = costoTotal
+        let monedaPedido: string | null = 'USD'
+
+        if ((item.ordenCompra.moneda || 'USD') !== 'USD') {
+          const tc = await tipoCambioDeLaCotizacion(tx, item.pedidoEquipoItemId, item.listaEquipoItemId)
+          if (tc && tc > 0) {
+            precioPedido = Math.round((precioUnitario / tc) * 10000) / 10000
+            costoPedido = Math.round((costoTotal / tc) * 10000) / 10000
+          } else {
+            // Sin tipo de cambio: guardar el monto en su moneda y decirlo.
+            monedaPedido = item.ordenCompra.moneda
+          }
+        }
+
         await tx.pedidoEquipoItem.update({
           where: { id: item.pedidoEquipoItemId },
           data: {
-            precioUnitario,
-            costoTotal,
+            precioUnitario: precioPedido,
+            costoTotal: costoPedido,
+            precioUnitarioMoneda: monedaPedido,
             updatedAt: now,
           },
         })

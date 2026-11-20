@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { propagarPrecioLogisticaCatalogo } from '@/lib/services/catalogoPrecioSync'
+import { aUsd, FaltaTipoCambioError } from '@/lib/services/precioCotizacionProveedor'
 import type { CotizacionProveedorItemUpdatePayload } from '@/types'
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -70,13 +71,14 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         },
       })
 
-      // Si el item es seleccionado, propagar precio/costo/tiempo al ListaEquipoItem
+      // Si el item es seleccionado, propagar precio/costo/tiempo al ListaEquipoItem.
+      // La lista va en USD, así que el precio del proveedor se convierte antes.
       if (item.esSeleccionada && item.listaEquipoItemId) {
         await tx.listaEquipoItem.update({
           where: { id: item.listaEquipoItemId },
           data: {
-            precioElegido: item.precioUnitario,
-            costoElegido: item.costoTotal,
+            precioElegido: aUsd(item.precioUnitario, item.cotizacionProveedor),
+            costoElegido: aUsd(item.costoTotal, item.cotizacionProveedor),
             tiempoEntrega: item.tiempoEntrega,
             tiempoEntregaDias: item.tiempoEntregaDias,
             updatedAt: new Date(),
@@ -98,15 +100,24 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       if (listaItem?.catalogoEquipoId) {
         propagarPrecioLogisticaCatalogo({
           catalogoEquipoId: listaItem.catalogoEquipoId,
-          precioLogistica: Math.round(updated.precioUnitario * 100) / 100,
+          precioLogistica: Math.round(aUsd(updated.precioUnitario, updated.cotizacionProveedor) * 100) / 100,
           userId,
-          metadata: { origen: 'cotizacion-proveedor-item-put', cotizacionItemId: id },
+          metadata: {
+            origen: 'cotizacion-proveedor-item-put',
+            cotizacionItemId: id,
+            monedaOriginal: updated.cotizacionProveedor?.moneda ?? 'USD',
+            precioOriginal: updated.precioUnitario,
+            tipoCambioUsado: updated.cotizacionProveedor?.tipoCambio ?? null,
+          },
         }).catch(err => console.error('Error propagating precioLogistica:', err))
       }
     }
 
     return NextResponse.json(updated)
   } catch (error) {
+    if (error instanceof FaltaTipoCambioError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     console.error('❌ Error en PUT:', error)
     return NextResponse.json(
       { error: 'Error al actualizar el ítem: ' + String(error) },

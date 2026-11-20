@@ -322,8 +322,10 @@ export async function PATCH(
 
     // CASO editable (selección): actualizar OC borrador con nuevo precio
     if (clasificacion === 'editable' && ocVinculada) {
-      const resultado = await actualizarOCBorrador(ocVinculada, precioUnitario, proveedorId)
-      warningOC = resultado.warningProveedor
+      const resultado = await actualizarOCBorrador(ocVinculada, precioUnitario, proveedorId, undefined, tipoCambioCot)
+      warningOC = resultado.precioNoAplicado
+        ? `La OC ${resultado.ocNumero} (borrador) está emitida en ${ocVinculada.ocMoneda} y no hay tipo de cambio para convertir: su precio quedó sin actualizar.`
+        : resultado.warningProveedor
         ? `La OC ${resultado.ocNumero} está en borrador y fue actualizada con el nuevo precio. Sin embargo, fue generada para otro proveedor. Considera anularla y generar una nueva OC.`
         : `La OC ${resultado.ocNumero} (borrador) fue actualizada con el nuevo precio.`
     }

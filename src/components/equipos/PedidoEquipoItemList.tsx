@@ -1,7 +1,10 @@
 /**
  * Componente PedidoEquipoItemList - Lista de ítems de pedidos de equipos
  * Mejoras UX/UI: Animaciones con Framer Motion, mejor diseño visual, componentes Shadcn/UI
- * Todas las monedas están en dólares (USD)
+ *
+ * Los precios van en USD salvo que el ítem traiga `precioUnitarioMoneda`: eso
+ * pasa cuando el precio vino de una OC en soles sin tipo de cambio con que
+ * convertirlo. En ese caso se muestra con su símbolo real, no con "$".
  */
 'use client'
 
@@ -42,10 +45,20 @@ export default function PedidoEquipoItemList({ items, onUpdate, onDelete }: Prop
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   // Helper functions
-  const formatCurrency = (amount: number | null | undefined): string => {
+  const formatCurrency = (amount: number | null | undefined, moneda?: string | null): string => {
     if (!amount) return '-'
-    return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+    const simbolo = moneda === 'PEN' ? 'S/' : moneda === 'EUR' ? '€' : '$'
+    return `${simbolo}${amount.toLocaleString(moneda === 'PEN' ? 'es-PE' : 'en-US', { minimumFractionDigits: 2 })}`
   }
+
+  /**
+   * El total de la cabecera solo tiene sentido si todas las líneas están en la
+   * misma moneda. Mezclar soles y dólares en una suma da un número que no es
+   * ninguna de las dos cosas, así que en ese caso se avisa en vez de sumar.
+   */
+  const monedasDistintas = new Set(
+    items.filter(i => i.costoTotal).map(i => (i as { precioUnitarioMoneda?: string | null }).precioUnitarioMoneda || 'USD')
+  )
 
   const formatDate = (date: string | Date | null | undefined): string => {
     if (!date) return '-'
@@ -150,10 +163,22 @@ export default function PedidoEquipoItemList({ items, onUpdate, onDelete }: Prop
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <DollarSign className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-semibold">
-            Total: {formatCurrency(items.reduce((sum, item) => sum + (item.costoTotal || 0), 0))}
-          </span>
+          {monedasDistintas.size > 1 ? (
+            <span className="inline-flex items-center gap-1 text-sm font-medium text-amber-600">
+              <AlertCircle className="h-4 w-4" />
+              Hay ítems en {[...monedasDistintas].join(' y ')}: no se puede sumar un total
+            </span>
+          ) : (
+            <>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-semibold">
+                Total: {formatCurrency(
+                  items.reduce((sum, item) => sum + (item.costoTotal || 0), 0),
+                  [...monedasDistintas][0],
+                )}
+              </span>
+            </>
+          )}
         </div>
       </div>
 
@@ -258,7 +283,7 @@ export default function PedidoEquipoItemList({ items, onUpdate, onDelete }: Prop
                           Precio Unitario
                         </label>
                         <div className="text-sm font-semibold text-green-600">
-                          {formatCurrency(item.precioUnitario)}
+                          {formatCurrency(item.precioUnitario, (item as { precioUnitarioMoneda?: string | null }).precioUnitarioMoneda)}
                         </div>
                       </div>
 
@@ -268,7 +293,7 @@ export default function PedidoEquipoItemList({ items, onUpdate, onDelete }: Prop
                           Costo Total
                         </label>
                         <div className="text-sm font-bold text-green-700">
-                          {formatCurrency(item.costoTotal)}
+                          {formatCurrency(item.costoTotal, (item as { precioUnitarioMoneda?: string | null }).precioUnitarioMoneda)}
                         </div>
                       </div>
                     </div>

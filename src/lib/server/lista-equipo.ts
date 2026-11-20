@@ -65,6 +65,11 @@ export async function getListaEquipoDetail(proyectoId: string, listaId: string) 
                     id: true,
                     codigo: true,
                     estado: true,
+                    // La moneda y el tipo de cambio hacen falta para mostrar el
+                    // precio del proveedor como lo cotizó (soles, por ejemplo)
+                    // y no como si todo estuviera en dólares.
+                    moneda: true,
+                    tipoCambio: true,
                     proveedor: {
                       select: {
                         id: true,
