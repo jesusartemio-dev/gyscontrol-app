@@ -75,9 +75,57 @@ import {
   List,
 } from 'lucide-react'
 import { useVistaCompacta, CONTENEDOR_TABLA_SCROLL, CABECERA_FIJA, CABECERA_FIJA_PAGINA } from '@/hooks/useVistaCompacta'
+import { BarraAvance } from '@/components/shared/BarraAvance'
+import { abreviarNombre } from '@/lib/utils'
 
 /** Nombre a mostrar del pedido: el suyo o, si no tiene, el de la lista de la que salió. */
 const nombrePedido = (p: any): string | null => p?.nombre || p?.lista?.nombre || p?.listaEquipo?.nombre || null
+
+/** Cuántos ítems llegaron completos, de cuántos tiene el pedido. */
+function avanceEntrega(items: any[] = []) {
+  const total = items.length
+  const entregados = items.filter(
+    (i: any) => (i.cantidadPedida || 0) > 0 && (i.cantidadAtendida || 0) >= i.cantidadPedida
+  ).length
+  return { entregados, total }
+}
+
+/**
+ * Lo que logística tiene que decir sobre la entrega, sacado de los ítems.
+ *
+ * La cabecera del pedido tiene `fechaEntregaReal`, pero casi nunca se llena:
+ * de 62 pedidos entregados o parciales, 56 la tenían vacía mientras sus ítems
+ * sí traían la fecha. El dato real vive en el ítem —909 de 1266 lo tienen—,
+ * así que se deriva de ahí y se usa la cabecera solo como respaldo.
+ *
+ * `fechaEntregaEstimada` no entra: está vacía en los 1266 ítems y los 98
+ * pedidos abiertos porque no hay ninguna pantalla donde escribirla.
+ */
+function entregaDeLogistica(pedido: any) {
+  const items = pedido.items || []
+  const { entregados, total } = avanceEntrega(items)
+
+  const fechas = items
+    .map((i: any) => i.fechaEntregaReal)
+    .filter(Boolean)
+    .map((f: string | Date) => new Date(f))
+    .sort((a: Date, b: Date) => b.getTime() - a.getTime())
+  const ultima: Date | null = fechas[0] ?? (pedido.fechaEntregaReal ? new Date(pedido.fechaEntregaReal) : null)
+
+  if (total > 0 && entregados >= total) {
+    return { tono: 'completo' as const, fecha: ultima, parcial: null, diasVencido: 0 }
+  }
+  if (entregados > 0) {
+    return { tono: 'parcial' as const, fecha: ultima, parcial: `${entregados} de ${total}`, diasVencido: 0 }
+  }
+
+  // Nada entregado: lo único que se puede decir es si ya se pasó de la fecha.
+  const necesaria = pedido.fechaNecesaria ? new Date(pedido.fechaNecesaria) : null
+  const diasVencido = necesaria
+    ? Math.floor((Date.now() - necesaria.getTime()) / 86400000)
+    : 0
+  return { tono: diasVencido > 0 ? ('vencido' as const) : ('pendiente' as const), fecha: null, parcial: null, diasVencido }
+}
 import Link from 'next/link'
 import PedidoEquipoModalCrear from '@/components/equipos/PedidoEquipoModalCrear'
 import ModalPedidoUrgente from '@/components/logistica/ModalPedidoUrgente'
@@ -436,8 +484,9 @@ const PedidosTable = memo(function PedidosTable({
               <TableHead className="min-w-[220px]">
                 <span className="text-xs font-medium">Nombre / Proveedor</span>
               </TableHead>
-              <TableHead className="w-[110px] text-xs font-medium">Responsable</TableHead>
+              <TableHead className="w-[100px] text-xs font-medium">Responsable</TableHead>
               <TableHead className="w-[70px] text-right text-xs font-medium">Items</TableHead>
+              <TableHead className="w-[110px] text-right text-xs font-medium">Entregado</TableHead>
               <TableHead className="w-[100px] text-right">
                 <button
                   onClick={() => handleSort('montoTotal')}
@@ -446,26 +495,18 @@ const PedidosTable = memo(function PedidosTable({
                   Monto<SortIcon field="montoTotal" />
                 </button>
               </TableHead>
-              <TableHead className="w-[90px]">
-                <button onClick={() => handleSort('fechaPedido')} className="flex items-center text-xs font-medium">
-                  Pedido<SortIcon field="fechaPedido" />
-                </button>
-              </TableHead>
-              <TableHead className="w-[90px]">
+              {/* Las dos fechas que pone quien pide, juntas: la de pedido es
+                  automática y lo que manda es el "para cuándo". */}
+              <TableHead className="w-[100px]">
                 <button onClick={() => handleSort('fechaNecesaria')} className="flex items-center text-xs font-medium">
-                  Necesaria<SortIcon field="fechaNecesaria" />
+                  Solicitado<SortIcon field="fechaNecesaria" />
                 </button>
               </TableHead>
-              <TableHead className="w-[90px]">
-                <button onClick={() => handleSort('fechaEntregaEstimada')} className="flex items-center text-xs font-medium">
-                  Estimada<SortIcon field="fechaEntregaEstimada" />
-                </button>
-              </TableHead>
-              <TableHead className="w-[90px]">
-                <button onClick={() => handleSort('fechaEntregaReal')} className="flex items-center text-xs font-medium">
-                  Entregado<SortIcon field="fechaEntregaReal" />
-                </button>
-              </TableHead>
+              {/* Lo que responde logística. Antes eran "Estimada" y "Entregado":
+                  la primera está vacía en los 98 pedidos abiertos porque no hay
+                  dónde escribirla, y la segunda leía una cabecera que casi
+                  nunca se llena. Ahora sale de los ítems. */}
+              <TableHead className="w-[130px] text-xs font-medium">Entrega</TableHead>
               <TableHead className="w-[100px] text-xs font-medium">Estado</TableHead>
               <TableHead className="w-[80px]"></TableHead>
             </TableRow>
@@ -473,7 +514,7 @@ const PedidosTable = memo(function PedidosTable({
           <TableBody>
             {sortedPedidos.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={canDrag ? 12 : 11} className="text-center py-8 text-muted-foreground text-sm">
+                <TableCell colSpan={canDrag ? 11 : 10} className="text-center py-8 text-muted-foreground text-sm">
                   {search || filterEstado !== 'all' ? 'No se encontraron pedidos' : 'Sin pedidos registrados'}
                 </TableCell>
               </TableRow>
@@ -519,41 +560,69 @@ const PedidosTable = memo(function PedidosTable({
                       </div>
                     </TableCell>
                     <TableCell className="py-2 text-xs text-muted-foreground">
-                      <span className="truncate block max-w-[100px]" title={pedido.responsable?.name ?? undefined}>
-                        {pedido.responsable?.name || '—'}
+                      <span className="whitespace-nowrap" title={pedido.responsable?.name ?? undefined}>
+                        {pedido.responsable?.name ? abreviarNombre(pedido.responsable.name) : '—'}
                       </span>
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm py-2">
                       {totalItems}
                     </TableCell>
+                    <TableCell className="py-2">
+                      {(() => {
+                        const av = avanceEntrega(pedido.items || [])
+                        return <BarraAvance hechos={av.entregados} total={av.total} concepto="ítems entregados" />
+                      })()}
+                    </TableCell>
                     <TableCell className="text-right font-mono text-sm font-medium py-2">
                       {formatCurrency(montoTotal)}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground py-2">
-                      {formatDate((pedido as any).fechaPedido)}
-                    </TableCell>
                     <TableCell className="text-xs py-2">
                       {(pedido as any).fechaNecesaria ? (
-                        <span className={(() => {
-                          const diff = new Date((pedido as any).fechaNecesaria).getTime() - Date.now()
-                          if (pedido.estado === 'entregado') return 'text-muted-foreground'
-                          if (diff < 0) return 'text-red-600 font-medium'
-                          if (diff < 7 * 86400000) return 'text-amber-600 font-medium'
-                          return 'text-foreground'
-                        })()}>
-                          {formatDate((pedido as any).fechaNecesaria)}
-                        </span>
+                        <div className="leading-tight">
+                          <span className={(() => {
+                            const diff = new Date((pedido as any).fechaNecesaria).getTime() - Date.now()
+                            if (pedido.estado === 'entregado') return 'text-muted-foreground'
+                            if (diff < 0) return 'text-red-600 font-medium'
+                            if (diff < 7 * 86400000) return 'text-amber-600 font-medium'
+                            return 'text-foreground'
+                          })()}>
+                            para {formatDate((pedido as any).fechaNecesaria)}
+                          </span>
+                          <span className="block text-[10px] text-muted-foreground">
+                            pedido {formatDate((pedido as any).fechaPedido)}
+                          </span>
+                        </div>
                       ) : <span className="text-muted-foreground">—</span>}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground py-2">
-                      {formatDate((pedido as any).fechaEntregaEstimada)}
                     </TableCell>
                     <TableCell className="text-xs py-2">
-                      {(pedido as any).fechaEntregaReal ? (
-                        <span className="text-green-600 font-medium">
-                          {formatDate((pedido as any).fechaEntregaReal)}
-                        </span>
-                      ) : <span className="text-muted-foreground">—</span>}
+                      {(() => {
+                        const e = entregaDeLogistica(pedido)
+                        if (e.tono === 'completo') {
+                          return (
+                            <span className="font-medium text-green-600 whitespace-nowrap">
+                              completo{e.fecha ? ` ${formatDate(e.fecha)}` : ''}
+                            </span>
+                          )
+                        }
+                        if (e.tono === 'parcial') {
+                          return (
+                            <div className="leading-tight text-amber-700">
+                              <span className="font-medium whitespace-nowrap">parcial {e.parcial}</span>
+                              {e.fecha && (
+                                <span className="block text-[10px] text-muted-foreground">último {formatDate(e.fecha)}</span>
+                              )}
+                            </div>
+                          )
+                        }
+                        if (e.tono === 'vencido') {
+                          return (
+                            <span className="font-medium text-red-600 whitespace-nowrap">
+                              vencido hace {e.diasVencido} d
+                            </span>
+                          )
+                        }
+                        return <span className="text-muted-foreground">sin entregas</span>
+                      })()}
                     </TableCell>
                     <TableCell className="py-2">
                       {getEstadoBadge(pedido.estado || 'borrador')}

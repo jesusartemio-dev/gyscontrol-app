@@ -31,6 +31,21 @@ export const formatDate = (date: Date | string): string => {
   }).format(utcDate)
 }
 
+/**
+ * El nombre para una celda de tabla: primera palabra e inicial de la segunda.
+ * "BENJAMIN AMESQUITA" → "BENJAMIN A."
+ *
+ * Se toma la segunda palabra y no la última porque acá el apellido que
+ * identifica es el paterno: "JESUS MAMANI QUISPE" es "JESUS M.", no "JESUS Q.".
+ * Un nombre de una sola palabra se deja entero.
+ */
+export const abreviarNombre = (nombre?: string | null): string => {
+  const partes = (nombre ?? '').trim().split(/\s+/).filter(Boolean)
+  if (partes.length === 0) return '—'
+  if (partes.length === 1) return partes[0]
+  return `${partes[0]} ${partes[1][0].toUpperCase()}.`
+}
+
 /** Zona horaria de la operación. Todo lo que lleva hora se muestra en esta. */
 export const ZONA_HORARIA = 'America/Lima'
 

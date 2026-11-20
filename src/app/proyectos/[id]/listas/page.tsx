@@ -67,9 +67,23 @@ function avanceLista(items: any[] = []) {
   const pedidos = items.filter((i) => (i.cantidadPedida || 0) > 0).length;
   return { total, llegaron, pedidos };
 }
+
+/**
+ * Cuántos ítems ya tienen su precio cerrado con un proveedor.
+ *
+ * Es distinto de contar cotizaciones recibidas, que es lo que mostraba la
+ * columna "Cotiz.": QRM15-LST-018 marcaba 56 teniendo 59 ítems, y esos 3 sin
+ * cotizar no se veían por ningún lado. Lo que importa para saber si la lista
+ * está lista es cuántos ítems quedan sin resolver.
+ */
+function itemsCotizados(items: any[] = []) {
+  return items.filter((i) => i.cotizacionSeleccionadaId).length;
+}
 import Link from 'next/link';
 import { toast } from 'sonner';
 import ModalCrearListaEquipo from '@/components/equipos/ModalCrearListaEquipo';
+import { BarraAvance } from '@/components/shared/BarraAvance';
+import { abreviarNombre } from '@/lib/utils';
 import type { Proyecto } from '@/types';
 
 interface PageProps {
@@ -146,6 +160,29 @@ function gruposCotizados(lista: any): string[] {
         return [grupo.id as string, grupo.nombre as string];
       })
   ).values()];
+}
+
+/** Ítems con precio cerrado, de cuántos tiene la lista. */
+function CeldaCotizado({ lista }: { lista: any }) {
+  const items = lista.items || [];
+  return (
+    <TableCell className="py-2">
+      <BarraAvance hechos={itemsCotizados(items)} total={items.length} concepto="ítems cotizados" />
+    </TableCell>
+  );
+}
+
+/** El responsable, abreviado para que no empuje la tabla. */
+function CeldaResponsable({ lista }: { lista: any }) {
+  const persona = lista.responsable || lista.user;
+  const nombre = persona?.name || persona?.email || null;
+  return (
+    <TableCell className="py-2">
+      <span className="text-xs text-muted-foreground whitespace-nowrap" title={nombre ?? undefined}>
+        {nombre ? abreviarNombre(nombre) : '—'}
+      </span>
+    </TableCell>
+  );
 }
 
 /** El código en su propia columna, igual que en la tabla de pedidos. */
@@ -303,9 +340,11 @@ const ListasTable = memo(function ListasTable({
     );
   };
 
+  // timeZone UTC a propósito: fechaNecesaria y createdAt son campos de día
+  // guardados como medianoche UTC; sin esto en Lima se leen un día antes.
   const formatDate = (date: string) => {
     if (!date) return '-';
-    return new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' });
+    return new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', timeZone: 'UTC' });
   };
 
   return (
@@ -458,9 +497,9 @@ const ListasTable = memo(function ListasTable({
                   Items<SortIcon field="totalItems" />
                 </button>
               </TableHead>
-              <TableHead className="w-[70px] text-center text-xs font-medium">Cotiz.</TableHead>
+              <TableHead className="w-[110px] text-right text-xs font-medium">Cotizado</TableHead>
               <TableHead className="w-[100px] text-right text-xs font-medium">Total</TableHead>
-              <TableHead className="w-[120px] text-xs font-medium">Creado por</TableHead>
+              <TableHead className="w-[100px] text-xs font-medium">Responsable</TableHead>
               <TableHead className="w-[90px]">
                 <button
                   onClick={() => handleSort('createdAt')}
@@ -505,30 +544,11 @@ const ListasTable = memo(function ListasTable({
                   <TableCell className="text-right font-mono text-sm py-2">
                     {lista.totalItems || lista.items?.length || 0}
                   </TableCell>
-                  <TableCell className="text-center py-2">
-                    {(lista._count?.cotizacionProveedorItem || lista.cotizacionCount || 0) > 0 ? (
-                      <div className="flex items-center justify-center gap-1">
-                        <ShoppingCart className="h-3.5 w-3.5 text-green-500" />
-                        <span className="text-xs font-medium text-green-700">
-                          {lista._count?.cotizacionProveedorItem || lista.cotizacionCount || 0}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
+                  <CeldaCotizado lista={lista} />
                   <TableCell className="text-right font-mono text-xs text-muted-foreground py-2">
                     ${(lista.montoEstimado || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
                   </TableCell>
-                  <TableCell className="py-2">
-                    {lista.responsable || lista.user ? (
-                      <span className="text-xs text-muted-foreground">
-                        {(lista.responsable || lista.user).name || (lista.responsable || lista.user).email || '—'}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
+                  <CeldaResponsable lista={lista} />
                   <TableCell className="text-xs text-muted-foreground py-2">
                     {formatDate(lista.createdAt)}
                   </TableCell>
@@ -575,30 +595,11 @@ const ListasTable = memo(function ListasTable({
                   <TableCell className="text-right font-mono text-sm py-2">
                     {lista.totalItems || lista.items?.length || 0}
                   </TableCell>
-                  <TableCell className="text-center py-2">
-                    {(lista._count?.cotizacionProveedorItem || lista.cotizacionCount || 0) > 0 ? (
-                      <div className="flex items-center justify-center gap-1">
-                        <ShoppingCart className="h-3.5 w-3.5 text-green-500" />
-                        <span className="text-xs font-medium text-green-700">
-                          {lista._count?.cotizacionProveedorItem || lista.cotizacionCount || 0}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
+                  <CeldaCotizado lista={lista} />
                   <TableCell className="text-right font-mono text-xs text-muted-foreground py-2">
                     ${(lista.montoEstimado || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
                   </TableCell>
-                  <TableCell className="py-2">
-                    {lista.responsable || lista.user ? (
-                      <span className="text-xs text-muted-foreground">
-                        {(lista.responsable || lista.user).name || (lista.responsable || lista.user).email || '—'}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
+                  <CeldaResponsable lista={lista} />
                   <TableCell className="text-xs text-muted-foreground py-2">
                     {formatDate(lista.createdAt)}
                   </TableCell>
