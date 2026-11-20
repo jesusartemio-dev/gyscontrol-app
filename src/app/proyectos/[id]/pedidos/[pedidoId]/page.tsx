@@ -450,6 +450,9 @@ export default function ProjectPedidoDetailPage({ params }: PageProps) {
       nombre: (pedido as any).nombre,
       proyecto: proyecto.nombre,
       estado: ESTADO_LABELS[pedido.estado || ''] ?? pedido.estado ?? '',
+      // Para quien lo recibe en el grupo de obra, la fecha requerida es el dato
+      // que decide si tiene que moverse hoy: va en la cabecera, no en el enlace.
+      extras: pedido.fechaNecesaria ? [`Requerido: ${formatDate(pedido.fechaNecesaria)}`] : [],
       items: localPedidoItems.map((i: any) => ({
         codigo: i.codigo,
         descripcion: i.descripcion,
