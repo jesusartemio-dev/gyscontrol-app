@@ -40,7 +40,18 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
         },
         listaEquipo: {
           include: {
-            listaEquipoItem: true
+            listaEquipoItem: {
+              include: {
+                // Solo el precio: con esto la tarjeta del proyecto calcula el
+                // monto igual que /api/lista-equipo (precio elegido, y si no el
+                // más barato cotizado) en vez de sumar el campo `presupuesto`,
+                // que es el precio genérico de la cotización al cliente. Antes
+                // las dos pantallas mostraban totales distintos del mismo
+                // proyecto. También sirve para saber qué ítems no tienen
+                // ninguna cotización pedida todavía.
+                cotizacionProveedorItems: { select: { precioUnitario: true } },
+              },
+            },
           }
         },
         pedidoEquipo: {

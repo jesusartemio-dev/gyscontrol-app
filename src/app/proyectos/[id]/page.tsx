@@ -254,13 +254,41 @@ export default function ProyectoHubPage() {
   const totalGastosInterno = proyecto.gastos?.reduce((acc, g) => acc + (g.subtotalInterno || 0), 0) || 0
   const totalGastosReal = proyecto.gastos?.reduce((acc, g) => acc + (g.subtotalReal || 0), 0) || 0
   const totalListas = proyecto.listaEquipos?.length || 0
-  const totalListasItems = proyecto.listaEquipos?.reduce((acc, l) => acc + (l.listaEquipoItem?.length || 0), 0) || 0
-  const totalListasPresupuesto = proyecto.listaEquipos?.reduce((acc, l) =>
-    acc + (l.listaEquipoItem?.reduce((s, i) => s + (i.presupuesto || 0), 0) || 0), 0) || 0
-  const listasAprobadas = proyecto.listaEquipos?.filter(l =>
-    l.estado === 'aprobada').length || 0
-  const progresoListas = totalListas > 0
-    ? { porcentaje: (listasAprobadas / totalListas) * 100, estado: 'ok' as const }
+  const itemsDeListas: any[] = proyecto.listaEquipos?.flatMap((l: any) => l.listaEquipoItem || []) || []
+  const totalListasItems = itemsDeListas.length
+
+  /**
+   * El monto de las listas, con el mismo criterio que /api/lista-equipo: el
+   * precio cerrado con el proveedor y, si todavía no hay, el más barato que se
+   * haya cotizado.
+   *
+   * Antes esto sumaba `item.presupuesto` y sin multiplicar por la cantidad, así
+   * que un ítem de 500 m a $4.50 aportaba $4.50. En CJM50 la tarjeta decía
+   * $11,037.66 y la página de listas $13,211.78 por lo mismo.
+   */
+  const totalListasPresupuesto = itemsDeListas.reduce((acc: number, i: any) => {
+    const cotizados: number[] = (i.cotizacionProveedorItems || []).map((c: any) => c.precioUnitario || 0)
+    const minimo = cotizados.length ? Math.min(...cotizados) : 0
+    const unitario = (i.precioElegido ?? 0) > 0 ? i.precioElegido : minimo
+    return acc + unitario * (i.cantidad || 0)
+  }, 0)
+
+  // Ítems con precio ya cerrado con un proveedor: es lo que dice si el proyecto
+  // está en condiciones de comprar, más que cuántas listas se firmaron.
+  const itemsCotizados = itemsDeListas.filter((i: any) => i.cotizacionSeleccionadaId).length
+  // La cola de trabajo de logística: ni siquiera se pidió una cotización.
+  const itemsSinCotizar = itemsDeListas.filter(
+    (i: any) => (i.cotizacionProveedorItems?.length || 0) === 0
+  ).length
+  const listasVencidas = proyecto.listaEquipos?.filter((l: any) => {
+    if (!l.fechaNecesaria || new Date(l.fechaNecesaria).getTime() >= Date.now()) return false
+    return (l.listaEquipoItem || []).some((i: any) => (i.cantidad || 0) > (i.cantidadEntregada || 0))
+  }).length || 0
+  const progresoListas = totalListasItems > 0
+    ? {
+        porcentaje: (itemsCotizados / totalListasItems) * 100,
+        estado: 'ok' as const,
+      }
     : null
 
   // Totales de pedidos. Para pedidos directos (pedido.proyectoId === proyecto.id) se
@@ -270,7 +298,6 @@ export default function ProyectoHubPage() {
   // inflar métricas con pedidos que sólo contribuyen parcialmente.
   const pedidosDirectos = proyecto.pedidos?.filter((p: any) => !p._overrideExterno) || []
   const totalPedidos = pedidosDirectos.length
-  const pedidosEntregados = pedidosDirectos.filter(p => p.estado === 'entregado').length
   const pedidosUrgentes = pedidosDirectos.filter(p => p.esUrgente).length
   const itemPerteneceAEsteProyecto = (item: any, padreProyectoId: string | null | undefined) => {
     if (item.proyectoId === proyecto.id) return true
@@ -291,8 +318,28 @@ export default function ProyectoHubPage() {
       return s + (item.costoTotal ?? 0)
     }, 0)
   }, 0)
-  const progresoPedidosEntrega = totalPedidos > 0
-    ? { porcentaje: (pedidosEntregados / totalPedidos) * 100, estado: 'ok' as const }
+  /**
+   * La entrega se mide por ítem, no por pedido: contando documentos, uno con
+   * 15 de 16 ítems recibidos pesa igual que uno con cero. En CJM50 los 10
+   * pedidos salían como "0 entregados" sin distinguir nada.
+   */
+  const itemsDePedidos: any[] = pedidosDirectos.flatMap((p: any) => p.items || p.pedidoEquipoItem || [])
+  const itemsPedidosEntregados = itemsDePedidos.filter(
+    (i: any) => (i.cantidadPedida || 0) > 0 && (i.cantidadAtendida || 0) >= i.cantidadPedida
+  ).length
+  // Pedidos que pasaron su fecha y todavía tienen algo sin recibir. "Entrega 0%"
+  // se lee como "aún no empieza"; esto dice que lleva semanas atrasado.
+  const pedidosVencidos = pedidosDirectos.filter((p: any) => {
+    if (!p.fechaNecesaria || new Date(p.fechaNecesaria).getTime() >= Date.now()) return false
+    const items = p.items || p.pedidoEquipoItem || []
+    return items.some((i: any) => (i.cantidadAtendida || 0) < (i.cantidadPedida || 0))
+  })
+  const diasMasAtrasado = pedidosVencidos.length
+    ? Math.max(...pedidosVencidos.map((p: any) =>
+        Math.floor((Date.now() - new Date(p.fechaNecesaria).getTime()) / 86400000)))
+    : 0
+  const progresoPedidosEntrega = itemsDePedidos.length > 0
+    ? { porcentaje: (itemsPedidosEntregados / itemsDePedidos.length) * 100, estado: 'ok' as const }
     : null
   const progresoPedidosCosto = calcularProgreso(pedidosCostoReal, pedidosPresupuesto)
 
@@ -437,11 +484,14 @@ export default function ProyectoHubPage() {
       stats: [
         { label: 'Listas', value: totalListas },
         { label: 'Items', value: totalListasItems },
-        { label: 'Aprobadas', value: listasAprobadas },
+        // Solo cuando hay algo que mirar, como ya hace "Urgentes" en pedidos:
+        // un proyecto al día no se llena de avisos.
+        ...(itemsSinCotizar > 0 ? [{ label: 'sin cotizar', value: itemsSinCotizar, tono: 'alerta' as const }] : []),
+        ...(listasVencidas > 0 ? [{ label: 'vencidas', value: listasVencidas, tono: 'critico' as const }] : []),
       ],
       total: totalListasPresupuesto,
       cobertura: progresoListas,
-      coberturaLabel: 'Aprobación',
+      coberturaLabel: `Cotizado ${itemsCotizados}/${totalListasItems}`,
     },
     {
       id: 'cronograma',
@@ -504,11 +554,14 @@ export default function ProyectoHubPage() {
       href: `${baseUrl}/pedidos`,
       stats: [
         { label: 'Pedidos', value: totalPedidos },
-        { label: 'Entregados', value: pedidosEntregados },
+        { label: 'Items', value: itemsDePedidos.length },
         ...(pedidosUrgentes > 0 ? [{ label: 'Urgentes', value: pedidosUrgentes }] : []),
+        ...(pedidosVencidos.length > 0
+          ? [{ label: `vencidos · máx ${diasMasAtrasado} d`, value: pedidosVencidos.length, tono: 'critico' as const }]
+          : []),
       ],
       cobertura: progresoPedidosEntrega,
-      coberturaLabel: 'Entrega',
+      coberturaLabel: `Entregado ${itemsPedidosEntregados}/${itemsDePedidos.length}`,
       progreso: progresoPedidosCosto,
       real: pedidosCostoReal,
       plan: pedidosPresupuesto
@@ -702,12 +755,30 @@ export default function ProyectoHubPage() {
                 {/* Row 2: Stats */}
                 <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-xs">
                   {card.stats && card.stats.length > 0 ? (
-                    card.stats.map((stat, i) => (
-                      <div key={i} className="flex items-center gap-1">
-                        <span className="font-semibold text-gray-900">{stat.value}</span>
-                        <span className="text-muted-foreground">{stat.label}</span>
-                      </div>
-                    ))
+                    card.stats.map((stat, i) => {
+                      // Los conteos normales van en gris; los que piden acción
+                      // —ítems sin cotizar, documentos vencidos— se tiñen para
+                      // que se vean sin tener que leer la tarjeta entera.
+                      const tono = (stat as { tono?: 'alerta' | 'critico' }).tono
+                      return (
+                        <div key={i} className="flex items-center gap-1">
+                          <span className={
+                            tono === 'critico' ? 'font-semibold text-red-600'
+                            : tono === 'alerta' ? 'font-semibold text-amber-600'
+                            : 'font-semibold text-gray-900'
+                          }>
+                            {stat.value}
+                          </span>
+                          <span className={
+                            tono === 'critico' ? 'text-red-600'
+                            : tono === 'alerta' ? 'text-amber-600'
+                            : 'text-muted-foreground'
+                          }>
+                            {stat.label}
+                          </span>
+                        </div>
+                      )
+                    })
                   ) : (
                     <span className="text-muted-foreground">Ver detalles</span>
                   )}
