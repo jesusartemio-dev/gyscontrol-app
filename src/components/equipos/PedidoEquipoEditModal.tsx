@@ -60,19 +60,28 @@ export default function PedidoEquipoEditModal({ pedido, open, onOpenChange, onUp
     }
   }, [pedido])
 
+  /**
+   * Las fechas solo se validan si el usuario las cambió.
+   *
+   * Un pedido viejo ya entregado tiene su fecha necesaria en el pasado, y eso
+   * es el dato correcto: es cuando se necesitaba. Validarla siempre impedía
+   * entrar a corregir el nombre o una observación sin antes mover la fecha, y
+   * moverla haría parecer que logística llegó a tiempo cuando no fue así.
+   */
   const validateForm = () => {
     const newErrors: { fechaNecesaria?: string; fechaEntregaEstimada?: string } = {}
+    const hoy = new Date().toISOString().split('T')[0]
+    const necesariaOriginal = pedido?.fechaNecesaria ? formatDateForInput(pedido.fechaNecesaria) : ''
+    const estimadaOriginal = pedido?.fechaEntregaEstimada ? formatDateForInput(pedido.fechaEntregaEstimada) : ''
+    const cambioNecesaria = fechaNecesaria !== necesariaOriginal
+    const cambioEstimada = fechaEntregaEstimada !== estimadaOriginal
 
-    // Validación opcional para fechaNecesaria (comparar como string YYYY-MM-DD para evitar offset UTC)
-    if (fechaNecesaria) {
-      const hoy = new Date().toISOString().split('T')[0]
-      if (fechaNecesaria < hoy) {
-        newErrors.fechaNecesaria = 'La fecha necesaria no puede ser anterior a hoy'
-      }
+    // Comparadas como string YYYY-MM-DD para no arrastrar el offset UTC.
+    if (fechaNecesaria && cambioNecesaria && fechaNecesaria < hoy) {
+      newErrors.fechaNecesaria = 'La fecha necesaria no puede ser anterior a hoy'
     }
 
-    // Validación opcional para fechaEntregaEstimada
-    if (fechaEntregaEstimada && fechaNecesaria) {
+    if (fechaEntregaEstimada && fechaNecesaria && (cambioNecesaria || cambioEstimada)) {
       if (fechaEntregaEstimada < fechaNecesaria) {
         newErrors.fechaEntregaEstimada = 'La fecha de entrega estimada no puede ser anterior a la fecha necesaria'
       }
@@ -197,8 +206,12 @@ export default function PedidoEquipoEditModal({ pedido, open, onOpenChange, onUp
       if (pedido) {
         setNombre((pedido as any).nombre || '')
         setObservacion(pedido.observacion || '')
-        setFechaNecesaria(pedido.fechaNecesaria || '')
-        setFechaEntregaEstimada(pedido.fechaEntregaEstimada || '')
+        // formatDateForInput y no el valor crudo: el campo espera YYYY-MM-DD.
+        // Al cerrar y reabrir sin que cambie el objeto `pedido`, el useEffect
+        // no vuelve a correr, así que acá quedaba un ISO completo y la fecha
+        // parecía modificada aunque nadie la hubiera tocado.
+        setFechaNecesaria(pedido.fechaNecesaria ? formatDateForInput(pedido.fechaNecesaria) : '')
+        setFechaEntregaEstimada(pedido.fechaEntregaEstimada ? formatDateForInput(pedido.fechaEntregaEstimada) : '')
         setEstado(pedido.estado || 'borrador')
         setErrors({})
       }
