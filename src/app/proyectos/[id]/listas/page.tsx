@@ -200,13 +200,22 @@ function CeldaNombreYGrupos({ lista }: { lista: any }) {
   return (
     <TableCell className="py-2">
       <div>
-        <span className="text-sm font-medium line-clamp-2 block" title={lista.nombre ?? undefined}>
+        <span className="text-xs font-medium line-clamp-2 block" title={lista.nombre ?? undefined}>
           {lista.nombre}
         </span>
         {grupos.length > 0 ? (
           <div className="flex flex-wrap gap-1 mt-0.5">
             {grupos.map((nombre, idx) => (
-              <Badge key={idx} variant="outline" className="text-[10px] px-1.5 py-0 font-normal whitespace-nowrap">
+              // max-w + truncate: los nombres de grupo llegan a 56 caracteres
+              // ("TABLEROS DE COMUNICACIÓN DE FILTROS BANDA DE LIXIVIACIÓN") y
+              // con nowrap le ponían un piso de 330 px a esta columna, que
+              // apretaba todas las demás. El nombre completo va en el title.
+              <Badge
+                key={idx}
+                variant="outline"
+                className="max-w-[180px] truncate text-[10px] px-1.5 py-0 font-normal"
+                title={nombre}
+              >
                 {nombre}
               </Badge>
             ))}
