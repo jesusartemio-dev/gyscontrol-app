@@ -27,14 +27,10 @@ import { toast } from 'sonner'
 import { createHojaDeGastos } from '@/lib/services/hojaDeGastos'
 import {
   getItemsParaRequerimiento,
-  getBeneficiarios,
   type ProyectoParaRequerimiento,
   type ItemParaRequerimiento,
-  type Beneficiario,
 } from '@/lib/services/hojaDeGastos'
 import SelectorAsignacion, { type AsignacionValue } from '@/components/shared/SelectorAsignacion'
-import { useSession } from 'next-auth/react'
-import { tieneRol, ROLES_PAGO_A_OTROS } from '@/lib/auth/roles'
 
 type TipoRequerimiento = 'gastos_viaticos' | 'compra_materiales'
 type AgrupacionModal = 'proyecto' | 'pedido' | 'proveedor'
@@ -494,7 +490,6 @@ function ItemRow({ item, checked, onToggle, indent, showPedido }: ItemRowProps) 
 function NuevoRequerimientoPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { data: session } = useSession()
   const [saving, setSaving] = useState(false)
   const [tipo, setTipo] = useState<TipoRequerimiento>(
     searchParams.get('tipo') === 'compra_materiales' ? 'compra_materiales' : 'gastos_viaticos'
@@ -511,18 +506,8 @@ function NuevoRequerimientoPageInner() {
   const [asignacion, setAsignacion] = useState<AsignacionValue>({ proyectoId: null, centroCostoId: null })
   const [categoriaCosto, setCategoriaCosto] = useState('gastos')
 
-  // A quién se le deposita. Vacío = a mí, que es lo normal.
-  const [beneficiarioId, setBeneficiarioId] = useState('')
-  const [beneficiarios, setBeneficiarios] = useState<Beneficiario[]>([])
-  const puedePagarAOtros = tieneRol(session, ROLES_PAGO_A_OTROS)
-
-  useEffect(() => {
-    if (!puedePagarAOtros) return
-    getBeneficiarios().then(setBeneficiarios).catch(() => {
-      // Sin la lista, el formulario sigue sirviendo para pedir a nombre propio.
-      setBeneficiarios([])
-    })
-  }, [puedePagarAOtros])
+  // El requerimiento es siempre de quien lo crea. A quién se le deposita se
+  // decide línea por línea, en el campo "Pagado por" de cada gasto.
 
   // Campos materiales
   const [justificacion, setJustificacion] = useState('')
@@ -626,7 +611,6 @@ function NuevoRequerimientoPageInner() {
           observaciones: observaciones.trim() || undefined,
           requiereAnticipo,
           montoAnticipo: requiereAnticipo ? parseFloat(montoAnticipo) || 0 : 0,
-          empleadoId: beneficiarioId || undefined,
         })
         toast.success(`Requerimiento ${hoja.numero} creado`)
         router.push(`/gastos/mis-requerimientos/${hoja.id}`)
@@ -739,33 +723,6 @@ function NuevoRequerimientoPageInner() {
                   </Select>
                 </div>
 
-                {/* El depósito sale hacia una persona, así que acá se dice
-                    cuál. Por defecto uno mismo, que es el caso normal. */}
-                {puedePagarAOtros && beneficiarios.length > 0 && (
-                  <div className="space-y-1.5">
-                    <Label>Depositar a</Label>
-                    <Select
-                      value={beneficiarioId || 'yo'}
-                      onValueChange={v => setBeneficiarioId(v === 'yo' ? '' : v)}
-                      disabled={saving}
-                    >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="yo">Yo mismo</SelectItem>
-                        {beneficiarios
-                          .filter(b => b.id !== session?.user?.id)
-                          .map(b => (
-                            <SelectItem key={b.id} value={b.id}>{b.name || b.email}</SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    {beneficiarioId && (
-                      <p className="text-xs text-muted-foreground">
-                        El dinero se depositará a su cuenta. El requerimiento queda a tu nombre como quien lo pidió.
-                      </p>
-                    )}
-                  </div>
-                )}
               </>
             )}
 
