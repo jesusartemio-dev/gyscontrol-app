@@ -1,4 +1,4 @@
-import { tieneRol } from '@/lib/auth/roles'
+import { tieneRol, ROLES_PAGO_A_OTROS } from '@/lib/auth/roles'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
@@ -106,6 +106,31 @@ export async function POST(req: Request) {
     const tipoProposito: string = payload.tipoProposito || 'gastos_viaticos'
     const esCompra = tipoProposito === 'compra_materiales'
 
+    /**
+     * A quién se le deposita. Por defecto, quien crea el requerimiento.
+     *
+     * Pedir que el dinero salga hacia otra persona necesita el mismo permiso
+     * que liquidar terceros, y queda registrado en `creadoPorId`: sin eso la
+     * hoja aparecía a nombre del beneficiario sin rastro de quién la pidió, y
+     * encima desaparecía de "mis requerimientos" de quien la creó, porque ese
+     * listado filtra por empleadoId o creadoPorId.
+     */
+    const empleadoId: string = payload.empleadoId || session.user.id
+    const esParaOtro = empleadoId !== session.user.id
+    if (esParaOtro) {
+      if (!tieneRol(session, ROLES_PAGO_A_OTROS)) {
+        return NextResponse.json(
+          { error: 'Sin permiso para crear un requerimiento a nombre de otra persona' },
+          { status: 403 },
+        )
+      }
+      const destinatario = await prisma.user.findUnique({ where: { id: empleadoId }, select: { id: true } })
+      if (!destinatario) {
+        return NextResponse.json({ error: 'El beneficiario indicado no existe' }, { status: 400 })
+      }
+    }
+    const creadoPorId = esParaOtro ? session.user.id : null
+
     // ─── Requerimiento de materiales ───────────────────────────────────────
     if (esCompra) {
       // Solo logística puede crear requerimientos de materiales
@@ -184,7 +209,8 @@ export async function POST(req: Request) {
             centroCostoId: ccLogistica.id,
             categoriaCosto: 'equipos',
             tipoPropósito: 'compra_materiales',
-            empleadoId: payload.empleadoId || session.user.id,
+            empleadoId,
+            creadoPorId,
             motivo: payload.motivo.trim(),
             justificacionMateriales: payload.justificacionMateriales?.trim() || null,
             observaciones: payload.observaciones || null,
@@ -275,7 +301,8 @@ export async function POST(req: Request) {
           proyectoId: payload.proyectoId || null,
           centroCostoId: payload.centroCostoId || null,
           categoriaCosto: payload.categoriaCosto || 'gastos',
-          empleadoId: payload.empleadoId || session.user.id,
+          empleadoId,
+          creadoPorId,
           motivo: payload.motivo.trim(),
           observaciones: payload.observaciones || null,
           requiereAnticipo: payload.requiereAnticipo || false,
@@ -289,7 +316,9 @@ export async function POST(req: Request) {
         data: {
           hojaDeGastosId: hoja.id,
           tipo: 'creado',
-          descripcion: `Requerimiento ${numero} creado`,
+          descripcion: esParaOtro
+            ? `Requerimiento ${numero} creado a nombre de ${hoja.empleado?.name ?? 'otra persona'}`
+            : `Requerimiento ${numero} creado`,
           estadoNuevo: 'borrador',
           usuarioId: session.user.id,
         },

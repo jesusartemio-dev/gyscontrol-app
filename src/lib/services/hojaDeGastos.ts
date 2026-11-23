@@ -253,3 +253,20 @@ export async function crearPagoTerceros(
   if (!res.ok) throw new Error(data.error || 'Error al crear la liquidación de terceros')
   return data
 }
+
+/** Una persona a la que se le puede pedir un depósito. */
+export interface Beneficiario {
+  id: string
+  name: string | null
+  email: string
+}
+
+/**
+ * Las personas elegibles como beneficiario de un requerimiento. Solo responde
+ * a quien tiene permiso para crear hojas a nombre de otro.
+ */
+export async function getBeneficiarios(): Promise<Beneficiario[]> {
+  const res = await fetch(`${BASE_URL}/beneficiarios`)
+  if (!res.ok) throw new Error('Error al listar beneficiarios')
+  return res.json()
+}

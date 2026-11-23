@@ -72,3 +72,13 @@ export function combinarRoles(role: string | null | undefined, rolesExtra: reado
   )
   return Array.from(new Set(lista))
 }
+
+/**
+ * Quién puede crear un requerimiento de gastos a nombre de otra persona.
+ *
+ * Son los que supervisan cuadrillas y ya podían liquidar terceros: el mismo
+ * criterio, porque es la misma decisión —ordenar que el dinero salga hacia
+ * alguien que no es uno mismo—. Estaba repetida en la ruta de pago a terceros
+ * y en la página que la llama; vive acá para que no se separen.
+ */
+export const ROLES_PAGO_A_OTROS = ['admin', 'gerente', 'gestor', 'coordinador', 'proyectos'] as const
