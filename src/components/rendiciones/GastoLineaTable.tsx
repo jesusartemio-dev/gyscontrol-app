@@ -33,6 +33,7 @@ import {
 import { toast } from 'sonner'
 import { Plus, Loader2, Trash2, Edit, Receipt, ScanLine, ShieldCheck, FileSpreadsheet, Download, ArrowRightLeft, Search, AlertTriangle, CheckCircle2, Circle, AlertCircle } from 'lucide-react'
 import { createGastoLinea, updateGastoLinea, deleteGastoLinea } from '@/lib/services/gastoLinea'
+import { getBeneficiarios, type Beneficiario } from '@/lib/services/hojaDeGastos'
 import GastoAdjuntoUpload from './GastoAdjuntoUpload'
 import CargaMasivaComprobantes from './CargaMasivaComprobantes'
 import GastoLineaPreviewDrawer from './GastoLineaPreviewDrawer'
@@ -46,6 +47,13 @@ const TIPOS_COMPROBANTE = [
   { value: 'recibo', label: 'Recibo' },
   { value: 'ticket', label: 'Ticket' },
   { value: 'sin_comprobante', label: 'Sin comprobante' },
+]
+
+/** Quién pone el dinero de una línea. Ver GastoLinea.pagadoPor. */
+const PAGADO_POR = [
+  { value: 'yo', label: 'Yo (con mi anticipo)' },
+  { value: 'administracion', label: 'Administración (pago directo)' },
+  { value: 'personal', label: 'Se deposita a otra persona' },
 ]
 
 const CATEGORIAS_COSTO = [
@@ -106,6 +114,11 @@ export default function GastoLineaTable({
   const [sunatVerificado, setSunatVerificado] = useState(false)
   const rucTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Quién puso el dinero de esta línea. "yo" es el caso normal.
+  const [pagadoPor, setPagadoPor] = useState('yo')
+  const [pagadoAPersonalId, setPagadoAPersonalId] = useState('')
+  const [personas, setPersonas] = useState<Beneficiario[]>([])
+
   // Override fields
   const [showOverride, setShowOverride] = useState(false)
   const [overrideType, setOverrideType] = useState<'proyecto' | 'centroCosto' | ''>('')
@@ -124,6 +137,13 @@ export default function GastoLineaTable({
       loadOverrideLists()
     }
   }, [showOverride])
+
+  // La lista solo hace falta al marcar una línea como depósito a otra persona,
+  // y solo responde a quien tiene ese permiso.
+  useEffect(() => {
+    if (pagadoPor !== 'personal' || personas.length > 0) return
+    getBeneficiarios().then(setPersonas).catch(() => setPersonas([]))
+  }, [pagadoPor, personas.length])
 
   const loadOverrideLists = async () => {
     try {
@@ -166,6 +186,8 @@ export default function GastoLineaTable({
     setOverrideProyectoId('')
     setOverrideCentroCostoId('')
     setOverrideCategoriaCosto('')
+    setPagadoPor('yo')
+    setPagadoAPersonalId('')
     setEditLinea(null)
   }
 
@@ -227,6 +249,8 @@ export default function GastoLineaTable({
     setNumeroComprobante(linea.numeroComprobante || '')
     setProveedorNombre(linea.proveedorNombre || '')
     setProveedorRuc(linea.proveedorRuc || '')
+    setPagadoPor(linea.pagadoPor || 'yo')
+    setPagadoAPersonalId(linea.pagadoAPersonalId || '')
 
     // Load override state
     if (linea.proyectoId || linea.centroCostoId || linea.categoriaCosto) {
@@ -278,6 +302,8 @@ export default function GastoLineaTable({
           proveedorNombre: proveedorNombre || null,
           proveedorRuc: proveedorRuc || null,
           sunatVerificado: sunatVerificado || null,
+          pagadoPor,
+          pagadoAPersonalId: pagadoPor === 'personal' ? (pagadoAPersonalId || null) : null,
           ...overrideData,
         })
         toast.success('Linea actualizada')
@@ -293,6 +319,8 @@ export default function GastoLineaTable({
           proveedorNombre: proveedorNombre || undefined,
           proveedorRuc: proveedorRuc || undefined,
           sunatVerificado: sunatVerificado || undefined,
+          pagadoPor,
+          pagadoAPersonalId: pagadoPor === 'personal' ? (pagadoAPersonalId || null) : null,
           ...overrideData,
         })
         toast.success('Linea agregada')
@@ -608,6 +636,44 @@ export default function GastoLineaTable({
                 </Select>
               </div>
             </div>
+
+            {/* Quién pone el dinero de esta línea. Lo que no paga el dueño del
+                requerimiento no cuenta contra su saldo, así que puede pedir un
+                anticipo menor al total y rendirlo igual. */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-sm">Pagado por</Label>
+                <Select value={pagadoPor} onValueChange={setPagadoPor} disabled={loading}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PAGADO_POR.map(p => (
+                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {pagadoPor === 'personal' && (
+                <div className="space-y-1.5">
+                  <Label className="text-sm">¿A quién se le deposita?</Label>
+                  <Select value={pagadoAPersonalId} onValueChange={setPagadoAPersonalId} disabled={loading}>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder="Seleccionar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {personas.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.name || p.email}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+            {pagadoPor !== 'yo' && (
+              <p className="text-xs text-muted-foreground -mt-1">
+                Este monto no sale de tu anticipo, pero igual lo rindes acá. El comprobante lo puede
+                subir quien haya pagado.
+              </p>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">

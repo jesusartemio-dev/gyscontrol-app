@@ -64,6 +64,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (payload.proyectoId !== undefined) updateData.proyectoId = payload.proyectoId
     if (payload.centroCostoId !== undefined) updateData.centroCostoId = payload.centroCostoId
     if (payload.categoriaCosto !== undefined) updateData.categoriaCosto = payload.categoriaCosto
+    if (payload.pagadoPor !== undefined) {
+      updateData.pagadoPor = payload.pagadoPor || 'yo'
+      // La persona solo tiene sentido cuando el pago va hacia ella.
+      updateData.pagadoAPersonalId = payload.pagadoPor === 'personal'
+        ? (payload.pagadoAPersonalId || null)
+        : null
+    }
 
     const data = await prisma.gastoLinea.update({
       where: { id },
@@ -76,10 +83,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       },
     })
 
-    // Recalcular montoGastado si cambió el monto
-    if (payload.monto !== undefined) {
+    // Recalcular montoGastado si cambió el monto o quién lo pagó: pasar una
+    // línea a "la paga administración" la saca de la cuenta del dueño aunque
+    // el importe no se haya tocado.
+    if (payload.monto !== undefined || payload.pagadoPor !== undefined) {
       const totalResult = await prisma.gastoLinea.aggregate({
-        where: { hojaDeGastosId: existing.hojaDeGastosId },
+        where: { hojaDeGastosId: existing.hojaDeGastosId, pagadoPor: 'yo' },
         _sum: { monto: true },
       })
       const montoGastado = totalResult._sum.monto || 0
@@ -123,7 +132,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
     // Recalcular montoGastado
     const totalResult = await prisma.gastoLinea.aggregate({
-      where: { hojaDeGastosId: existing.hojaDeGastosId },
+      where: { hojaDeGastosId: existing.hojaDeGastosId, pagadoPor: 'yo' },
       _sum: { monto: true },
     })
     const montoGastado = totalResult._sum.monto || 0

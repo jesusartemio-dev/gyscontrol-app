@@ -15,6 +15,9 @@ interface BatchLineaPayload {
   proveedorRuc?: string | null
   observaciones?: string | null
   sunatVerificado?: boolean | null
+  /** "yo" | "administracion" | "personal" — ver GastoLinea.pagadoPor. */
+  pagadoPor?: string | null
+  pagadoAPersonalId?: string | null
 }
 
 interface BatchRequest {
@@ -84,6 +87,8 @@ export async function POST(req: Request) {
             proveedorRuc: l.proveedorRuc || null,
             observaciones: l.observaciones || null,
             sunatVerificado: l.sunatVerificado ?? null,
+            pagadoPor: l.pagadoPor || 'yo',
+            pagadoAPersonalId: l.pagadoPor === 'personal' ? (l.pagadoAPersonalId || null) : null,
             updatedAt: new Date(),
           },
           include: { adjuntos: true, categoriaGasto: true },
@@ -93,7 +98,7 @@ export async function POST(req: Request) {
 
       // Recalcular montoGastado de la hoja
       const totalResult = await tx.gastoLinea.aggregate({
-        where: { hojaDeGastosId: payload.hojaDeGastosId },
+        where: { hojaDeGastosId: payload.hojaDeGastosId, pagadoPor: 'yo' },
         _sum: { monto: true },
       })
       const montoGastado = totalResult._sum.monto || 0

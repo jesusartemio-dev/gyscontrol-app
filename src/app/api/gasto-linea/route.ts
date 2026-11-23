@@ -72,6 +72,8 @@ export async function POST(req: Request) {
         proyectoId: payload.proyectoId || null,
         centroCostoId: payload.centroCostoId || null,
         categoriaCosto: payload.categoriaCosto || null,
+        pagadoPor: payload.pagadoPor || 'yo',
+        pagadoAPersonalId: payload.pagadoPor === 'personal' ? (payload.pagadoAPersonalId || null) : null,
         updatedAt: new Date(),
       },
       include: {
@@ -82,9 +84,15 @@ export async function POST(req: Request) {
       },
     })
 
-    // Recalcular montoGastado de la hoja
+    // Recalcular montoGastado de la hoja.
+    //
+    // Solo las líneas que pagó el dueño del requerimiento: lo que pagó
+    // administración directo, o lo que se le depositó a otra persona, nunca
+    // pasó por su cuenta. Sin este filtro, pedir 200 y que administración
+    // pague 100 dejaba el saldo en -100 y el cierre exigía un reembolso que
+    // nadie debía.
     const totalResult = await prisma.gastoLinea.aggregate({
-      where: { hojaDeGastosId: payload.hojaDeGastosId },
+      where: { hojaDeGastosId: payload.hojaDeGastosId, pagadoPor: 'yo' },
       _sum: { monto: true },
     })
     const montoGastado = totalResult._sum.monto || 0

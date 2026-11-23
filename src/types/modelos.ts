@@ -2930,12 +2930,16 @@ export interface GastoLinea {
   categoriaCosto?: 'equipos' | 'servicios' | 'gastos' | null
   gastoComprobanteId?: string | null
   requerimientoMaterialItemId?: string | null
+  /** Quién puso el dinero: 'yo' | 'administracion' | 'personal'. Solo 'yo' cuenta contra el saldo. */
+  pagadoPor?: string | null
+  pagadoAPersonalId?: string | null
   createdAt: string
   updatedAt: string
   // Relations
   categoriaGasto?: CategoriaGasto | null
   proyecto?: { id: string; nombre: string; codigo: string } | null
   centroCosto?: { id: string; nombre: string } | null
+  pagadoAPersonal?: { id: string; name: string | null } | null
   adjuntos?: GastoAdjunto[]
 }
 

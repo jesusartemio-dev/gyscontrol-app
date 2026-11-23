@@ -1470,6 +1470,9 @@ export interface GastoLineaPayload {
   proyectoId?: string | null
   centroCostoId?: string | null
   categoriaCosto?: 'equipos' | 'servicios' | 'gastos' | null
+  /** Quién puso el dinero: 'yo' | 'administracion' | 'personal'. */
+  pagadoPor?: string | null
+  pagadoAPersonalId?: string | null
 }
 
 export interface GastoLineaUpdatePayload {
@@ -1488,6 +1491,9 @@ export interface GastoLineaUpdatePayload {
   proyectoId?: string | null
   centroCostoId?: string | null
   categoriaCosto?: 'equipos' | 'servicios' | 'gastos' | null
+  /** Quién puso el dinero: 'yo' | 'administracion' | 'personal'. */
+  pagadoPor?: string | null
+  pagadoAPersonalId?: string | null
 }
 
 // ======================

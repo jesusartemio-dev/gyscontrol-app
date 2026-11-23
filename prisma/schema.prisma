@@ -2118,6 +2118,7 @@ model User {
   hojasEventos                             HojaDeGastosEvento[]                 @relation("HojaEventoUsuario")
   depositosCreados                         DepositoHoja[]                       @relation("DepositoCreadoPor")
   itemsRequerimientoCerradosSinComprobante RequerimientoMaterialItem[]          @relation("ItemCerradoSinComprobante")
+  gastoLineasPagadasAEstaPersona           GastoLinea[]                         @relation("GastoLineaPagadoAPersonal")
   // Órdenes de compra
   ordenesCompraSolicitante                 OrdenCompra[]                        @relation("OCsolicitante")
   ordenesCompraAprobador                   OrdenCompra[]                        @relation("OCaprobador")
@@ -4563,9 +4564,19 @@ model GastoLinea {
   gastoComprobanteId          String?
   // Cierre sin comprobante: línea auto-generada cuando se cierra un ítem de material sin documento
   requerimientoMaterialItemId String?
+  /// Quién puso el dinero de esta línea: "yo" (el dueño del requerimiento, que
+  /// es el caso normal), "administracion" cuando lo paga directo administración
+  /// —un hospedaje facturado a la empresa, por ejemplo— o "personal" cuando el
+  /// depósito va a otra persona, que se indica en pagadoAPersonalId.
+  ///
+  /// Solo lo marcado como "yo" cuenta contra el saldo del requerimiento: lo
+  /// demás es dinero que nunca pasó por su cuenta, aunque él igual lo rinda.
+  pagadoPor                   String          @default("yo")
+  pagadoAPersonalId           String?
   createdAt                   DateTime        @default(now())
   updatedAt                   DateTime
 
+  pagadoAPersonal           User?                      @relation("GastoLineaPagadoAPersonal", fields: [pagadoAPersonalId], references: [id])
   hojaDeGastos              HojaDeGastos               @relation(fields: [hojaDeGastosId], references: [id], onDelete: Cascade)
   categoriaGasto            CategoriaGasto?            @relation(fields: [categoriaGastoId], references: [id])
   proyecto                  Proyecto?                  @relation("GastoLineaProyecto", fields: [proyectoId], references: [id])
