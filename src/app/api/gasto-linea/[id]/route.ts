@@ -13,6 +13,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         categoriaGasto: true,
         proyecto: { select: { id: true, nombre: true, codigo: true } },
         centroCosto: { select: { id: true, nombre: true } },
+      pagadoAPersonal: { select: { id: true, name: true } },
       },
     })
     if (!data) {
@@ -80,6 +81,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         categoriaGasto: true,
         proyecto: { select: { id: true, nombre: true, codigo: true } },
         centroCosto: { select: { id: true, nombre: true } },
+      pagadoAPersonal: { select: { id: true, name: true } },
       },
     })
 

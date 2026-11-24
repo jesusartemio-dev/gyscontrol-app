@@ -15,6 +15,7 @@ const includeRelations = {
       adjuntos: true,
       categoriaGasto: true,
       centroCosto: { select: { id: true, nombre: true } },
+      pagadoAPersonal: { select: { id: true, name: true } },
     },
     orderBy: { fecha: 'asc' as const },
   },

@@ -356,12 +356,29 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
     const asignacion = getAsignadoA(hoja, lineas)
     const url = `${window.location.origin}/gastos/mis-requerimientos/${hoja.id}`
 
+    // Quién paga cada línea: es lo que administración necesita para saber qué
+    // le toca desembolsar a ella y qué se le deposita al dueño.
+    const quienPaga = (l: GastoLinea) =>
+      l.pagadoPor === 'administracion' ? '  [paga administración]'
+      : l.pagadoPor === 'personal' ? `  [depositar a ${l.pagadoAPersonal?.name || 'otra persona'}]`
+      : ''
+
     const MAX_LINEAS = 6
     const detalle = lineas
       .slice(0, MAX_LINEAS)
-      .map((l) => `• ${formatDate(l.fecha)} — ${l.descripcion} — ${fmtMoney(l.monto)}`)
+      .map((l) => `• ${formatDate(l.fecha)} — ${l.descripcion} — ${fmtMoney(l.monto)}${quienPaga(l)}`)
       .join('\n')
     const masLineas = lineas.length > MAX_LINEAS ? `\n… y ${lineas.length - MAX_LINEAS} línea(s) más` : ''
+
+    // El total es la suma de TODAS las líneas; `montoGastado` solo cuenta las
+    // que paga el dueño, así que usarlo acá dejaría fuera lo de administración.
+    const suma = (fn: (l: GastoLinea) => boolean) =>
+      lineas.filter(fn).reduce((s, l) => s + (l.monto || 0), 0)
+    const total = suma(() => true)
+    const propio = suma(l => (l.pagadoPor ?? 'yo') === 'yo')
+    const admin = suma(l => l.pagadoPor === 'administracion')
+    const aTerceros = suma(l => l.pagadoPor === 'personal')
+    const hayRepartos = admin > 0 || aTerceros > 0
 
     const partes = [
       `*${hoja.numero}* — ${hoja.motivo}`,
@@ -369,7 +386,12 @@ export default function RequerimientoDetailPage({ params }: { params: Promise<{ 
       `Empleado: ${hoja.empleado?.name || '-'}`,
       hoja.creadoPor && hoja.creadoPor.id !== hoja.empleadoId ? `Generado por: ${hoja.creadoPor.name || '-'}` : null,
       `Asignado a: ${asignacion}`,
-      `Monto: ${fmtMoney(hoja.montoGastado || 0)}`,
+      `Monto: ${fmtMoney(total)}`,
+      hayRepartos && propio > 0
+        ? `  · a depositar a ${hoja.empleado?.name?.split(' ')[0] || 'el solicitante'}: ${fmtMoney(propio)}`
+        : null,
+      admin > 0 ? `  · paga administración: ${fmtMoney(admin)}` : null,
+      aTerceros > 0 ? `  · a depositar a terceros: ${fmtMoney(aTerceros)}` : null,
       lineas.length > 0 ? `\nDetalle:\n${detalle}${masLineas}` : null,
       `\nVer y aprobar: ${url}`,
     ].filter(Boolean)

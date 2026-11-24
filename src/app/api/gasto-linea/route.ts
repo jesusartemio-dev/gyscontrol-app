@@ -24,6 +24,7 @@ export async function GET(req: Request) {
         categoriaGasto: true,
         proyecto: { select: { id: true, nombre: true, codigo: true } },
         centroCosto: { select: { id: true, nombre: true } },
+      pagadoAPersonal: { select: { id: true, name: true } },
       },
       orderBy: { fecha: 'asc' },
     })
@@ -81,6 +82,7 @@ export async function POST(req: Request) {
         categoriaGasto: true,
         proyecto: { select: { id: true, nombre: true, codigo: true } },
         centroCosto: { select: { id: true, nombre: true } },
+      pagadoAPersonal: { select: { id: true, name: true } },
       },
     })
 

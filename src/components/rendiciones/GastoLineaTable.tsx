@@ -34,6 +34,7 @@ import { toast } from 'sonner'
 import { Plus, Loader2, Trash2, Edit, Receipt, ScanLine, ShieldCheck, FileSpreadsheet, Download, ArrowRightLeft, Search, AlertTriangle, CheckCircle2, Circle, AlertCircle } from 'lucide-react'
 import { createGastoLinea, updateGastoLinea, deleteGastoLinea } from '@/lib/services/gastoLinea'
 import { getBeneficiarios, type Beneficiario } from '@/lib/services/hojaDeGastos'
+import { abreviarNombre } from '@/lib/utils'
 import GastoAdjuntoUpload from './GastoAdjuntoUpload'
 import CargaMasivaComprobantes from './CargaMasivaComprobantes'
 import GastoLineaPreviewDrawer from './GastoLineaPreviewDrawer'
@@ -461,6 +462,18 @@ export default function GastoLineaTable({
                           {linea.categoriaCosto && ` (${linea.categoriaCosto})`}
                         </Badge>
                       </span>
+                    )}
+                    {/* Solo cuando no lo pagó el dueño: lo normal no necesita
+                        decirse, y marcar todas las líneas sería ruido. */}
+                    {linea.pagadoPor === 'administracion' && (
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 mt-0.5 bg-violet-50 text-violet-700 border-violet-200">
+                        Paga administración
+                      </Badge>
+                    )}
+                    {linea.pagadoPor === 'personal' && (
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 mt-0.5 bg-teal-50 text-teal-700 border-teal-200">
+                        Depositar a {abreviarNombre(linea.pagadoAPersonal?.name) }
+                      </Badge>
                     )}
                   </td>
                   <td className="p-2 text-xs text-muted-foreground">
